@@ -3,10 +3,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageMetadata } from "@/lib/seo/metadata";
-import { request } from "@/lib/graphql/client";
-import { GET_TAG_BY_SLUG, GET_ALL_TAG_SLUGS } from "@/lib/graphql/queries";
-import { TagBySlugResponse } from "@/lib/graphql/types";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
+import { SAMPLE_POSTS } from "@/lib/sample-posts";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
@@ -15,16 +13,21 @@ interface PageProps {
 }
 
 async function getTag(slug: string) {
-  try {
-    const data = await request<TagBySlugResponse>(GET_TAG_BY_SLUG, {
-      slug,
-      first: 12,
-    });
-    return data.tag;
-  } catch (error) {
-    console.error("Error fetching tag:", error);
-    return null;
-  }
+  // Filter posts by tag slug
+  const posts = SAMPLE_POSTS.filter((post) =>
+    post.tags.nodes.some((tag) => tag.slug === slug)
+  );
+
+  if (posts.length === 0) return null;
+
+  // Get tag name from the first post that has this tag
+  const tagName = posts[0].tags.nodes.find((tag) => tag.slug === slug)?.name || slug;
+
+  return {
+    slug,
+    name: tagName,
+    posts: { nodes: posts },
+  };
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -43,17 +46,17 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export async function generateStaticParams() {
-  try {
-    const data = await request<{ tags: { nodes: { slug: string }[] } }>(
-      GET_ALL_TAG_SLUGS
-    );
-    return data.tags.nodes.slice(0, 50).map((tag) => ({
-      slug: tag.slug,
-    }));
-  } catch (error) {
-    console.error("Error generating static params:", error);
-    return [];
-  }
+  // Get all unique tags from sample posts
+  const allTags = new Set<string>();
+  SAMPLE_POSTS.forEach((post) => {
+    post.tags.nodes.forEach((tag) => {
+      allTags.add(tag.slug);
+    });
+  });
+
+  return Array.from(allTags).map((slug) => ({
+    slug,
+  }));
 }
 
 export default async function TagPage({ params }: PageProps) {

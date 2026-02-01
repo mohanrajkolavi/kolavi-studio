@@ -22,26 +22,14 @@ interface PageProps {
 }
 
 async function getPost(slug: string) {
-  try {
-    const data = await request<PostBySlugResponse>(GET_POST_BY_SLUG, { slug });
-    if (data.post) return data.post;
-  } catch (error) {
-    console.error("Error fetching post:", error);
-  }
+  // Use sample posts directly for now
+  // TODO: Re-enable WordPress integration when backend is configured
   return getSamplePostBySlug(slug);
 }
 
 async function getRelatedPosts(currentSlug: string, limit = 3): Promise<WPPost[]> {
-  try {
-    const data = await request<PostsResponse>(GET_POSTS, { first: 12 });
-    if (data.posts.nodes.length > 0) {
-      return data.posts.nodes
-        .filter((p) => p.slug !== currentSlug)
-        .slice(0, limit);
-    }
-  } catch (error) {
-    console.error("Error fetching related posts:", error);
-  }
+  // Use sample posts directly for now
+  // TODO: Re-enable WordPress integration when backend is configured
   return SAMPLE_POSTS.filter((p) => p.slug !== currentSlug).slice(0, limit);
 }
 
@@ -62,18 +50,8 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export async function generateStaticParams() {
-  try {
-    const data = await request<{ posts: { nodes: { slug: string }[] } }>(
-      GET_ALL_POST_SLUGS
-    );
-    if (data.posts.nodes.length > 0) {
-      return data.posts.nodes.slice(0, 50).map((post) => ({
-        slug: post.slug,
-      }));
-    }
-  } catch (error) {
-    console.error("Error generating static params:", error);
-  }
+  // Use sample posts directly for now
+  // TODO: Re-enable WordPress integration when backend is configured
   return SAMPLE_POSTS.map((p) => ({ slug: p.slug }));
 }
 

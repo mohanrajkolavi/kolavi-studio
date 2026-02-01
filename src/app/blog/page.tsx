@@ -16,16 +16,8 @@ export const metadata = getPageMetadata({
 });
 
 async function getPosts() {
-  try {
-    const data = await request<PostsResponse>(GET_POSTS, {
-      first: 12,
-    });
-    if (data.posts.nodes.length > 0) {
-      return data.posts.nodes;
-    }
-  } catch (error) {
-    console.error("Error fetching posts:", error);
-  }
+  // Use sample posts directly for now
+  // TODO: Re-enable WordPress integration when backend is configured
   return SAMPLE_POSTS;
 }
 

@@ -3,10 +3,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageMetadata } from "@/lib/seo/metadata";
-import { request } from "@/lib/graphql/client";
-import { GET_CATEGORY_BY_SLUG, GET_ALL_CATEGORY_SLUGS } from "@/lib/graphql/queries";
-import { CategoryBySlugResponse } from "@/lib/graphql/types";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
+import { SAMPLE_POSTS } from "@/lib/sample-posts";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
@@ -14,17 +12,41 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
+// Define available categories with descriptions
+const CATEGORIES = {
+  seo: {
+    name: "SEO",
+    description: "Learn search engine optimization strategies to improve your website's visibility and attract more organic traffic.",
+  },
+  guides: {
+    name: "Guides",
+    description: "Comprehensive guides and tutorials to help you master digital marketing and grow your business.",
+  },
+  marketing: {
+    name: "Marketing",
+    description: "Discover effective marketing strategies and tactics to reach your target audience and drive results.",
+  },
+  "medical-spa-marketing": {
+    name: "Medical Spa Marketing",
+    description: "Specialized marketing strategies for medical spas to attract more clients and grow your practice.",
+  },
+};
+
 async function getCategory(slug: string) {
-  try {
-    const data = await request<CategoryBySlugResponse>(GET_CATEGORY_BY_SLUG, {
-      slug,
-      first: 12,
-    });
-    return data.category;
-  } catch (error) {
-    console.error("Error fetching category:", error);
-    return null;
-  }
+  const categoryInfo = CATEGORIES[slug as keyof typeof CATEGORIES];
+  if (!categoryInfo) return null;
+
+  // Filter posts by category slug
+  const posts = SAMPLE_POSTS.filter((post) =>
+    post.categories.nodes.some((cat) => cat.slug === slug)
+  );
+
+  return {
+    slug,
+    name: categoryInfo.name,
+    description: categoryInfo.description,
+    posts: { nodes: posts },
+  };
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -43,17 +65,9 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export async function generateStaticParams() {
-  try {
-    const data = await request<{ categories: { nodes: { slug: string }[] } }>(
-      GET_ALL_CATEGORY_SLUGS
-    );
-    return data.categories.nodes.map((category) => ({
-      slug: category.slug,
-    }));
-  } catch (error) {
-    console.error("Error generating static params:", error);
-    return [];
-  }
+  return Object.keys(CATEGORIES).map((slug) => ({
+    slug,
+  }));
 }
 
 export default async function CategoryPage({ params }: PageProps) {
