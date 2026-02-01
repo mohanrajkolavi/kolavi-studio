@@ -7,6 +7,7 @@ import { GET_POST_BY_SLUG, GET_ALL_POST_SLUGS } from "@/lib/graphql/queries";
 import { PostBySlugResponse } from "@/lib/graphql/types";
 import { getArticleSchema } from "@/lib/seo/jsonld/article";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
+import { getSamplePostBySlug, SAMPLE_POSTS } from "@/lib/sample-posts";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
@@ -17,11 +18,11 @@ interface PageProps {
 async function getPost(slug: string) {
   try {
     const data = await request<PostBySlugResponse>(GET_POST_BY_SLUG, { slug });
-    return data.post;
+    if (data.post) return data.post;
   } catch (error) {
     console.error("Error fetching post:", error);
-    return null;
   }
+  return getSamplePostBySlug(slug);
 }
 
 export async function generateMetadata({ params }: PageProps) {
@@ -45,13 +46,15 @@ export async function generateStaticParams() {
     const data = await request<{ posts: { nodes: { slug: string }[] } }>(
       GET_ALL_POST_SLUGS
     );
-    return data.posts.nodes.slice(0, 50).map((post) => ({
-      slug: post.slug,
-    }));
+    if (data.posts.nodes.length > 0) {
+      return data.posts.nodes.slice(0, 50).map((post) => ({
+        slug: post.slug,
+      }));
+    }
   } catch (error) {
     console.error("Error generating static params:", error);
-    return [];
   }
+  return SAMPLE_POSTS.map((p) => ({ slug: p.slug }));
 }
 
 export default async function BlogPostPage({ params }: PageProps) {

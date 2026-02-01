@@ -6,13 +6,15 @@ export const SITE_DESCRIPTION = "Kolavi Studio helps businesses grow with expert
 
 export const NAV_LINKS = [
   { name: "Home", href: "/" },
-  { name: "Medical Spas", href: "/medical-spas" },
+  { name: "Who We Serve", href: "/industries" },
   { name: "Services", href: "/services" },
-  { name: "Portfolio", href: "/portfolio" },
-  { name: "About", href: "/about" },
   { name: "Blog", href: "/blog" },
-  { name: "Contact", href: "/contact" },
+  { name: "About", href: "/about" },
 ];
 
-// Future verticals - not yet implemented
-export const FUTURE_VERTICALS = ["dental", "law-firms"];
+// Vertical landing pages - industries we specialize in
+export const VERTICAL_LINKS = [
+  { name: "Medical Spas", href: "/medical-spas", available: true },
+  { name: "Dental Practices", href: "/dental", available: false },
+  { name: "Law Firms", href: "/law-firms", available: false },
+];
