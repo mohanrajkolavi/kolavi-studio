@@ -35,6 +35,10 @@ interface PageMetadataProps {
   path: string;
   image?: string;
   noIndex?: boolean;
+  keywords?: string;
+  author?: string;
+  publishedTime?: string;
+  modifiedTime?: string;
 }
 
 export function getPageMetadata({
@@ -43,6 +47,10 @@ export function getPageMetadata({
   path,
   image,
   noIndex = false,
+  keywords,
+  author,
+  publishedTime,
+  modifiedTime,
 }: PageMetadataProps): Metadata {
   const url = `${SITE_URL}${path}`;
   const ogImage = image || `${SITE_URL}/og-image.jpg`;
@@ -50,15 +58,19 @@ export function getPageMetadata({
   return {
     title,
     description,
+    keywords,
+    authors: author ? [{ name: author }] : undefined,
     alternates: {
       canonical: url,
     },
     openGraph: {
-      type: "website",
+      type: "article",
       url,
       title: `${title} | ${SITE_NAME}`,
       description,
       siteName: SITE_NAME,
+      publishedTime,
+      modifiedTime,
       images: [
         {
           url: ogImage,
