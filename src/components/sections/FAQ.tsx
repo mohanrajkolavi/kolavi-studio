@@ -32,25 +32,35 @@ export function FAQ({
         </div>
         <div className="mx-auto mt-16 max-w-3xl">
           <div className="space-y-4">
-            {items.map((item, index) => (
-              <div key={index} className="border-b pb-4">
-                <button
-                  className="flex w-full items-center justify-between text-left"
-                  onClick={() => setOpenIndex(openIndex === index ? null : index)}
-                >
-                  <span className="text-lg font-semibold">{item.question}</span>
-                  <ChevronDown
-                    className={cn(
-                      "h-5 w-5 transition-transform",
-                      openIndex === index && "rotate-180"
+            {items.map((item, index) => {
+              const answerId = `faq-answer-${index}`;
+              const isOpen = openIndex === index;
+              return (
+                <div key={index} className="border-b pb-4">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between text-left"
+                    onClick={() => setOpenIndex(isOpen ? null : index)}
+                    aria-expanded={isOpen}
+                    aria-controls={answerId}
+                  >
+                    <span className="text-lg font-semibold">{item.question}</span>
+                    <ChevronDown
+                      className={cn(
+                        "h-5 w-5 transition-transform",
+                        isOpen && "rotate-180"
+                      )}
+                      aria-hidden
+                    />
+                  </button>
+                  <div id={answerId} role="region">
+                    {isOpen && (
+                      <p className="mt-4 text-muted-foreground">{item.answer}</p>
                     )}
-                  />
-                </button>
-                {openIndex === index && (
-                  <p className="mt-4 text-muted-foreground">{item.answer}</p>
-                )}
-              </div>
-            ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

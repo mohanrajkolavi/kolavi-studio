@@ -15,10 +15,10 @@ export default function IndustriesPage() {
       <section className="py-16 sm:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl">
+            <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
               Who We Serve
             </h1>
-            <p className="mt-6 text-lg leading-8 text-neutral-600">
+            <p className="mt-6 text-lg leading-8 text-muted-foreground">
               We specialize in industries where trust, expertise, and digital presence matter most. Our strategies are tailored to the unique challenges and opportunities of each sector.
             </p>
           </div>
@@ -33,23 +33,23 @@ export default function IndustriesPage() {
                 key={vertical.href}
                 className={`group relative overflow-hidden rounded-2xl border ${
                   vertical.available
-                    ? "border-neutral-200 bg-white shadow-sm transition-shadow hover:shadow-md"
-                    : "border-neutral-100 bg-neutral-50/80 opacity-75"
+                    ? "border-border bg-card shadow-sm transition-shadow hover:shadow-md dark:border-border dark:bg-card"
+                    : "border-border/60 bg-muted/80 opacity-75 dark:border-border/60 dark:bg-muted/50"
                 }`}
               >
                 <div className="p-8">
                   {vertical.available ? (
                     <Link href={vertical.href} className="block">
                       <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-neutral-400" />
-                        <h2 className="text-xl font-semibold text-neutral-900 group-hover:text-neutral-700">
+                        <Sparkles className="h-5 w-5 text-muted-foreground" />
+                        <h2 className="text-xl font-semibold text-foreground group-hover:text-muted-foreground">
                           {vertical.name}
                         </h2>
                       </div>
-                      <p className="mt-3 text-sm text-neutral-600">
+                      <p className="mt-3 text-sm text-muted-foreground">
                         Grow your business with industry-specific digital marketing strategies.
                       </p>
-                      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-neutral-900 group-hover:gap-2 transition-all">
+                      <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-foreground group-hover:gap-2 transition-all">
                         Explore
                         <ArrowRight className="h-4 w-4" />
                       </span>
@@ -57,12 +57,12 @@ export default function IndustriesPage() {
                   ) : (
                     <>
                       <div className="flex items-center gap-2">
-                        <Sparkles className="h-5 w-5 text-neutral-300" />
-                        <h2 className="text-xl font-semibold text-neutral-500">
+                        <Sparkles className="h-5 w-5 text-muted-foreground/60" />
+                        <h2 className="text-xl font-semibold text-muted-foreground">
                           {vertical.name}
                         </h2>
                       </div>
-                      <span className="mt-4 inline-block rounded-full bg-neutral-200 px-3 py-1 text-xs font-medium text-neutral-500">
+                      <span className="mt-4 inline-block rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
                         Coming Soon
                       </span>
                     </>
@@ -74,11 +74,11 @@ export default function IndustriesPage() {
         </div>
       </section>
 
-      <section className="border-t border-neutral-200 bg-neutral-50/50 py-16 sm:py-24">
+      <section className="border-t border-border bg-muted/30 py-16 sm:py-24">
         <div className="container mx-auto px-4 text-center sm:px-6 lg:px-8">
-          <p className="text-lg text-neutral-600">
+          <p className="text-lg text-muted-foreground">
             Don&apos;t see your industry?{" "}
-            <Link href="/contact" className="font-medium text-neutral-900 underline underline-offset-4 hover:text-neutral-700">
+            <Link href="/contact" className="font-medium text-foreground underline underline-offset-4 hover:text-muted-foreground">
               Get in touch
             </Link>
             {" "}—we&apos;re always expanding.

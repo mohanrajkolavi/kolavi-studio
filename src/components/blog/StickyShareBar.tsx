@@ -22,7 +22,7 @@ function ShareLink({
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-orange-100 hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
+      className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-orange-100 hover:text-orange-600 dark:hover:bg-orange-900/30 dark:hover:text-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       {children}
     </a>
@@ -59,7 +59,7 @@ export function StickyShareBar({ url, title }: StickyShareBarProps) {
       className="sticky top-24 hidden shrink-0 flex-col items-center lg:flex"
       style={{ width: "4.5rem" }}
     >
-      <span className="mb-4 text-xs font-semibold uppercase tracking-widest text-neutral-400">
+      <span className="mb-4 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
         Share
       </span>
       <div className="flex flex-col gap-1">
@@ -91,7 +91,7 @@ export function StickyShareBar({ url, title }: StickyShareBarProps) {
           type="button"
           onClick={handleCopyLink}
           aria-label={copied ? "Link copied" : copyError ? "Copy failed" : "Copy link"}
-          className="flex h-10 w-10 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-orange-100 hover:text-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2"
+          className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-orange-100 hover:text-orange-600 dark:hover:bg-orange-900/30 dark:hover:text-orange-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {copied ? (
             <svg className="h-5 w-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

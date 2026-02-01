@@ -42,14 +42,14 @@ export function BlogPostTOC({ headings }: BlogPostTOCProps) {
   return (
     <nav
       aria-label="Table of contents"
-      className="sticky top-24 shrink-0 lg:w-60 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm"
+      className="sticky top-24 shrink-0 lg:w-60 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
       {/* Accent header */}
-      <div className="border-b border-neutral-100 bg-gradient-to-r from-neutral-50 to-white px-4 py-3.5 lg:px-5">
-        <h3 className="text-sm font-semibold text-neutral-800">
+      <div className="border-b border-border bg-muted/50 px-4 py-3.5 lg:px-5 dark:bg-muted/30">
+        <h3 className="text-sm font-semibold text-foreground">
           On this page
         </h3>
-        <p className="mt-0.5 text-xs text-neutral-500">
+        <p className="mt-0.5 text-xs text-muted-foreground">
           {headings.length} {headings.length === 1 ? "section" : "sections"}
         </p>
       </div>
@@ -62,18 +62,18 @@ export function BlogPostTOC({ headings }: BlogPostTOCProps) {
           return (
             <li
               key={item.id}
-              className={isH3 ? "pl-3 ml-1.5 border-l border-neutral-200" : ""}
+              className={isH3 ? "pl-3 ml-1.5 border-l border-border" : ""}
             >
               <Link
                 href={`#${item.id}`}
                 aria-current={isActive ? "location" : undefined}
                 className={`
                   relative block rounded-lg py-2 px-3 text-left text-sm transition-colors
-                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2
-                  ${isH3 ? "text-neutral-600" : "font-medium text-neutral-800"}
+                  focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background
+                  ${isH3 ? "text-muted-foreground" : "font-medium text-foreground"}
                   ${isActive
-                    ? "bg-orange-50 text-orange-700 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-full before:bg-orange-500 before:content-['']"
-                    : "hover:bg-neutral-50 hover:text-neutral-900"}
+                    ? "bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-full before:bg-orange-500 dark:before:bg-orange-400 before:content-['']"
+                    : "hover:bg-muted hover:text-foreground"}
                 `}
               >
                 <span className="line-clamp-2">{item.text}</span>

@@ -145,7 +145,7 @@ export default async function CategoryPage({ params }: PageProps) {
       />
 
       {/* Hero Section with Gradient */}
-      <section className="relative overflow-hidden border-b border-neutral-200 bg-white">
+      <section className="relative overflow-hidden border-b border-border bg-background">
         {/* Gradient Background */}
         <div className={`absolute inset-0 bg-gradient-to-br ${categoryInfo.color} opacity-5`} />
         
@@ -153,16 +153,16 @@ export default async function CategoryPage({ params }: PageProps) {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-4xl">
               {/* Breadcrumb */}
-              <nav className="mb-8 flex items-center gap-2 text-sm text-neutral-500" aria-label="Breadcrumb">
-                <Link href="/" className="hover:text-neutral-900 transition-colors">
+              <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground" aria-label="Breadcrumb">
+                <Link href="/" className="hover:text-foreground transition-colors">
                   Home
                 </Link>
                 <span>/</span>
-                <Link href="/blog" className="hover:text-neutral-900 transition-colors">
+                <Link href="/blog" className="hover:text-foreground transition-colors">
                   Blog
                 </Link>
                 <span>/</span>
-                <span className="font-medium text-neutral-900">{category.name}</span>
+                <span className="font-medium text-foreground">{category.name}</span>
               </nav>
 
               {/* Category Icon & Badge */}
@@ -170,31 +170,31 @@ export default async function CategoryPage({ params }: PageProps) {
                 <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${categoryInfo.color} text-3xl shadow-lg`}>
                   {categoryInfo.icon}
                 </div>
-                <div className="rounded-full bg-neutral-100 px-4 py-1.5 text-sm font-medium text-neutral-700">
+                <div className="rounded-full bg-muted px-4 py-1.5 text-sm font-medium text-foreground">
                   {postCount} Article{postCount !== 1 ? 's' : ''}
                 </div>
               </div>
 
               {/* Title & Description */}
-              <h1 className="mb-4 text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl lg:text-6xl">
+              <h1 className="mb-4 text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 {category.name}
               </h1>
               
-              <p className="mb-3 text-xl font-medium text-neutral-700 sm:text-2xl">
+              <p className="mb-3 text-xl font-medium text-muted-foreground sm:text-2xl">
                 {categoryInfo.tagline}
               </p>
 
-              <p className="mb-8 text-lg leading-relaxed text-neutral-600">
+              <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
                 {categoryInfo.longDescription}
               </p>
 
               {/* Related Topics */}
               <div className="flex flex-wrap gap-2">
-                <span className="text-sm font-medium text-neutral-500">Related topics:</span>
+                <span className="text-sm font-medium text-muted-foreground">Related topics:</span>
                 {categoryInfo.relatedTopics.map((topic) => (
                   <span
                     key={topic}
-                    className="rounded-full bg-white px-3 py-1 text-sm font-medium text-neutral-700 shadow-sm ring-1 ring-neutral-200"
+                    className="rounded-full bg-card px-3 py-1 text-sm font-medium text-foreground shadow-sm ring-1 ring-border"
                   >
                     {topic}
                   </span>
@@ -204,7 +204,7 @@ export default async function CategoryPage({ params }: PageProps) {
               {/* CTA for Medical Spa Marketing */}
               {slug === "medical-spa-marketing" && (
                 <div className="mt-8 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-6">
-                  <p className="text-neutral-900">
+                  <p className="text-foreground">
                     <strong>Need expert help?</strong> Our team specializes in medical spa marketing.{" "}
                     <Link href="/medical-spas" className="font-semibold text-orange-600 hover:text-orange-700 underline underline-offset-2">
                       Explore our services →
@@ -219,19 +219,19 @@ export default async function CategoryPage({ params }: PageProps) {
 
       {/* Latest Article - Featured */}
       {latestPost && (
-        <section className="border-b border-neutral-200 bg-neutral-50/50 py-12 sm:py-16">
+        <section className="border-b border-border bg-muted/30 py-12 sm:py-16">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-6xl">
               <div className="mb-6 flex items-center gap-2">
                 <div className="h-1 w-8 rounded-full bg-orange-500" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-900">
+                <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
                   Latest Article
                 </h2>
               </div>
 
               <Link
                 href={`/blog/${latestPost.slug}`}
-                className="group block overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition-all hover:shadow-xl"
+                className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-xl dark:hover:border-orange-800"
               >
                 <article className="grid gap-0 md:grid-cols-2">
                   {latestPost.featuredImage && (
@@ -247,17 +247,17 @@ export default async function CategoryPage({ params }: PageProps) {
                     </div>
                   )}
                   <div className="flex flex-col justify-center p-8 lg:p-12">
-                    <time className="mb-3 text-sm font-medium text-neutral-500">
+                    <time className="mb-3 text-sm font-medium text-muted-foreground">
                       {new Date(latestPost.date).toLocaleDateString("en-US", {
                         year: "numeric",
                         month: "long",
                         day: "numeric",
                       })}
                     </time>
-                    <h3 className="mb-4 text-2xl font-bold text-neutral-900 transition-colors group-hover:text-orange-600 sm:text-3xl lg:text-4xl">
+                    <h3 className="mb-4 text-2xl font-bold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400 sm:text-3xl lg:text-4xl">
                       {latestPost.title}
                     </h3>
-                    <p className="mb-6 text-lg leading-relaxed text-neutral-600">
+                    <p className="mb-6 text-lg leading-relaxed text-muted-foreground">
                       {stripHtml(latestPost.excerpt)}
                     </p>
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-gap group-hover:gap-3">
@@ -280,8 +280,8 @@ export default async function CategoryPage({ params }: PageProps) {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-6xl">
               <div className="mb-8 flex items-center gap-2">
-                <div className="h-1 w-8 rounded-full bg-neutral-300" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-900">
+                <div className="h-1 w-8 rounded-full bg-primary" />
+                <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
                   All Articles
                 </h2>
               </div>
@@ -293,7 +293,7 @@ export default async function CategoryPage({ params }: PageProps) {
                     href={`/blog/${post.slug}`}
                     className="group block"
                   >
-                    <article className="h-full overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition-all hover:shadow-lg">
+                    <article className="h-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-lg dark:hover:border-orange-800">
                       {post.featuredImage && (
                         <div className="relative h-48 overflow-hidden">
                           <Image
@@ -307,17 +307,17 @@ export default async function CategoryPage({ params }: PageProps) {
                         </div>
                       )}
                       <div className="p-6">
-                        <time className="mb-2 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+                        <time className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           {new Date(post.date).toLocaleDateString("en-US", {
                             year: "numeric",
                             month: "short",
                             day: "numeric",
                           })}
                         </time>
-                        <h3 className="mb-3 line-clamp-2 text-xl font-bold text-neutral-900 transition-colors group-hover:text-orange-600">
+                        <h3 className="mb-3 line-clamp-2 text-xl font-bold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400">
                           {post.title}
                         </h3>
-                        <p className="line-clamp-3 text-sm leading-relaxed text-neutral-600">
+                        <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
                           {stripHtml(post.excerpt)}
                         </p>
                       </div>
@@ -336,10 +336,10 @@ export default async function CategoryPage({ params }: PageProps) {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
               <div className="mb-6 text-6xl">{categoryInfo.icon}</div>
-              <h2 className="mb-4 text-2xl font-bold text-neutral-900">
+              <h2 className="mb-4 text-2xl font-bold text-foreground">
                 No articles yet
               </h2>
-              <p className="mb-8 text-lg text-neutral-600">
+              <p className="mb-8 text-lg text-muted-foreground">
                 We're working on creating great content for this category. Check back soon!
               </p>
               <Link
@@ -358,13 +358,13 @@ export default async function CategoryPage({ params }: PageProps) {
 
       {/* Bottom CTA Section */}
       {postCount > 0 && (
-        <section className="border-t border-neutral-200 bg-neutral-50 py-12 sm:py-16">
+        <section className="border-t border-border bg-muted/30 py-12 sm:py-16">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
-              <h2 className="mb-4 text-2xl font-bold text-neutral-900 sm:text-3xl">
+              <h2 className="mb-4 text-2xl font-bold text-foreground sm:text-3xl">
                 Want more {category.name.toLowerCase()} insights?
               </h2>
-              <p className="mb-8 text-lg text-neutral-600">
+              <p className="mb-8 text-lg text-muted-foreground">
                 Subscribe to our newsletter for the latest tips, strategies, and industry updates delivered to your inbox.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
@@ -379,7 +379,7 @@ export default async function CategoryPage({ params }: PageProps) {
                 </Link>
                 <Link
                   href="/blog"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-neutral-300 bg-white px-8 py-3 font-semibold text-neutral-900 transition-colors hover:border-neutral-400 hover:bg-neutral-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-card px-8 py-3 font-semibold text-foreground transition-colors hover:bg-muted"
                 >
                   View All Articles
                 </Link>

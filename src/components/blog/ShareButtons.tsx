@@ -24,7 +24,7 @@ function ShareLink({
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2"
+      className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
       {children}
     </a>
@@ -49,7 +49,7 @@ export function ShareButtons({ url, title, showLabel = true }: ShareButtonsProps
   return (
     <div className="flex items-center gap-3">
       {showLabel && (
-        <span className="text-xs font-medium uppercase tracking-widest text-neutral-400">
+        <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
           Share
         </span>
       )}
@@ -82,7 +82,7 @@ export function ShareButtons({ url, title, showLabel = true }: ShareButtonsProps
           type="button"
           onClick={handleCopyLink}
           aria-label={copied ? "Link copied" : "Copy link"}
-          className="flex h-9 w-9 items-center justify-center rounded-full text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2"
+          className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {copied ? (
             <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

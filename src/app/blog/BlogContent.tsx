@@ -41,7 +41,7 @@ export function BlogContent({ posts }: BlogContentProps) {
     <>
       {/* Featured */}
       {featuredPost && (
-        <section className="border-b border-neutral-200 bg-neutral-50/50 py-14 sm:py-20">
+        <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-6xl">
               <div className="mb-8 flex items-center justify-between">
@@ -55,7 +55,7 @@ export function BlogContent({ posts }: BlogContentProps) {
 
               <Link
                 href={`/blog/${featuredPost.slug}`}
-                className="group block overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 hover:shadow-xl hover:border-orange-200/60"
+                className="group block overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-orange-200/60 dark:hover:border-orange-800"
               >
                 <article className="grid gap-0 md:grid-cols-2">
                   {featuredPost.featuredImage && (
@@ -70,8 +70,8 @@ export function BlogContent({ posts }: BlogContentProps) {
                       />
                     </div>
                   )}
-                  <div className="flex flex-col justify-center p-8 lg:p-14 bg-white">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-500">
+                  <div className="flex flex-col justify-center p-8 lg:p-14 bg-card">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       {featuredPost.categories?.nodes?.[0] && (
                         <span className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-600">
                           {featuredPost.categories.nodes[0].name}
@@ -86,15 +86,15 @@ export function BlogContent({ posts }: BlogContentProps) {
                       </time>
                       {featuredPost.content && (
                         <>
-                          <span className="text-neutral-300">·</span>
+                          <span className="text-muted-foreground/60">·</span>
                           <span>{calculateReadingTime(featuredPost.content)} min read</span>
                         </>
                       )}
                     </div>
-                    <h3 className="mt-5 text-2xl font-bold text-neutral-900 transition-colors group-hover:text-orange-600 sm:text-3xl lg:text-4xl">
+                    <h3 className="mt-5 text-2xl font-bold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400 sm:text-3xl lg:text-4xl">
                       {featuredPost.title}
                     </h3>
-                    <p className="mt-4 text-base leading-relaxed text-neutral-600 lg:text-lg">
+                    <p className="mt-4 text-base leading-relaxed text-muted-foreground lg:text-lg">
                       {stripHtml(featuredPost.excerpt)}
                     </p>
                     <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-all group-hover:gap-4">
@@ -113,12 +113,12 @@ export function BlogContent({ posts }: BlogContentProps) {
 
       {/* Category + Articles - only when we have posts */}
       {filteredPosts.length > 0 && (
-      <section className="border-b border-neutral-200 bg-neutral-50/50 py-14 sm:py-20">
+      <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
             {/* Category tabs */}
             <nav
-              className="mb-10 flex flex-wrap items-center gap-3 border-b border-neutral-200 pb-6"
+              className="mb-10 flex flex-wrap items-center gap-3 border-b border-border pb-6"
               aria-label="Filter by category"
             >
               <button
@@ -126,8 +126,8 @@ export function BlogContent({ posts }: BlogContentProps) {
                 onClick={() => setSelectedCategory(null)}
                 className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                   selectedCategory === null
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
                 All posts
@@ -144,7 +144,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                     className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                       isActive
                         ? "bg-orange-500 text-white"
-                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
                     {topic.name} ({count})
@@ -158,7 +158,7 @@ export function BlogContent({ posts }: BlogContentProps) {
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {[...latestPosts, ...morePosts].map((post, index) => (
                   <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
-                    <article className="h-full overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-all duration-200 hover:border-orange-200 hover:shadow-md">
+                    <article className="h-full overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
                       {post.featuredImage && (
                         <div className="relative aspect-[16/10] overflow-hidden">
                           <Image
@@ -171,7 +171,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                           />
                           <div className="absolute left-3 top-3">
                             {post.categories?.nodes?.[0] && (
-                              <span className="rounded-md bg-white/95 px-2.5 py-1 text-xs font-semibold text-neutral-800 shadow-sm">
+                              <span className="rounded-md bg-card px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm ring-1 ring-border">
                                 {post.categories.nodes[0].name}
                               </span>
                             )}
@@ -184,7 +184,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                             {post.categories.nodes[0].name}
                           </span>
                         )}
-                        <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
                           <time>
                             {new Date(post.date).toLocaleDateString("en-US", {
                               month: "short",
@@ -196,10 +196,10 @@ export function BlogContent({ posts }: BlogContentProps) {
                             <span>· {calculateReadingTime(post.content)} min</span>
                           )}
                         </div>
-                        <h3 className="mt-3 line-clamp-2 font-semibold text-neutral-900 transition-colors group-hover:text-orange-600">
+                        <h3 className="mt-3 line-clamp-2 font-semibold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400">
                           {post.title}
                         </h3>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-neutral-600">
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                           {stripHtml(post.excerpt)}
                         </p>
                         <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 opacity-0 transition-opacity group-hover:opacity-100">
@@ -214,7 +214,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                 ))}
               </div>
             ) : featuredPost && (
-              <p className="py-12 text-center text-sm text-neutral-500">
+              <p className="py-12 text-center text-sm text-muted-foreground">
                 No other articles in this category
               </p>
             )}
@@ -225,10 +225,10 @@ export function BlogContent({ posts }: BlogContentProps) {
 
       {/* Empty state when filtered */}
       {filteredPosts.length === 0 && (
-        <section className="border-b border-neutral-200 bg-white py-16 sm:py-24">
+        <section className="border-b border-border bg-background py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 py-16 text-center">
-              <p className="text-lg font-medium text-neutral-900">No articles in this category yet</p>
+            <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-border bg-muted/50 py-16 text-center">
+              <p className="text-lg font-medium text-foreground">No articles in this category yet</p>
               <button
                 type="button"
                 onClick={() => setSelectedCategory(null)}
