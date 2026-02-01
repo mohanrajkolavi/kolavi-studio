@@ -25,6 +25,13 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
                 {link.name}
               </Link>
             ))}
+            <Link
+              href="/contact"
+              className="mt-4 inline-flex items-center justify-center rounded-2xl bg-primary px-5 py-3 text-base font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              onClick={() => onOpenChange(false)}
+            >
+              Get in Touch
+            </Link>
           </nav>
         </SheetContent>
       )}

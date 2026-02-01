@@ -39,6 +39,7 @@ export function FAQ({
                 <div key={index} className="border-b pb-4">
                   <button
                     type="button"
+                    id={`${answerId}-button`}
                     className="flex w-full items-center justify-between text-left"
                     onClick={() => setOpenIndex(isOpen ? null : index)}
                     aria-expanded={isOpen}
@@ -53,11 +54,15 @@ export function FAQ({
                       aria-hidden
                     />
                   </button>
-                  <div id={answerId} role="region">
-                    {isOpen && (
+                  {isOpen && (
+                    <div
+                      id={answerId}
+                      role="region"
+                      aria-labelledby={`${answerId}-button`}
+                    >
                       <p className="mt-4 text-muted-foreground">{item.answer}</p>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

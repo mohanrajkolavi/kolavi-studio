@@ -50,15 +50,9 @@ export function Header() {
           </Link>
         </div>
 
-        {/* Mobile: Theme toggle + Get in Touch + Menu Button */}
+        {/* Mobile: Theme toggle + Menu Button (Get in Touch is inside menu) */}
         <div className="flex items-center gap-2 md:hidden">
           <ThemeToggle />
-          <Link
-            href="/contact"
-            className="inline-flex items-center rounded-2xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Get in Touch
-          </Link>
           <button
             type="button"
             className="inline-flex items-center justify-center rounded-2xl p-2.5 text-muted-foreground transition-colors hover:bg-muted"
