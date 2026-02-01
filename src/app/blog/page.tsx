@@ -101,93 +101,151 @@ export default async function BlogPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(blogSchema) }}
       />
 
-      {/* Hero */}
+      {/* Hero - Inspired by Flair but enhanced */}
       <section className="relative overflow-hidden border-b border-neutral-200 bg-white">
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 via-transparent to-cyan-500/5" />
-        <div className="relative py-16 sm:py-20 lg:py-24">
+        {/* Subtle gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-b from-neutral-50 via-white to-white" />
+        
+        <div className="relative">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl">
-              <nav
-                className="mb-8 flex items-center gap-2 text-sm text-neutral-500"
-                aria-label="Breadcrumb"
-              >
-                <Link href="/" className="hover:text-neutral-900 transition-colors">
-                  Home
+            {/* Centered content with max-width */}
+            <div className="mx-auto max-w-3xl py-12 sm:py-16 lg:py-20 text-center">
+              {/* Logo/Brand (optional) */}
+              <div className="mb-8">
+                <Link 
+                  href="/" 
+                  className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-orange-600 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back to Home
                 </Link>
-                <span>/</span>
-                <span className="font-medium text-neutral-900">Blog</span>
-              </nav>
-
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-neutral-100 px-4 py-2 text-sm font-medium text-neutral-700">
-                <span className="h-2 w-2 rounded-full bg-orange-500" />
-                {posts.length} Article{posts.length !== 1 ? "s" : ""}
               </div>
 
+              {/* Main heading */}
               <h1 className="text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl lg:text-6xl">
-                Blog & Resources
+                Kolavi Studio{" "}
+                <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
+                  Blog
+                </span>
+                {" "}& Resources
               </h1>
-              <p className="mt-4 text-xl font-medium text-neutral-700 sm:text-2xl">
-                Digital marketing insights that drive growth
-              </p>
-              <p className="mt-4 text-lg leading-relaxed text-neutral-600 max-w-2xl">
-                Expert strategies on SEO, conversion optimization, content marketing, and more. Practical guides and tactics for service businesses and brands.
+
+              {/* Subtitle */}
+              <p className="mt-6 text-lg leading-8 text-neutral-600 sm:text-xl max-w-2xl mx-auto">
+                Discover the latest insights, guides and tutorials on digital marketing, SEO, and business growth. Learn best practices that drive real results.
               </p>
 
-              {/* Topic pills */}
-              <div className="mt-10 flex flex-wrap items-center gap-3">
-                <span className="text-sm font-medium text-neutral-600">Browse by topic:</span>
+              {/* Newsletter subscribe - prominent placement */}
+              <div className="mt-10">
+                <BlogSubscribe />
+              </div>
+
+              {/* Stats bar */}
+              <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">
+                    <svg className="h-4 w-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium text-neutral-900">{posts.length} Articles</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                    <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium text-neutral-900">{categories.length} Topics</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                    <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <span className="font-medium text-neutral-900">Weekly Updates</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Category navigation tabs - below hero */}
+            <div className="border-t border-neutral-200">
+              <nav 
+                className="mx-auto flex max-w-5xl items-center justify-center gap-1 overflow-x-auto py-4 scrollbar-hide"
+                aria-label="Blog categories"
+              >
                 <Link
                   href="/blog"
-                  className="inline-flex items-center rounded-full bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-neutral-800"
+                  className="group flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all bg-neutral-900 text-white hover:bg-neutral-800"
                 >
-                  All
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                  All posts
                 </Link>
-                {categories.map((cat) => (
-                  <Link
-                    key={cat.slug}
-                    href={`/blog/category/${cat.slug}`}
-                    className="inline-flex items-center rounded-full border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:border-orange-400 hover:text-orange-600"
-                  >
-                    {cat.name}
-                  </Link>
-                ))}
-              </div>
+                {BLOG_TOPICS.map((topic) => {
+                  const count = getCategoryPostCount(topic.slug);
+                  return (
+                    <Link
+                      key={topic.slug}
+                      href={`/blog/category/${topic.slug}`}
+                      className="group flex items-center gap-2 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
+                    >
+                      <span className="text-base">{topic.icon}</span>
+                      {topic.name}
+                      <span className="ml-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600 group-hover:bg-orange-200 group-hover:text-orange-700">
+                        {count}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
 
-              {/* Social + RSS */}
-              <div className="mt-8 flex items-center gap-4 border-t border-neutral-200 pt-8">
-                <span className="text-sm font-medium text-neutral-600">Follow:</span>
-                <div className="flex gap-2">
-                  <a
-                    href="https://twitter.com/kolavistudio"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-600 transition-colors hover:bg-orange-500 hover:text-white"
-                    aria-label="Twitter"
-                  >
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                    </svg>
-                  </a>
-                  <a
-                    href="https://linkedin.com/company/kolavi-studio"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-600 transition-colors hover:bg-orange-500 hover:text-white"
-                    aria-label="LinkedIn"
-                  >
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                    </svg>
-                  </a>
-                  <a
-                    href="/blog/rss.xml"
-                    className="flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 text-neutral-600 transition-colors hover:bg-orange-500 hover:text-white"
-                    aria-label="RSS"
-                  >
-                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M6.503 20.752c0 1.794-1.456 3.248-3.251 3.248-1.796 0-3.252-1.454-3.252-3.248 0-1.794 1.456-3.248 3.252-3.248 1.795.001 3.251 1.454 3.251 3.248zm-6.503-12.572v4.811c6.05.062 10.96 4.966 11.022 11.009h4.817c-.062-8.71-7.118-15.758-15.839-15.82zm0-3.368c10.58.046 19.152 8.594 19.183 19.188h4.817c-.03-13.231-10.755-23.954-24-24v4.812z" />
-                    </svg>
-                  </a>
+            {/* Social proof & follow section */}
+            <div className="border-t border-neutral-200 bg-neutral-50/50 py-6">
+              <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row">
+                <p className="text-sm text-neutral-600">
+                  Join <span className="font-semibold text-neutral-900">5,000+</span> marketers getting weekly insights
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-medium text-neutral-600">Follow us:</span>
+                  <div className="flex gap-2">
+                    <a
+                      href="https://twitter.com/kolavistudio"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-600 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
+                      aria-label="Follow on Twitter"
+                    >
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                      </svg>
+                    </a>
+                    <a
+                      href="https://linkedin.com/company/kolavi-studio"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-600 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
+                      aria-label="Follow on LinkedIn"
+                    >
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+                      </svg>
+                    </a>
+                    <a
+                      href="/blog/rss.xml"
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-600 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
+                      aria-label="Subscribe to RSS feed"
+                    >
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M6.503 20.752c0 1.794-1.456 3.248-3.251 3.248-1.796 0-3.252-1.454-3.252-3.248 0-1.794 1.456-3.248 3.252-3.248 1.795.001 3.251 1.454 3.251 3.248zm-6.503-12.572v4.811c6.05.062 10.96 4.966 11.022 11.009h4.817c-.062-8.71-7.118-15.758-15.839-15.82zm0-3.368c10.58.046 19.152 8.594 19.183 19.188h4.817c-.03-13.231-10.755-23.954-24-24v4.812z" />
+                      </svg>
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
