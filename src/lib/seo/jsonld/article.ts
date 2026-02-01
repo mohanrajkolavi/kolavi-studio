@@ -6,8 +6,16 @@ interface ArticleSchemaProps {
   datePublished: string;
   dateModified: string;
   authorName?: string;
+  authorUrl?: string;
   image?: string;
+  imageWidth?: number;
+  imageHeight?: number;
   url: string;
+  wordCount?: number;
+}
+
+function fullUrl(pathOrUrl: string): string {
+  return pathOrUrl.startsWith("http") ? pathOrUrl : `${SITE_URL}${pathOrUrl}`;
 }
 
 export function getArticleSchema({
@@ -16,24 +24,37 @@ export function getArticleSchema({
   datePublished,
   dateModified,
   authorName = SITE_NAME,
+  authorUrl = SITE_URL,
   image,
+  imageWidth = 1200,
+  imageHeight = 630,
   url,
+  wordCount,
 }: ArticleSchemaProps) {
+  const imageUrl = image ? fullUrl(image) : `${SITE_URL}/og-image.jpg`;
   return {
     "@context": "https://schema.org",
     "@type": "Article",
     headline,
     description,
-    image: image || `${SITE_URL}/og-image.jpg`,
+    image: {
+      "@type": "ImageObject",
+      url: imageUrl,
+      width: imageWidth,
+      height: imageHeight,
+    },
     datePublished,
     dateModified,
+    ...(wordCount != null && { wordCount }),
     author: {
       "@type": "Organization",
       name: authorName,
+      url: authorUrl.startsWith("http") ? authorUrl : `${SITE_URL}${authorUrl}`,
     },
     publisher: {
       "@type": "Organization",
       name: SITE_NAME,
+      url: SITE_URL,
       logo: {
         "@type": "ImageObject",
         url: `${SITE_URL}/logo.png`,
@@ -41,7 +62,7 @@ export function getArticleSchema({
     },
     mainEntityOfPage: {
       "@type": "WebPage",
-      "@id": url,
+      "@id": fullUrl(url),
     },
   };
 }

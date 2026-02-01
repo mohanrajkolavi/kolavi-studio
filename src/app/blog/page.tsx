@@ -1,8 +1,9 @@
 import Link from "next/link";
-import Image from "next/image";
 import { getPageMetadata } from "@/lib/seo/metadata";
-import { SAMPLE_POSTS } from "@/lib/sample-posts";
+import { getPosts, getCategoriesFromPosts } from "@/lib/blog-data";
+import { stripHtml } from "@/lib/blog-utils";
 import { BlogSubscribe } from "./BlogSubscribe";
+import { BlogContent } from "./BlogContent";
 import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60;
@@ -16,49 +17,10 @@ export const metadata = getPageMetadata({
     "digital marketing blog, SEO tips, conversion optimization, content marketing, medical spa marketing, local SEO, web design, business growth",
 });
 
-async function getPosts() {
-  return SAMPLE_POSTS;
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
-}
-
-function calculateReadingTime(content: string): number {
-  const wordsPerMinute = 200;
-  const wordCount = stripHtml(content).split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.ceil(wordCount / wordsPerMinute));
-}
-
-function getAllCategories() {
-  const seen = new Map<string, { slug: string; name: string }>();
-  SAMPLE_POSTS.forEach((post) => {
-    post.categories.nodes.forEach((cat) => {
-      if (!seen.has(cat.slug)) seen.set(cat.slug, { slug: cat.slug, name: cat.name });
-    });
-  });
-  return Array.from(seen.values());
-}
-
-function getCategoryPostCount(slug: string): number {
-  return SAMPLE_POSTS.filter((post) =>
-    post.categories.nodes.some((c) => c.slug === slug)
-  ).length;
-}
-
-const BLOG_TOPICS = [
-  { slug: "seo", name: "SEO", icon: "🔍", color: "from-blue-500 to-cyan-500" },
-  { slug: "guides", name: "Guides", icon: "📚", color: "from-purple-500 to-pink-500" },
-  { slug: "marketing", name: "Marketing", icon: "📈", color: "from-orange-500 to-red-500" },
-  { slug: "medical-spa-marketing", name: "Medical Spa", icon: "💆", color: "from-teal-500 to-emerald-500" },
-] as const;
-
 export default async function BlogPage() {
   const posts = await getPosts();
-  const featuredPost = posts[0];
-  const latestPosts = posts.slice(1, 4);
-  const morePosts = posts.slice(4);
-  const categories = getAllCategories();
+  const categories = getCategoriesFromPosts(posts);
+  const firstPost = posts[0];
 
   const breadcrumbSchema = {
     "@context": "https://schema.org",
@@ -69,12 +31,18 @@ export default async function BlogPage() {
     ],
   };
 
+  const blogImage =
+    firstPost?.featuredImage?.node?.sourceUrl?.startsWith("http") === true
+      ? firstPost.featuredImage.node.sourceUrl
+      : `${SITE_URL}/og-image.jpg`;
+
   const blogSchema = {
     "@context": "https://schema.org",
     "@type": "Blog",
     name: "Kolavi Studio Blog",
     description: "Digital marketing insights, SEO strategies, and business growth resources.",
     url: `${SITE_URL}/blog`,
+    image: blogImage,
     publisher: {
       "@type": "Organization",
       name: "Kolavi Studio",
@@ -86,7 +54,7 @@ export default async function BlogPage() {
       headline: post.title,
       url: `${SITE_URL}/blog/${post.slug}`,
       datePublished: post.date,
-      description: stripHtml(post.excerpt).slice(0, 160),
+      description: stripHtml(post.excerpt || "").slice(0, 160),
     })),
   };
 
@@ -101,6 +69,7 @@ export default async function BlogPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(blogSchema) }}
       />
 
+      <main>
       {/* Hero - Inspired by Flair but enhanced */}
       <section className="relative overflow-hidden border-b border-neutral-200 bg-white">
         {/* Subtle gradient background */}
@@ -110,19 +79,6 @@ export default async function BlogPage() {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             {/* Centered content with max-width */}
             <div className="mx-auto max-w-3xl py-12 sm:py-16 lg:py-20 text-center">
-              {/* Logo/Brand (optional) */}
-              <div className="mb-8">
-                <Link 
-                  href="/" 
-                  className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-orange-600 transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                  </svg>
-                  Back to Home
-                </Link>
-              </div>
-
               {/* Main heading */}
               <h1 className="text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl lg:text-6xl">
                 Kolavi Studio{" "}
@@ -142,108 +98,32 @@ export default async function BlogPage() {
                 <BlogSubscribe />
               </div>
 
-              {/* Stats bar */}
-              <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100">
-                    <svg className="h-4 w-4 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+              {/* Stats + Social */}
+              <div className="mt-14 inline-flex flex-col items-center gap-6 rounded-2xl bg-white px-8 py-6 shadow-[0_1px_3px_rgba(0,0,0,0.04)] ring-1 ring-neutral-200/60 sm:flex-row sm:gap-10">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xl font-bold tabular-nums text-neutral-900">{posts.length}</span>
+                    <span className="text-sm text-neutral-500">articles</span>
                   </div>
-                  <span className="font-medium text-neutral-900">{posts.length} Articles</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
-                    <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                    </svg>
+                  <div className="h-4 w-px bg-neutral-200" aria-hidden />
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-xl font-bold tabular-nums text-neutral-900">{categories.length}</span>
+                    <span className="text-sm text-neutral-500">topics</span>
                   </div>
-                  <span className="font-medium text-neutral-900">{categories.length} Topics</span>
+                  <div className="h-4 w-px bg-neutral-200" aria-hidden />
+                  <span className="text-sm text-neutral-600">New every week</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
-                    <svg className="h-4 w-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <span className="font-medium text-neutral-900">Weekly Updates</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Category navigation tabs - below hero */}
-            <div className="border-t border-neutral-200">
-              <nav 
-                className="mx-auto flex max-w-5xl items-center justify-center gap-1 overflow-x-auto py-4 scrollbar-hide"
-                aria-label="Blog categories"
-              >
-                <Link
-                  href="/blog"
-                  className="group flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-all bg-neutral-900 text-white hover:bg-neutral-800"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                  </svg>
-                  All posts
-                </Link>
-                {BLOG_TOPICS.map((topic) => {
-                  const count = getCategoryPostCount(topic.slug);
-                  return (
-                    <Link
-                      key={topic.slug}
-                      href={`/blog/category/${topic.slug}`}
-                      className="group flex items-center gap-2 whitespace-nowrap rounded-full border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-700 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"
-                    >
-                      <span className="text-base">{topic.icon}</span>
-                      {topic.name}
-                      <span className="ml-1 rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-semibold text-neutral-600 group-hover:bg-orange-200 group-hover:text-orange-700">
-                        {count}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </nav>
-            </div>
-
-            {/* Social proof & follow section */}
-            <div className="border-t border-neutral-200 bg-neutral-50/50 py-6">
-              <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 sm:flex-row">
-                <p className="text-sm text-neutral-600">
-                  Join <span className="font-semibold text-neutral-900">5,000+</span> marketers getting weekly insights
-                </p>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-neutral-600">Follow us:</span>
-                  <div className="flex gap-2">
-                    <a
-                      href="https://twitter.com/kolavistudio"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-600 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
-                      aria-label="Follow on Twitter"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                      </svg>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-neutral-500">5,000+ readers</span>
+                  <div className="flex gap-1.5">
+                    <a href="https://twitter.com/kolavistudio" target="_blank" rel="noopener noreferrer" className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-orange-600" aria-label="Twitter">
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
                     </a>
-                    <a
-                      href="https://linkedin.com/company/kolavi-studio"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-600 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
-                      aria-label="Follow on LinkedIn"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
-                      </svg>
+                    <a href="https://linkedin.com/company/kolavi-studio" target="_blank" rel="noopener noreferrer" className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-orange-600" aria-label="LinkedIn">
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" /></svg>
                     </a>
-                    <a
-                      href="/blog/rss.xml"
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-neutral-200 text-neutral-600 transition-all hover:border-orange-300 hover:bg-orange-50 hover:text-orange-600"
-                      aria-label="Subscribe to RSS feed"
-                    >
-                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M6.503 20.752c0 1.794-1.456 3.248-3.251 3.248-1.796 0-3.252-1.454-3.252-3.248 0-1.794 1.456-3.248 3.252-3.248 1.795.001 3.251 1.454 3.251 3.248zm-6.503-12.572v4.811c6.05.062 10.96 4.966 11.022 11.009h4.817c-.062-8.71-7.118-15.758-15.839-15.82zm0-3.368c10.58.046 19.152 8.594 19.183 19.188h4.817c-.03-13.231-10.755-23.954-24-24v4.812z" />
-                      </svg>
+                    <a href="/blog/rss.xml" className="rounded-full p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-orange-600" aria-label="RSS">
+                      <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6.503 20.752c0 1.794-1.456 3.248-3.251 3.248-1.796 0-3.252-1.454-3.252-3.248 0-1.794 1.456-3.248 3.252-3.248 1.795.001 3.251 1.454 3.251 3.248zm-6.503-12.572v4.811c6.05.062 10.96 4.966 11.022 11.009h4.817c-.062-8.71-7.118-15.758-15.839-15.82zm0-3.368c10.58.046 19.152 8.594 19.183 19.188h4.817c-.03-13.231-10.755-23.954-24-24v4.812z" /></svg>
                     </a>
                   </div>
                 </div>
@@ -253,277 +133,9 @@ export default async function BlogPage() {
         </div>
       </section>
 
-      {/* Featured article */}
-      {featuredPost && (
-        <section className="border-b border-neutral-200 bg-neutral-50/50 py-12 sm:py-16">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-6xl">
-              <div className="mb-6 flex items-center gap-2">
-                <div className="h-1 w-8 rounded-full bg-orange-500" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-900">
-                  Featured
-                </h2>
-              </div>
+      <BlogContent posts={posts} />
 
-              <Link
-                href={`/blog/${featuredPost.slug}`}
-                className="group block overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition-all hover:shadow-xl"
-              >
-                <article className="grid gap-0 md:grid-cols-2">
-                  {featuredPost.featuredImage && (
-                    <div className="relative h-64 md:h-full min-h-[320px]">
-                      <Image
-                        src={featuredPost.featuredImage.node.sourceUrl}
-                        alt={featuredPost.featuredImage.node.altText || featuredPost.title}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                        priority
-                      />
-                    </div>
-                  )}
-                  <div className="flex flex-col justify-center p-8 lg:p-12">
-                    <div className="flex flex-wrap items-center gap-3 text-sm">
-                      {featuredPost.categories?.nodes?.[0] && (
-                        <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white">
-                          {featuredPost.categories.nodes[0].name}
-                        </span>
-                      )}
-                      <time className="font-medium text-neutral-500">
-                        {new Date(featuredPost.date).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </time>
-                      {featuredPost.content && (
-                        <>
-                          <span className="text-neutral-300">·</span>
-                          <span className="text-neutral-500">
-                            {calculateReadingTime(featuredPost.content)} min read
-                          </span>
-                        </>
-                      )}
-                    </div>
-                    <h3 className="mt-4 text-2xl font-bold text-neutral-900 transition-colors group-hover:text-orange-600 sm:text-3xl lg:text-4xl">
-                      {featuredPost.title}
-                    </h3>
-                    <p className="mt-4 text-lg leading-relaxed text-neutral-600">
-                      {stripHtml(featuredPost.excerpt)}
-                    </p>
-                    <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-gap group-hover:gap-3">
-                      Read article
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
-                    </span>
-                  </div>
-                </article>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Latest – 3-card grid */}
-      {latestPosts.length > 0 && (
-        <section className="border-b border-neutral-200 bg-white py-12 sm:py-16">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-6xl">
-              <div className="mb-8 flex items-center gap-2">
-                <div className="h-1 w-8 rounded-full bg-neutral-300" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-900">
-                  Latest
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {latestPosts.map((post, index) => (
-                  <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
-                    <article className="h-full overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm transition-all hover:shadow-lg">
-                      {post.featuredImage && (
-                        <div className="relative h-48 overflow-hidden">
-                          <Image
-                            src={post.featuredImage.node.sourceUrl}
-                            alt={post.featuredImage.node.altText || post.title}
-                            fill
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            loading={index < 3 ? "eager" : "lazy"}
-                          />
-                        </div>
-                      )}
-                      <div className="p-6">
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <time className="font-medium uppercase tracking-wide text-neutral-500">
-                            {new Date(post.date).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </time>
-                          {post.categories?.nodes?.[0] && (
-                            <>
-                              <span className="text-neutral-300">·</span>
-                              <span className="font-medium text-orange-600">
-                                {post.categories.nodes[0].name}
-                              </span>
-                            </>
-                          )}
-                          {post.content && (
-                            <>
-                              <span className="text-neutral-300">·</span>
-                              <span className="text-neutral-500">
-                                {calculateReadingTime(post.content)} min read
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        <h3 className="mt-3 line-clamp-2 text-xl font-bold text-neutral-900 transition-colors group-hover:text-orange-600">
-                          {post.title}
-                        </h3>
-                        <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-neutral-600">
-                          {stripHtml(post.excerpt)}
-                        </p>
-                      </div>
-                    </article>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Browse by topic – category cards */}
-      <section className="border-b border-neutral-200 bg-neutral-50/50 py-12 sm:py-16">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
-            <div className="mb-8 flex items-center gap-2">
-              <div className="h-1 w-8 rounded-full bg-neutral-300" />
-              <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-900">
-                Browse by topic
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {BLOG_TOPICS.map((topic) => {
-                const count = getCategoryPostCount(topic.slug);
-                return (
-                  <Link
-                    key={topic.slug}
-                    href={`/blog/category/${topic.slug}`}
-                    className="group flex items-center gap-4 rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm transition-all hover:border-neutral-300 hover:shadow-md"
-                  >
-                    <div
-                      className={`flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${topic.color} text-2xl shadow-md transition-transform group-hover:scale-105`}
-                    >
-                      {topic.icon}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="font-bold text-neutral-900 group-hover:text-orange-600 transition-colors">
-                        {topic.name}
-                      </h3>
-                      <p className="text-sm text-neutral-500">
-                        {count} article{count !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <svg
-                      className="h-5 w-5 flex-shrink-0 text-neutral-400 transition-transform group-hover:translate-x-1 group-hover:text-orange-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* More articles – list (if any) */}
-      {morePosts.length > 0 && (
-        <section className="border-b border-neutral-200 bg-white py-12 sm:py-16">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-4xl">
-              <div className="mb-8 flex items-center gap-2">
-                <div className="h-1 w-8 rounded-full bg-neutral-300" />
-                <h2 className="text-sm font-bold uppercase tracking-wider text-neutral-900">
-                  More articles
-                </h2>
-              </div>
-
-              <ul className="space-y-6" role="list">
-                {morePosts.map((post) => (
-                  <li key={post.id}>
-                    <article>
-                      <Link
-                        href={`/blog/${post.slug}`}
-                        className="group flex flex-col gap-4 rounded-2xl border border-neutral-200 bg-white p-6 transition-all hover:border-orange-200 hover:shadow-md sm:flex-row"
-                      >
-                      {post.featuredImage && (
-                        <div className="relative h-40 w-full flex-shrink-0 overflow-hidden rounded-xl sm:h-28 sm:w-44">
-                          <Image
-                            src={post.featuredImage.node.sourceUrl}
-                            alt={post.featuredImage.node.altText || post.title}
-                            fill
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
-                            sizes="(max-width: 640px) 100vw, 176px"
-                            loading="lazy"
-                          />
-                        </div>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
-                          <time>
-                            {new Date(post.date).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </time>
-                          {post.categories?.nodes?.[0] && (
-                            <>
-                              <span>·</span>
-                              <span className="font-medium text-orange-600">
-                                {post.categories.nodes[0].name}
-                              </span>
-                            </>
-                          )}
-                          {post.content && (
-                            <>
-                              <span>·</span>
-                              <span>{calculateReadingTime(post.content)} min read</span>
-                            </>
-                          )}
-                        </div>
-                        <h3 className="mt-2 text-lg font-bold text-neutral-900 transition-colors group-hover:text-orange-600 line-clamp-2">
-                          {post.title}
-                        </h3>
-                        <p className="mt-1 line-clamp-2 text-sm text-neutral-600">
-                          {stripHtml(post.excerpt)}
-                        </p>
-                      </div>
-                        <span className="flex items-center gap-1 text-sm font-semibold text-orange-600 self-start sm:self-center">
-                          Read
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                          </svg>
-                        </span>
-                      </Link>
-                    </article>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Empty state */}
+      {/* Empty state (only when no posts at all) */}
       {posts.length === 0 && (
         <section className="py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -538,20 +150,24 @@ export default async function BlogPage() {
       )}
 
       {/* Newsletter CTA */}
-      <section className="bg-white py-16 sm:py-20">
+      <section className="border-b border-neutral-200 bg-neutral-50/50 py-16 sm:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl">
-            <div className="rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 to-amber-50 p-8 sm:p-10 text-center">
-              <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-orange-500 text-2xl text-white">
-                ✉️
+          <div className="mx-auto max-w-2xl">
+            <div className="overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_4px_24px_-4px_rgba(0,0,0,0.06)]">
+              <div className="border-b border-neutral-100 bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 px-8 py-10 sm:px-12 sm:py-12 text-center">
+                <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-orange-600">
+                  <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-neutral-900 sm:text-3xl">
+                  Get the latest insights
+                </h2>
+                <p className="mt-4 text-base leading-relaxed text-neutral-600 sm:text-lg">
+                  Digital marketing tips, SEO strategies, and growth tactics delivered to your inbox.
+                </p>
               </div>
-              <h2 className="text-2xl font-bold text-neutral-900 sm:text-3xl">
-                Get the latest insights
-              </h2>
-              <p className="mt-3 text-lg text-neutral-600">
-                Digital marketing tips, SEO strategies, and growth tactics delivered to your inbox.
-              </p>
-              <div className="mt-8">
+              <div className="px-8 py-10 sm:px-12 sm:pb-12">
                 <BlogSubscribe />
               </div>
             </div>
@@ -589,6 +205,7 @@ export default async function BlogPage() {
           </div>
         </div>
       </section>
+      </main>
     </>
   );
 }

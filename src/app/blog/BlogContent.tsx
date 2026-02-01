@@ -1,0 +1,245 @@
+"use client";
+
+import Link from "next/link";
+import Image from "next/image";
+import { useState } from "react";
+import type { WPPost } from "@/lib/graphql/types";
+import { stripHtml, calculateReadingTime } from "@/lib/blog-utils";
+
+const BLOG_TOPICS = [
+  { slug: "seo", name: "SEO" },
+  { slug: "guides", name: "Guides" },
+  { slug: "marketing", name: "Marketing" },
+  { slug: "medical-spa-marketing", name: "Medical Spa" },
+] as const;
+
+function getCategoryPostCount(posts: WPPost[], slug: string): number {
+  return posts.filter((post) =>
+    post.categories?.nodes?.some((c) => c.slug === slug)
+  ).length;
+}
+
+function filterPostsByCategory(posts: WPPost[], slug: string | null): WPPost[] {
+  if (!slug) return posts;
+  return posts.filter((post) =>
+    post.categories?.nodes?.some((c) => c.slug === slug)
+  );
+}
+
+interface BlogContentProps {
+  posts: WPPost[];
+}
+
+export function BlogContent({ posts }: BlogContentProps) {
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const filteredPosts = filterPostsByCategory(posts, selectedCategory);
+  const featuredPost = filteredPosts[0];
+  const latestPosts = filteredPosts.slice(1, 4);
+  const morePosts = filteredPosts.slice(4);
+
+  return (
+    <>
+      {/* Featured */}
+      {featuredPost && (
+        <section className="border-b border-neutral-200 bg-neutral-50/50 py-14 sm:py-20">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-6xl">
+              <div className="mb-8 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
+                    Featured
+                  </span>
+                  <span className="h-px flex-1 max-w-[60px] bg-gradient-to-r from-orange-400/60 to-transparent" aria-hidden />
+                </div>
+              </div>
+
+              <Link
+                href={`/blog/${featuredPost.slug}`}
+                className="group block overflow-hidden rounded-3xl border border-neutral-200 bg-white shadow-[0_4px_20px_-4px_rgba(0,0,0,0.08)] transition-all duration-300 hover:shadow-xl hover:border-orange-200/60"
+              >
+                <article className="grid gap-0 md:grid-cols-2">
+                  {featuredPost.featuredImage && (
+                    <div className="relative h-72 md:h-[420px] overflow-hidden">
+                      <Image
+                        src={featuredPost.featuredImage.node.sourceUrl}
+                        alt={featuredPost.featuredImage.node.altText || featuredPost.title}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 768px) 100vw, 50vw"
+                        priority
+                      />
+                    </div>
+                  )}
+                  <div className="flex flex-col justify-center p-8 lg:p-14 bg-white">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-neutral-500">
+                      {featuredPost.categories?.nodes?.[0] && (
+                        <span className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-600">
+                          {featuredPost.categories.nodes[0].name}
+                        </span>
+                      )}
+                      <time>
+                        {new Date(featuredPost.date).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })}
+                      </time>
+                      {featuredPost.content && (
+                        <>
+                          <span className="text-neutral-300">·</span>
+                          <span>{calculateReadingTime(featuredPost.content)} min read</span>
+                        </>
+                      )}
+                    </div>
+                    <h3 className="mt-5 text-2xl font-bold text-neutral-900 transition-colors group-hover:text-orange-600 sm:text-3xl lg:text-4xl">
+                      {featuredPost.title}
+                    </h3>
+                    <p className="mt-4 text-base leading-relaxed text-neutral-600 lg:text-lg">
+                      {stripHtml(featuredPost.excerpt)}
+                    </p>
+                    <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-all group-hover:gap-4">
+                      Read article
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </span>
+                  </div>
+                </article>
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Category + Articles - only when we have posts */}
+      {filteredPosts.length > 0 && (
+      <section className="border-b border-neutral-200 bg-neutral-50/50 py-14 sm:py-20">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-6xl">
+            {/* Category tabs */}
+            <nav
+              className="mb-10 flex flex-wrap items-center gap-3 border-b border-neutral-200 pb-6"
+              aria-label="Filter by category"
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedCategory(null)}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                  selectedCategory === null
+                    ? "bg-neutral-900 text-white"
+                    : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                }`}
+              >
+                All posts
+              </button>
+              {BLOG_TOPICS.map((topic) => {
+                const count = getCategoryPostCount(posts, topic.slug);
+                if (count === 0) return null;
+                const isActive = selectedCategory === topic.slug;
+                return (
+                  <button
+                    key={topic.slug}
+                    type="button"
+                    onClick={() => setSelectedCategory(topic.slug)}
+                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                      isActive
+                        ? "bg-orange-500 text-white"
+                        : "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
+                    }`}
+                  >
+                    {topic.name} ({count})
+                  </button>
+                );
+              })}
+            </nav>
+
+            {/* Articles - card grid */}
+            {latestPosts.length > 0 || morePosts.length > 0 ? (
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                {[...latestPosts, ...morePosts].map((post, index) => (
+                  <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
+                    <article className="h-full overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-all duration-200 hover:border-orange-200 hover:shadow-md">
+                      {post.featuredImage && (
+                        <div className="relative aspect-[16/10] overflow-hidden">
+                          <Image
+                            src={post.featuredImage.node.sourceUrl}
+                            alt={post.featuredImage.node.altText || post.title}
+                            fill
+                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                            loading={index < 6 ? "eager" : "lazy"}
+                          />
+                          <div className="absolute left-3 top-3">
+                            {post.categories?.nodes?.[0] && (
+                              <span className="rounded-md bg-white/95 px-2.5 py-1 text-xs font-semibold text-neutral-800 shadow-sm">
+                                {post.categories.nodes[0].name}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      <div className="p-5">
+                        {!post.featuredImage && post.categories?.nodes?.[0] && (
+                          <span className="text-xs font-semibold text-orange-600">
+                            {post.categories.nodes[0].name}
+                          </span>
+                        )}
+                        <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+                          <time>
+                            {new Date(post.date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </time>
+                          {post.content && (
+                            <span>· {calculateReadingTime(post.content)} min</span>
+                          )}
+                        </div>
+                        <h3 className="mt-3 line-clamp-2 font-semibold text-neutral-900 transition-colors group-hover:text-orange-600">
+                          {post.title}
+                        </h3>
+                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-neutral-600">
+                          {stripHtml(post.excerpt)}
+                        </p>
+                        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 opacity-0 transition-opacity group-hover:opacity-100">
+                          Read article
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </span>
+                      </div>
+                    </article>
+                  </Link>
+                ))}
+              </div>
+            ) : featuredPost && (
+              <p className="py-12 text-center text-sm text-neutral-500">
+                No other articles in this category
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* Empty state when filtered */}
+      {filteredPosts.length === 0 && (
+        <section className="border-b border-neutral-200 bg-white py-16 sm:py-24">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 py-16 text-center">
+              <p className="text-lg font-medium text-neutral-900">No articles in this category yet</p>
+              <button
+                type="button"
+                onClick={() => setSelectedCategory(null)}
+                className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700 hover:underline"
+              >
+                View all posts
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}

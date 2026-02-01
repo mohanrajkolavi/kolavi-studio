@@ -2,6 +2,17 @@ export interface WPFeaturedImage {
   node: {
     sourceUrl: string;
     altText?: string;
+    mediaDetails?: { width?: number; height?: number };
+  };
+}
+
+/** WPGraphQL: post.author.node */
+export interface WPAuthor {
+  node: {
+    name: string;
+    slug?: string;
+    url?: string;
+    avatar?: { url?: string };
   };
 }
 
@@ -15,6 +26,7 @@ export interface WPCategory {
 export interface WPTag {
   slug: string;
   name: string;
+  description?: string;
 }
 
 export interface WPPost {
@@ -26,6 +38,7 @@ export interface WPPost {
   date: string;
   modified: string;
   featuredImage?: WPFeaturedImage;
+  author?: WPAuthor;
   categories: {
     nodes: WPCategory[];
   };

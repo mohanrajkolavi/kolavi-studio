@@ -2,12 +2,9 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { getPageMetadata } from "@/lib/seo/metadata";
-import { request } from "@/lib/graphql/client";
-import { GET_POST_BY_SLUG, GET_ALL_POST_SLUGS, GET_POSTS } from "@/lib/graphql/queries";
-import { PostBySlugResponse, PostsResponse } from "@/lib/graphql/types";
 import { getArticleSchema } from "@/lib/seo/jsonld/article";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { getSamplePostBySlug, SAMPLE_POSTS } from "@/lib/sample-posts";
+import { getPostBySlug, getPosts, getPostAuthorName, getPostAuthorUrl } from "@/lib/blog-data";
 import { processContentForToc } from "@/lib/blog-utils";
 import { BlogPostTOC } from "@/components/blog/BlogPostTOC";
 import { ShareButtons } from "@/components/blog/ShareButtons";
@@ -15,72 +12,76 @@ import { BlogSubscribe } from "../BlogSubscribe";
 import { SITE_URL } from "@/lib/constants";
 import type { WPPost } from "@/lib/graphql/types";
 
-export const revalidate = 60; // ISR: revalidate every 60 seconds
+export const revalidate = 60;
 
 interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-async function getPost(slug: string) {
-  // Use sample posts directly for now
-  // TODO: Re-enable WordPress integration when backend is configured
-  return getSamplePostBySlug(slug);
-}
-
 async function getRelatedPosts(currentSlug: string, limit = 3): Promise<WPPost[]> {
-  // Use sample posts directly for now
-  // TODO: Re-enable WordPress integration when backend is configured
-  return SAMPLE_POSTS.filter((p) => p.slug !== currentSlug).slice(0, limit);
-}
-
-export async function generateMetadata({ params }: PageProps) {
-  const { slug } = await params;
-  const post = await getPost(slug);
-
-  if (!post) {
-    return {};
-  }
-
-  return getPageMetadata({
-    title: post.title,
-    description: post.excerpt.replace(/<[^>]*>/g, "").substring(0, 160),
-    path: `/blog/${slug}`,
-    image: post.featuredImage?.node.sourceUrl,
-  });
-}
-
-export async function generateStaticParams() {
-  // Use sample posts directly for now
-  // TODO: Re-enable WordPress integration when backend is configured
-  return SAMPLE_POSTS.map((p) => ({ slug: p.slug }));
+  const posts = await getPosts();
+  return posts.filter((p) => p.slug !== currentSlug).slice(0, limit);
 }
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
 }
 
+function readingTimeMinutes(content: string): number {
+  const words = stripHtml(content).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 200));
+}
+
+export async function generateMetadata({ params }: PageProps) {
+  const { slug } = await params;
+  const post = await getPostBySlug(slug);
+  if (!post) return {};
+  return getPageMetadata({
+    title: post.title,
+    description: stripHtml(post.excerpt || "").substring(0, 160),
+    path: `/blog/${slug}`,
+    image: post.featuredImage?.node.sourceUrl,
+    author: getPostAuthorName(post),
+    publishedTime: post.date,
+    modifiedTime: post.modified,
+  });
+}
+
+export async function generateStaticParams() {
+  const posts = await getPosts();
+  return posts.map((p) => ({ slug: p.slug }));
+}
+
 export default async function BlogPostPage({ params }: PageProps) {
   const { slug } = await params;
   const [post, relatedPosts] = await Promise.all([
-    getPost(slug),
+    getPostBySlug(slug),
     getRelatedPosts(slug),
   ]);
 
-  if (!post) {
-    notFound();
-  }
+  if (!post) notFound();
 
-  const { headings, content } = processContentForToc(post.content);
+  const safeContent = post.content || "";
+  const safeExcerpt = post.excerpt || "";
+  const { headings, content } = processContentForToc(safeContent);
   const postUrl = `${SITE_URL}/blog/${slug}`;
   const firstCategory = post.categories?.nodes?.[0];
+  const readTime = readingTimeMinutes(safeContent);
+  const wordCount = stripHtml(safeContent).split(/\s+/).filter(Boolean).length;
+  const mediaDetails = post.featuredImage?.node?.mediaDetails;
 
   const articleSchema = getArticleSchema({
     headline: post.title,
-    description: post.excerpt.replace(/<[^>]*>/g, ""),
+    description: stripHtml(safeExcerpt),
     datePublished: post.date,
     dateModified: post.modified,
+    authorName: getPostAuthorName(post),
+    authorUrl: getPostAuthorUrl(post),
     image: post.featuredImage?.node.sourceUrl,
-    url: `/blog/${slug}`,
+    imageWidth: mediaDetails?.width,
+    imageHeight: mediaDetails?.height,
+    url: postUrl,
+    wordCount,
   });
 
   const breadcrumbSchema = getBreadcrumbSchema([
@@ -95,6 +96,8 @@ export default async function BlogPostPage({ params }: PageProps) {
     day: "numeric",
   });
 
+  const leadText = stripHtml(safeExcerpt);
+
   return (
     <>
       <script
@@ -106,210 +109,248 @@ export default async function BlogPostPage({ params }: PageProps) {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
 
-      <article className="border-b border-neutral-200 bg-white py-16 sm:py-24">
+      <article className="min-h-screen bg-white">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
-            {/* Breadcrumb - Google blog style */}
+            {/* Breadcrumb - redesigned with chevrons and subtle background */}
             <nav
               aria-label="Breadcrumb"
-              className="mb-8 text-sm text-neutral-500"
+              className="pt-10 pb-6"
             >
-              <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
                 <li>
                   <Link
                     href="/"
-                    className="transition-colors hover:text-neutral-900"
+                    className="rounded px-2 py-1 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
                   >
                     Home
                   </Link>
                 </li>
-                <li aria-hidden>/</li>
+                <li aria-hidden className="text-neutral-300">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </li>
                 <li>
                   <Link
                     href="/blog"
-                    className="transition-colors hover:text-neutral-900"
+                    className="rounded px-2 py-1 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
                   >
                     Blog
                   </Link>
                 </li>
-                <li aria-hidden>/</li>
-                <li>
-                  {firstCategory ? (
-                    <Link
-                      href={`/blog/category/${firstCategory.slug}`}
-                      className="transition-colors hover:text-neutral-900"
-                    >
-                      {firstCategory.name}
-                    </Link>
-                  ) : (
-                    <span className="text-neutral-900">Article</span>
-                  )}
-                </li>
+                {firstCategory && (
+                  <>
+                    <li aria-hidden className="text-neutral-300">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </li>
+                    <li>
+                      <Link
+                        href={`/blog/category/${firstCategory.slug}`}
+                        className="rounded px-2 py-1 font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700"
+                      >
+                        {firstCategory.name}
+                      </Link>
+                    </li>
+                  </>
+                )}
               </ol>
             </nav>
 
-            {/* Title + Meta row - Google blog inspired */}
-            <header>
-              <h1 className="text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl lg:text-[2.75rem]">
-                {post.title}
-              </h1>
-              <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
-                <time dateTime={post.date} className="text-neutral-500">
-                  {formattedDate}
-                </time>
-                {post.categories?.nodes?.length > 0 && (
-                  <>
-                    <span className="text-neutral-300" aria-hidden>
-                      ·
-                    </span>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {post.categories?.nodes?.map((category) => (
-                        <Link
-                          key={category.slug}
-                          href={`/blog/category/${category.slug}`}
-                          className="text-neutral-600 transition-colors hover:text-neutral-900"
-                        >
-                          {category.name}
-                        </Link>
-                      ))}
-                    </div>
-                  </>
-                )}
-                <span className="text-neutral-300" aria-hidden>
-                  ·
-                </span>
-                <ShareButtons url={postUrl} title={post.title} />
-              </div>
-            </header>
+            {/* Meta: category pill + date + read time - redesigned */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              {post.categories?.nodes?.[0] && (
+                <Link
+                  href={`/blog/category/${post.categories.nodes[0].slug}`}
+                  className="inline-flex items-center rounded-full bg-orange-100 px-3.5 py-1.5 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-200"
+                >
+                  {post.categories.nodes[0].name}
+                </Link>
+              )}
+              <span className="flex items-center gap-1.5 text-sm text-neutral-500">
+                <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <time dateTime={post.date}>{formattedDate}</time>
+              </span>
+              <span className="flex items-center gap-1.5 text-sm text-neutral-500">
+                <svg className="h-4 w-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {readTime} min read
+              </span>
+            </div>
 
-            {/* Author block - Google blog style */}
-            <div className="mt-8 flex items-center gap-4 border-y border-neutral-200 py-6">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-lg font-semibold text-neutral-600">
-                K
+            {/* Title - H1 (unchanged - you like it) */}
+            <h1 className="mt-5 text-4xl font-bold tracking-tight text-neutral-900 sm:text-5xl">
+              {post.title}
+            </h1>
+
+            {/* Lead paragraph / meta description (unchanged - you like it) */}
+            <p className="mt-6 text-lg leading-relaxed text-neutral-600 sm:text-xl">
+              {leadText}
+            </p>
+
+            {/* Author + Share – single card */}
+            <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-neutral-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5 sm:py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-100 to-amber-100 text-sm font-bold text-orange-700">
+                  {getPostAuthorName(post).charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-neutral-900">{getPostAuthorName(post)}</p>
+                  <p className="mt-0.5 text-xs text-neutral-500 sm:text-sm">
+                    Digital marketing insights for service businesses
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-neutral-900">Kolavi Studio</p>
-                <p className="text-sm text-neutral-500">
-                  Digital marketing insights for service businesses
-                </p>
+              <div className="flex items-center gap-3 border-t border-neutral-100 pt-3 sm:border-t-0 sm:border-l sm:border-neutral-100 sm:pl-5 sm:pt-0">
+                <span className="text-sm font-medium text-neutral-600">Share</span>
+                <ShareButtons url={postUrl} title={post.title} showLabel={false} />
               </div>
             </div>
 
-            {/* Featured Image */}
+            {/* Featured image */}
             {post.featuredImage && (
-              <div className="relative mt-8 aspect-[2/1] w-full overflow-hidden rounded-2xl">
-                <Image
-                  src={post.featuredImage.node.sourceUrl}
-                  alt={post.featuredImage.node.altText || post.title}
-                  fill
-                  className="object-cover"
-                  priority
-                  sizes="(max-width: 1024px) 100vw, 1024px"
-                />
-              </div>
+              <figure className="mt-8">
+                <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl bg-neutral-100">
+                  <Image
+                    src={post.featuredImage.node.sourceUrl}
+                    alt={post.featuredImage.node.altText || post.title}
+                    fill
+                    className="object-cover"
+                    priority
+                    sizes="(max-width: 768px) 100vw, (max-width: 1280px) 80vw, 1024px"
+                  />
+                </div>
+              </figure>
             )}
 
-            {/* Table of contents - mobile (before content) */}
+            {/* TOC mobile */}
             {headings.length > 0 && (
               <div className="mt-8 lg:hidden">
                 <BlogPostTOC headings={headings} />
               </div>
             )}
 
-            {/* Content + TOC layout */}
-            <div className="mt-12 flex flex-col gap-12 lg:flex-row lg:gap-16">
-              {/* Main content */}
+            {/* Content + sidebar TOC */}
+            <div className="mt-12 flex flex-col gap-12 pb-12 lg:flex-row lg:gap-16">
               <div className="min-w-0 flex-1">
                 <div
-                  className="prose prose-lg prose-neutral max-w-none prose-headings:scroll-mt-24 prose-headings:font-semibold prose-a:text-neutral-900 prose-a:underline prose-a:underline-offset-4 hover:prose-a:text-neutral-600"
+                  className="prose prose-lg prose-neutral max-w-none prose-headings:scroll-mt-24 prose-headings:font-semibold prose-p:leading-relaxed prose-a:text-orange-600 prose-a:no-underline hover:prose-a:underline prose-img:rounded-xl"
                   dangerouslySetInnerHTML={{ __html: content }}
                 />
 
-                {/* Tags */}
-                {post.tags?.nodes?.length > 0 && (
-                  <div className="mt-12 border-t border-neutral-200 pt-8">
-                    <h3 className="text-xs font-semibold uppercase tracking-widest text-neutral-400">
-                      Tags
-                    </h3>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {post.tags?.nodes?.map((tag) => (
-                        <Link
-                          key={tag.slug}
-                          href={`/blog/tag/${tag.slug}`}
-                          className="rounded-full border border-neutral-200 bg-white px-4 py-1.5 text-sm text-neutral-600 transition-colors hover:border-neutral-300 hover:bg-neutral-50"
-                        >
-                          {tag.name}
-                        </Link>
-                      ))}
-                    </div>
+                {/* Categories + Tags – rounded pills */}
+                <footer className="mt-10 border-t border-neutral-100 pt-6">
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    {(post.categories?.nodes?.length ?? 0) + (post.tags?.nodes?.length ?? 0) > 0 && (
+                      <span className="text-neutral-500">Posted in</span>
+                    )}
+                    {post.categories?.nodes?.map((cat) => (
+                      <Link
+                        key={cat.slug}
+                        href={`/blog/category/${cat.slug}`}
+                        className="rounded-full bg-neutral-100 px-3 py-1.5 text-neutral-700 transition-colors hover:bg-orange-100 hover:text-orange-700"
+                      >
+                        {cat.name}
+                      </Link>
+                    ))}
+                    {post.tags?.nodes?.map((tag) => (
+                      <Link
+                        key={tag.slug}
+                        href={`/blog/tag/${tag.slug}`}
+                        className="rounded-full border border-neutral-200 px-3 py-1.5 text-neutral-600 transition-colors hover:border-orange-300 hover:text-orange-600"
+                      >
+                        {tag.name}
+                      </Link>
+                    ))}
                   </div>
-                )}
+                </footer>
               </div>
 
-              {/* Table of contents - sticky sidebar (desktop) */}
               {headings.length > 0 && (
-                <aside className="hidden lg:block">
+                <aside className="hidden shrink-0 lg:block">
                   <BlogPostTOC headings={headings} />
                 </aside>
               )}
             </div>
 
-            {/* Related stories - Google blog style */}
+            {/* Read next – redesigned */}
             {relatedPosts.length > 0 && (
-              <section className="mt-20 border-t border-neutral-200 pt-16">
-                <h2 className="mb-10 text-2xl font-bold text-neutral-900">
-                  Related stories
-                </h2>
-                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <section className="border-t border-neutral-200 pt-6 pb-12 sm:pt-8 sm:pb-14">
+                <div className="flex flex-col items-center gap-6 sm:gap-8">
+                  <span className="rounded-full bg-neutral-100 px-4 py-2 text-sm font-semibold text-neutral-700">
+                    More to read
+                  </span>
+                  <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {relatedPosts.map((related) => (
                     <Link
                       key={related.id}
                       href={`/blog/${related.slug}`}
-                      className="group"
+                      className="group flex flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white transition-all hover:border-orange-200 hover:shadow-md"
                     >
                       {related.featuredImage ? (
-                        <div className="relative aspect-[16/10] overflow-hidden rounded-xl">
+                        <div className="relative aspect-[16/10] overflow-hidden bg-neutral-100">
                           <Image
                             src={related.featuredImage.node.sourceUrl}
                             alt={related.featuredImage.node.altText || related.title}
                             fill
-                            className="object-cover transition-transform group-hover:scale-[1.02]"
+                            className="object-cover transition-transform duration-300 group-hover:scale-105"
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                           />
                         </div>
                       ) : (
-                        <div className="aspect-[16/10] rounded-xl bg-neutral-100" />
+                        <div className="aspect-[16/10] bg-neutral-100" />
                       )}
-                      <p className="mt-4 text-xs font-medium uppercase tracking-wide text-neutral-400">
-                        {related.categories?.nodes?.[0]?.name || "Blog"}
-                        {" · "}
-                        {new Date(related.date).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })}
-                      </p>
-                      <h3 className="mt-2 font-semibold text-neutral-900 group-hover:text-neutral-600">
-                        {related.title}
-                      </h3>
-                      <p className="mt-1 line-clamp-2 text-sm text-neutral-600">
-                        {stripHtml(related.excerpt)}
-                      </p>
+                      <div className="flex flex-1 flex-col p-5">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          {related.categories?.nodes?.[0] && (
+                            <span className="rounded-full bg-orange-100 px-2.5 py-0.5 font-medium text-orange-700">
+                              {related.categories.nodes[0].name}
+                            </span>
+                          )}
+                          <time className="text-neutral-400">
+                            {new Date(related.date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </time>
+                        </div>
+                        <h3 className="mt-3 font-semibold text-neutral-900 line-clamp-2 transition-colors group-hover:text-orange-600">
+                          {related.title}
+                        </h3>
+                        <p className="mt-2 line-clamp-2 flex-1 text-sm text-neutral-500">
+                          {stripHtml(related.excerpt || "")}
+                        </p>
+                        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 group-hover:gap-2">
+                          Read article
+                          <svg className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                          </svg>
+                        </span>
+                      </div>
                     </Link>
                   ))}
+                  </div>
                 </div>
               </section>
             )}
 
-            {/* Subscribe CTA - Google blog style */}
-            <div className="mt-20 rounded-2xl border border-neutral-200 bg-neutral-50/50 px-6 py-12 text-center sm:px-12">
-              <p className="text-lg font-medium text-neutral-900">
-                Get the latest insights in your inbox
-              </p>
-              <p className="mt-2 text-sm text-neutral-600">
-                Subscribe for digital marketing tips and updates.
-              </p>
-              <div className="mt-6 flex justify-center">
+            {/* Newsletter – horizontal layout (heading left, form right) */}
+            <div className="mb-14 flex flex-col gap-6 rounded-2xl border border-neutral-200 bg-white px-5 py-6 sm:mb-16 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-6 sm:py-5">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-neutral-900 sm:text-xl">
+                  Want product news and updates?
+                </h2>
+                <p className="mt-1 text-sm text-neutral-600">
+                  Sign up for our newsletter.
+                </p>
+              </div>
+              <div className="shrink-0 sm:min-w-[280px]">
                 <BlogSubscribe />
               </div>
             </div>

@@ -4,7 +4,8 @@ import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { SAMPLE_POSTS } from "@/lib/sample-posts";
+import { getPosts, getTagsFromPosts } from "@/lib/blog-data";
+import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
@@ -13,15 +14,14 @@ interface PageProps {
 }
 
 async function getTag(slug: string) {
-  // Filter posts by tag slug
-  const posts = SAMPLE_POSTS.filter((post) =>
-    post.tags.nodes.some((tag) => tag.slug === slug)
+  const allPosts = await getPosts();
+  const posts = allPosts.filter((post) =>
+    post.tags?.nodes?.some((tag) => tag.slug === slug)
   );
 
   if (posts.length === 0) return null;
 
-  // Get tag name from the first post that has this tag
-  const tagName = posts[0].tags.nodes.find((tag) => tag.slug === slug)?.name || slug;
+  const tagName = posts[0].tags?.nodes?.find((tag) => tag.slug === slug)?.name || slug;
 
   return {
     slug,
@@ -42,21 +42,14 @@ export async function generateMetadata({ params }: PageProps) {
     title: `${tag.name} - Blog Tag`,
     description: `Browse all posts tagged with ${tag.name}.`,
     path: `/blog/tag/${slug}`,
+    keywords: `blog tag, ${tag.name}, articles, Kolavi Studio`,
   });
 }
 
 export async function generateStaticParams() {
-  // Get all unique tags from sample posts
-  const allTags = new Set<string>();
-  SAMPLE_POSTS.forEach((post) => {
-    post.tags.nodes.forEach((tag) => {
-      allTags.add(tag.slug);
-    });
-  });
-
-  return Array.from(allTags).map((slug) => ({
-    slug,
-  }));
+  const posts = await getPosts();
+  const tags = getTagsFromPosts(posts);
+  return tags.map((t) => ({ slug: t.slug }));
 }
 
 export default async function TagPage({ params }: PageProps) {
@@ -73,18 +66,32 @@ export default async function TagPage({ params }: PageProps) {
     { name: tag.name, url: `/blog/tag/${slug}` },
   ]);
 
+  const collectionSchema = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: `Posts tagged: ${tag.name}`,
+    description: `Browse all posts tagged with ${tag.name}.`,
+    url: `${SITE_URL}/blog/tag/${slug}`,
+    numberOfItems: tag.posts.nodes.length,
+  };
+
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
       />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+      />
 
+      <main>
       <section className="py-16 sm:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl">
             {/* Breadcrumb */}
-            <nav className="mb-8 text-sm text-muted-foreground">
+            <nav aria-label="Breadcrumb" className="mb-8 text-sm text-muted-foreground">
               <Link href="/" className="hover:text-foreground">
                 Home
               </Link>
@@ -146,6 +153,7 @@ export default async function TagPage({ params }: PageProps) {
           </div>
         </div>
       </section>
+      </main>
     </>
   );
 }

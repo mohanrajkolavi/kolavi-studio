@@ -1,3 +1,12 @@
+export function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, "").trim();
+}
+
+export function calculateReadingTime(content: string, wordsPerMinute = 200): number {
+  const wordCount = stripHtml(content).split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(wordCount / wordsPerMinute));
+}
+
 export interface TocItem {
   level: 2 | 3;
   text: string;

@@ -5,6 +5,7 @@ export const SAMPLE_POSTS: WPPost[] = [
     id: "sample-1",
     slug: "introducing-next-level-seo-for-medical-spas",
     title: "Introducing the next level of SEO for medical spas",
+    author: { node: { name: "Kolavi Studio", slug: "kolavi-studio", url: "https://kolavistudio.com" } },
     content: `
       <p>Medical spas face unique challenges when it comes to digital marketing. Unlike traditional retail or service businesses, med spas must balance compliance, trust-building, and conversion optimization.</p>
       
@@ -91,6 +92,12 @@ export const SAMPLE_POSTS: WPPost[] = [
     content: `<p>Local SEO is essential for businesses that serve a geographic area. This guide covers the fundamentals.</p>`,
     date: "2024-03-13T11:00:00Z",
     modified: "2024-03-13T11:00:00Z",
+    featuredImage: {
+      node: {
+        sourceUrl: "https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80",
+        altText: "Map and location",
+      },
+    },
     categories: { nodes: [{ slug: "seo", name: "SEO" }] },
     tags: { nodes: [] },
   },
@@ -102,6 +109,12 @@ export const SAMPLE_POSTS: WPPost[] = [
     content: `<p>Content marketing builds long-term organic traffic and authority. Learn how to create content that resonates.</p>`,
     date: "2024-03-13T10:00:00Z",
     modified: "2024-03-13T10:00:00Z",
+    featuredImage: {
+      node: {
+        sourceUrl: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?w=800&q=80",
+        altText: "Content marketing",
+      },
+    },
     categories: { nodes: [{ slug: "marketing", name: "Marketing" }] },
     tags: { nodes: [] },
   },
@@ -113,6 +126,12 @@ export const SAMPLE_POSTS: WPPost[] = [
     content: `<p>Mobile-first design ensures your site performs well on the devices your audience actually uses. We'll cover the why and how.</p>`,
     date: "2024-03-13T09:00:00Z",
     modified: "2024-03-13T09:00:00Z",
+    featuredImage: {
+      node: {
+        sourceUrl: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=800&q=80",
+        altText: "Mobile phone",
+      },
+    },
     categories: { nodes: [{ slug: "guides", name: "Guides" }] },
     tags: { nodes: [] },
   },

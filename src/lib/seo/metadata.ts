@@ -64,7 +64,7 @@ export function getPageMetadata({
       canonical: url,
     },
     openGraph: {
-      type: "article",
+      type: publishedTime ? "article" : "website",
       url,
       title: `${title} | ${SITE_NAME}`,
       description,

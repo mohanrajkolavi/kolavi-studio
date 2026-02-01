@@ -4,7 +4,8 @@ import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { SAMPLE_POSTS } from "@/lib/sample-posts";
+import { getPosts } from "@/lib/blog-data";
+import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
@@ -56,9 +57,9 @@ async function getCategory(slug: string) {
   const categoryInfo = CATEGORIES[slug as keyof typeof CATEGORIES];
   if (!categoryInfo) return null;
 
-  // Filter posts by category slug
-  const posts = SAMPLE_POSTS.filter((post) =>
-    post.categories.nodes.some((cat) => cat.slug === slug)
+  const allPosts = await getPosts();
+  const posts = allPosts.filter((post) =>
+    post.categories?.nodes?.some((cat) => cat.slug === slug)
   );
 
   return {
@@ -117,13 +118,13 @@ export default async function CategoryPage({ params }: PageProps) {
     { name: category.name, url: `/blog/category/${slug}` },
   ]);
 
-  // Collection List Schema for SEO
+  // Collection List Schema for SEO (WordPress headless compatible)
   const collectionSchema = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: `${category.name} Articles`,
     description: categoryInfo.longDescription,
-    url: `https://kolavistudio.com/blog/category/${slug}`,
+    url: `${SITE_URL}/blog/category/${slug}`,
     about: {
       "@type": "Thing",
       name: category.name,
