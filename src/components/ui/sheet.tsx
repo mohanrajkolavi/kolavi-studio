@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+
+const SheetContext = React.createContext<{
+  open: boolean;
+  onCloseAnimationEnd: () => void;
+}>({ open: false, onCloseAnimationEnd: () => {} });
 
 interface SheetProps {
   open: boolean;
@@ -9,17 +15,45 @@ interface SheetProps {
   children: React.ReactNode;
 }
 
+const CLOSE_ANIMATION_MS = 300;
+
 export function Sheet({ open, onOpenChange, children }: SheetProps) {
-  return (
-    <>
-      {open && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80"
-          onClick={() => onOpenChange(false)}
-        />
-      )}
+  const [mounted, setMounted] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(open);
+
+  React.useEffect(() => setMounted(true), []);
+
+  React.useEffect(() => {
+    if (open) setIsVisible(true);
+  }, [open]);
+
+  const onCloseAnimationEnd = React.useCallback(() => {
+    setIsVisible(false);
+  }, []);
+
+  React.useEffect(() => {
+    if (!open && isVisible) {
+      const fallback = setTimeout(
+        () => setIsVisible(false),
+        CLOSE_ANIMATION_MS
+      );
+      return () => clearTimeout(fallback);
+    }
+  }, [open, isVisible]);
+
+  if (!mounted || typeof document === "undefined") return null;
+  if (!isVisible) return null;
+
+  return createPortal(
+    <SheetContext.Provider value={{ open, onCloseAnimationEnd }}>
+      <div
+        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm"
+        onClick={() => onOpenChange(false)}
+        aria-hidden
+      />
       {children}
-    </>
+    </SheetContext.Provider>,
+    document.body
   );
 }
 
@@ -29,22 +63,32 @@ interface SheetContentProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export const SheetContent = React.forwardRef<HTMLDivElement, SheetContentProps>(
   ({ side = "right", className, children, ...props }, ref) => {
+    const { open, onCloseAnimationEnd } = React.useContext(SheetContext);
     const sideClasses = {
-      left: "inset-y-0 left-0 h-full w-3/4 border-r sm:max-w-sm",
-      right: "inset-y-0 right-0 h-full w-3/4 border-l sm:max-w-sm",
-      top: "inset-x-0 top-0 border-b",
-      bottom: "inset-x-0 bottom-0 border-t",
+      left: "inset-y-0 left-0 h-full w-3/4 max-w-sm border-r",
+      right: "inset-y-0 right-0 h-full w-3/4 max-w-sm border-l",
+      top: "inset-x-0 top-0 w-full border-b",
+      bottom: "inset-x-0 bottom-0 w-full border-t",
+    };
+
+    const handleAnimationEnd = (e: React.AnimationEvent<HTMLDivElement>) => {
+      if (!open && e.target === e.currentTarget) {
+        onCloseAnimationEnd();
+      }
+      props.onAnimationEnd?.(e);
     };
 
     return (
       <div
         ref={ref}
+        data-state={open ? "open" : "closed"}
         className={cn(
-          "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
+          "fixed z-[101] gap-4 border-border bg-background p-6 shadow-xl transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
           sideClasses[side],
           className
         )}
         {...props}
+        onAnimationEnd={handleAnimationEnd}
       >
         {children}
       </div>
