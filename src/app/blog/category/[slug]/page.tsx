@@ -84,7 +84,7 @@ export async function generateMetadata({ params }: PageProps) {
     title: `${category.name} Articles & Resources | ${categoryInfo.tagline}`,
     description: `${categoryInfo.longDescription} Browse ${postCount} expert article${postCount !== 1 ? 's' : ''} on ${category.name.toLowerCase()}.`,
     path: `/blog/category/${slug}`,
-    keywords: [category.name, ...categoryInfo.relatedTopics, "digital marketing", "business growth"],
+    keywords: [category.name, ...categoryInfo.relatedTopics, "digital marketing", "business growth"].join(", "),
   });
 }
 
