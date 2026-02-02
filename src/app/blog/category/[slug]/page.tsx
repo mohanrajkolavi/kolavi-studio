@@ -1,10 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { getPosts } from "@/lib/blog-data";
+import { getCategoryBySlug, getAllCategorySlugs } from "@/lib/blog-data";
 import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
@@ -13,86 +12,68 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-// Define available categories with enhanced descriptions and metadata
-const CATEGORIES = {
+// Optional visual styles per category slug (WordPress provides name/description only)
+const CATEGORY_STYLES: Record<
+  string,
+  { icon: string; color: string; tagline?: string }
+> = {
   seo: {
-    name: "SEO",
-    tagline: "Master Search Engine Optimization",
-    description: "Learn search engine optimization strategies to improve your website's visibility and attract more organic traffic.",
-    longDescription: "Discover proven SEO techniques, algorithm updates, and best practices that help businesses rank higher in search results. From technical SEO to content optimization, we cover everything you need to dominate search engines.",
     icon: "🔍",
     color: "from-blue-500 to-cyan-500",
-    relatedTopics: ["Technical SEO", "Local SEO", "Content Strategy", "Link Building"],
+    tagline: "Master Search Engine Optimization",
   },
   guides: {
-    name: "Guides",
-    tagline: "Step-by-Step Digital Marketing Tutorials",
-    description: "Comprehensive guides and tutorials to help you master digital marketing and grow your business.",
-    longDescription: "In-depth, actionable guides that walk you through complex digital marketing strategies. Whether you're a beginner or expert, our tutorials provide clear steps to achieve your marketing goals.",
     icon: "📚",
     color: "from-purple-500 to-pink-500",
-    relatedTopics: ["Getting Started", "Advanced Tactics", "Tools & Resources", "Best Practices"],
+    tagline: "Step-by-Step Digital Marketing Tutorials",
   },
   marketing: {
-    name: "Marketing",
-    tagline: "Grow Your Business with Smart Marketing",
-    description: "Discover effective marketing strategies and tactics to reach your target audience and drive results.",
-    longDescription: "Explore cutting-edge marketing strategies that drive real business growth. From content marketing to social media, learn how to create campaigns that resonate with your audience and deliver measurable ROI.",
     icon: "📈",
     color: "from-orange-500 to-red-500",
-    relatedTopics: ["Content Marketing", "Social Media", "Email Marketing", "Analytics"],
+    tagline: "Grow Your Business with Smart Marketing",
   },
   "medical-spa-marketing": {
-    name: "Medical Spa Marketing",
-    tagline: "Attract More Clients to Your Med Spa",
-    description: "Specialized marketing strategies for medical spas to attract more clients and grow your practice.",
-    longDescription: "Industry-specific marketing insights for medical spas and aesthetic practices. Learn how to navigate compliance, build trust, and attract high-value clients in the competitive med spa industry.",
     icon: "💆",
     color: "from-teal-500 to-emerald-500",
-    relatedTopics: ["Patient Acquisition", "Online Reputation", "Before & After Marketing", "Compliance"],
+    tagline: "Attract More Clients to Your Med Spa",
   },
+  automation: { icon: "⚙️", color: "from-slate-500 to-slate-600" },
+  compliance: { icon: "✓", color: "from-emerald-500 to-teal-500" },
+  design: { icon: "🎨", color: "from-violet-500 to-purple-500" },
+  growth: { icon: "📈", color: "from-amber-500 to-orange-500" },
+  insights: { icon: "💡", color: "from-yellow-500 to-amber-500" },
 };
 
-async function getCategory(slug: string) {
-  const categoryInfo = CATEGORIES[slug as keyof typeof CATEGORIES];
-  if (!categoryInfo) return null;
+const DEFAULT_STYLE = { icon: "📁", color: "from-orange-500 to-orange-600" };
 
-  const allPosts = await getPosts();
-  const posts = allPosts.filter((post) =>
-    post.categories?.nodes?.some((cat) => cat.slug === slug)
-  );
-
-  return {
-    slug,
-    name: categoryInfo.name,
-    description: categoryInfo.description,
-    posts: { nodes: posts },
-  };
+function getCategoryStyle(slug: string) {
+  return CATEGORY_STYLES[slug] ?? DEFAULT_STYLE;
 }
 
 export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
-  const category = await getCategory(slug);
+  const category = await getCategoryBySlug(slug);
 
   if (!category) {
     return {};
   }
 
-  const categoryInfo = CATEGORIES[slug as keyof typeof CATEGORIES];
   const postCount = category.posts.nodes.length;
+  const description =
+    category.description?.replace(/<[^>]*>/g, "").trim() ||
+    `Browse ${postCount} article${postCount !== 1 ? "s" : ""} in ${category.name}.`;
 
   return getPageMetadata({
-    title: `${category.name} Articles & Resources | ${categoryInfo.tagline}`,
-    description: `${categoryInfo.longDescription} Browse ${postCount} expert article${postCount !== 1 ? 's' : ''} on ${category.name.toLowerCase()}.`,
+    title: `${category.name} Articles & Resources | Kolavi Studio`,
+    description,
     path: `/blog/category/${slug}`,
-    keywords: [category.name, ...categoryInfo.relatedTopics, "digital marketing", "business growth"].join(", "),
+    keywords: [category.name, "digital marketing", "business growth"].join(", "),
   });
 }
 
 export async function generateStaticParams() {
-  return Object.keys(CATEGORIES).map((slug) => ({
-    slug,
-  }));
+  const slugs = await getAllCategorySlugs();
+  return slugs.map(({ slug }) => ({ slug }));
 }
 
 function stripHtml(html: string): string {
@@ -101,16 +82,18 @@ function stripHtml(html: string): string {
 
 export default async function CategoryPage({ params }: PageProps) {
   const { slug } = await params;
-  const category = await getCategory(slug);
+  const category = await getCategoryBySlug(slug);
 
   if (!category) {
     notFound();
   }
 
-  const categoryInfo = CATEGORIES[slug as keyof typeof CATEGORIES];
+  const style = getCategoryStyle(slug);
   const postCount = category.posts.nodes.length;
   const latestPost = category.posts.nodes[0];
   const olderPosts = category.posts.nodes.slice(1);
+  const descriptionPlain =
+    category.description?.replace(/<[^>]*>/g, "").trim() || "";
 
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", url: "/" },
@@ -118,17 +101,18 @@ export default async function CategoryPage({ params }: PageProps) {
     { name: category.name, url: `/blog/category/${slug}` },
   ]);
 
-  // Collection List Schema for SEO (WordPress headless compatible)
   const collectionSchema = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: `${category.name} Articles`,
-    description: categoryInfo.longDescription,
+    description:
+      descriptionPlain ||
+      `Browse articles in ${category.name}.`,
     url: `${SITE_URL}/blog/category/${slug}`,
     about: {
       "@type": "Thing",
       name: category.name,
-      description: categoryInfo.description,
+      description: descriptionPlain || category.name,
     },
     numberOfItems: postCount,
   };
@@ -146,8 +130,7 @@ export default async function CategoryPage({ params }: PageProps) {
 
       {/* Hero Section with Gradient */}
       <section className="relative overflow-hidden border-b border-border bg-background">
-        {/* Gradient Background */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${categoryInfo.color} opacity-5`} />
+        <div className={`absolute inset-0 bg-gradient-to-br ${style.color} opacity-5`} />
         
         <div className="relative py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -167,11 +150,11 @@ export default async function CategoryPage({ params }: PageProps) {
 
               {/* Category Icon & Badge */}
               <div className="mb-6 flex items-center gap-3">
-                <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${categoryInfo.color} text-3xl shadow-lg`}>
-                  {categoryInfo.icon}
+                <div className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${style.color} text-3xl shadow-lg`}>
+                  {style.icon}
                 </div>
                 <div className="rounded-full bg-muted px-4 py-1.5 text-sm font-medium text-foreground">
-                  {postCount} Article{postCount !== 1 ? 's' : ''}
+                  {postCount} Article{postCount !== 1 ? "s" : ""}
                 </div>
               </div>
 
@@ -180,26 +163,21 @@ export default async function CategoryPage({ params }: PageProps) {
                 {category.name}
               </h1>
               
-              <p className="mb-3 text-xl font-medium text-muted-foreground sm:text-2xl">
-                {categoryInfo.tagline}
-              </p>
+              {style.tagline && (
+                <p className="mb-3 text-xl font-medium text-muted-foreground sm:text-2xl">
+                  {style.tagline}
+                </p>
+              )}
 
-              <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
-                {categoryInfo.longDescription}
-              </p>
-
-              {/* Related Topics */}
-              <div className="flex flex-wrap gap-2">
-                <span className="text-sm font-medium text-muted-foreground">Related topics:</span>
-                {categoryInfo.relatedTopics.map((topic) => (
-                  <span
-                    key={topic}
-                    className="rounded-full bg-card px-3 py-1 text-sm font-medium text-foreground shadow-sm ring-1 ring-border"
-                  >
-                    {topic}
-                  </span>
-                ))}
-              </div>
+              {descriptionPlain ? (
+                <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
+                  {descriptionPlain}
+                </p>
+              ) : (
+                <p className="mb-8 text-lg leading-relaxed text-muted-foreground">
+                  Browse our latest articles and resources in {category.name}.
+                </p>
+              )}
 
               {/* CTA for Medical Spa Marketing */}
               {slug === "medical-spa-marketing" && (
@@ -234,7 +212,7 @@ export default async function CategoryPage({ params }: PageProps) {
                 className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-xl dark:hover:border-orange-800"
               >
                 <article className="grid gap-0 md:grid-cols-2">
-                  {latestPost.featuredImage && (
+                  {latestPost.featuredImage?.node?.sourceUrl && (
                     <div className="relative h-64 md:h-full">
                       <Image
                         src={latestPost.featuredImage.node.sourceUrl}
@@ -294,7 +272,7 @@ export default async function CategoryPage({ params }: PageProps) {
                     className="group block"
                   >
                     <article className="h-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-lg dark:hover:border-orange-800">
-                      {post.featuredImage && (
+                      {post.featuredImage?.node?.sourceUrl ? (
                         <div className="relative h-48 overflow-hidden">
                           <Image
                             src={post.featuredImage.node.sourceUrl}
@@ -305,6 +283,8 @@ export default async function CategoryPage({ params }: PageProps) {
                             loading={index < 6 ? "eager" : "lazy"}
                           />
                         </div>
+                      ) : (
+                        <div className="h-48 bg-muted" />
                       )}
                       <div className="p-6">
                         <time className="mb-2 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -335,7 +315,7 @@ export default async function CategoryPage({ params }: PageProps) {
         <section className="py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl text-center">
-              <div className="mb-6 text-6xl">{categoryInfo.icon}</div>
+              <div className="mb-6 text-6xl">{style.icon}</div>
               <h2 className="mb-4 text-2xl font-bold text-foreground">
                 No articles yet
               </h2>
