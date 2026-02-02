@@ -31,7 +31,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <ThemeProvider>
           <Header />
-          <main id="main-content" className="min-h-screen overflow-x-hidden">{children}</main>
+          <main id="main-content" className="min-h-screen overflow-x-clip">{children}</main>
           <Footer />
         </ThemeProvider>
       </body>
