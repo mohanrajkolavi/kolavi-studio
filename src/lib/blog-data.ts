@@ -1,26 +1,43 @@
 /**
  * Blog data layer: single place for post/category/tag access.
- * Currently uses sample data; swap to WPGraphQL (or REST) by replacing
- * the implementations below. All consumers use WPPost/WPCategory/WPTag types
- * so no component changes are needed when switching to WordPress headless.
+ * Uses WPGraphQL when NEXT_PUBLIC_WP_GRAPHQL_URL is set; otherwise falls back
+ * to sample data so the site works before WordPress is connected.
  */
 
-import type { WPPost, WPCategory, WPTag } from "@/lib/graphql/types";
+import type {
+  WPPost,
+  WPCategory,
+  WPTag,
+  PostsResponse,
+  PostBySlugResponse,
+} from "@/lib/graphql/types";
+import { request } from "@/lib/graphql/client";
+import { GET_POSTS, GET_POST_BY_SLUG } from "@/lib/graphql/queries";
 import { SAMPLE_POSTS } from "@/lib/sample-posts";
-import { SITE_NAME, SITE_URL } from "@/lib/constants";
+import { SITE_NAME, SITE_URL, WP_GRAPHQL_URL } from "@/lib/constants";
 
 export async function getPosts(): Promise<WPPost[]> {
-  // TODO: When using WordPress headless, replace with:
-  // const res = await fetch(GraphQL endpoint, { query: POSTS_QUERY });
-  // return res.posts.nodes;
-  return SAMPLE_POSTS;
+  if (!WP_GRAPHQL_URL?.trim()) return SAMPLE_POSTS;
+  try {
+    const data = await request<PostsResponse>(GET_POSTS, { first: 100 });
+    return data.posts?.nodes ?? [];
+  } catch (error) {
+    console.error("getPosts (WPGraphQL):", error);
+    return SAMPLE_POSTS;
+  }
 }
 
 export async function getPostBySlug(slug: string): Promise<WPPost | null> {
-  // TODO: When using WordPress headless, replace with:
-  // const res = await fetch(GraphQL endpoint, { query: POST_BY_SLUG_QUERY, variables: { slug } });
-  // return res.post ?? null;
-  return SAMPLE_POSTS.find((p) => p.slug === slug) ?? null;
+  if (!WP_GRAPHQL_URL?.trim()) {
+    return SAMPLE_POSTS.find((p) => p.slug === slug) ?? null;
+  }
+  try {
+    const data = await request<PostBySlugResponse>(GET_POST_BY_SLUG, { slug });
+    return data.post ?? null;
+  } catch (error) {
+    console.error("getPostBySlug (WPGraphQL):", error);
+    return SAMPLE_POSTS.find((p) => p.slug === slug) ?? null;
+  }
 }
 
 /** All unique categories derived from posts. With WP headless, can instead query categories list from GraphQL. */

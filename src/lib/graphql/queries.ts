@@ -19,6 +19,13 @@ export const GET_POSTS = `
             name
           }
         }
+        author {
+          node {
+            name
+            slug
+            url
+          }
+        }
       }
       pageInfo {
         hasNextPage
@@ -44,6 +51,10 @@ export const GET_POST_BY_SLUG = `
         node {
           sourceUrl
           altText
+          mediaDetails {
+            width
+            height
+          }
         }
       }
       categories {
@@ -56,6 +67,13 @@ export const GET_POST_BY_SLUG = `
         nodes {
           slug
           name
+        }
+      }
+      author {
+        node {
+          name
+          slug
+          url
         }
       }
     }
@@ -98,6 +116,13 @@ export const GET_CATEGORY_BY_SLUG = `
             nodes {
               slug
               name
+            }
+          }
+          author {
+            node {
+              name
+              slug
+              url
             }
           }
         }
@@ -145,6 +170,13 @@ export const GET_TAG_BY_SLUG = `
             nodes {
               slug
               name
+            }
+          }
+          author {
+            node {
+              name
+              slug
+              url
             }
           }
         }

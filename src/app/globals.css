@@ -64,9 +64,24 @@
   * {
     @apply border-border;
   }
+  html {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    overflow-x: hidden;
+  }
+  /* Prevent overscroll rubber-banding on main content for premium feel */
+  body.overflow-hidden {
+    overflow: hidden;
+    touch-action: none;
   }
 }
 

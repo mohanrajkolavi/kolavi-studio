@@ -21,12 +21,12 @@ export function Footer() {
           {/* Navigation */}
           <div>
             <h3 className="text-sm font-semibold">Navigation</h3>
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4 space-y-1">
               {NAV_LINKS.slice(0, 4).map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
                   >
                     {link.name}
                   </Link>
@@ -38,28 +38,19 @@ export function Footer() {
           {/* Resources */}
           <div>
             <h3 className="text-sm font-semibold">Resources</h3>
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4 space-y-1">
               <li>
-                <Link
-                  href="/blog"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
+                <Link href="/blog" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
                   Blog
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/portfolio"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
+                <Link href="/portfolio" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
                   Portfolio
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/about"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
+                <Link href="/about" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
                   About Us
                 </Link>
               </li>
@@ -69,12 +60,9 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h3 className="text-sm font-semibold">Get in Touch</h3>
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4 space-y-1">
               <li>
-                <Link
-                  href="/contact"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                >
+                <Link href="/contact" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
                   Contact Us
                 </Link>
               </li>
