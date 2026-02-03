@@ -6,13 +6,6 @@ import { useState } from "react";
 import type { WPPost } from "@/lib/graphql/types";
 import { stripHtml, truncateToWords, calculateReadingTime } from "@/lib/blog-utils";
 
-const BLOG_TOPICS = [
-  { slug: "seo", name: "SEO" },
-  { slug: "guides", name: "Guides" },
-  { slug: "marketing", name: "Marketing" },
-  { slug: "medical-spa-marketing", name: "Medical Spa" },
-] as const;
-
 function getCategoryPostCount(posts: WPPost[], slug: string): number {
   return posts.filter((post) =>
     post.categories?.nodes?.some((c) => c.slug === slug)
@@ -26,11 +19,18 @@ function filterPostsByCategory(posts: WPPost[], slug: string | null): WPPost[] {
   );
 }
 
-interface BlogContentProps {
-  posts: WPPost[];
+export interface BlogCategory {
+  slug: string;
+  name: string;
 }
 
-export function BlogContent({ posts }: BlogContentProps) {
+interface BlogContentProps {
+  posts: WPPost[];
+  /** Categories derived from posts (e.g. getCategoriesFromPosts). Used for filter tabs. */
+  categories: BlogCategory[];
+}
+
+export function BlogContent({ posts, categories }: BlogContentProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const filteredPosts = filterPostsByCategory(posts, selectedCategory);
   const featuredPost = filteredPosts[0];
@@ -95,7 +95,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                       {featuredPost.title}
                     </h3>
                     <p className="mt-4 text-base leading-relaxed text-muted-foreground lg:text-lg">
-                      {truncateToWords(stripHtml(featuredPost.excerpt || ""), 30)}
+                      {truncateToWords(stripHtml(featuredPost.excerpt || ""), 20)}
                     </p>
                     <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-all group-hover:gap-4">
                       Read article
@@ -132,22 +132,24 @@ export function BlogContent({ posts }: BlogContentProps) {
               >
                 All posts
               </button>
-              {BLOG_TOPICS.map((topic) => {
-                const count = getCategoryPostCount(posts, topic.slug);
+              {[...categories]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((cat) => {
+                const count = getCategoryPostCount(posts, cat.slug);
                 if (count === 0) return null;
-                const isActive = selectedCategory === topic.slug;
+                const isActive = selectedCategory === cat.slug;
                 return (
                   <button
-                    key={topic.slug}
+                    key={cat.slug}
                     type="button"
-                    onClick={() => setSelectedCategory(topic.slug)}
+                    onClick={() => setSelectedCategory(cat.slug)}
                     className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                       isActive
                         ? "bg-orange-500 text-white"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    {topic.name} ({count})
+                    {cat.name} ({count})
                   </button>
                 );
               })}
@@ -200,7 +202,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                           {post.title}
                         </h3>
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                          {truncateToWords(stripHtml(post.excerpt || ""), 30)}
+                          {truncateToWords(stripHtml(post.excerpt || ""), 20)}
                         </p>
                         <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 opacity-0 transition-opacity group-hover:opacity-100">
                           Read article

@@ -133,7 +133,7 @@ export default async function BlogPage() {
         </div>
       </section>
 
-      <BlogContent posts={posts} />
+      <BlogContent posts={posts} categories={categories} />
 
       {/* Empty state (only when no posts at all) */}
       {posts.length === 0 && (

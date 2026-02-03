@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
 import { getPosts, getTagsFromPosts } from "@/lib/blog-data";
+import { stripHtml, truncateToWords } from "@/lib/blog-utils";
 import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
@@ -134,10 +135,9 @@ export default async function TagPage({ params }: PageProps) {
                       <CardTitle className="line-clamp-2">{post.title}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <CardDescription
-                        className="line-clamp-3"
-                        dangerouslySetInnerHTML={{ __html: post.excerpt }}
-                      />
+                      <CardDescription className="line-clamp-3">
+                        {truncateToWords(stripHtml(post.excerpt || ""), 20)}
+                      </CardDescription>
                       <p className="mt-4 text-sm text-muted-foreground">
                         {new Date(post.date).toLocaleDateString("en-US", {
                           year: "numeric",

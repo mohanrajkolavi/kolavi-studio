@@ -4,6 +4,7 @@ import Image from "next/image";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
 import { getCategoryBySlug, getAllCategorySlugs } from "@/lib/blog-data";
+import { truncateToWords } from "@/lib/blog-utils";
 import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
@@ -236,7 +237,7 @@ export default async function CategoryPage({ params }: PageProps) {
                       {latestPost.title}
                     </h3>
                     <p className="mb-6 text-lg leading-relaxed text-muted-foreground">
-                      {stripHtml(latestPost.excerpt)}
+                      {truncateToWords(stripHtml(latestPost.excerpt || ""), 20)}
                     </p>
                     <span className="inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-gap group-hover:gap-3">
                       Read article
@@ -298,7 +299,7 @@ export default async function CategoryPage({ params }: PageProps) {
                           {post.title}
                         </h3>
                         <p className="line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                          {stripHtml(post.excerpt)}
+                          {truncateToWords(stripHtml(post.excerpt ?? ""), 20)}
                         </p>
                       </div>
                     </article>
