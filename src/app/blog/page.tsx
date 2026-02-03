@@ -8,7 +8,7 @@ import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60;
 
-export const metadata = getPageMetadata({
+const blogPageMetadata = getPageMetadata({
   title: "Blog & Resources – Digital Marketing Insights | Kolavi Studio",
   description:
     "Expert strategies on SEO, conversion optimization, content marketing, and business growth. Proven tactics and actionable guides for medical spas, service businesses, and brands.",
@@ -16,6 +16,16 @@ export const metadata = getPageMetadata({
   keywords:
     "digital marketing blog, SEO tips, conversion optimization, content marketing, medical spa marketing, local SEO, web design, business growth",
 });
+
+export const metadata = {
+  ...blogPageMetadata,
+  alternates: {
+    ...blogPageMetadata.alternates,
+    types: {
+      "application/rss+xml": `${SITE_URL}/blog/rss`,
+    },
+  },
+};
 
 export default async function BlogPage() {
   const rawPosts = await getPosts();

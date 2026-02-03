@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import type { WPPost } from "@/lib/graphql/types";
 import { stripHtml, truncateToWords, calculateReadingTime } from "@/lib/blog-utils";
 
@@ -17,6 +18,19 @@ function filterPostsByCategory(posts: WPPost[], slug: string | null): WPPost[] {
   return posts.filter((post) =>
     post.categories?.nodes?.some((c) => c.slug === slug)
   );
+}
+
+function filterPostsBySearch(posts: WPPost[], query: string): WPPost[] {
+  if (!query.trim()) return posts;
+  const q = query.trim().toLowerCase();
+  return posts.filter((post) => {
+    const title = (post.title || "").toLowerCase();
+    const excerpt = stripHtml(post.excerpt || "").toLowerCase();
+    const categoryNames = (post.categories?.nodes ?? [])
+      .map((c) => c.name.toLowerCase())
+      .join(" ");
+    return title.includes(q) || excerpt.includes(q) || categoryNames.includes(q);
+  });
 }
 
 export interface BlogCategory {
@@ -39,14 +53,16 @@ function sortPostsByDateNewestFirst(posts: WPPost[]): WPPost[] {
 
 export function BlogContent({ posts, categories }: BlogContentProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const sortedAllPosts = useMemo(() => sortPostsByDateNewestFirst(posts), [posts]);
-  // "All posts" = full list (newest first); category tab = filter by that category, also newest first
+  // Category filter first, then search within that set
   const displayPosts = useMemo(() => {
-    if (selectedCategory === null) return sortedAllPosts;
-    return sortPostsByDateNewestFirst(
-      filterPostsByCategory(posts, selectedCategory)
-    );
-  }, [posts, selectedCategory, sortedAllPosts]);
+    const byCategory =
+      selectedCategory === null
+        ? sortedAllPosts
+        : sortPostsByDateNewestFirst(filterPostsByCategory(posts, selectedCategory));
+    return filterPostsBySearch(byCategory, searchQuery);
+  }, [posts, selectedCategory, sortedAllPosts, searchQuery]);
   const isAllPosts = selectedCategory === null;
   // Featured = always the latest post from ALL posts; independent of tab selection.
   const featuredPost = sortedAllPosts.length > 0 ? sortedAllPosts[0] : null;
@@ -132,44 +148,71 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
       <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
-            {/* Category tabs */}
-            <nav
-              className="mb-10 flex flex-wrap items-center gap-3 border-b border-border pb-6"
-              aria-label="Filter by category"
-            >
-              <button
-                type="button"
-                onClick={() => setSelectedCategory(null)}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  selectedCategory === null
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
+            {/* Category tabs + Search */}
+            <div className="mb-10 flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+              <nav
+                className="flex flex-wrap items-center gap-3"
+                aria-label="Filter by category"
               >
-                All posts
-              </button>
-              {[...categories]
-                .sort((a, b) => a.name.localeCompare(b.name))
-                .map((cat) => {
-                const count = getCategoryPostCount(posts, cat.slug);
-                if (count === 0) return null;
-                const isActive = selectedCategory === cat.slug;
-                return (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory(null)}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    selectedCategory === null
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  All posts
+                </button>
+                {[...categories]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((cat) => {
+                  const count = getCategoryPostCount(posts, cat.slug);
+                  if (count === 0) return null;
+                  const isActive = selectedCategory === cat.slug;
+                  return (
+                    <button
+                      key={cat.slug}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat.slug)}
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        isActive
+                          ? "bg-orange-500 text-white"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      {cat.name} ({count})
+                    </button>
+                  );
+                })}
+              </nav>
+              {/* Search */}
+              <div className="relative flex-shrink-0 sm:min-w-[200px]">
+                <Search
+                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  aria-hidden
+                />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search posts…"
+                  className={`w-full rounded-full border border-border bg-background py-2 pl-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${searchQuery ? "pr-12" : "pr-4"}`}
+                  aria-label="Search blog posts"
+                />
+                {searchQuery && (
                   <button
-                    key={cat.slug}
                     type="button"
-                    onClick={() => setSelectedCategory(cat.slug)}
-                    className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-orange-500 text-white"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Clear search"
                   >
-                    {cat.name} ({count})
+                    Clear
                   </button>
-                );
-              })}
-            </nav>
+                )}
+              </div>
+            </div>
 
             {/* Articles - card grid */}
             {gridPosts.length > 0 ? (
@@ -241,19 +284,36 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
       </section>
       )}
 
-      {/* Empty state when filtered */}
+      {/* Empty state when filtered or no search results */}
       {displayPosts.length === 0 && (
         <section className="border-b border-border bg-background py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-border bg-muted/50 py-16 text-center">
-              <p className="text-lg font-medium text-foreground">No articles in this category yet</p>
-              <button
-                type="button"
-                onClick={() => setSelectedCategory(null)}
-                className="mt-4 text-sm font-semibold text-orange-600 hover:text-orange-700 hover:underline"
-              >
-                View all posts
-              </button>
+              <p className="text-lg font-medium text-foreground">
+                {searchQuery.trim()
+                  ? "No posts match your search."
+                  : "No articles in this category yet"}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="text-sm font-semibold text-orange-600 hover:text-orange-700 hover:underline"
+                  >
+                    Clear search
+                  </button>
+                )}
+                {selectedCategory !== null && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory(null)}
+                    className="text-sm font-semibold text-orange-600 hover:text-orange-700 hover:underline"
+                  >
+                    View all posts
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </section>

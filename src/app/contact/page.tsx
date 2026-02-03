@@ -1,3 +1,4 @@
+import Script from "next/script";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,11 @@ const CONTACT_FAQ_ITEMS = [
   },
 ];
 
+const TYPEFORM_EMBED_URL = process.env.NEXT_PUBLIC_TYPEFORM_EMBED_URL;
+const TALLY_EMBED_URL = process.env.NEXT_PUBLIC_TALLY_FORM_EMBED_URL;
+const GOOGLE_FORM_EMBED_URL = process.env.NEXT_PUBLIC_GOOGLE_FORM_EMBED_URL;
+const USE_THIRD_PARTY_FORM = TYPEFORM_EMBED_URL || TALLY_EMBED_URL || GOOGLE_FORM_EMBED_URL;
+
 export default function ContactPage() {
   const faqSchema = getFAQSchema(CONTACT_FAQ_ITEMS);
   return (
@@ -47,32 +53,54 @@ export default function ContactPage() {
               </p>
             </div>
 
+            {USE_THIRD_PARTY_FORM ? (
+              <div className="mt-12 min-h-[500px] w-full overflow-hidden rounded-lg border bg-muted/30">
+                {TYPEFORM_EMBED_URL ? (
+                  <>
+                    <Script
+                      src="https://embed.typeform.com/next/embed.js"
+                      strategy="lazyOnload"
+                    />
+                    <div
+                      data-tf-live={TYPEFORM_EMBED_URL}
+                      className="min-h-[600px] w-full"
+                    />
+                  </>
+                ) : TALLY_EMBED_URL ? (
+                  <>
+                    <Script
+                      src="https://tally.so/widgets/embed.js"
+                      strategy="lazyOnload"
+                    />
+                    <iframe
+                      data-tally-embed
+                      src={TALLY_EMBED_URL}
+                      title="Contact form"
+                      className="h-[600px] w-full border-0"
+                    />
+                  </>
+                ) : GOOGLE_FORM_EMBED_URL ? (
+                  <iframe
+                    src={GOOGLE_FORM_EMBED_URL}
+                    title="Contact form"
+                    className="h-[600px] w-full border-0"
+                    frameBorder={0}
+                  />
+                ) : null}
+              </div>
+            ) : (
             <form className="mt-12 space-y-6">
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium">
-                    First Name
-                  </label>
-                  <Input
-                    type="text"
-                    id="firstName"
-                    name="firstName"
-                    className="mt-2"
-                    required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium">
-                    Last Name
-                  </label>
-                  <Input
-                    type="text"
-                    id="lastName"
-                    name="lastName"
-                    className="mt-2"
-                    required
-                  />
-                </div>
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium">
+                  Name
+                </label>
+                <Input
+                  type="text"
+                  id="name"
+                  name="name"
+                  className="mt-2"
+                  required
+                />
               </div>
 
               <div>
@@ -137,6 +165,7 @@ export default function ContactPage() {
                 </Button>
               </div>
             </form>
+            )}
 
             <div className="mt-12 border-t pt-12">
               <h2 className="text-2xl font-bold">Other Ways to Reach Us</h2>
