@@ -99,6 +99,7 @@ export default async function CategoryPage({ params }: PageProps) {
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", url: "/" },
     { name: "Blog", url: "/blog" },
+    { name: "Category", url: "/blog/category" },
     { name: category.name, url: `/blog/category/${slug}` },
   ]);
 
@@ -144,6 +145,10 @@ export default async function CategoryPage({ params }: PageProps) {
                 <span>/</span>
                 <Link href="/blog" className="hover:text-foreground transition-colors">
                   Blog
+                </Link>
+                <span>/</span>
+                <Link href="/blog/category" className="hover:text-foreground transition-colors">
+                  Category
                 </Link>
                 <span>/</span>
                 <span className="font-medium text-foreground">{category.name}</span>

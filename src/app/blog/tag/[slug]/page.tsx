@@ -75,6 +75,7 @@ export default async function TagPage({ params }: PageProps) {
   const breadcrumbSchema = getBreadcrumbSchema([
     { name: "Home", url: "/" },
     { name: "Blog", url: "/blog" },
+    { name: "Tag", url: "/blog/tag" },
     { name: tag.name, url: `/blog/tag/${slug}` },
   ]);
 
@@ -103,16 +104,20 @@ export default async function TagPage({ params }: PageProps) {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl">
             {/* Breadcrumb */}
-            <nav aria-label="Breadcrumb" className="mb-8 text-sm text-muted-foreground">
-              <Link href="/" className="hover:text-foreground">
+            <nav aria-label="Breadcrumb" className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
+              <Link href="/" className="hover:text-foreground transition-colors">
                 Home
               </Link>
-              {" / "}
-              <Link href="/blog" className="hover:text-foreground">
+              <span>/</span>
+              <Link href="/blog" className="hover:text-foreground transition-colors">
                 Blog
               </Link>
-              {" / "}
-              <span className="text-foreground">{tag.name}</span>
+              <span>/</span>
+              <Link href="/blog/tag" className="hover:text-foreground transition-colors">
+                Tag
+              </Link>
+              <span>/</span>
+              <span className="font-medium text-foreground">{tag.name}</span>
             </nav>
 
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
