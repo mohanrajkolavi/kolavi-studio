@@ -57,13 +57,15 @@ export default function ContactPage() {
               <div className="mt-12 min-h-[500px] w-full overflow-hidden rounded-lg border bg-muted/30">
                 {TYPEFORM_EMBED_URL ? (
                   <>
+                    <div
+                      data-tf-widget={TYPEFORM_EMBED_URL}
+                      data-tf-live={TYPEFORM_EMBED_URL}
+                      data-tf-inline-on-mobile
+                      className="min-h-[600px] w-full"
+                    />
                     <Script
                       src="https://embed.typeform.com/next/embed.js"
-                      strategy="lazyOnload"
-                    />
-                    <div
-                      data-tf-live={TYPEFORM_EMBED_URL}
-                      className="min-h-[600px] w-full"
+                      strategy="afterInteractive"
                     />
                   </>
                 ) : TALLY_EMBED_URL ? (

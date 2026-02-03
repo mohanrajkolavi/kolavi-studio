@@ -17,7 +17,7 @@ Environment variables and third-party integrations used by the site.
 
 The contact page can use a third-party form so submissions are stored and managed for you.
 
-- **Typeform**: Create a form at [typeform.com](https://typeform.com). In Share → Embed, copy the **form ID** from the embed code (the value of `data-tf-live="..."`, e.g. `01KGJEJHFEM5Q5S88DS411X006`). Set `NEXT_PUBLIC_TYPEFORM_EMBED_URL` to that ID in `.env.local`. Responses appear in your Typeform workspace and can be exported or connected to Zapier, webhooks, etc.
+- **Typeform**: Create a form at [typeform.com](https://typeform.com). In Share → Embed, copy the **form ID** from the embed code (the value of `data-tf-widget="..."` or `data-tf-live="..."`, e.g. `01KGJEJHFEM5Q5S88DS411X006`). Set `NEXT_PUBLIC_TYPEFORM_EMBED_URL` to that ID in `.env.local`. Responses appear in your Typeform workspace and can be exported or connected to Zapier, webhooks, etc. CSP allows Typeform script and frames (`embed.typeform.com`, `form.typeform.com`, `www.typeform.com`).
 - **Tally**: Create a form at [tally.so](https://tally.so). In Share → Get the code, copy the **embed URL** (e.g. `https://tally.so/embed/xxxxx`). Set `NEXT_PUBLIC_TALLY_FORM_EMBED_URL` in `.env.local`. Submissions appear in your Tally dashboard and can be emailed or exported.
 - **Google Forms**: Create a form in Google Forms. Use Send → embed HTML and copy the iframe `src` URL (e.g. `https://docs.google.com/forms/d/e/.../viewform?embedded=true`). Set `NEXT_PUBLIC_GOOGLE_FORM_EMBED_URL` in `.env.local`. Responses are stored in the form’s Responses tab.
 
