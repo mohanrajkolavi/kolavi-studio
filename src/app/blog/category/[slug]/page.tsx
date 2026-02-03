@@ -239,7 +239,7 @@ export default async function CategoryPage({ params }: PageProps) {
                     <p className="mb-6 text-lg leading-relaxed text-muted-foreground">
                       {truncateToWords(stripHtml(latestPost.excerpt || ""), 20)}
                     </p>
-                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-gap group-hover:gap-3">
+                    <span className="inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-all group-hover:gap-3">
                       Read article
                       <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />

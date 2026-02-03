@@ -15,8 +15,14 @@ interface PageProps {
 }
 
 async function getTag(slug: string) {
-  const allPosts = await getPosts();
-  const posts = allPosts.filter((post) =>
+  let allPosts;
+  try {
+    allPosts = await getPosts();
+  } catch (error) {
+    console.error("getTag: getPosts failed", error);
+    return null;
+  }
+  const posts = (allPosts ?? []).filter((post) =>
     post.tags?.nodes?.some((tag) => tag.slug === slug)
   );
 
@@ -48,9 +54,14 @@ export async function generateMetadata({ params }: PageProps) {
 }
 
 export async function generateStaticParams() {
-  const posts = await getPosts();
-  const tags = getTagsFromPosts(posts);
-  return tags.map((t) => ({ slug: t.slug }));
+  try {
+    const posts = await getPosts();
+    const tags = getTagsFromPosts(posts ?? []);
+    return tags.map((t) => ({ slug: t.slug }));
+  } catch (error) {
+    console.error("generateStaticParams (tag):", error);
+    return [];
+  }
 }
 
 export default async function TagPage({ params }: PageProps) {
@@ -121,7 +132,7 @@ export default async function TagPage({ params }: PageProps) {
               {tag.posts.nodes.map((post) => (
                 <Link key={post.id} href={`/blog/${post.slug}`}>
                   <Card className="h-full hover:shadow-lg transition-shadow">
-                    {post.featuredImage && (
+                    {post.featuredImage?.node?.sourceUrl && (
                       <div className="relative h-48 w-full">
                         <Image
                           src={post.featuredImage.node.sourceUrl}

@@ -19,6 +19,12 @@ export const GET_POSTS = `
             name
           }
         }
+        tags {
+          nodes {
+            slug
+            name
+          }
+        }
         author {
           node {
             name

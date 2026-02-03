@@ -167,7 +167,7 @@ export async function getPostEntries(): Promise<UrlEntry[]> {
       return entries;
     },
     ["sitemap-posts"],
-    { revalidate: CACHE_REVALIDATE }
+    { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
   )();
 }
 
@@ -210,7 +210,7 @@ export async function getCategoryEntries(): Promise<UrlEntry[]> {
       return entries;
     },
     ["sitemap-categories"],
-    { revalidate: CACHE_REVALIDATE }
+    { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
   )();
 }
 
@@ -252,6 +252,6 @@ export async function getTagEntries(): Promise<UrlEntry[]> {
       return entries;
     },
     ["sitemap-tags"],
-    { revalidate: CACHE_REVALIDATE }
+    { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
   )();
 }

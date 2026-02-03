@@ -40,7 +40,7 @@ export async function getPosts(): Promise<WPPost[]> {
       }
     },
     ["blog-posts"],
-    { revalidate: CACHE_REVALIDATE }
+    { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
   )();
 }
 
@@ -59,7 +59,7 @@ export async function getPostBySlug(slug: string): Promise<WPPost | null> {
       }
     },
     ["blog-post", slug],
-    { revalidate: CACHE_REVALIDATE }
+    { revalidate: CACHE_REVALIDATE, tags: ["blog", `blog-post-${slug}`] }
   )();
 }
 
@@ -181,7 +181,7 @@ export async function getCategoryBySlug(
         }
       },
       ["blog-category", slug],
-      { revalidate: CACHE_REVALIDATE }
+      { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
     )();
   }
   const posts = await getPosts();
@@ -214,7 +214,7 @@ export async function getAllCategorySlugs(): Promise<{ slug: string }[]> {
         }
       },
       ["blog-category-slugs"],
-      { revalidate: CACHE_REVALIDATE }
+      { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
     )();
   }
   const posts = await getPosts();
