@@ -1,22 +1,26 @@
 /**
  * Sitemap index (Google-style): root sitemap lists child sitemaps.
  * Conforms to sitemaps.org protocol (urlset + sitemapindex).
+ * Entry fetchers use unstable_cache (revalidate 60s) so sitemaps don't hit WP on every request.
  * @see https://www.sitemaps.org/protocol.html
  * @see https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap
  */
 
+import { unstable_cache } from "next/cache";
 import { SITE_URL, WP_GRAPHQL_URL } from "@/lib/constants";
 import { request } from "@/lib/graphql/client";
 import {
   getPosts,
   getAllCategorySlugs,
   getTagsFromPosts,
+  fetchAllPostSlugs,
 } from "@/lib/blog-data";
 import {
-  GET_ALL_POST_SLUGS,
   GET_ALL_CATEGORY_SLUGS,
   GET_ALL_TAG_SLUGS,
 } from "@/lib/graphql/queries";
+
+const CACHE_REVALIDATE = 60;
 
 const NS = "http://www.sitemaps.org/schemas/sitemap/0.9";
 const XSI = "http://www.w3.org/2001/XMLSchema-instance";
@@ -126,113 +130,128 @@ export function getStaticEntries(): UrlEntry[] {
 }
 
 export async function getPostEntries(): Promise<UrlEntry[]> {
-  const now = new Date();
-  const entries: UrlEntry[] = [];
-  if (WP_GRAPHQL_URL?.trim()) {
-    try {
-      const data = await request<{ posts: { nodes: { slug: string; modified: string }[] } }>(
-        GET_ALL_POST_SLUGS
-      );
-      const nodes = data.posts?.nodes ?? [];
-      nodes.forEach((post) => {
-        entries.push({
-          path: `/blog/${post.slug}`,
-          lastModified: new Date(post.modified),
-          changeFrequency: SITEMAP.changeFrequency.post,
-          priority: SITEMAP.priority.post,
-        });
-      });
-    } catch (error) {
-      console.error("Sitemap posts:", error);
-    }
-  } else {
-    try {
-      const posts = await getPosts();
-      posts.forEach((post) => {
-        entries.push({
-          path: `/blog/${post.slug}`,
-          lastModified: new Date(post.modified ?? now),
-          changeFrequency: SITEMAP.changeFrequency.post,
-          priority: SITEMAP.priority.post,
-        });
-      });
-    } catch (error) {
-      console.error("Sitemap posts:", error);
-    }
-  }
-  entries.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
-  return entries;
+  return unstable_cache(
+    async () => {
+      const now = new Date();
+      const entries: UrlEntry[] = [];
+      if (WP_GRAPHQL_URL?.trim()) {
+        try {
+          const nodes = await fetchAllPostSlugs();
+          nodes.forEach((post) => {
+            entries.push({
+              path: `/blog/${post.slug}`,
+              lastModified: new Date(post.modified),
+              changeFrequency: SITEMAP.changeFrequency.post,
+              priority: SITEMAP.priority.post,
+            });
+          });
+        } catch (error) {
+          console.error("Sitemap posts:", error);
+        }
+      } else {
+        try {
+          const posts = await getPosts();
+          posts.forEach((post) => {
+            entries.push({
+              path: `/blog/${post.slug}`,
+              lastModified: new Date(post.modified ?? now),
+              changeFrequency: SITEMAP.changeFrequency.post,
+              priority: SITEMAP.priority.post,
+            });
+          });
+        } catch (error) {
+          console.error("Sitemap posts:", error);
+        }
+      }
+      entries.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
+      return entries;
+    },
+    ["sitemap-posts"],
+    { revalidate: CACHE_REVALIDATE }
+  )();
 }
 
 export async function getCategoryEntries(): Promise<UrlEntry[]> {
-  const now = new Date();
-  const entries: UrlEntry[] = [];
-  if (WP_GRAPHQL_URL?.trim()) {
-    try {
-      const data = await request<{ categories: { nodes: { slug: string }[] } }>(
-        GET_ALL_CATEGORY_SLUGS
-      );
-      (data.categories?.nodes ?? []).forEach((cat) => {
-        entries.push({
-          path: `/blog/category/${cat.slug}`,
-          lastModified: now,
-          changeFrequency: SITEMAP.changeFrequency.category,
-          priority: SITEMAP.priority.category,
-        });
-      });
-    } catch (error) {
-      console.error("Sitemap categories:", error);
-    }
-  } else {
-    try {
-      const categories = await getAllCategorySlugs();
-      categories.forEach(({ slug }) => {
-        entries.push({
-          path: `/blog/category/${slug}`,
-          lastModified: now,
-          changeFrequency: SITEMAP.changeFrequency.category,
-          priority: SITEMAP.priority.category,
-        });
-      });
-    } catch (error) {
-      console.error("Sitemap categories:", error);
-    }
-  }
-  return entries;
+  return unstable_cache(
+    async () => {
+      const now = new Date();
+      const entries: UrlEntry[] = [];
+      if (WP_GRAPHQL_URL?.trim()) {
+        try {
+          const data = await request<{ categories: { nodes: { slug: string }[] } }>(
+            GET_ALL_CATEGORY_SLUGS
+          );
+          (data.categories?.nodes ?? []).forEach((cat) => {
+            entries.push({
+              path: `/blog/category/${cat.slug}`,
+              lastModified: now,
+              changeFrequency: SITEMAP.changeFrequency.category,
+              priority: SITEMAP.priority.category,
+            });
+          });
+        } catch (error) {
+          console.error("Sitemap categories:", error);
+        }
+      } else {
+        try {
+          const categories = await getAllCategorySlugs();
+          categories.forEach(({ slug }) => {
+            entries.push({
+              path: `/blog/category/${slug}`,
+              lastModified: now,
+              changeFrequency: SITEMAP.changeFrequency.category,
+              priority: SITEMAP.priority.category,
+            });
+          });
+        } catch (error) {
+          console.error("Sitemap categories:", error);
+        }
+      }
+      return entries;
+    },
+    ["sitemap-categories"],
+    { revalidate: CACHE_REVALIDATE }
+  )();
 }
 
 export async function getTagEntries(): Promise<UrlEntry[]> {
-  const now = new Date();
-  const entries: UrlEntry[] = [];
-  if (WP_GRAPHQL_URL?.trim()) {
-    try {
-      const data = await request<{ tags: { nodes: { slug: string }[] } }>(GET_ALL_TAG_SLUGS);
-      (data.tags?.nodes ?? []).forEach((tag) => {
-        entries.push({
-          path: `/blog/tag/${tag.slug}`,
-          lastModified: now,
-          changeFrequency: SITEMAP.changeFrequency.tag,
-          priority: SITEMAP.priority.tag,
-        });
-      });
-    } catch (error) {
-      console.error("Sitemap tags:", error);
-    }
-  } else {
-    try {
-      const posts = await getPosts();
-      const tags = getTagsFromPosts(posts);
-      tags.forEach(({ slug }) => {
-        entries.push({
-          path: `/blog/tag/${slug}`,
-          lastModified: now,
-          changeFrequency: SITEMAP.changeFrequency.tag,
-          priority: SITEMAP.priority.tag,
-        });
-      });
-    } catch (error) {
-      console.error("Sitemap tags:", error);
-    }
-  }
-  return entries;
+  return unstable_cache(
+    async () => {
+      const now = new Date();
+      const entries: UrlEntry[] = [];
+      if (WP_GRAPHQL_URL?.trim()) {
+        try {
+          const data = await request<{ tags: { nodes: { slug: string }[] } }>(GET_ALL_TAG_SLUGS);
+          (data.tags?.nodes ?? []).forEach((tag) => {
+            entries.push({
+              path: `/blog/tag/${tag.slug}`,
+              lastModified: now,
+              changeFrequency: SITEMAP.changeFrequency.tag,
+              priority: SITEMAP.priority.tag,
+            });
+          });
+        } catch (error) {
+          console.error("Sitemap tags:", error);
+        }
+      } else {
+        try {
+          const posts = await getPosts();
+          const tags = getTagsFromPosts(posts);
+          tags.forEach(({ slug }) => {
+            entries.push({
+              path: `/blog/tag/${slug}`,
+              lastModified: now,
+              changeFrequency: SITEMAP.changeFrequency.tag,
+              priority: SITEMAP.priority.tag,
+            });
+          });
+        } catch (error) {
+          console.error("Sitemap tags:", error);
+        }
+      }
+      return entries;
+    },
+    ["sitemap-tags"],
+    { revalidate: CACHE_REVALIDATE }
+  )();
 }

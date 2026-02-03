@@ -5,7 +5,7 @@ import { getPageMetadata } from "@/lib/seo/metadata";
 import { parseRankMathFullHead } from "@/lib/seo/rank-math-parser";
 import { getArticleSchema } from "@/lib/seo/jsonld/article";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { getPostBySlug, getPosts, getPostAuthorName, getPostAuthorUrl } from "@/lib/blog-data";
+import { getPostBySlug, getPosts, getPostAuthorName, getPostAuthorUrl, fetchAllPostSlugs } from "@/lib/blog-data";
 import { processContentForToc } from "@/lib/blog-utils";
 import { BlogPostTOC } from "@/components/blog/BlogPostTOC";
 import { ShareButtons } from "@/components/blog/ShareButtons";
@@ -52,12 +52,16 @@ export async function generateMetadata({ params }: PageProps) {
     author: getPostAuthorName(post),
     publishedTime: post.date,
     modifiedTime: post.modified,
+    ogDescription: parsed.ogDescription?.trim() || undefined,
+    twitterTitle: parsed.twitterTitle?.trim() || undefined,
+    twitterDescription: parsed.twitterDescription?.trim() || undefined,
+    twitterImage: parsed.twitterImage?.trim() || undefined,
   });
 }
 
 export async function generateStaticParams() {
-  const posts = await getPosts();
-  return posts.map((p) => ({ slug: p.slug }));
+  const slugs = await fetchAllPostSlugs();
+  return slugs.map((p) => ({ slug: p.slug }));
 }
 
 export default async function BlogPostPage({ params }: PageProps) {
@@ -72,6 +76,9 @@ export default async function BlogPostPage({ params }: PageProps) {
   const safeContent = post.content || "";
   const safeExcerpt = post.excerpt || "";
   const { headings, content } = processContentForToc(safeContent);
+  const h2h3 = headings.filter((h) => h.level <= 3);
+  const tocHeadings =
+    h2h3.length > 12 ? headings.filter((h) => h.level === 2) : h2h3;
   const postUrl = `${SITE_URL}/blog/${slug}`;
   const firstCategory = post.categories?.nodes?.[0];
   const readTime = readingTimeMinutes(safeContent);
@@ -239,9 +246,9 @@ export default async function BlogPostPage({ params }: PageProps) {
             )}
 
             {/* TOC mobile */}
-            {headings.length > 0 && (
+            {tocHeadings.length > 0 && (
               <div className="mt-8 lg:hidden">
-                <BlogPostTOC headings={headings} maxLevel={3} />
+                <BlogPostTOC headings={tocHeadings} maxLevel={3} />
               </div>
             )}
 
@@ -281,9 +288,9 @@ export default async function BlogPostPage({ params }: PageProps) {
                 </footer>
               </div>
 
-              {headings.length > 0 && (
+              {tocHeadings.length > 0 && (
                 <aside className="hidden shrink-0 lg:block">
-                  <BlogPostTOC headings={headings} maxLevel={3} />
+                  <BlogPostTOC headings={tocHeadings} maxLevel={3} />
                 </aside>
               )}
             </div>

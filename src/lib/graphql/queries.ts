@@ -205,6 +205,22 @@ export const GET_ALL_POST_SLUGS = `
   }
 `;
 
+/** Paginated post slugs for large blogs (1000+). Use with fetchAllPostSlugs. */
+export const GET_POST_SLUGS_PAGE = `
+  query GetPostSlugsPage($first: Int!, $after: String) {
+    posts(first: $first, after: $after, where: { status: PUBLISH }) {
+      nodes {
+        slug
+        modified
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+`;
+
 export const GET_ALL_CATEGORY_SLUGS = `
   query GetAllCategorySlugs {
     categories(first: 100) {

@@ -72,7 +72,7 @@ Completely redesigned category pages with inspiration from [Google's Blog](https
 - **Clear CTAs**: Multiple paths to engagement (Get in Touch, View All)
 
 #### Performance
-- **Image Optimization**: 
+- **Image Optimization**:
   - Responsive `sizes` attribute
   - Priority loading for above-fold images
   - Lazy loading for below-fold content

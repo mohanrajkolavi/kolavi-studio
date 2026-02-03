@@ -5,6 +5,7 @@ export const metadata = getPageMetadata({
   title: "About Us - Digital Marketing Experts",
   description: "Learn about Kolavi Studio, our mission to help businesses grow through strategic digital marketing, and the team behind our success.",
   path: "/about",
+  keywords: "digital marketing agency, about Kolavi Studio, marketing team, business growth experts",
 });
 
 export default function AboutPage() {

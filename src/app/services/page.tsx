@@ -7,6 +7,8 @@ export const metadata = getPageMetadata({
   title: "Our Services - Digital Marketing & Web Design",
   description: "Comprehensive digital marketing services including SEO, web design, content marketing, PPC advertising, and more. Tailored solutions for your business growth.",
   path: "/services",
+  keywords:
+    "SEO services, web design, content marketing, PPC advertising, digital marketing services, business growth",
 });
 
 const services = [

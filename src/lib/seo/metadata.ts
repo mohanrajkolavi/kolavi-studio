@@ -39,6 +39,14 @@ interface PageMetadataProps {
   author?: string;
   publishedTime?: string;
   modifiedTime?: string;
+  /** Override Open Graph description when different from meta description. */
+  ogDescription?: string;
+  /** Override Twitter card title. */
+  twitterTitle?: string;
+  /** Override Twitter card description. */
+  twitterDescription?: string;
+  /** Override Twitter card image. */
+  twitterImage?: string;
 }
 
 export function getPageMetadata({
@@ -51,9 +59,17 @@ export function getPageMetadata({
   author,
   publishedTime,
   modifiedTime,
+  ogDescription,
+  twitterTitle,
+  twitterDescription,
+  twitterImage,
 }: PageMetadataProps): Metadata {
   const url = `${SITE_URL}${path}`;
   const ogImage = image || `${SITE_URL}/og-image.jpg`;
+  const ogDesc = ogDescription ?? description;
+  const twTitle = twitterTitle ?? `${title} | ${SITE_NAME}`;
+  const twDesc = twitterDescription ?? description;
+  const twImage = twitterImage ?? ogImage;
 
   return {
     title,
@@ -67,7 +83,7 @@ export function getPageMetadata({
       type: publishedTime ? "article" : "website",
       url,
       title: `${title} | ${SITE_NAME}`,
-      description,
+      description: ogDesc,
       siteName: SITE_NAME,
       publishedTime,
       modifiedTime,
@@ -82,9 +98,9 @@ export function getPageMetadata({
     },
     twitter: {
       card: "summary_large_image",
-      title: `${title} | ${SITE_NAME}`,
-      description,
-      images: [ogImage],
+      title: twTitle,
+      description: twDesc,
+      images: [twImage],
     },
     robots: noIndex
       ? {

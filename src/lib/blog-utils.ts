@@ -1,3 +1,26 @@
+import DOMPurify from "isomorphic-dompurify";
+
+/** Allowed tags for post body HTML (safe subset for WordPress content). */
+const ALLOWED_TAGS = [
+  "p", "br", "h2", "h3", "h4", "h5", "h6",
+  "a", "ul", "ol", "li", "strong", "em", "b", "i",
+  "blockquote", "img", "figure", "figcaption",
+  "pre", "code", "span", "div",
+];
+const ALLOWED_ATTR = ["href", "target", "rel", "src", "alt", "width", "height", "id", "class"];
+
+/**
+ * Sanitize post HTML before render. Allows safe tags and attributes; strips script, event handlers, risky protocols.
+ */
+export function sanitizePostHtml(html: string): string {
+  if (!html || typeof html !== "string") return "";
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS,
+    ALLOWED_ATTR,
+    ADD_ATTR: ["target"],
+  });
+}
+
 export function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
 }
@@ -75,8 +98,17 @@ export function addHeadingIds(html: string, headings: TocItem[]): string {
   );
 }
 
+/** Remove WordPress / Gutenberg Table of Contents block from HTML so only our sidebar TOC shows. */
+function stripEmbeddedToc(html: string): string {
+  return html.replace(
+    /<nav[^>]*wp-block-table-of-contents[^>]*>[\s\S]*?<\/nav>/gi,
+    ""
+  );
+}
+
 export function processContentForToc(html: string): ProcessedContent {
-  const headings = extractHeadings(html);
+  const sanitized = sanitizePostHtml(html);
+  const headings = extractHeadings(sanitized);
   const seen = new Map<string, number>();
   const headingsWithUniqueIds: TocItem[] = headings.map((item) => {
     const count = seen.get(item.id) ?? 0;
@@ -84,6 +116,7 @@ export function processContentForToc(html: string): ProcessedContent {
     seen.set(item.id, count + 1);
     return { ...item, id };
   });
-  const content = addHeadingIds(html, headingsWithUniqueIds);
+  let content = addHeadingIds(sanitized, headingsWithUniqueIds);
+  content = stripEmbeddedToc(content);
   return { headings: headingsWithUniqueIds, content };
 }

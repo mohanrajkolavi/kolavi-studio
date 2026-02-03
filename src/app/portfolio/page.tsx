@@ -6,6 +6,8 @@ export const metadata = getPageMetadata({
   title: "Our Portfolio - Client Success Stories",
   description: "Explore our portfolio of successful digital marketing campaigns and web design projects for medical spas, dental practices, and law firms.",
   path: "/portfolio",
+  keywords:
+    "digital marketing portfolio, web design projects, medical spa case studies, marketing success stories",
 });
 
 const projects = [

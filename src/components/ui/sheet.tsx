@@ -114,6 +114,7 @@ export function SheetTitle({
   ...props
 }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
+    /* eslint-disable-next-line jsx-a11y/heading-has-content -- SheetTitle is a wrapper; content comes from parent */
     <h2
       className={cn("text-lg font-semibold text-foreground", className)}
       {...props}

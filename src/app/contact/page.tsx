@@ -2,16 +2,39 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { getPageMetadata } from "@/lib/seo/metadata";
+import { getFAQSchema } from "@/lib/seo/jsonld/faq";
+import { FAQ } from "@/components/sections/FAQ";
 
 export const metadata = getPageMetadata({
   title: "Contact Us - Get Your Free Consultation",
   description: "Ready to grow your business? Contact Kolavi Studio for a free consultation. We'll discuss your goals and create a custom digital marketing strategy.",
   path: "/contact",
+  keywords: "contact Kolavi Studio, free marketing consultation, digital marketing quote",
 });
 
+const CONTACT_FAQ_ITEMS = [
+  {
+    question: "How quickly can I expect to hear back after submitting the form?",
+    answer: "We respond to all inquiries within 24 hours during business days (Monday–Friday).",
+  },
+  {
+    question: "Is the initial consultation really free?",
+    answer: "Yes. We offer a free consultation to discuss your goals and explore how we can help. There’s no obligation.",
+  },
+  {
+    question: "Which industries do you work with?",
+    answer: "We specialize in medical spas, dental practices, and law firms, but we also work with other service-based businesses.",
+  },
+];
+
 export default function ContactPage() {
+  const faqSchema = getFAQSchema(CONTACT_FAQ_ITEMS);
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       <section className="py-16 sm:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-3xl">
@@ -129,6 +152,12 @@ export default function ContactPage() {
                 </p>
               </div>
             </div>
+
+            <FAQ
+              title="Frequently Asked Questions"
+              items={CONTACT_FAQ_ITEMS}
+              className="mt-16"
+            />
           </div>
         </div>
       </section>

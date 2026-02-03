@@ -11,6 +11,8 @@ export const metadata = getPageMetadata({
   title: "Medical Spa Marketing & Web Design Services",
   description: "Specialized digital marketing and web design services for medical spas. Increase bookings, attract more clients, and grow your med spa business with proven strategies.",
   path: "/medical-spas",
+  keywords:
+    "medical spa marketing, med spa SEO, medical spa web design, med spa digital marketing",
 });
 
 const medSpaBenefits = [

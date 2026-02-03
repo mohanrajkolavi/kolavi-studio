@@ -68,10 +68,7 @@ export function BlogPostTOC({ headings, maxLevel = 3 }: BlogPostTOCProps) {
         </p>
       </div>
 
-      <ol
-        className="max-h-[calc(100vh-10rem)] overflow-y-auto p-3 lg:p-4 space-y-0.5 list-none"
-        role="list"
-      >
+      <ol className="max-h-[calc(100vh-10rem)] overflow-y-auto p-3 lg:p-4 space-y-0.5 list-none">
         {visibleHeadings.map((item) => {
           const isActive = activeId === item.id;
           const isSubheading = item.level >= 3;

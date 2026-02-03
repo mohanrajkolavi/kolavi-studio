@@ -18,7 +18,10 @@ export const metadata = getPageMetadata({
 });
 
 export default async function BlogPage() {
-  const posts = await getPosts();
+  const rawPosts = await getPosts();
+  const posts = [...rawPosts].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
   const categories = getCategoriesFromPosts(posts);
   const firstPost = posts[0];
 

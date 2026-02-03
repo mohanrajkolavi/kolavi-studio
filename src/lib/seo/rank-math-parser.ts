@@ -1,6 +1,6 @@
 /**
  * Parses Rank Math SEO fullHead HTML (from WPGraphQL for Rank Math SEO).
- * Extracts meta description, og:image, and og:title only.
+ * Extracts meta description, Open Graph, and Twitter card meta.
  * Canonical, og:url, and robots are intentionally ignored; Next.js sets those.
  *
  * Fail-safe: returns empty object on any error, null/undefined, or oversized input.
@@ -10,6 +10,10 @@ export interface ParsedRankMathHead {
   metaDescription?: string;
   ogImage?: string;
   ogTitle?: string;
+  ogDescription?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  twitterImage?: string;
 }
 
 /** Max input length to avoid regex DoS on very large strings. */
@@ -27,6 +31,10 @@ const META_EXTRACTIONS: Array<{
   { key: "metaDescription", attr: "name", value: "description" },
   { key: "ogImage", attr: "property", value: "og:image" },
   { key: "ogTitle", attr: "property", value: "og:title" },
+  { key: "ogDescription", attr: "property", value: "og:description" },
+  { key: "twitterTitle", attr: "name", value: "twitter:title" },
+  { key: "twitterDescription", attr: "name", value: "twitter:description" },
+  { key: "twitterImage", attr: "name", value: "twitter:image" },
 ];
 
 function safeTrim(value: string, maxLen: number): string {
@@ -58,7 +66,7 @@ function extractMetaContent(
 }
 
 /**
- * Parse Rank Math fullHead string into meta description, og:image, and og:title.
+ * Parse Rank Math fullHead string into meta description, Open Graph, and Twitter card fields.
  * Returns an empty object when fullHead is null, undefined, empty, oversized, or on any parse error.
  */
 export function parseRankMathFullHead(

@@ -16,7 +16,7 @@
 
 ## 1. SEO Audit
 
-### ✅ What’s in place
+### ✅ What's in place
 
 - **Metadata (Next.js)**
   - All blog pages use `generateMetadata` or `metadata` with `getPageMetadata()`.

@@ -7,6 +7,8 @@ export const metadata = getPageMetadata({
   title: "Who We Serve - Industries We Specialize In",
   description: "Kolavi Studio helps medical spas, dental practices, and law firms grow with expert digital marketing, web design, and SEO services tailored to your industry.",
   path: "/industries",
+  keywords:
+    "medical spa marketing, dental practice marketing, law firm marketing, industry-specific digital marketing",
 });
 
 export default function IndustriesPage() {

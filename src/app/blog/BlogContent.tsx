@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { WPPost } from "@/lib/graphql/types";
 import { stripHtml, truncateToWords, calculateReadingTime } from "@/lib/blog-utils";
 
@@ -30,12 +30,28 @@ interface BlogContentProps {
   categories: BlogCategory[];
 }
 
+/** Sort posts newest first so featured = latest. */
+function sortPostsByDateNewestFirst(posts: WPPost[]): WPPost[] {
+  return [...posts].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+}
+
 export function BlogContent({ posts, categories }: BlogContentProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const filteredPosts = filterPostsByCategory(posts, selectedCategory);
-  const featuredPost = filteredPosts[0];
-  const latestPosts = filteredPosts.slice(1, 4);
-  const morePosts = filteredPosts.slice(4);
+  const sortedAllPosts = useMemo(() => sortPostsByDateNewestFirst(posts), [posts]);
+  // "All posts" = full list (newest first); category tab = filter by that category, also newest first
+  const displayPosts = useMemo(() => {
+    if (selectedCategory === null) return sortedAllPosts;
+    return sortPostsByDateNewestFirst(
+      filterPostsByCategory(posts, selectedCategory)
+    );
+  }, [posts, selectedCategory, sortedAllPosts]);
+  const isAllPosts = selectedCategory === null;
+  // Featured = always the latest post from ALL posts; independent of tab selection.
+  const featuredPost = sortedAllPosts.length > 0 ? sortedAllPosts[0] : null;
+  // Grid = posts for the selected tab only (All posts or category); no connection to Featured.
+  const gridPosts = displayPosts;
 
   return (
     <>
@@ -43,8 +59,8 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
       {featuredPost && (
         <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-6xl">
-              <div className="mb-8 flex items-center justify-between">
+            <div className="mx-auto max-w-5xl">
+              <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
                     Featured
@@ -55,22 +71,22 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
 
               <Link
                 href={`/blog/${featuredPost.slug}`}
-                className="group block overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-orange-200/60 dark:hover:border-orange-800"
+                className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-orange-200/60 dark:hover:border-orange-800"
               >
-                <article className="grid grid-cols-1">
+                <article className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-stretch">
                   {featuredPost.featuredImage && (
-                    <div className="relative h-64 sm:h-80 overflow-hidden">
+                    <div className="relative min-w-0 h-56 w-full overflow-hidden bg-muted md:h-full md:min-h-[18rem]">
                       <Image
                         src={featuredPost.featuredImage.node.sourceUrl}
                         alt={featuredPost.featuredImage.node.altText || featuredPost.title}
                         fill
-                        className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        sizes="100vw"
+                        className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                        sizes="(max-width: 768px) 100vw, 50vw"
                         priority
                       />
                     </div>
                   )}
-                  <div className="flex flex-col justify-center p-8 lg:p-14 bg-card">
+                  <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-10 bg-card">
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       {featuredPost.categories?.nodes?.[0] && (
                         <span className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-600">
@@ -112,7 +128,7 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
       )}
 
       {/* Category + Articles - only when we have posts */}
-      {filteredPosts.length > 0 && (
+      {displayPosts.length > 0 && (
       <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
@@ -156,9 +172,9 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
             </nav>
 
             {/* Articles - card grid */}
-            {latestPosts.length > 0 || morePosts.length > 0 ? (
+            {gridPosts.length > 0 ? (
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {[...latestPosts, ...morePosts].map((post, index) => (
+                {gridPosts.map((post, index) => (
                   <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
                     <article className="h-full overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
                       {post.featuredImage && (
@@ -215,7 +231,7 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                   </Link>
                 ))}
               </div>
-            ) : featuredPost && filteredPosts.length === 1 ? null : featuredPost ? (
+            ) : featuredPost ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
                 No other articles in this category
               </p>
@@ -226,7 +242,7 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
       )}
 
       {/* Empty state when filtered */}
-      {filteredPosts.length === 0 && (
+      {displayPosts.length === 0 && (
         <section className="border-b border-border bg-background py-16 sm:py-24">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-2xl rounded-2xl border border-dashed border-border bg-muted/50 py-16 text-center">

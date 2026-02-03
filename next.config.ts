@@ -9,10 +9,10 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**",
-      },
+      { protocol: "https", hostname: "kolavistudio.com" },
+      { protocol: "https", hostname: "www.kolavistudio.com" },
+      { protocol: "https", hostname: "cms.kolavistudio.com" },
+      { protocol: "http", hostname: "localhost" },
     ],
   },
 };

@@ -9,6 +9,8 @@ export const metadata = getPageMetadata({
   title: "Digital Marketing Agency for Medical Spas, Dental & Law Firms",
   description: "Kolavi Studio helps businesses grow with expert digital marketing, web design, and SEO services. Specializing in medical spas, dental practices, and law firms.",
   path: "/",
+  keywords:
+    "digital marketing agency, medical spa marketing, dental practice SEO, law firm marketing, web design, SEO services, business growth",
 });
 
 export default function HomePage() {

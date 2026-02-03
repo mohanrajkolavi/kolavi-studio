@@ -78,6 +78,13 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     overflow-x: clip;
   }
+  /* Visible focus for keyboard users; respect prefers-reduced-motion */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  .dark :focus-visible {
+    outline-color: hsl(var(--ring));
+  }
   /* Prevent overscroll rubber-banding on main content for premium feel */
   body.overflow-hidden {
     overflow: hidden;

@@ -117,7 +117,7 @@ Redesigned the blog page with inspiration from Google's blog design, but enhance
 - [ ] Comment system integration
 - [ ] Reading progress indicator
 - [ ] Print-friendly styles
-- [ ] Dark mode support
+- [x] **Dark mode support** — Already implemented: `.dark` theme variables in `src/app/globals.css` and `ThemeProvider` in `src/app/layout.tsx`. No further core implementation required; optional follow-ups: component-level contrast tweaks or accessibility (e.g. reduced-motion) if needed.
 
 ## Files Modified
 - `src/app/blog/page.tsx` - Main blog page redesign
