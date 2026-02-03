@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { getPageMetadata } from "@/lib/seo/metadata";
+import { parseRankMathFullHead } from "@/lib/seo/rank-math-parser";
 import { getArticleSchema } from "@/lib/seo/jsonld/article";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
 import { getPostBySlug, getPosts, getPostAuthorName, getPostAuthorUrl } from "@/lib/blog-data";
@@ -36,11 +37,18 @@ export async function generateMetadata({ params }: PageProps) {
   const { slug } = await params;
   const post = await getPostBySlug(slug);
   if (!post) return {};
+  const parsed = parseRankMathFullHead(post.seo?.fullHead);
+  const title = parsed.ogTitle?.trim() || post.title;
+  const description =
+    parsed.metaDescription?.trim() ||
+    stripHtml(post.excerpt || "").substring(0, 160);
+  const image =
+    parsed.ogImage?.trim() || post.featuredImage?.node.sourceUrl;
   return getPageMetadata({
-    title: post.title,
-    description: stripHtml(post.excerpt || "").substring(0, 160),
+    title,
+    description,
     path: `/blog/${slug}`,
-    image: post.featuredImage?.node.sourceUrl,
+    image,
     author: getPostAuthorName(post),
     publishedTime: post.date,
     modifiedTime: post.modified,
@@ -96,7 +104,9 @@ export default async function BlogPostPage({ params }: PageProps) {
     day: "numeric",
   });
 
-  const leadText = stripHtml(safeExcerpt);
+  const parsedSeo = parseRankMathFullHead(post.seo?.fullHead);
+  const leadText =
+    parsedSeo.metaDescription?.trim() || stripHtml(safeExcerpt);
 
   return (
     <>

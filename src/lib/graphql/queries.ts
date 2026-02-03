@@ -76,6 +76,9 @@ export const GET_POST_BY_SLUG = `
           url
         }
       }
+      seo {
+        fullHead
+      }
     }
   }
 `;

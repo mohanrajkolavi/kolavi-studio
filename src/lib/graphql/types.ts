@@ -45,6 +45,8 @@ export interface WPPost {
   tags: {
     nodes: WPTag[];
   };
+  /** Rank Math SEO output via WPGraphQL for Rank Math SEO */
+  seo?: { fullHead?: string };
 }
 
 export interface WPPageInfo {

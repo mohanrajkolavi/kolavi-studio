@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 import type { WPPost } from "@/lib/graphql/types";
-import { stripHtml, calculateReadingTime } from "@/lib/blog-utils";
+import { stripHtml, truncateToWords, calculateReadingTime } from "@/lib/blog-utils";
 
 const BLOG_TOPICS = [
   { slug: "seo", name: "SEO" },
@@ -95,7 +95,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                       {featuredPost.title}
                     </h3>
                     <p className="mt-4 text-base leading-relaxed text-muted-foreground lg:text-lg">
-                      {stripHtml(featuredPost.excerpt)}
+                      {truncateToWords(stripHtml(featuredPost.excerpt || ""), 30)}
                     </p>
                     <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-all group-hover:gap-4">
                       Read article
@@ -200,7 +200,7 @@ export function BlogContent({ posts }: BlogContentProps) {
                           {post.title}
                         </h3>
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                          {stripHtml(post.excerpt)}
+                          {truncateToWords(stripHtml(post.excerpt || ""), 30)}
                         </p>
                         <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 opacity-0 transition-opacity group-hover:opacity-100">
                           Read article

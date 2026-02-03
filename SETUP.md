@@ -29,11 +29,13 @@ npm install
 
 ### 2. Configure Environment Variables
 
-Update `.env.local` with your settings:
+Update `.env.local` with your settings (see `.env.example` for reference):
 
 ```env
 NEXT_PUBLIC_SITE_URL=https://your-domain.com
 NEXT_PUBLIC_WP_GRAPHQL_URL=https://your-wordpress-site.com/graphql
+# Optional: Google Analytics 4 Measurement ID (e.g. G-XXXXXXXXXX). When set, GA4 loads on every page.
+# NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 ```
 
 **Important:** Replace the WordPress GraphQL URL with your actual WordPress installation that has WPGraphQL plugin installed.
@@ -77,8 +79,8 @@ src/
 │   │   ├── [slug]/             # Individual blog posts
 │   │   ├── category/[slug]/    # Category pages
 │   │   └── tag/[slug]/         # Tag pages
-│   ├── sitemap.ts              # Dynamic sitemap
-│   └── robots.ts               # Robots.txt
+│   ├── sitemap/                 # Sitemap index + child sitemaps (static, posts, categories, tags)
+│   └── robots.ts                # Robots.txt
 ├── components/
 │   ├── layout/                  # Layout components
 │   │   ├── Header.tsx          # Mobile-first header
@@ -166,7 +168,7 @@ src/
 1. Create a new file in `src/app/[page-name]/page.tsx`
 2. Export metadata using `getPageMetadata()`
 3. Add the route to `NAV_LINKS` in `src/lib/constants.ts`
-4. Update sitemap in `src/app/sitemap.ts` if needed
+4. Add static routes in `src/lib/sitemap-index.ts` (STATIC_ROUTES) if needed
 
 ### Styling
 
@@ -212,6 +214,19 @@ For medical spas vertical:
 - SEO for Spas
 - Web Design
 - Social Media Marketing
+
+## Google Search Console
+
+1. **Verify your property** at [Google Search Console](https://search.google.com/search-console) for your public domain (e.g. `https://kolavistudio.com`).
+   - **Option A — HTML tag:** In GSC, choose “HTML tag” and copy the meta tag. Add it to your site’s `<head>` (e.g. in `src/app/layout.tsx` via a literal `<meta>` or via `metadata.other`). Redeploy, then click “Verify” in GSC.
+   - **Option B — DNS:** Verify using the TXT record in your domain’s DNS (no code change).
+2. **Submit sitemap:** After verification, go to **Indexing → Sitemaps** and add `https://<your-domain>/sitemap.xml` (e.g. `https://kolavistudio.com/sitemap.xml`). The sitemap index is served at `/sitemap.xml` (see README **Sitemap** section).
+
+## Ongoing SEO & Analytics Monitoring
+
+- **Google Search Console:** Check Coverage, Core Web Vitals, and search performance; fix any indexing or crawl issues.
+- **Google Analytics 4:** Review traffic and events (when `NEXT_PUBLIC_GA_MEASUREMENT_ID` is set).
+- **Content:** Use Rank Math in WordPress for focus keyword, SEO title, and meta description; refresh older posts periodically.
 
 ## Deployment
 
@@ -263,10 +278,10 @@ Compatible with any platform supporting Next.js:
    - Create initial blog posts
    - Set up categories and tags
 
-3. **SEO Optimization**
-   - Add Google Analytics
-   - Submit sitemap to Google Search Console
-   - Configure meta descriptions for all pages
+3. **SEO & Analytics**
+   - **Google Analytics 4:** Set `NEXT_PUBLIC_GA_MEASUREMENT_ID` in `.env.local` (and in Vercel/host env). GA4 scripts load on every page when set.
+   - **Google Search Console:** Verify your property, then submit your sitemap. See [Google Search Console](#google-search-console) above.
+   - Configure meta descriptions (e.g. via Rank Math in WordPress for blog posts).
 
 4. **Performance Testing**
    - Run Lighthouse audit
