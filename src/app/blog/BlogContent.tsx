@@ -57,15 +57,15 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                 href={`/blog/${featuredPost.slug}`}
                 className="group block overflow-hidden rounded-3xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-orange-200/60 dark:hover:border-orange-800"
               >
-                <article className="grid gap-0 md:grid-cols-2">
+                <article className="grid grid-cols-1">
                   {featuredPost.featuredImage && (
-                    <div className="relative h-72 md:h-[420px] overflow-hidden">
+                    <div className="relative h-64 sm:h-80 overflow-hidden">
                       <Image
                         src={featuredPost.featuredImage.node.sourceUrl}
                         alt={featuredPost.featuredImage.node.altText || featuredPost.title}
                         fill
                         className="object-cover transition-transform duration-500 group-hover:scale-105"
-                        sizes="(max-width: 768px) 100vw, 50vw"
+                        sizes="100vw"
                         priority
                       />
                     </div>
@@ -215,11 +215,11 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                   </Link>
                 ))}
               </div>
-            ) : featuredPost && (
+            ) : featuredPost && filteredPosts.length === 1 ? null : featuredPost ? (
               <p className="py-12 text-center text-sm text-muted-foreground">
                 No other articles in this category
               </p>
-            )}
+            ) : null}
           </div>
         </div>
       </section>

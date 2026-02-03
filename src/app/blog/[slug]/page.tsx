@@ -241,7 +241,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             {/* TOC mobile */}
             {headings.length > 0 && (
               <div className="mt-8 lg:hidden">
-                <BlogPostTOC headings={headings} />
+                <BlogPostTOC headings={headings} maxLevel={3} />
               </div>
             )}
 
@@ -283,7 +283,7 @@ export default async function BlogPostPage({ params }: PageProps) {
 
               {headings.length > 0 && (
                 <aside className="hidden shrink-0 lg:block">
-                  <BlogPostTOC headings={headings} />
+                  <BlogPostTOC headings={headings} maxLevel={3} />
                 </aside>
               )}
             </div>

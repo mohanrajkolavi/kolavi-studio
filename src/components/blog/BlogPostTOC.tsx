@@ -1,20 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { TocItem } from "@/lib/blog-utils";
 
 interface BlogPostTOCProps {
   headings: TocItem[];
+  /** Max heading level to show (2–6). Default 3 = H2 + H3 only. */
+  maxLevel?: 2 | 3 | 4 | 5 | 6;
 }
 
-export function BlogPostTOC({ headings }: BlogPostTOCProps) {
+export function BlogPostTOC({ headings, maxLevel = 3 }: BlogPostTOCProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (headings.length === 0) return;
+  const visibleHeadings = useMemo(
+    () => headings.filter((item) => item.level <= maxLevel),
+    [headings, maxLevel]
+  );
 
-    const ids = headings.map((h) => h.id);
+  useEffect(() => {
+    if (visibleHeadings.length === 0) return;
+
+    const ids = visibleHeadings.map((h) => h.id);
     const offset = 100; // Pixels from top of viewport (below header)
 
     const updateActiveId = () => {
@@ -34,9 +41,9 @@ export function BlogPostTOC({ headings }: BlogPostTOCProps) {
     updateActiveId();
     window.addEventListener("scroll", updateActiveId, { passive: true });
     return () => window.removeEventListener("scroll", updateActiveId);
-  }, [headings]);
+  }, [visibleHeadings]);
 
-  if (headings.length === 0) return null;
+  if (visibleHeadings.length === 0) return null;
 
   const indentByLevel: Record<number, string> = {
     2: "",
@@ -57,7 +64,7 @@ export function BlogPostTOC({ headings }: BlogPostTOCProps) {
           On this page
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {headings.length} {headings.length === 1 ? "section" : "sections"}
+          {visibleHeadings.length} {visibleHeadings.length === 1 ? "section" : "sections"}
         </p>
       </div>
 
@@ -65,7 +72,7 @@ export function BlogPostTOC({ headings }: BlogPostTOCProps) {
         className="max-h-[calc(100vh-10rem)] overflow-y-auto p-3 lg:p-4 space-y-0.5 list-none"
         role="list"
       >
-        {headings.map((item) => {
+        {visibleHeadings.map((item) => {
           const isActive = activeId === item.id;
           const isSubheading = item.level >= 3;
 
