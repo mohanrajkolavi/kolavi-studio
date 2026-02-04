@@ -109,7 +109,6 @@ export default async function BlogPostPage({ params }: PageProps) {
       url: `/blog/category/${firstCategory.slug}`,
     });
   }
-  breadcrumbItems.push({ name: post.title, url: `/blog/${slug}` });
   const breadcrumbSchema = getBreadcrumbSchema(breadcrumbItems);
 
   const formattedDate = new Date(post.date).toLocaleDateString("en-US", {
@@ -180,16 +179,6 @@ export default async function BlogPostPage({ params }: PageProps) {
                     </li>
                   </>
                 )}
-                <li aria-hidden className="text-muted-foreground/50">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </li>
-                <li>
-                  <span className="rounded px-2 py-1 font-medium text-foreground">
-                    {post.title}
-                  </span>
-                </li>
               </ol>
             </nav>
 
