@@ -49,7 +49,7 @@ export function BlogSubscribe({ variant = "default" }: { variant?: "default" | "
       </p>
       {status === "success" && (
         <p className="mt-2 text-xs text-green-600 dark:text-green-400 text-center">
-          Thanks — subscription saved locally (no email sent).
+          Thanks. Subscription saved locally (no email sent).
         </p>
       )}
       {status === "error" && (

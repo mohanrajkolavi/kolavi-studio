@@ -9,6 +9,8 @@ interface Benefit {
 
 interface BenefitsProps {
   title?: string;
+  /** Blog-style bar + uppercase label above the title (e.g. "Why work with us") */
+  sectionLabel?: string;
   benefits?: Benefit[];
   className?: string;
 }
@@ -38,21 +40,34 @@ const defaultBenefits: Benefit[] = [
 
 export function Benefits({
   title = "Why Choose Kolavi Studio",
+  sectionLabel,
   benefits = defaultBenefits,
   className,
 }: BenefitsProps) {
   return (
-    <section className={cn("py-16 sm:py-24", className)}>
+    <section className={cn("border-b border-border bg-muted/30 py-16 sm:py-24", className)}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
+        <div className="mx-auto max-w-5xl">
+          {sectionLabel && (
+            <div className="mb-6 flex items-center gap-3">
+              <div className="h-1 w-8 rounded-full bg-orange-500" aria-hidden="true" />
+              <span className="text-sm font-bold uppercase tracking-wider text-foreground">
+                {sectionLabel}
+              </span>
+            </div>
+          )}
+          {title && (
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className={cn("font-bold tracking-tight sm:text-4xl", sectionLabel ? "text-2xl sm:text-3xl" : "text-3xl")}>
+                {title}
+              </h2>
+            </div>
+          )}
         </div>
-        <div className="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={cn("mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4", sectionLabel && "mt-12")}>
           {benefits.map((benefit, index) => (
             <div key={index} className="text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:border dark:border-orange-400/40 dark:text-white">
                 {benefit.icon}
               </div>
               <h3 className="mt-6 text-lg font-semibold">{benefit.title}</h3>

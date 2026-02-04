@@ -8,6 +8,8 @@ interface ProcessStep {
 
 interface ProcessProps {
   title?: string;
+  /** Blog-style bar + uppercase label above the title (e.g. "Our Process") */
+  sectionLabel?: string;
   steps?: ProcessStep[];
   className?: string;
 }
@@ -37,18 +39,31 @@ const defaultSteps: ProcessStep[] = [
 
 export function Process({
   title = "Our Process",
+  sectionLabel,
   steps = defaultSteps,
   className,
 }: ProcessProps) {
   return (
-    <section className={cn("bg-muted/50 py-16 sm:py-24", className)}>
+    <section className={cn("border-b border-border bg-muted/30 py-16 sm:py-24", className)}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
+        <div className="mx-auto max-w-5xl">
+          {sectionLabel && (
+            <div className="mb-6 flex items-center justify-center gap-3">
+              <div className="h-1 w-8 rounded-full bg-orange-500" aria-hidden />
+              <span className="text-sm font-bold uppercase tracking-wider text-foreground">
+                {sectionLabel}
+              </span>
+            </div>
+          )}
+          {title && (
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className={cn("text-3xl font-bold tracking-tight sm:text-4xl", sectionLabel && "text-2xl sm:text-3xl")}>
+                {title}
+              </h2>
+            </div>
+          )}
         </div>
-        <div className="mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={cn("mx-auto grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4", (title || sectionLabel) ? "mt-12" : "mt-0")}>
           {steps.map((step, index) => (
             <div key={index} className="relative">
               <div className="text-6xl font-bold text-primary/20">

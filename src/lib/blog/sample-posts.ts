@@ -16,7 +16,7 @@ export const SAMPLE_POSTS: WPPost[] = [
       <ul>
         <li><strong>Local SEO:</strong> Optimize for "near me" and city-specific searches with a complete Google Business Profile.</li>
         <li><strong>Service pages:</strong> Create dedicated pages for each treatment with detailed, helpful content.</li>
-        <li><strong>Reviews and reputation:</strong> Encourage satisfied clients to leave reviews—they influence both rankings and conversions.</li>
+        <li><strong>Reviews and reputation:</strong> Encourage satisfied clients to leave reviews. They influence both rankings and conversions.</li>
         <li><strong>Mobile-first design:</strong> Most med spa searches happen on mobile; ensure your site loads fast and looks great on phones.</li>
       </ul>
       
@@ -68,7 +68,7 @@ export const SAMPLE_POSTS: WPPost[] = [
     title: "Building trust with social proof for service businesses",
     excerpt: "<p>Testimonials, reviews, and case studies build credibility. Here's how to collect and showcase social proof that turns skeptical visitors into confident clients.</p>",
     content: `
-      <p>When someone is considering a medical spa, dental practice, or professional service, trust is everything. Social proof—reviews, testimonials, before-and-after photos—helps bridge the gap between stranger and client.</p>
+      <p>When someone is considering a medical spa, dental practice, or professional service, trust is everything. Social proof (reviews, testimonials, before-and-after photos) helps bridge the gap between stranger and client.</p>
       
       <h2>Types of social proof</h2>
       <p>Google reviews, testimonials on your site, case studies with specific results, and before-and-after galleries each serve a purpose. We'll help you prioritize based on your industry.</p>
@@ -122,7 +122,7 @@ export const SAMPLE_POSTS: WPPost[] = [
     id: "sample-6",
     slug: "why-mobile-first-design-matters",
     title: "Why mobile-first design matters for your business",
-    excerpt: "<p>Most of your prospects are searching on their phones. A mobile-first website isn't optional—it's essential for rankings and conversions.</p>",
+    excerpt: "<p>Most of your prospects are searching on their phones. A mobile-first website isn't optional. It's essential for rankings and conversions.</p>",
     content: `<p>Mobile-first design ensures your site performs well on the devices your audience actually uses. We'll cover the why and how.</p>`,
     date: "2024-03-13T09:00:00Z",
     modified: "2024-03-13T09:00:00Z",
