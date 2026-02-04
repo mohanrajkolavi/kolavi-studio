@@ -5,11 +5,11 @@ import { getPageMetadata } from "@/lib/seo/metadata";
 import { parseRankMathFullHead } from "@/lib/seo/rank-math-parser";
 import { getArticleSchema } from "@/lib/seo/jsonld/article";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { getPostBySlug, getPosts, getPostAuthorName, getPostAuthorUrl, fetchAllPostSlugs } from "@/lib/blog-data";
-import { processContentForToc } from "@/lib/blog-utils";
+import { getPostBySlug, getPosts, getPostAuthorName, getPostAuthorUrl, fetchAllPostSlugs } from "@/lib/blog/data";
+import { processContentForToc } from "@/lib/blog/utils";
 import { BlogPostTOC } from "@/components/blog/BlogPostTOC";
 import { ShareButtons } from "@/components/blog/ShareButtons";
-import { BlogSubscribe } from "../BlogSubscribe";
+import { BlogSubscribe } from "@/components/blog/BlogSubscribe";
 import { SITE_URL } from "@/lib/constants";
 import type { WPPost } from "@/lib/graphql/types";
 
@@ -99,11 +99,18 @@ export default async function BlogPostPage({ params }: PageProps) {
     wordCount,
   });
 
-  const breadcrumbSchema = getBreadcrumbSchema([
+  const breadcrumbItems = [
     { name: "Home", url: "/" },
     { name: "Blog", url: "/blog" },
-    { name: post.title, url: `/blog/${slug}` },
-  ]);
+  ];
+  if (firstCategory) {
+    breadcrumbItems.push({
+      name: firstCategory.name,
+      url: `/blog/category/${firstCategory.slug}`,
+    });
+  }
+  breadcrumbItems.push({ name: post.title, url: `/blog/${slug}` });
+  const breadcrumbSchema = getBreadcrumbSchema(breadcrumbItems);
 
   const formattedDate = new Date(post.date).toLocaleDateString("en-US", {
     year: "numeric",
@@ -173,6 +180,16 @@ export default async function BlogPostPage({ params }: PageProps) {
                     </li>
                   </>
                 )}
+                <li aria-hidden className="text-muted-foreground/50">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </li>
+                <li>
+                  <span className="rounded px-2 py-1 font-medium text-foreground">
+                    {post.title}
+                  </span>
+                </li>
               </ol>
             </nav>
 
@@ -242,6 +259,9 @@ export default async function BlogPostPage({ params }: PageProps) {
                     sizes="(max-width: 768px) 100vw, (max-width: 1280px) 80vw, 1024px"
                   />
                 </div>
+                <figcaption className="sr-only">
+                  {post.featuredImage.node.altText || post.title}
+                </figcaption>
               </figure>
             )}
 

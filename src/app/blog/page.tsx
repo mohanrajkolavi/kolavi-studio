@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { getPageMetadata } from "@/lib/seo/metadata";
-import { getPosts, getCategoriesFromPosts } from "@/lib/blog-data";
-import { stripHtml } from "@/lib/blog-utils";
-import { BlogSubscribe } from "./BlogSubscribe";
-import { BlogContent } from "./BlogContent";
+import { getPosts, getCategoriesFromPosts } from "@/lib/blog/data";
+import { stripHtml } from "@/lib/blog/utils";
+import { BlogSubscribe } from "@/components/blog/BlogSubscribe";
+import { BlogContent } from "@/components/blog/BlogContent";
 import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60;

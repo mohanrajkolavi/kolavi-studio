@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { WPPost } from "@/lib/graphql/types";
-import { stripHtml, truncateToWords, calculateReadingTime } from "@/lib/blog-utils";
+import { stripHtml, truncateToWords, calculateReadingTime } from "@/lib/blog/utils";
 
 function getCategoryPostCount(posts: WPPost[], slug: string): number {
   return posts.filter((post) =>
@@ -157,6 +157,7 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                 <button
                   type="button"
                   onClick={() => setSelectedCategory(null)}
+                  aria-pressed={selectedCategory === null}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     selectedCategory === null
                       ? "bg-primary text-primary-foreground"
@@ -176,6 +177,7 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                       key={cat.slug}
                       type="button"
                       onClick={() => setSelectedCategory(cat.slug)}
+                      aria-pressed={isActive}
                       className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                         isActive
                           ? "bg-orange-500 text-white"

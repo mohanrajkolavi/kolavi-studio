@@ -3,8 +3,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { getCategoryBySlug, getAllCategorySlugs } from "@/lib/blog-data";
-import { truncateToWords } from "@/lib/blog-utils";
+import { getCategoryBySlug, getAllCategorySlugs } from "@/lib/blog/data";
+import { truncateToWords } from "@/lib/blog/utils";
 import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds

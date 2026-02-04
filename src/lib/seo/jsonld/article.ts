@@ -47,7 +47,7 @@ export function getArticleSchema({
     dateModified,
     ...(wordCount != null && { wordCount }),
     author: {
-      "@type": "Organization",
+      "@type": authorName === SITE_NAME ? "Organization" : "Person",
       name: authorName,
       url: authorUrl.startsWith("http") ? authorUrl : `${SITE_URL}${authorUrl}`,
     },

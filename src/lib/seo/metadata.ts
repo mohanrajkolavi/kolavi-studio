@@ -64,10 +64,12 @@ export function getPageMetadata({
   twitterDescription,
   twitterImage,
 }: PageMetadataProps): Metadata {
+  const withSiteName = (value: string) =>
+    value.includes(SITE_NAME) ? value : `${value} | ${SITE_NAME}`;
   const url = `${SITE_URL}${path}`;
   const ogImage = image || `${SITE_URL}/og-image.jpg`;
   const ogDesc = ogDescription ?? description;
-  const twTitle = twitterTitle ?? `${title} | ${SITE_NAME}`;
+  const twTitle = twitterTitle ?? withSiteName(title);
   const twDesc = twitterDescription ?? description;
   const twImage = twitterImage ?? ogImage;
 
@@ -82,7 +84,7 @@ export function getPageMetadata({
     openGraph: {
       type: publishedTime ? "article" : "website",
       url,
-      title: `${title} | ${SITE_NAME}`,
+      title: withSiteName(title),
       description: ogDesc,
       siteName: SITE_NAME,
       publishedTime,

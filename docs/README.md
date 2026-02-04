@@ -39,6 +39,7 @@ Central index for all project documentation, design notes, and guides.
 | [implementation/CATEGORY_TAG_PAGES_FIX.md](implementation/CATEGORY_TAG_PAGES_FIX.md) | Fix for category/tag 404s with sample data |
 | [implementation/IMPLEMENTATION_SUMMARY.md](implementation/IMPLEMENTATION_SUMMARY.md) | Full implementation summary, file structure, features |
 | [implementation/PROJECT_COMPLETE.md](implementation/PROJECT_COMPLETE.md) | Completion checklist and next steps |
+| [implementation/UNUSED_CODE.md](implementation/UNUSED_CODE.md) | Unused code audit – safe removals and refactors |
 
 ---
 
@@ -48,3 +49,5 @@ Central index for all project documentation, design notes, and guides.
 |-----|-------------|
 | [seo/BLOG_SEO_ANALYSIS_2026.md](seo/BLOG_SEO_ANALYSIS_2026.md) | Blog SEO & WordPress headless compliance analysis (scores, recommendations) |
 | [seo/BLOG_SEO_WORDPRESS_AUDIT.md](seo/BLOG_SEO_WORDPRESS_AUDIT.md) | SEO and WordPress headless compatibility audit (96/100) |
+| [audits/AUDIT_SEO_SECURITY_WORDPRESS_2026.md](audits/AUDIT_SEO_SECURITY_WORDPRESS_2026.md) | Full audit: SEO, security, WordPress headless, performance |
+| [audits/CODEBASE_AUDIT.md](audits/CODEBASE_AUDIT.md) | Codebase audit – Next.js, headless WP, SEO, security, DX |

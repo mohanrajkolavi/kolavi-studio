@@ -91,8 +91,10 @@ export function addHeadingIds(html: string, headings: TocItem[]): string {
   return html.replace(
     /<(h[2-6])([^>]*)>([\s\S]*?)<\/\1>/gi,
     (match, tag, attrs, inner) => {
+      if (attrs.includes("id=") || !inner.trim()) return match;
+      if (index >= uniqueIds.length) return match;
       const id = uniqueIds[index++];
-      if (!id || attrs.includes("id=")) return match;
+      if (!id) return match;
       return `<${tag}${attrs} id="${id}">${inner}</${tag}>`;
     }
   );

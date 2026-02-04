@@ -22,7 +22,7 @@ import {
   GET_ALL_CATEGORY_SLUGS,
   GET_POST_SLUGS_PAGE,
 } from "@/lib/graphql/queries";
-import { SAMPLE_POSTS } from "@/lib/sample-posts";
+import { SAMPLE_POSTS } from "./sample-posts";
 import { SITE_NAME, SITE_URL, WP_GRAPHQL_URL } from "@/lib/constants";
 
 const CACHE_REVALIDATE = 60;
@@ -87,11 +87,13 @@ export async function fetchAllPostSlugs(): Promise<{ slug: string; modified: str
   let pageCount = 0;
   while (hasNext) {
     if (pageCount >= MAX_PAGES) {
-      const err = new Error(
-        `fetchAllPostSlugs: pagination limit reached (MAX_PAGES=${MAX_PAGES}). Collected ${all.length} slugs so far.`
+      console.error(
+        `fetchAllPostSlugs: pagination limit reached (MAX_PAGES=${MAX_PAGES}). Collected ${all.length} slugs. Falling back to sample slugs.`
       );
-      console.error(err.message);
-      throw err;
+      return SAMPLE_POSTS.map((p) => ({
+        slug: p.slug,
+        modified: p.modified ?? new Date().toISOString(),
+      }));
     }
     pageCount += 1;
     try {
@@ -106,7 +108,10 @@ export async function fetchAllPostSlugs(): Promise<{ slug: string; modified: str
     } catch (error) {
       const context = { query: "GET_POST_SLUGS_PAGE", after, pageCount, collectedCount: all.length };
       console.error("fetchAllPostSlugs: request failed", context, error);
-      throw error;
+      return SAMPLE_POSTS.map((p) => ({
+        slug: p.slug,
+        modified: p.modified ?? new Date().toISOString(),
+      }));
     }
   }
   return all;

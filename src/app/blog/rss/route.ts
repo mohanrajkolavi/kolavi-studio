@@ -1,4 +1,4 @@
-import { getPosts } from "@/lib/blog-data";
+import { getPosts } from "@/lib/blog/data";
 import { SITE_NAME, SITE_URL } from "@/lib/constants";
 
 const RSS_SPEC_URL = "https://www.rssboard.org/rss-specification";
@@ -32,7 +32,7 @@ export async function GET() {
     <description>Digital marketing insights, SEO strategies, and business growth resources.</description>
     <language>en-us</language>
     <lastBuildDate>${lastBuild}</lastBuildDate>
-    <atom:link href="${SITE_URL}/blog/rss" rel="self" type="application/rss+xml"/>
+    <atom:link href="${SITE_URL}/blog/rss.xml" rel="self" type="application/rss+xml"/>
     <docs>${RSS_SPEC_URL}</docs>
     <generator>${escapeXml(SITE_NAME)}</generator>
     <ttl>${TTL_MINUTES}</ttl>

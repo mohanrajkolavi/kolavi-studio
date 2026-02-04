@@ -1,5 +1,12 @@
 # Architecture & Runbooks
 
+## Project structure
+
+- **`src/app/`** – Routes and page composition only (pages, layouts, API routes, sitemap/robots). No shared UI components.
+- **`src/components/`** – Reusable UI: `blog/` (BlogContent, BlogSubscribe, BlogPostTOC, ShareButtons), `layout/` (Header, Footer, CTAStrip, MobileNav), `sections/`, `ui/`, `contact/`.
+- **`src/lib/`** – Shared logic: `blog/` (data, utils, sample-posts), `graphql/` (client, queries, types), `seo/` (metadata, JSON-LD, canonical, rank-math), `constants.ts`, `utils.ts`, `sitemap-index.ts`.
+- **`docs/`** – `architecture/`, `design/`, `implementation/`, `integrations/`, `seo/`, `audits/`.
+
 ## Environment variables
 
 All public config is via `NEXT_PUBLIC_*`; no server secrets are exposed to the client.
@@ -13,7 +20,7 @@ See [INTEGRATIONS.md](../integrations/INTEGRATIONS.md) for full list and GTM not
 ## WordPress (headless)
 
 - **Where it's used:** Blog posts, categories, tags, sitemap posts/categories/tags, RSS, and static params for blog post pages.
-- **Data layer:** `src/lib/blog-data.ts` – `getPosts`, `getPostBySlug`, `getCategoryBySlug`, `getAllCategorySlugs`, `fetchAllPostSlugs`. GraphQL client in `src/lib/graphql/client.ts`; queries in `src/lib/graphql/queries.ts`.
+- **Data layer:** `src/lib/blog/data.ts` – `getPosts`, `getPostBySlug`, `getCategoryBySlug`, `getAllCategorySlugs`, `fetchAllPostSlugs`. GraphQL client in `src/lib/graphql/client.ts`; queries in `src/lib/graphql/queries.ts`.
 - **Slugs at scale:** `fetchAllPostSlugs()` paginates (100 per page) so sitemaps and `generateStaticParams` work with 1000+ posts. Post list for the blog index still uses `getPosts()` (first 100); increase or paginate there if needed.
 - **Auth:** Public read-only by default. To lock down WP, add headers or auth in `src/lib/graphql/client.ts`.
 
@@ -47,4 +54,4 @@ To inspect bundle size and route-based code splitting:
 
 - **Runtime errors:** Root `src/app/error.tsx` catches unhandled errors and shows a friendly message with "Try again" and "Go home" / "Blog".
 - **404:** `src/app/not-found.tsx` with links to home and blog.
-- **GraphQL failures:** `blog-data.ts` catches errors and falls back to sample data (posts) or null (category) so the site degrades gracefully.
+- **GraphQL failures:** `lib/blog/data.ts` catches errors and falls back to sample data (posts) or null (category) so the site degrades gracefully.

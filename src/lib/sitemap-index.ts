@@ -14,7 +14,7 @@ import {
   getAllCategorySlugs,
   getTagsFromPosts,
   fetchAllPostSlugs,
-} from "@/lib/blog-data";
+} from "@/lib/blog/data";
 import {
   GET_ALL_CATEGORY_SLUGS,
   GET_ALL_TAG_SLUGS,
@@ -117,6 +117,8 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: UrlEntry
   { path: "/about", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/contact", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/blog", priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
+  { path: "/blog/category", priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
+  { path: "/blog/tag", priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
 ];
 
 export function getStaticEntries(): UrlEntry[] {

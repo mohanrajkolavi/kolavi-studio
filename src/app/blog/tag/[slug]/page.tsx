@@ -4,8 +4,8 @@ import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
-import { getPosts, getTagsFromPosts } from "@/lib/blog-data";
-import { stripHtml, truncateToWords } from "@/lib/blog-utils";
+import { getPosts, getTagsFromPosts } from "@/lib/blog/data";
+import { stripHtml, truncateToWords } from "@/lib/blog/utils";
 import { SITE_URL } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
@@ -144,6 +144,7 @@ export default async function TagPage({ params }: PageProps) {
                           alt={post.featuredImage.node.altText || post.title}
                           fill
                           className="rounded-t-xl object-cover"
+                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         />
                       </div>
                     )}

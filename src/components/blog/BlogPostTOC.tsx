@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { TocItem } from "@/lib/blog-utils";
+import type { TocItem } from "@/lib/blog/utils";
 
 interface BlogPostTOCProps {
   headings: TocItem[];
