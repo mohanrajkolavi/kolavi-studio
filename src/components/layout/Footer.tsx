@@ -1,79 +1,118 @@
 import Link from "next/link";
-import { NAV_LINKS } from "@/lib/constants";
+import { NAV_LINKS, SITE_URL } from "@/lib/constants";
+
+function getWebsiteDomain(): string {
+  try {
+    const url = new URL(SITE_URL);
+    return url.hostname.replace(/^www\./, "");
+  } catch {
+    return "kolavistudio.com";
+  }
+}
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
+  const websiteDomain = getWebsiteDomain();
 
   return (
-    <footer className="border-t bg-background">
-      <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
-          {/* Brand */}
+    <footer className="border-t bg-background" role="contentinfo">
+      <div className="container mx-auto px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
+        {/* Mobile: compact stacked layout */}
+        <div className="grid grid-cols-1 gap-10 sm:gap-8 md:grid-cols-4 md:gap-8">
+          {/* Brand - full width on mobile */}
           <div className="md:col-span-1">
-            <Link href="/" className="text-xl font-bold">
+            <Link href="/" className="text-xl font-bold tracking-tight">
               Kolavi Studio
             </Link>
-            <p className="mt-4 text-sm text-muted-foreground">
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:mt-4">
               Digital marketing agency specializing in medical spas, dental practices, and law firms.
             </p>
           </div>
 
-          {/* Navigation */}
-          <div>
-            <h3 className="text-sm font-semibold">Navigation</h3>
-            <ul className="mt-4 space-y-1">
-              {NAV_LINKS.slice(0, 4).map((link) => (
-                <li key={link.href}>
+          {/* Mobile: 2-column grid for Navigation + Resources */}
+          <div className="grid grid-cols-2 gap-8 sm:gap-0 md:contents">
+            {/* Navigation */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                Navigation
+              </h3>
+              <ul className="mt-3 space-y-0 sm:mt-4 sm:space-y-1">
+                {NAV_LINKS.slice(0, 4).map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
+                    >
+                      {link.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Resources */}
+            <div>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+                Resources
+              </h3>
+              <ul className="mt-3 space-y-0 sm:mt-4 sm:space-y-1">
+                <li>
                   <Link
-                    href={link.href}
-                    className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md"
+                    href="/blog"
+                    className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
                   >
-                    {link.name}
+                    Blog
                   </Link>
                 </li>
-              ))}
-            </ul>
+                <li>
+                  <Link
+                    href="/portfolio"
+                    className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
+                  >
+                    Portfolio
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/about"
+                    className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
+                  >
+                    About Us
+                  </Link>
+                </li>
+              </ul>
+            </div>
           </div>
 
-          {/* Resources */}
-          <div>
-            <h3 className="text-sm font-semibold">Resources</h3>
-            <ul className="mt-4 space-y-1">
-              <li>
-                <Link href="/blog" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
-                  Blog
-                </Link>
-              </li>
-              <li>
-                <Link href="/portfolio" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
-                  Portfolio
-                </Link>
-              </li>
-              <li>
-                <Link href="/about" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
-                  About Us
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h3 className="text-sm font-semibold">Get in Touch</h3>
-            <ul className="mt-4 space-y-1">
-              <li>
-                <Link href="/contact" className="block py-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-md">
-                  Contact Us
-                </Link>
-              </li>
-            </ul>
+          {/* Get in Touch - full width on mobile with CTA */}
+          <div className="md:col-start-4">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
+              Get in Touch
+            </h3>
+            <div className="mt-3 sm:mt-4">
+              <Link
+                href="/contact"
+                className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                Contact Us
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="mt-12 border-t pt-8">
+        {/* Bottom bar - copyright + website CTA */}
+        <div className="mt-10 flex flex-col items-center gap-4 border-t pt-8 sm:mt-12">
           <p className="text-center text-sm text-muted-foreground">
             © {currentYear} Kolavi Studio. All rights reserved.
           </p>
+          <Link
+            href={SITE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center rounded-full bg-muted px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {websiteDomain}
+          </Link>
         </div>
       </div>
     </footer>
