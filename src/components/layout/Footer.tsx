@@ -1,24 +1,14 @@
 import Link from "next/link";
-import { NAV_LINKS, SITE_URL } from "@/lib/constants";
-
-function getWebsiteDomain(): string {
-  try {
-    const url = new URL(SITE_URL);
-    return url.hostname.replace(/^www\./, "");
-  } catch {
-    return "kolavistudio.com";
-  }
-}
+import { NAV_LINKS } from "@/lib/constants";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
-  const websiteDomain = getWebsiteDomain();
 
   return (
     <footer className="border-t bg-background" role="contentinfo">
       <div className="container mx-auto px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
         {/* Mobile: compact stacked layout */}
-        <div className="grid grid-cols-1 gap-10 sm:gap-8 md:grid-cols-4 md:gap-8">
+        <div className="grid grid-cols-1 gap-10 sm:gap-8 md:grid-cols-3 md:gap-8">
           {/* Brand - full width on mobile */}
           <div className="md:col-span-1">
             <Link href="/" className="text-xl font-bold tracking-tight">
@@ -83,36 +73,13 @@ export function Footer() {
               </ul>
             </div>
           </div>
-
-          {/* Get in Touch - full width on mobile with CTA */}
-          <div className="md:col-start-4">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-              Get in Touch
-            </h3>
-            <div className="mt-3 sm:mt-4">
-              <Link
-                href="/contact"
-                className="inline-flex items-center rounded-lg bg-orange-500 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                Contact Us
-              </Link>
-            </div>
-          </div>
         </div>
 
-        {/* Bottom bar - copyright + website CTA */}
-        <div className="mt-10 flex flex-col items-center gap-4 border-t pt-8 sm:mt-12">
+        {/* Bottom bar - copyright */}
+        <div className="mt-10 border-t pt-8 sm:mt-12">
           <p className="text-center text-sm text-muted-foreground">
             © {currentYear} Kolavi Studio. All rights reserved.
           </p>
-          <Link
-            href={SITE_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center rounded-full bg-muted px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            {websiteDomain}
-          </Link>
         </div>
       </div>
     </footer>
