@@ -20,7 +20,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const organizationSchema = getOrganizationSchema();
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const headersList = await headers();
+  const nonce = headersList.get("x-nonce") ?? undefined;
+  const isAdmin = headersList.get("x-authenticated") === "1";
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -58,7 +60,7 @@ export default async function RootLayout({
           </>
         )}
         <ThemeProvider>
-          <LayoutShell>
+          <LayoutShell isAdmin={isAdmin}>
             <main id="main-content" className="min-h-screen overflow-x-clip">{children}</main>
           </LayoutShell>
         </ThemeProvider>

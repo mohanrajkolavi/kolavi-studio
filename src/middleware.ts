@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { isAuthenticated } from "@/lib/auth";
 
 /** Nonce-based CSP: one-time random value per request so inline scripts/styles are allowlisted without 'unsafe-inline'. */
 function getCspWithNonce(nonce: string): string {
@@ -56,6 +57,13 @@ export async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("Content-Security-Policy", cspHeader);
+  // Never trust client-supplied x-authenticated; strip it then set from server-side check only
+  requestHeaders.delete("x-authenticated");
+  if (await isAuthenticated(request)) {
+    requestHeaders.set("x-authenticated", "1");
+  } else {
+    requestHeaders.set("x-authenticated", "0");
+  }
 
   const response = NextResponse.next({
     request: { headers: requestHeaders },

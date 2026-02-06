@@ -52,6 +52,14 @@ export const NAV_LINKS = [
   { name: "About", href: "/about" },
 ];
 
+// Legal pages - privacy, terms, cookies, disclaimer
+export const LEGAL_LINKS = [
+  { name: "Privacy Policy", href: "/privacy" },
+  { name: "Terms of Service", href: "/terms" },
+  { name: "Cookie Policy", href: "/cookies" },
+  { name: "Disclaimer", href: "/disclaimer" },
+];
+
 // Vertical landing pages - industries we specialize in
 export const VERTICAL_LINKS = [
   { name: "Medical Spas", href: "/medical-spas", available: true },

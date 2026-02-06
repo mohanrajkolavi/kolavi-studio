@@ -1,83 +1,102 @@
 import Link from "next/link";
-import { NAV_LINKS } from "@/lib/constants";
+import { ArrowRight } from "lucide-react";
+import { NAV_LINKS, LEGAL_LINKS } from "@/lib/constants";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t bg-background" role="contentinfo">
-      <div className="container mx-auto px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
-        {/* Mobile: compact stacked layout */}
-        <div className="grid grid-cols-1 gap-10 sm:gap-8 md:grid-cols-3 md:gap-8">
-          {/* Brand - full width on mobile */}
-          <div className="md:col-span-1">
-            <Link href="/" className="text-xl font-bold tracking-tight">
-              Kolavi Studio.
-            </Link>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:mt-4">
-              Digital marketing agency specializing in medical spas, dental practices, and law firms.
-            </p>
-          </div>
+    <footer className="border-t border-border bg-muted/30 dark:bg-muted/10" role="contentinfo">
+      <div className="container mx-auto px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
+        {/* Main footer content - card-style container */}
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-card px-6 py-10 shadow-sm sm:px-8 sm:py-12 lg:px-10 lg:py-14">
+          {/* Subtle gradient accent */}
+          <div className="absolute right-0 top-0 h-48 w-48 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.06] blur-3xl dark:bg-primary/[0.08]" aria-hidden />
 
-          {/* Mobile: 2-column grid for Navigation + Resources */}
-          <div className="grid grid-cols-2 gap-8 sm:gap-0 md:contents">
-            {/* Navigation */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                Navigation
-              </h3>
-              <ul className="mt-3 space-y-0 sm:mt-4 sm:space-y-1">
-                {NAV_LINKS.slice(0, 4).map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
-                    >
-                      {link.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+          <div className="relative grid grid-cols-1 gap-10 sm:gap-12 lg:grid-cols-12 lg:gap-8">
+            {/* Brand block */}
+            <div className="lg:col-span-5">
+              <Link
+                href="/"
+                className="inline-block text-2xl font-bold tracking-tight text-foreground transition-opacity hover:opacity-90 sm:text-3xl"
+              >
+                Kolavi Studio.
+              </Link>
+              <p className="mt-4 max-w-sm text-base leading-relaxed text-muted-foreground">
+                Digital marketing agency specializing in medical spas, dental practices, and law firms.
+              </p>
+              <Link
+                href="/contact"
+                className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+              >
+                Get in Touch
+                <ArrowRight className="h-4 w-4" aria-hidden />
+              </Link>
             </div>
 
-            {/* Resources */}
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
-                Resources
-              </h3>
-              <ul className="mt-3 space-y-0 sm:mt-4 sm:space-y-1">
-                <li>
-                  <Link
-                    href="/blog"
-                    className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
-                  >
-                    Blog
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/portfolio"
-                    className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
-                  >
-                    Portfolio
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    href="/about"
-                    className="-mx-2 block rounded-lg py-2.5 pl-2 text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:py-2 sm:pl-0"
-                  >
-                    About Us
-                  </Link>
-                </li>
-              </ul>
+            {/* Navigation links - 2 columns on larger screens */}
+            <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:col-span-7 lg:grid-cols-2 lg:gap-12">
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-foreground">
+                  Site
+                </h3>
+                <ul className="mt-4 space-y-3">
+                  {NAV_LINKS.map((link) => (
+                    <li key={link.href}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded"
+                      >
+                        {link.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-widest text-foreground">
+                  More
+                </h3>
+                <ul className="mt-4 space-y-3">
+                  <li>
+                    <Link
+                      href="/portfolio"
+                      className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded"
+                    >
+                      Portfolio
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/contact"
+                      className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card rounded"
+                    >
+                      Contact
+                    </Link>
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Bottom bar - copyright */}
-        <div className="mt-10 border-t pt-8 sm:mt-12">
-          <p className="text-center text-sm text-muted-foreground">
+        {/* Bottom bar - legal links + copyright */}
+        <div className="mt-8 flex flex-col items-center justify-between gap-4 sm:flex-row sm:gap-6">
+          <nav
+            className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:gap-x-4"
+            aria-label="Legal"
+          >
+            {LEGAL_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+              >
+                {link.name}
+              </Link>
+            ))}
+          </nav>
+          <p className="text-xs text-muted-foreground">
             © {currentYear} Kolavi Studio. All rights reserved.
           </p>
         </div>
