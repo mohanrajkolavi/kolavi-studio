@@ -139,27 +139,44 @@ export default async function BlogPostPage({ params }: PageProps) {
       <article className="min-h-screen bg-background">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-5xl">
-            {/* Breadcrumb */}
-            <nav aria-label="Breadcrumb" className="pt-8 pb-4">
-              <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            {/* Breadcrumb - redesigned with chevrons and subtle background */}
+            <nav
+              aria-label="Breadcrumb"
+              className="pt-10 pb-6"
+            >
+              <ol className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
                 <li>
-                  <Link href="/" className="text-muted-foreground transition-colors hover:text-foreground">
+                  <Link
+                    href="/"
+                    className="rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
                     Home
                   </Link>
                 </li>
-                <li aria-hidden className="text-muted-foreground/50">/</li>
+                <li aria-hidden className="text-muted-foreground/50">
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </li>
                 <li>
-                  <Link href="/blog" className="text-muted-foreground transition-colors hover:text-foreground">
+                  <Link
+                    href="/blog"
+                    className="rounded px-2 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
                     Blog
                   </Link>
                 </li>
                 {firstCategory && (
                   <>
-                    <li aria-hidden className="text-muted-foreground/50">/</li>
+                    <li aria-hidden className="text-muted-foreground/50">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </li>
                     <li>
                       <Link
                         href={`/blog/category/${firstCategory.slug}`}
-                        className="font-medium text-foreground transition-colors hover:text-muted-foreground"
+                        className="rounded px-2 py-1 font-medium text-orange-600 transition-colors hover:bg-orange-50 hover:text-orange-700"
                       >
                         {firstCategory.name}
                       </Link>
@@ -169,18 +186,28 @@ export default async function BlogPostPage({ params }: PageProps) {
               </ol>
             </nav>
 
-            {/* Meta */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-muted-foreground">
+            {/* Meta: category pill + date + read time - redesigned */}
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
               {post.categories?.nodes?.[0] && (
                 <Link
                   href={`/blog/category/${post.categories.nodes[0].slug}`}
-                  className="rounded-md border border-border px-2.5 py-0.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/50"
+                  className="inline-flex items-center rounded-full bg-orange-100 px-3.5 py-1.5 text-sm font-semibold text-orange-700 transition-colors hover:bg-orange-200"
                 >
                   {post.categories.nodes[0].name}
                 </Link>
               )}
-              <time dateTime={post.date}>{formattedDate}</time>
-              <span>{readTime} min read</span>
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <time dateTime={post.date}>{formattedDate}</time>
+              </span>
+              <span className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {readTime} min read
+              </span>
             </div>
 
             {/* Title - H1 (unchanged - you like it) */}
@@ -193,21 +220,21 @@ export default async function BlogPostPage({ params }: PageProps) {
               {leadText}
             </p>
 
-            {/* Author + Share */}
-            <div className="mt-8 flex flex-col gap-4 rounded-xl border border-border bg-card px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            {/* Author + Share – single card */}
+            <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5 sm:py-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-sm font-semibold text-foreground">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-100 to-amber-100 text-sm font-bold text-orange-700">
                   {getPostAuthorName(post).charAt(0)}
                 </div>
-                <div>
-                  <p className="font-medium text-foreground">{getPostAuthorName(post)}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Digital marketing insights
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">{getPostAuthorName(post)}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+                    Digital marketing insights for service businesses
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 border-t border-border pt-4 sm:border-t-0 sm:border-l sm:border-border sm:pl-5 sm:pt-0">
-                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Share</span>
+              <div className="flex items-center gap-3 border-t border-border pt-3 sm:border-t-0 sm:border-l sm:border-border sm:pl-5 sm:pt-0">
+                <span className="text-sm font-medium text-muted-foreground">Share</span>
                 <ShareButtons url={postUrl} title={post.title} showLabel={false} />
               </div>
             </div>
@@ -215,7 +242,7 @@ export default async function BlogPostPage({ params }: PageProps) {
             {/* Featured image */}
             {post.featuredImage && (
               <figure className="mt-8">
-                <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-muted">
+                <div className="relative aspect-[16/10] w-full overflow-hidden rounded-2xl bg-muted">
                   <Image
                     src={post.featuredImage.node.sourceUrl}
                     alt={post.featuredImage.node.altText || post.title}
@@ -246,17 +273,17 @@ export default async function BlogPostPage({ params }: PageProps) {
                   dangerouslySetInnerHTML={{ __html: content }}
                 />
 
-                {/* Categories + Tags */}
+                {/* Categories + Tags – rounded pills */}
                 <footer className="mt-10 border-t border-border pt-6">
                   <div className="flex flex-wrap items-center gap-2 text-sm">
                     {(post.categories?.nodes?.length ?? 0) + (post.tags?.nodes?.length ?? 0) > 0 && (
-                      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Posted in</span>
+                      <span className="text-muted-foreground">Posted in</span>
                     )}
                     {post.categories?.nodes?.map((cat) => (
                       <Link
                         key={cat.slug}
                         href={`/blog/category/${cat.slug}`}
-                        className="rounded-md border border-border px-2.5 py-0.5 text-xs font-medium text-foreground transition-colors hover:bg-muted/50"
+                        className="rounded-full bg-muted px-3 py-1.5 text-foreground transition-colors hover:bg-orange-100 hover:text-orange-700 dark:hover:bg-orange-900/30 dark:hover:text-orange-400"
                       >
                         {cat.name}
                       </Link>
@@ -265,7 +292,7 @@ export default async function BlogPostPage({ params }: PageProps) {
                       <Link
                         key={tag.slug}
                         href={`/blog/tag/${tag.slug}`}
-                        className="rounded-md border border-border px-2.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                        className="rounded-full border border-border px-3 py-1.5 text-muted-foreground transition-colors hover:border-orange-300 hover:text-orange-600 dark:hover:border-orange-600 dark:hover:text-orange-400"
                       >
                         {tag.name}
                       </Link>
@@ -281,18 +308,19 @@ export default async function BlogPostPage({ params }: PageProps) {
               )}
             </div>
 
-            {/* Read next */}
+            {/* Read next – redesigned */}
             {relatedPosts.length > 0 && (
-              <section className="border-t border-border pt-8 pb-12 sm:pt-10 sm:pb-14">
-                <p className="mb-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  More to read
-                </p>
-                <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              <section className="border-t border-border pt-6 pb-12 sm:pt-8 sm:pb-14">
+                <div className="flex flex-col items-center gap-6 sm:gap-8">
+                  <span className="rounded-full bg-muted px-4 py-2 text-sm font-semibold text-foreground">
+                    More to read
+                  </span>
+                  <div className="grid w-full grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {relatedPosts.map((related) => (
                     <Link
                       key={related.id}
                       href={`/blog/${related.slug}`}
-                      className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30 hover:bg-muted/20"
+                      className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition-all hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800"
                     >
                       {related.featuredImage ? (
                         <div className="relative aspect-[16/10] overflow-hidden bg-muted">
@@ -308,13 +336,13 @@ export default async function BlogPostPage({ params }: PageProps) {
                         <div className="aspect-[16/10] bg-muted" />
                       )}
                       <div className="flex flex-1 flex-col p-5">
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
                           {related.categories?.nodes?.[0] && (
-                            <span className="rounded-md border border-border px-2 py-0.5 text-xs font-medium text-foreground">
+                            <span className="rounded-full bg-orange-100 px-2.5 py-0.5 font-medium text-orange-700">
                               {related.categories.nodes[0].name}
                             </span>
                           )}
-                          <time>
+                          <time className="text-muted-foreground">
                             {new Date(related.date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
@@ -322,15 +350,15 @@ export default async function BlogPostPage({ params }: PageProps) {
                             })}
                           </time>
                         </div>
-                        <h3 className="mt-3 font-semibold text-foreground line-clamp-2 transition-colors group-hover:text-foreground">
+                        <h3 className="mt-3 font-semibold text-foreground line-clamp-2 transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400">
                           {related.title}
                         </h3>
                         <p className="mt-2 line-clamp-2 flex-1 text-sm text-muted-foreground">
                           {stripHtml(related.excerpt || "")}
                         </p>
-                        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-all group-hover:gap-2">
+                        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 group-hover:gap-2">
                           Read article
-                          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg className="h-4 w-4 shrink-0 transition-transform group-hover:translate-x-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                           </svg>
                         </span>
@@ -338,20 +366,21 @@ export default async function BlogPostPage({ params }: PageProps) {
                     </Link>
                   ))}
                   </div>
+                </div>
               </section>
             )}
 
-            {/* Newsletter */}
-            <div className="mb-12 flex flex-col gap-6 rounded-xl border border-border bg-card px-5 py-6 sm:mb-14 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Newsletter
-                </p>
-                <h2 className="mt-1 text-base font-semibold text-foreground sm:text-lg">
-                  Get the latest insights
+            {/* Newsletter – horizontal layout (heading left, form right) */}
+            <div className="mb-14 flex flex-col gap-6 rounded-2xl border border-border bg-card px-5 py-6 sm:mb-16 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-6 sm:py-5">
+              <div className="min-w-0">
+                <h2 className="text-lg font-semibold text-foreground sm:text-xl">
+                  Want product news and updates?
                 </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Sign up for our newsletter.
+                </p>
               </div>
-              <div className="shrink-0 sm:min-w-[260px]">
+              <div className="shrink-0 sm:min-w-[280px]">
                 <BlogSubscribe />
               </div>
             </div>

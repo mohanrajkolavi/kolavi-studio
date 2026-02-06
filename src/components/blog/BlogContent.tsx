@@ -73,16 +73,21 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
     <>
       {/* Featured */}
       {featuredPost && (
-        <section className="border-b border-border bg-muted/30 py-12 sm:py-16">
+        <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-5xl">
-              <p className="mb-6 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Featured
-              </p>
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
+                    Featured
+                  </span>
+                  <span className="h-px flex-1 max-w-[60px] bg-gradient-to-r from-orange-400/60 to-transparent" aria-hidden />
+                </div>
+              </div>
 
               <Link
                 href={`/blog/${featuredPost.slug}`}
-                className="group block overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30 hover:bg-muted/20"
+                className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-orange-200/60 dark:hover:border-orange-800"
               >
                 <article className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-stretch">
                   {featuredPost.featuredImage && (
@@ -100,7 +105,7 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                   <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-10 bg-card">
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                       {featuredPost.categories?.nodes?.[0] && (
-                        <span className="rounded-md border border-border bg-muted/50 px-2.5 py-0.5 text-xs font-medium text-foreground">
+                        <span className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-600">
                           {featuredPost.categories.nodes[0].name}
                         </span>
                       )}
@@ -118,15 +123,15 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                         </>
                       )}
                     </div>
-                    <h3 className="mt-4 text-2xl font-bold text-foreground transition-colors group-hover:text-foreground sm:text-3xl lg:text-4xl">
+                    <h3 className="mt-5 text-2xl font-bold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400 sm:text-3xl lg:text-4xl">
                       {featuredPost.title}
                     </h3>
-                    <p className="mt-3 text-base leading-relaxed text-muted-foreground lg:text-lg">
+                    <p className="mt-4 text-base leading-relaxed text-muted-foreground lg:text-lg">
                       {truncateToWords(stripHtml(featuredPost.excerpt || ""), 20)}
                     </p>
-                    <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-foreground transition-all group-hover:gap-3">
+                    <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-all group-hover:gap-4">
                       Read article
-                      <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                       </svg>
                     </span>
@@ -138,28 +143,28 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
         </section>
       )}
 
-      {/* Category + Articles */}
+      {/* Category + Articles - only when we have posts */}
       {displayPosts.length > 0 && (
-      <section className="border-b border-border bg-background py-12 sm:py-16">
+      <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-6xl">
-            {/* Category tabs + Search - aligned with Blog Maker / dashboard */}
-            <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            {/* Category tabs + Search */}
+            <div className="mb-10 flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
               <nav
-                className="flex flex-wrap items-center gap-2"
+                className="flex flex-wrap items-center gap-3"
                 aria-label="Filter by category"
               >
                 <button
                   type="button"
                   onClick={() => setSelectedCategory(null)}
                   aria-pressed={selectedCategory === null}
-                  className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     selectedCategory === null
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border bg-background text-muted-foreground hover:border-muted-foreground/50 hover:bg-muted/50"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  All
+                  All posts
                 </button>
                 {[...categories]
                   .sort((a, b) => a.name.localeCompare(b.name))
@@ -173,10 +178,10 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                       type="button"
                       onClick={() => setSelectedCategory(cat.slug)}
                       aria-pressed={isActive}
-                      className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                         isActive
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-border bg-background text-muted-foreground hover:border-muted-foreground/50 hover:bg-muted/50"
+                          ? "bg-orange-500 text-white"
+                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
                       }`}
                     >
                       {cat.name} ({count})
@@ -184,16 +189,30 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                   );
                 })}
               </nav>
-              <div className="relative w-full sm:w-48">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" aria-hidden />
+              {/* Search */}
+              <div className="relative flex-shrink-0 sm:min-w-[200px]">
+                <Search
+                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  aria-hidden
+                />
                 <input
                   type="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search…"
-                  className="w-full rounded-lg border border-input bg-background py-2 pl-9 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground/20"
+                  placeholder="Search posts…"
+                  className={`w-full rounded-full border border-border bg-background py-2 pl-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${searchQuery ? "pr-12" : "pr-4"}`}
                   aria-label="Search blog posts"
                 />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
             </div>
 
@@ -202,20 +221,20 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
               <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {gridPosts.map((post, index) => (
                   <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
-                    <article className="h-full overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30 hover:bg-muted/20">
+                    <article className="h-full overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
                       {post.featuredImage && (
-                        <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+                        <div className="relative aspect-[16/10] overflow-hidden">
                           <Image
                             src={post.featuredImage.node.sourceUrl}
                             alt={post.featuredImage.node.altText || post.title}
                             fill
-                            className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                            className="object-cover transition-transform duration-300 group-hover:scale-105"
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             loading={index < 6 ? "eager" : "lazy"}
                           />
                           <div className="absolute left-3 top-3">
                             {post.categories?.nodes?.[0] && (
-                              <span className="rounded-md border border-border bg-card/90 px-2.5 py-0.5 text-xs font-medium text-foreground backdrop-blur-sm">
+                              <span className="rounded-md bg-card px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm ring-1 ring-border">
                                 {post.categories.nodes[0].name}
                               </span>
                             )}
@@ -224,7 +243,7 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                       )}
                       <div className="p-5">
                         {!post.featuredImage && post.categories?.nodes?.[0] && (
-                          <span className="text-xs font-medium text-muted-foreground">
+                          <span className="text-xs font-semibold text-orange-600">
                             {post.categories.nodes[0].name}
                           </span>
                         )}
@@ -240,16 +259,16 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                             <span>· {calculateReadingTime(post.content)} min</span>
                           )}
                         </div>
-                        <h3 className="mt-3 line-clamp-2 font-semibold text-foreground transition-colors group-hover:text-foreground">
+                        <h3 className="mt-3 line-clamp-2 font-semibold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400">
                           {post.title}
                         </h3>
                         <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
                           {truncateToWords(stripHtml(post.excerpt || ""), 20)}
                         </p>
-                        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-foreground transition-all group-hover:gap-2">
+                        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 opacity-0 transition-opacity group-hover:opacity-100">
                           Read article
-                          <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                           </svg>
                         </span>
                       </div>
