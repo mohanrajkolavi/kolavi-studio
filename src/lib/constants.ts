@@ -1,13 +1,13 @@
 /**
  * Canonical site URL for SEO (canonical, OG, sitemap, RSS).
- * In production we require it to be set to avoid indexing localhost.
+ * In production, set NEXT_PUBLIC_SITE_URL to your real domain so SEO and OG tags are correct.
  */
 function getSiteUrl(): string {
   const url = process.env.NEXT_PUBLIC_SITE_URL?.trim();
   if (process.env.NODE_ENV === "production" && (!url || url.startsWith("http://localhost"))) {
-    throw new Error(
-      "NEXT_PUBLIC_SITE_URL must be set to your production URL in production (e.g. https://kolavistudio.com). " +
-        "Do not use localhost in production or SEO will index the wrong URLs."
+    console.error(
+      "[Kolavi Studio] NEXT_PUBLIC_SITE_URL should be set to your production URL in production (e.g. https://kolavistudio.com). " +
+        "Using fallback; set the env var and redeploy for correct canonical/OG URLs."
     );
   }
   return url || "http://localhost:3000";

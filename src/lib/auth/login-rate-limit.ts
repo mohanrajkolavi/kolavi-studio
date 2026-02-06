@@ -32,10 +32,14 @@ export type RateLimitResult =
 /**
  * Check if IP is rate limited. Call before validating password.
  * Returns { ok: false } if locked.
+ * When DATABASE_URL is not set, skips rate limiting so login works with ADMIN_SECRET only.
  */
 export async function checkLoginRateLimit(
   request: NextRequest
 ): Promise<RateLimitResult> {
+  if (!process.env.DATABASE_URL?.trim()) {
+    return { ok: true };
+  }
   try {
     const ip = getClientIp(request);
     const ipHash = hashIp(ip);
@@ -76,8 +80,10 @@ export async function checkLoginRateLimit(
  * Record a failed login attempt. Call after password validation fails.
  * Returns true if now locked (just hit 3 attempts).
  * Uses atomic UPSERT to avoid TOCTOU race.
+ * No-op when DATABASE_URL is not set.
  */
 export async function recordFailedLogin(request: NextRequest): Promise<boolean> {
+  if (!process.env.DATABASE_URL?.trim()) return false;
   try {
     const ip = getClientIp(request);
     const ipHash = hashIp(ip);
@@ -111,8 +117,10 @@ export async function recordFailedLogin(request: NextRequest): Promise<boolean> 
 
 /**
  * Clear rate limit on successful login.
+ * No-op when DATABASE_URL is not set.
  */
 export async function clearLoginRateLimit(request: NextRequest): Promise<void> {
+  if (!process.env.DATABASE_URL?.trim()) return;
   try {
     const ip = getClientIp(request);
     const ipHash = hashIp(ip);
