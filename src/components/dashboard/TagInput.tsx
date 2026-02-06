@@ -86,7 +86,7 @@ export function TagInput({
         placeholder={tags.length >= maxTags ? "" : placeholder}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        className="min-w-[120px] flex-1 border-0 bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed"
+        className="min-w-[120px] flex-1 border-0 bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
       />
     </div>
   );
