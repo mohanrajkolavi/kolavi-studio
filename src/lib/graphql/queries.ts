@@ -7,6 +7,7 @@ export const GET_POSTS = `
         title
         excerpt
         date
+        modified
         featuredImage {
           node {
             sourceUrl

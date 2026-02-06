@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/ThemeProvider";
-import { Header } from "@/components/layout/Header";
-import { Footer } from "@/components/layout/Footer";
+import { LayoutShell } from "@/components/layout/LayoutShell";
 import { getBaseMetadata } from "@/lib/seo/metadata";
 import { getOrganizationSchema } from "@/lib/seo/jsonld/organization";
 
@@ -14,12 +14,13 @@ const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export const metadata: Metadata = getBaseMetadata();
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   const organizationSchema = getOrganizationSchema();
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -29,6 +30,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: JSON.stringify(organizationSchema),
           }}
+          nonce={nonce}
         />
       </head>
       <body className={inter.className}>
@@ -43,8 +45,9 @@ export default function RootLayout({
             <Script
               src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
               strategy="afterInteractive"
+              nonce={nonce}
             />
-            <Script id="google-analytics" strategy="afterInteractive">
+            <Script id="google-analytics" strategy="afterInteractive" nonce={nonce}>
               {`
                 window.dataLayer = window.dataLayer || [];
                 function gtag(){dataLayer.push(arguments);}
@@ -55,9 +58,9 @@ export default function RootLayout({
           </>
         )}
         <ThemeProvider>
-          <Header />
-          <main id="main-content" className="min-h-screen overflow-x-clip">{children}</main>
-          <Footer />
+          <LayoutShell>
+            <main id="main-content" className="min-h-screen overflow-x-clip">{children}</main>
+          </LayoutShell>
         </ThemeProvider>
       </body>
     </html>

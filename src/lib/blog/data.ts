@@ -27,12 +27,17 @@ import { SITE_NAME, SITE_URL, WP_GRAPHQL_URL } from "@/lib/constants";
 
 const CACHE_REVALIDATE = 60;
 
+/** Default number of posts for blog index and for deriving categories/tags. Increase if you have 100+ posts. */
+export const BLOG_LIST_DEFAULT_LIMIT = 300;
+
 export async function getPosts(): Promise<WPPost[]> {
   if (!WP_GRAPHQL_URL?.trim()) return SAMPLE_POSTS;
   return unstable_cache(
     async () => {
       try {
-        const data = await request<PostsResponse>(GET_POSTS, { first: 100 });
+        const data = await request<PostsResponse>(GET_POSTS, {
+          first: BLOG_LIST_DEFAULT_LIMIT,
+        });
         return data.posts?.nodes ?? [];
       } catch (error) {
         console.error("getPosts (WPGraphQL):", error);
@@ -170,7 +175,7 @@ export async function getCategoryBySlug(
         try {
           const data = await request<CategoryBySlugResponse>(GET_CATEGORY_BY_SLUG, {
             slug,
-            first: 100,
+            first: BLOG_LIST_DEFAULT_LIMIT,
           });
           const cat = data.category;
           if (!cat) return null;

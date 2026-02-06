@@ -2,6 +2,8 @@
 
 A production-ready Next.js website for Kolavi Studio agency, featuring mobile-first design, SEO-first architecture, and headless WordPress integration.
 
+> **Public repository:** Never commit `.env.local`, API keys, or credentials. Run `npm run check:secrets` before pushing. See [SECURITY.md](SECURITY.md).
+
 ## Tech Stack
 
 - Next.js 15 (App Router)
@@ -21,7 +23,7 @@ npm install
 
 2. Configure environment variables:
 
-Copy `.env.example` to `.env.local` and set **your own** values (use placeholders for local dev). **Never commit `.env.local`** or real API keys/URLs—see [docs/SECURITY.md](docs/SECURITY.md).
+Copy `.env.example` to `.env.local` and set **your own** values (use placeholders for local dev). **Never commit `.env.local`** or real API keys/URLs—see [SECURITY.md](SECURITY.md).
 
 ```
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
@@ -29,7 +31,7 @@ NEXT_PUBLIC_WP_GRAPHQL_URL=https://your-wordpress-site.com/graphql
 # Optional: NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX (enables GA4)
 ```
 
-See [SETUP.md](SETUP.md) for full env vars, Google Search Console verification, sitemap submission, and ongoing GSC/GA monitoring. See [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) for env vars, WordPress usage, caching (middleware + `unstable_cache`), and how to run bundle analysis.
+See [SETUP.md](SETUP.md) for full env vars, Google Search Console verification, sitemap submission, and ongoing GSC/GA monitoring. See [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) for env vars, WordPress usage, caching. See [docs/dashboard/DASHBOARD_SETUP.md](docs/dashboard/DASHBOARD_SETUP.md) for the dashboard (Blog Maker, Leads, Content Maintenance).
 
 3. Run the development server:
 
@@ -64,10 +66,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Documentation
 
-- **[QUICKSTART.md](QUICKSTART.md)** – Get running in 5 minutes
 - **[SETUP.md](SETUP.md)** – Full setup, env vars, GSC, sitemap
-- **[docs/SECURITY.md](docs/SECURITY.md)** – Never commit API keys or secrets; what’s gitignored
-- **[docs/README.md](docs/README.md)** – Design docs, implementation notes, SEO audits, architecture
+- **[SECURITY.md](SECURITY.md)** – Never commit API keys or secrets; what’s gitignored
+- **[docs/README.md](docs/README.md)** – Architecture, dashboard, integrations
 
 ## Features
 

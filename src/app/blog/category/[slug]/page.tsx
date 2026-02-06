@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import Image from "next/image";
 import { getPageMetadata } from "@/lib/seo/metadata";
@@ -82,6 +83,7 @@ function stripHtml(html: string): string {
 }
 
 export default async function CategoryPage({ params }: PageProps) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
 
@@ -124,10 +126,12 @@ export default async function CategoryPage({ params }: PageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        nonce={nonce}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+        nonce={nonce}
       />
 
       {/* Hero Section with Gradient */}

@@ -5,7 +5,7 @@
 - **`src/app/`** – Routes and page composition only (pages, layouts, API routes, sitemap/robots). No shared UI components.
 - **`src/components/`** – Reusable UI: `blog/` (BlogContent, BlogSubscribe, BlogPostTOC, ShareButtons), `layout/` (Header, Footer, CTAStrip, MobileNav), `sections/`, `ui/`, `contact/`.
 - **`src/lib/`** – Shared logic: `blog/` (data, utils, sample-posts), `graphql/` (client, queries, types), `seo/` (metadata, JSON-LD, canonical, rank-math), `constants.ts`, `utils.ts`, `sitemap-index.ts`.
-- **`docs/`** – `architecture/`, `design/`, `implementation/`, `integrations/`, `seo/`, `audits/`.
+- **`docs/`** – `architecture/`, `integrations/`, `dashboard/`.
 
 ## Environment variables
 

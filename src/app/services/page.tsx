@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Benefits } from "@/components/sections/Benefits";
 import { getPageMetadata } from "@/lib/seo/metadata";
+import { SITE_URL } from "@/lib/constants";
 import {
   Search,
   Globe,
@@ -16,6 +17,7 @@ export const metadata = getPageMetadata({
   title: "Our Services - Digital Marketing & Web Design",
   description: "Comprehensive digital marketing services including SEO, web design, content marketing, PPC advertising, and more. Tailored solutions for your business growth.",
   path: "/services",
+  image: `${SITE_URL}/og-image.jpg`,
   keywords:
     "SEO services, web design, content marketing, PPC advertising, digital marketing services, business growth",
 });

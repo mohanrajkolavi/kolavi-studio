@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { revalidatePath } from "next/cache";
+import crypto from "crypto";
 
 /**
  * On-demand revalidation for the blog.
@@ -11,6 +12,16 @@ import { revalidatePath } from "next/cache";
  *   POST /api/revalidate
  *   Authorization: Bearer <REVALIDATE_SECRET>
  */
+function timingSafeEqual(a: string, b: string): boolean {
+  const digestA = crypto.createHash("sha256").update(a, "utf8").digest();
+  const digestB = crypto.createHash("sha256").update(b, "utf8").digest();
+  try {
+    return crypto.timingSafeEqual(digestA, digestB);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   const secret = process.env.REVALIDATE_SECRET;
   if (!secret?.trim()) {
@@ -21,9 +32,9 @@ export async function POST(request: NextRequest) {
   }
 
   const authHeader = request.headers.get("authorization");
-  const provided = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const provided = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : null;
 
-  if (provided !== secret) {
+  if (!provided || !timingSafeEqual(provided, secret.trim())) {
     return NextResponse.json({ error: "Invalid or missing secret." }, { status: 401 });
   }
 

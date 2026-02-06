@@ -7,7 +7,7 @@
  */
 
 import { unstable_cache } from "next/cache";
-import { SITE_URL, WP_GRAPHQL_URL } from "@/lib/constants";
+import { SITE_URL, WP_GRAPHQL_URL, getSitemapBuildDate } from "@/lib/constants";
 import { request } from "@/lib/graphql/client";
 import {
   getPosts,
@@ -15,6 +15,7 @@ import {
   getTagsFromPosts,
   fetchAllPostSlugs,
 } from "@/lib/blog/data";
+import type { WPPost } from "@/lib/graphql/types";
 import {
   GET_ALL_CATEGORY_SLUGS,
   GET_ALL_TAG_SLUGS,
@@ -121,11 +122,41 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: UrlEntry
   { path: "/blog/tag", priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
 ];
 
+/**
+ * Derive lastmod per category and per tag from the latest post in each.
+ * Falls back to build date when set, else "now".
+ */
+function getCategoryTagLastModFromPosts(
+  posts: WPPost[]
+): { category: Map<string, Date>; tag: Map<string, Date> } {
+  const categoryLastMod = new Map<string, Date>();
+  const tagLastMod = new Map<string, Date>();
+  const fallback = getSitemapBuildDate() ?? new Date();
+  for (const post of posts) {
+    const mod = post.modified ? new Date(post.modified) : fallback;
+    if (Number.isNaN(mod.getTime())) continue;
+    post.categories?.nodes?.forEach((c) => {
+      const existing = categoryLastMod.get(c.slug);
+      if (!existing || mod.getTime() > existing.getTime()) {
+        categoryLastMod.set(c.slug, mod);
+      }
+    });
+    post.tags?.nodes?.forEach((t) => {
+      const existing = tagLastMod.get(t.slug);
+      if (!existing || mod.getTime() > existing.getTime()) {
+        tagLastMod.set(t.slug, mod);
+      }
+    });
+  }
+  return { category: categoryLastMod, tag: tagLastMod };
+}
+
+/** Static pages: use build/deploy date for lastmod when set (BUILD_TIMESTAMP / VERCEL_BUILD_COMMIT_TIMESTAMP). */
 export function getStaticEntries(): UrlEntry[] {
-  const now = new Date();
+  const lastModified = getSitemapBuildDate() ?? new Date();
   return STATIC_ROUTES.map(({ path, priority, changeFrequency }) => ({
     path: path || "/",
-    lastModified: now,
+    lastModified,
     changeFrequency,
     priority,
   }));
@@ -176,39 +207,40 @@ export async function getPostEntries(): Promise<UrlEntry[]> {
 export async function getCategoryEntries(): Promise<UrlEntry[]> {
   return unstable_cache(
     async () => {
-      const now = new Date();
+      const fallback = getSitemapBuildDate() ?? new Date();
       const entries: UrlEntry[] = [];
+      let categorySlugs: { slug: string }[] = [];
+      let lastModBySlug = new Map<string, Date>();
       if (WP_GRAPHQL_URL?.trim()) {
         try {
-          const data = await request<{ categories: { nodes: { slug: string }[] } }>(
-            GET_ALL_CATEGORY_SLUGS
-          );
-          (data.categories?.nodes ?? []).forEach((cat) => {
-            entries.push({
-              path: `/blog/category/${cat.slug}`,
-              lastModified: now,
-              changeFrequency: SITEMAP.changeFrequency.category,
-              priority: SITEMAP.priority.category,
-            });
-          });
+          const [data, posts] = await Promise.all([
+            request<{ categories: { nodes: { slug: string }[] } }>(GET_ALL_CATEGORY_SLUGS),
+            getPosts(),
+          ]);
+          categorySlugs = (data.categories?.nodes ?? []).map((c) => ({ slug: c.slug }));
+          const { category } = getCategoryTagLastModFromPosts(posts);
+          lastModBySlug = category;
         } catch (error) {
           console.error("Sitemap categories:", error);
         }
       } else {
         try {
-          const categories = await getAllCategorySlugs();
-          categories.forEach(({ slug }) => {
-            entries.push({
-              path: `/blog/category/${slug}`,
-              lastModified: now,
-              changeFrequency: SITEMAP.changeFrequency.category,
-              priority: SITEMAP.priority.category,
-            });
-          });
+          const posts = await getPosts();
+          categorySlugs = (await getAllCategorySlugs()).map((c) => ({ slug: c.slug }));
+          const { category } = getCategoryTagLastModFromPosts(posts);
+          lastModBySlug = category;
         } catch (error) {
           console.error("Sitemap categories:", error);
         }
       }
+      categorySlugs.forEach(({ slug }) => {
+        entries.push({
+          path: `/blog/category/${slug}`,
+          lastModified: lastModBySlug.get(slug) ?? fallback,
+          changeFrequency: SITEMAP.changeFrequency.category,
+          priority: SITEMAP.priority.category,
+        });
+      });
       return entries;
     },
     ["sitemap-categories"],
@@ -219,38 +251,40 @@ export async function getCategoryEntries(): Promise<UrlEntry[]> {
 export async function getTagEntries(): Promise<UrlEntry[]> {
   return unstable_cache(
     async () => {
-      const now = new Date();
+      const fallback = getSitemapBuildDate() ?? new Date();
       const entries: UrlEntry[] = [];
+      let tagSlugs: { slug: string }[] = [];
+      let lastModBySlug = new Map<string, Date>();
       if (WP_GRAPHQL_URL?.trim()) {
         try {
-          const data = await request<{ tags: { nodes: { slug: string }[] } }>(GET_ALL_TAG_SLUGS);
-          (data.tags?.nodes ?? []).forEach((tag) => {
-            entries.push({
-              path: `/blog/tag/${tag.slug}`,
-              lastModified: now,
-              changeFrequency: SITEMAP.changeFrequency.tag,
-              priority: SITEMAP.priority.tag,
-            });
-          });
+          const [data, posts] = await Promise.all([
+            request<{ tags: { nodes: { slug: string }[] } }>(GET_ALL_TAG_SLUGS),
+            getPosts(),
+          ]);
+          tagSlugs = (data.tags?.nodes ?? []).map((t) => ({ slug: t.slug }));
+          const { tag } = getCategoryTagLastModFromPosts(posts);
+          lastModBySlug = tag;
         } catch (error) {
           console.error("Sitemap tags:", error);
         }
       } else {
         try {
           const posts = await getPosts();
-          const tags = getTagsFromPosts(posts);
-          tags.forEach(({ slug }) => {
-            entries.push({
-              path: `/blog/tag/${slug}`,
-              lastModified: now,
-              changeFrequency: SITEMAP.changeFrequency.tag,
-              priority: SITEMAP.priority.tag,
-            });
-          });
+          tagSlugs = getTagsFromPosts(posts).map((t) => ({ slug: t.slug }));
+          const { tag } = getCategoryTagLastModFromPosts(posts);
+          lastModBySlug = tag;
         } catch (error) {
           console.error("Sitemap tags:", error);
         }
       }
+      tagSlugs.forEach(({ slug }) => {
+        entries.push({
+          path: `/blog/tag/${slug}`,
+          lastModified: lastModBySlug.get(slug) ?? fallback,
+          changeFrequency: SITEMAP.changeFrequency.tag,
+          priority: SITEMAP.priority.tag,
+        });
+      });
       return entries;
     },
     ["sitemap-tags"],

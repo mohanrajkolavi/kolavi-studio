@@ -1,10 +1,9 @@
 import Script from "next/script";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { headers } from "next/headers";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getFAQSchema } from "@/lib/seo/jsonld/faq";
 import { FAQ } from "@/components/sections/FAQ";
+import { ContactForm } from "@/components/contact/ContactForm";
 
 export const metadata = getPageMetadata({
   title: "Contact Us - Get Your Free Consultation",
@@ -33,13 +32,15 @@ const TALLY_EMBED_URL = process.env.NEXT_PUBLIC_TALLY_FORM_EMBED_URL;
 const GOOGLE_FORM_EMBED_URL = process.env.NEXT_PUBLIC_GOOGLE_FORM_EMBED_URL;
 const USE_THIRD_PARTY_FORM = TYPEFORM_EMBED_URL || TALLY_EMBED_URL || GOOGLE_FORM_EMBED_URL;
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const faqSchema = getFAQSchema(CONTACT_FAQ_ITEMS);
   return (
     <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+        nonce={nonce}
       />
       <section className="py-16 sm:py-24">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,6 +67,7 @@ export default function ContactPage() {
                     <Script
                       src="https://embed.typeform.com/next/embed.js"
                       strategy="afterInteractive"
+                      nonce={nonce}
                     />
                   </>
                 ) : TALLY_EMBED_URL ? (
@@ -73,6 +75,7 @@ export default function ContactPage() {
                     <Script
                       src="https://tally.so/widgets/embed.js"
                       strategy="lazyOnload"
+                      nonce={nonce}
                     />
                     <iframe
                       data-tally-embed
@@ -91,82 +94,7 @@ export default function ContactPage() {
                 ) : null}
               </div>
             ) : (
-            <form className="mt-12 space-y-6">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium">
-                  Name
-                </label>
-                <Input
-                  type="text"
-                  id="name"
-                  name="name"
-                  className="mt-2"
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium">
-                  Email Address
-                </label>
-                <Input
-                  type="email"
-                  id="email"
-                  name="email"
-                  className="mt-2"
-                  required
-                />
-              </div>
-
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium">
-                  Phone Number
-                </label>
-                <Input
-                  type="tel"
-                  id="phone"
-                  name="phone"
-                  className="mt-2"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="businessType" className="block text-sm font-medium">
-                  Business Type
-                </label>
-                <select
-                  id="businessType"
-                  name="businessType"
-                  className="mt-2 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm"
-                >
-                  <option value="">Select your business type</option>
-                  <option value="medical-spa">Medical Spa</option>
-                  <option value="dental">Dental Practice</option>
-                  <option value="law">Law Firm</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium">
-                  Tell us about your project
-                </label>
-                <Textarea
-                  id="message"
-                  name="message"
-                  rows={6}
-                  className="mt-2"
-                  placeholder="What are your goals? What challenges are you facing?"
-                  required
-                />
-              </div>
-
-              <div>
-                <Button type="submit" size="lg" className="w-full sm:w-auto">
-                  Send Message
-                </Button>
-              </div>
-            </form>
+              <ContactForm />
             )}
 
             <div className="mt-12 border-t pt-12">

@@ -6,9 +6,12 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:secrets": "sh scripts/check-secrets.sh",
+    "prepush": "npm run check:secrets && npm run lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.61.0",
     "@tailwindcss/typography": "^0.5.19",
     "autoprefixer": "^10.4.24",
     "class-variance-authority": "^0.7.1",
@@ -19,6 +22,7 @@
     "lucide-react": "^0.563.0",
     "next": "^15.1.6",
     "next-themes": "^0.4.6",
+    "postgres": "^3.4.8",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tailwind-merge": "^3.4.0",

@@ -33,6 +33,7 @@ interface PageMetadataProps {
   title: string;
   description: string;
   path: string;
+  /** OG/Twitter image URL. Set per-page for key landing pages (home, services, industries) for better social previews. */
   image?: string;
   noIndex?: boolean;
   keywords?: string;

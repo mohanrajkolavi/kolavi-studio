@@ -62,6 +62,55 @@ npm run build
 npm start
 ```
 
+### 6. Database schema (dashboard & contact form)
+
+If you use the **dashboard** (login, leads, content maintenance) or the **contact form** with DB-backed rate limiting, run the schema in your Postgres database once.
+
+Full schema: `src/lib/db/schema.sql`. To add only the **contact form rate limit** table (e.g. after an audit update), run:
+
+**Option A – Vercel Postgres**
+
+1. Open [Vercel Dashboard](https://vercel.com/dashboard) → your project → **Storage** → your Postgres database.
+2. Open the **Query** tab (or **.env.local** to get the connection string and use a SQL client).
+3. Paste and run:
+
+```sql
+CREATE TABLE IF NOT EXISTS contact_rate_limit (
+  ip_hash VARCHAR(64) PRIMARY KEY,
+  request_count INT NOT NULL DEFAULT 0,
+  reset_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_contact_rate_limit_reset_at ON contact_rate_limit(reset_at);
+```
+
+**Option B – Supabase**
+
+1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL Editor**.
+2. New query → paste the same SQL as above → **Run**.
+
+**Option C – Command line (psql)**
+
+If you have `psql` and `DATABASE_URL` in `.env.local`:
+
+```bash
+psql "$DATABASE_URL" -f src/lib/db/schema.sql
+```
+
+Or run only the contact_rate_limit part:
+
+```bash
+psql "$DATABASE_URL" -c "
+CREATE TABLE IF NOT EXISTS contact_rate_limit (
+  ip_hash VARCHAR(64) PRIMARY KEY,
+  request_count INT NOT NULL DEFAULT 0,
+  reset_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_contact_rate_limit_reset_at ON contact_rate_limit(reset_at);
+"
+```
+
+`CREATE TABLE IF NOT EXISTS` is safe to run multiple times; it will not overwrite existing tables.
+
 ## Project Structure
 
 ```

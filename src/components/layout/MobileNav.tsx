@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { NAV_LINKS } from "@/lib/constants";
+import { LogoutButton } from "@/components/dashboard/LogoutButton";
 import { cn } from "@/lib/utils";
 
 const EXIT_MS = 280;
@@ -12,9 +13,10 @@ const EXIT_MS = 280;
 interface MobileNavProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  isAdmin?: boolean;
 }
 
-export function MobileNav({ open, onOpenChange }: MobileNavProps) {
+export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProps) {
   const [visible, setVisible] = useState(false);
   const [isExiting, setIsExiting] = useState(false);
 
@@ -82,6 +84,17 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
       {/* Centered nav links - premium spacing and typography */}
       <nav className="flex flex-1 flex-col items-center justify-center px-6 py-8">
         <ul className="flex w-full max-w-sm flex-col gap-1 text-center">
+          {isAdmin && (
+            <li>
+              <Link
+                href="/dashboard"
+                className="block min-h-[48px] py-3 text-[17px] font-semibold leading-tight text-foreground transition-colors hover:text-primary active:opacity-80"
+                onClick={() => onOpenChange(false)}
+              >
+                Dashboard
+              </Link>
+            </li>
+          )}
           {NAV_LINKS.map((link) => (
             <li key={link.href}>
               <Link
@@ -95,15 +108,22 @@ export function MobileNav({ open, onOpenChange }: MobileNavProps) {
           ))}
         </ul>
 
-        {/* CTA - prominent, premium touch target */}
+        {/* CTA or Logout - prominent, premium touch target */}
         <div className="mt-10 w-full max-w-sm">
-          <Link
-            href="/contact"
-            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:opacity-90"
-            onClick={() => onOpenChange(false)}
-          >
-            Get in Touch
-          </Link>
+          {isAdmin ? (
+            <LogoutButton
+              onClick={() => onOpenChange(false)}
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:opacity-90"
+            />
+          ) : (
+            <Link
+              href="/contact"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:opacity-90"
+              onClick={() => onOpenChange(false)}
+            >
+              Get in Touch
+            </Link>
+          )}
         </div>
       </nav>
     </div>,

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
 import { getPosts, getCategoriesFromPosts } from "@/lib/blog/data";
@@ -13,6 +14,7 @@ export const metadata = getPageMetadata({
 });
 
 export default async function BlogCategoryIndexPage() {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const posts = await getPosts();
   const categories = getCategoriesFromPosts(posts)
     .map((cat) => ({
@@ -34,6 +36,7 @@ export default async function BlogCategoryIndexPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+        nonce={nonce}
       />
       <main>
         <section className="py-16 sm:py-24">

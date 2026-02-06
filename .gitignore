@@ -10,11 +10,24 @@
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
+.env.development
+*.env
+*.env.local
+*.env.backup
 *.pem
 *.key
 secrets/
 .secrets
 *.secret
+*.credentials
+.envrc
+
+# Generated output (may contain sensitive data)
+/output/
+*.bak
+*.backup
+*.orig
 
 # =============================================================================
 # Dependencies

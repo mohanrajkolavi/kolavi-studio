@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { VERTICAL_LINKS } from "@/lib/constants";
+import { VERTICAL_LINKS, SITE_URL } from "@/lib/constants";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { ArrowRight, HeartPulse, Scale, Smile } from "lucide-react";
 
@@ -9,6 +9,7 @@ export const metadata = getPageMetadata({
   title: "Who We Serve - Industries We Specialize In",
   description: "Kolavi Studio helps medical spas, dental practices, and law firms grow with expert digital marketing, web design, and SEO services tailored to your industry.",
   path: "/industries",
+  image: `${SITE_URL}/og-image.jpg`,
   keywords:
     "medical spa marketing, dental practice marketing, law firm marketing, industry-specific digital marketing",
 });

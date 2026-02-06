@@ -4,11 +4,13 @@ import { Benefits } from "@/components/sections/Benefits";
 import { Process } from "@/components/sections/Process";
 import { Testimonials } from "@/components/sections/Testimonials";
 import { getPageMetadata } from "@/lib/seo/metadata";
+import { SITE_URL } from "@/lib/constants";
 
 export const metadata = getPageMetadata({
   title: "Digital Marketing Agency for Medical Spas, Dental & Law Firms",
   description: "Kolavi Studio helps businesses grow with expert digital marketing, web design, and SEO services. Specializing in medical spas, dental practices, and law firms.",
   path: "/",
+  image: `${SITE_URL}/og-image.jpg`,
   keywords:
     "digital marketing agency, medical spa marketing, dental practice SEO, law firm marketing, web design, SEO services, business growth",
 });
@@ -16,29 +18,27 @@ export const metadata = getPageMetadata({
 export default function HomePage() {
   return (
     <main>
-      {/* Hero (premium: gradient accent, no clipping) */}
-      <section className="relative border-b border-border bg-background">
-        <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-muted/50 via-background to-background dark:from-muted/20 dark:via-background dark:to-background" />
-        <div className="relative overflow-visible">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-3xl py-12 sm:py-16 lg:py-20 text-center">
+      {/* Hero – same rounded rectangle as dashboard */}
+      <section className="relative px-4 pt-8 pb-12 sm:px-6 sm:pt-10 sm:pb-14 lg:px-8">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card via-card to-muted/30 px-6 py-12 sm:px-8 sm:py-16 lg:py-20">
+          <div className="absolute right-0 top-0 h-64 w-64 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.04] blur-3xl" />
+          <div className="relative mx-auto max-w-3xl text-center">
               <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 Transform Your Business with{" "}
-                <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
+                <span className="bg-gradient-to-r from-primary to-orange-600 bg-clip-text text-transparent">
                   Expert Digital Marketing
                 </span>
               </h1>
               <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl max-w-2xl mx-auto">
                 We help medical spas, dental practices, and law firms grow their online presence and attract more clients through strategic digital marketing and stunning web design.
               </p>
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <Button asChild size="lg" className="rounded-full bg-orange-600 px-8 font-semibold hover:bg-orange-700">
-                  <Link href="/contact">Schedule a Consultation</Link>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="rounded-full border-2 px-8 font-semibold">
-                  <Link href="/portfolio">View Our Work</Link>
-                </Button>
-              </div>
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button asChild size="lg" className="rounded-full bg-primary px-8 font-semibold hover:bg-primary/90">
+                <Link href="/contact">Schedule a Consultation</Link>
+              </Button>
+              <Button asChild size="lg" variant="outline" className="rounded-full border-2 px-8 font-semibold">
+                <Link href="/portfolio">View Our Work</Link>
+              </Button>
             </div>
           </div>
         </div>
