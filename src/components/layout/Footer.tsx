@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 import { NAV_LINKS, LEGAL_LINKS } from "@/lib/constants";
 
 export function Footer() {
@@ -21,13 +20,6 @@ export function Footer() {
             <p className="mt-4 max-w-sm text-base leading-relaxed text-muted-foreground">
               Digital marketing agency specializing in medical spas, dental practices, and law firms.
             </p>
-            <Link
-              href="/contact"
-              className="mt-6 inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              Get in Touch
-              <ArrowRight className="h-4 w-4" aria-hidden />
-            </Link>
           </div>
 
           {/* Navigation links - 2 columns on larger screens */}
