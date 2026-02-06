@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import type { TocItem } from "@/lib/blog/utils";
 
 interface BlogPostTOCProps {
@@ -10,8 +11,24 @@ interface BlogPostTOCProps {
   maxLevel?: 2 | 3 | 4 | 5 | 6;
 }
 
+const DESKTOP_BREAKPOINT = "(min-width: 1024px)";
+
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(DESKTOP_BREAKPOINT);
+    const handler = () => setIsDesktop(mq.matches);
+    handler(); // Run on mount
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isDesktop;
+}
+
 export function BlogPostTOC({ headings, maxLevel = 3 }: BlogPostTOCProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isDesktop = useIsDesktop();
 
   const visibleHeadings = useMemo(
     () => headings.filter((item) => item.level <= maxLevel),
@@ -53,6 +70,14 @@ export function BlogPostTOC({ headings, maxLevel = 3 }: BlogPostTOCProps) {
     6: "pl-9 ml-1.5 border-l border-border",
   };
 
+  // On mobile, show first 3 items when collapsed, all when expanded
+  // On desktop (lg+), always show all items; toggle is lg:hidden so desktop never needs it
+  const MOBILE_COLLAPSED_ITEMS = 3;
+  const displayHeadings =
+    isDesktop || isExpanded || visibleHeadings.length <= MOBILE_COLLAPSED_ITEMS
+      ? visibleHeadings
+      : visibleHeadings.slice(0, MOBILE_COLLAPSED_ITEMS);
+
   return (
     <nav
       aria-label="Table of contents"
@@ -60,16 +85,36 @@ export function BlogPostTOC({ headings, maxLevel = 3 }: BlogPostTOCProps) {
       className="sticky top-24 shrink-0 lg:w-60 overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
     >
       <div className="border-b border-border bg-muted/50 px-4 py-3.5 lg:px-5 dark:bg-muted/30">
-        <p className="text-sm font-semibold text-foreground">
-          On this page
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {visibleHeadings.length} {visibleHeadings.length === 1 ? "section" : "sections"}
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-foreground">
+              On this page
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {visibleHeadings.length} {visibleHeadings.length === 1 ? "section" : "sections"}
+            </p>
+          </div>
+          {/* Mobile toggle button */}
+          {visibleHeadings.length > MOBILE_COLLAPSED_ITEMS && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="lg:hidden flex items-center justify-center rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              aria-label={isExpanded ? "Collapse table of contents" : "Expand table of contents"}
+              aria-expanded={isExpanded}
+            >
+              {isExpanded ? (
+                <ChevronUp className="h-5 w-5" />
+              ) : (
+                <ChevronDown className="h-5 w-5" />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       <ol className="max-h-[calc(100vh-10rem)] overflow-y-auto p-3 lg:p-4 space-y-0.5 list-none">
-        {visibleHeadings.map((item) => {
+        {displayHeadings.map((item) => {
           const isActive = activeId === item.id;
           const isSubheading = item.level >= 3;
 

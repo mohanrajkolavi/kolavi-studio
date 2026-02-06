@@ -20,7 +20,7 @@ export default function HomePage() {
     <main>
       {/* Hero – same rounded rectangle as dashboard */}
       <section className="relative px-4 pt-8 pb-12 sm:px-6 sm:pt-10 sm:pb-14 lg:px-8">
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-card via-card to-muted/30 px-6 py-12 sm:px-8 sm:py-16 lg:py-20">
+        <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card via-card to-muted/30 shadow-sm px-6 py-12 sm:px-8 sm:py-16 lg:py-20">
           <div className="absolute right-0 top-0 h-64 w-64 translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.04] blur-3xl" />
           <div className="relative mx-auto max-w-3xl text-center">
               <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
@@ -33,10 +33,10 @@ export default function HomePage() {
                 We help medical spas, dental practices, and law firms grow their online presence and attract more clients through strategic digital marketing and stunning web design.
               </p>
             <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button asChild size="lg" className="rounded-full bg-primary px-8 font-semibold hover:bg-primary/90">
+              <Button asChild size="lg" className="rounded-2xl bg-primary px-8 font-semibold hover:bg-primary/90">
                 <Link href="/contact">Schedule a Consultation</Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full border-2 px-8 font-semibold">
+              <Button asChild size="lg" variant="outline" className="rounded-2xl border border-border px-8 font-semibold">
                 <Link href="/portfolio">View Our Work</Link>
               </Button>
             </div>
@@ -45,7 +45,7 @@ export default function HomePage() {
       </section>
 
       {/* Industries strip: who we serve */}
-      <section className="border-b border-border bg-muted/20 py-10 sm:py-12" aria-labelledby="industries-strip-heading">
+      <section className="border-b border-border bg-muted/30 py-10 sm:py-12" aria-labelledby="industries-strip-heading">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mx-auto flex max-w-4xl flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:gap-8 sm:text-left">
             <div className="min-w-0">
@@ -92,10 +92,10 @@ export default function HomePage() {
               Let&apos;s create a digital strategy that drives real results. Get in touch for a free consultation.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button asChild size="lg" className="rounded-full bg-orange-600 px-8 font-semibold hover:bg-orange-700">
+              <Button asChild size="lg" className="rounded-2xl bg-orange-600 px-8 font-semibold hover:bg-orange-700">
                 <Link href="/contact">Get in Touch</Link>
               </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full border-2 px-8 font-semibold">
+              <Button asChild size="lg" variant="outline" className="rounded-2xl border border-border px-8 font-semibold">
                 <Link href="/services">Our Services</Link>
               </Button>
             </div>

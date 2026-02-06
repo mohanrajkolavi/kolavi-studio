@@ -44,7 +44,7 @@ export function Testimonials({
   className,
 }: TestimonialsProps) {
   return (
-    <section className={cn("border-b border-border bg-muted/20 py-16 sm:py-24", className)}>
+      <section className={cn("border-b border-border bg-muted/30 py-16 sm:py-24", className)}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
           {sectionLabel && (

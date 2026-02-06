@@ -23,14 +23,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate that keywords contain actual content after splitting
+    const keywordParts = keywords.split(",").map((k) => k.trim()).filter(Boolean);
+    if (keywordParts.length === 0) {
+      return NextResponse.json(
+        { error: "Keywords must contain at least one valid keyword" },
+        { status: 400 }
+      );
+    }
+
+    // Validate and normalize competitor URLs
     const competitorList = competitorUrls
       ? (typeof competitorUrls === "string"
           ? competitorUrls.split(/\n|,/).map((u: string) => u.trim()).filter(Boolean)
           : Array.isArray(competitorUrls)
           ? competitorUrls.slice(0, 5).map((u: string) => String(u).trim()).filter(Boolean)
           : [])
+          .filter((url) => {
+            // Basic URL validation - must start with http:// or https:// or be a valid domain
+            const trimmed = url.trim();
+            return (
+              trimmed.length > 0 &&
+              (trimmed.startsWith("http://") ||
+                trimmed.startsWith("https://") ||
+                /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.[a-zA-Z]{2,}/.test(trimmed))
+            );
+          })
       : [];
 
+    // Validate and normalize intents
     const intentList = Array.isArray(intent)
       ? intent
           .map((i) => String(i).trim().toLowerCase())
@@ -41,6 +62,13 @@ export async function POST(request: NextRequest) {
           return v && ALLOWED_INTENTS.has(v) ? [v] : ["informational"];
         })()
       : ["informational"];
+
+    // If all intents were invalid, warn but proceed with default
+    if (Array.isArray(intent) && intent.length > 0 && intentList.length === 0) {
+      console.warn(
+        `All provided intents were invalid: ${JSON.stringify(intent)}. Defaulting to informational.`
+      );
+    }
 
     const runGeneration = async () => {
       let competitorContent: { url: string; content: string; success: boolean }[] = [];

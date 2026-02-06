@@ -25,8 +25,10 @@ export function Header({ isAdmin = false }: HeaderProps) {
       </a>
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-[2rem] border border-border bg-background/80 px-5 shadow-sm backdrop-blur-xl sm:px-6 dark:bg-background/80 dark:border-border">
         {/* Logo */}
-        <Link href="/" className="flex items-center space-x-2 transition-opacity hover:opacity-80">
-          <span className="text-lg font-semibold tracking-tight text-foreground">Kolavi Studio</span>
+        <Link href="/" className="flex items-center space-x-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-lg">
+          <span className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+            Kolavi Studio.
+          </span>
         </Link>
 
         {/* Desktop Navigation (centered, SaaS-style nav links) */}

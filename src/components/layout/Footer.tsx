@@ -12,7 +12,7 @@ export function Footer() {
           {/* Brand - full width on mobile */}
           <div className="md:col-span-1">
             <Link href="/" className="text-xl font-bold tracking-tight">
-              Kolavi Studio
+              Kolavi Studio.
             </Link>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground sm:mt-4">
               Digital marketing agency specializing in medical spas, dental practices, and law firms.
