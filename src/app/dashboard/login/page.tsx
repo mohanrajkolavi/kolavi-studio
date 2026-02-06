@@ -22,10 +22,10 @@ export default async function LoginPage({ searchParams }: Props) {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center px-4 sm:px-6">
-      <div className="absolute inset-0 bg-gradient-to-b from-muted/40 via-background to-background dark:from-muted/15" />
+      <div className="absolute inset-0 bg-gradient-to-b from-muted/50 via-background to-background dark:from-muted/20 dark:via-background dark:to-background" />
 
       <div className="relative w-full max-w-[400px]">
-        <div className="rounded-2xl border border-border/80 bg-card px-8 py-10 shadow-premium sm:px-10 sm:py-12">
+        <div className="rounded-[2rem] border border-border bg-card px-8 py-10 shadow-sm sm:px-10 sm:py-12">
           {/* Header: brand + heading */}
           <div className="text-center">
             <Link

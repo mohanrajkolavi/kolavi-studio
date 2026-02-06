@@ -147,7 +147,7 @@ export default function BlogMakerPage() {
       {status.type && (
         <div
           role="alert"
-          className={`flex items-start justify-between gap-4 rounded-xl px-5 py-4 text-sm ${
+          className={`flex items-start justify-between gap-4 rounded-2xl px-5 py-4 text-sm ${
             status.type === "success"
               ? "bg-emerald-50/90 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
               : "bg-red-50/90 text-red-800 dark:bg-red-950/50 dark:text-red-200"
@@ -169,7 +169,7 @@ export default function BlogMakerPage() {
           <button
             type="button"
             onClick={() => setStatus({ type: null, message: "", link: undefined })}
-            className="shrink-0 rounded-lg p-1 opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-foreground/20"
+            className="shrink-0 rounded-2xl p-1 opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-foreground/20"
             aria-label="Dismiss"
           >
             <X className="h-4 w-4" />
@@ -180,7 +180,7 @@ export default function BlogMakerPage() {
       {!generated ? (
         <form
           onSubmit={handleGenerate}
-          className="relative overflow-hidden rounded-2xl bg-card shadow-premium"
+          className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
         >
           {generating && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/95 animate-in fade-in duration-200 backdrop-blur-sm">
@@ -209,7 +209,7 @@ export default function BlogMakerPage() {
                   placeholder="Add a keyword, press Enter"
                   maxTags={10}
                   disabled={generating}
-                  className="min-h-12 rounded-xl border border-border/60 bg-muted/40 px-4 py-3 focus-within:bg-muted/60 focus-within:ring-1 focus-within:ring-foreground/20 dark:border-white/10 dark:bg-white/5 dark:focus-within:bg-white/[0.08] dark:focus-within:ring-foreground/20"
+                  className="min-h-12 rounded-2xl border border-border bg-background px-4 py-3 focus-within:ring-2 focus-within:ring-ring"
                 />
               </div>
               <div className="space-y-3">
@@ -227,7 +227,7 @@ export default function BlogMakerPage() {
                   placeholder="Add a phrase, press Enter"
                   maxTags={15}
                   disabled={generating}
-                  className="min-h-12 rounded-xl border border-border/60 bg-muted/40 px-4 py-3 focus-within:bg-muted/60 focus-within:ring-1 focus-within:ring-foreground/20 dark:border-white/10 dark:bg-white/5 dark:focus-within:bg-white/[0.08] dark:focus-within:ring-foreground/20"
+                  className="min-h-12 rounded-2xl border border-border bg-background px-4 py-3 focus-within:ring-2 focus-within:ring-ring"
                 />
               </div>
             </section>
@@ -286,7 +286,7 @@ export default function BlogMakerPage() {
                 placeholder="Paste URL, press Enter"
                 maxTags={5}
                 disabled={generating}
-                className="min-h-12 rounded-xl border border-border/60 bg-muted/40 px-4 py-3 focus-within:bg-muted/60 focus-within:ring-1 focus-within:ring-foreground/20 dark:border-white/10 dark:bg-white/5 dark:focus-within:bg-white/[0.08] dark:focus-within:ring-foreground/20"
+                className="min-h-12 rounded-2xl border border-border bg-background px-4 py-3 focus-within:ring-2 focus-within:ring-ring"
               />
             </section>
 
@@ -306,7 +306,7 @@ export default function BlogMakerPage() {
       ) : editing ? (
         <div className="space-y-8">
           {/* Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-card px-6 py-5 shadow-premium">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card px-6 py-5 shadow-sm">
             <Button
               variant="ghost"
               size="sm"
@@ -324,7 +324,7 @@ export default function BlogMakerPage() {
                 variant="outline"
                 size="sm"
                 onClick={() => setEditing({ ...generated! })}
-                className="rounded-full border-border/60"
+                className="rounded-full border-border"
               >
                 Reset edits
               </Button>
@@ -342,7 +342,7 @@ export default function BlogMakerPage() {
           <div className="grid gap-8 lg:grid-cols-[360px_1fr]">
             {/* Sidebar */}
             <aside className="space-y-8">
-              <div className="rounded-2xl bg-card p-8 shadow-premium">
+              <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
                 <h3 className="text-sm font-semibold text-foreground">
                   Meta
                 </h3>
@@ -355,7 +355,7 @@ export default function BlogMakerPage() {
                       id="edit-title"
                       value={editing.title}
                       onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                      className="mt-2 h-11 rounded-xl border border-border/60 bg-muted/30 dark:border-white/10 dark:bg-white/5"
+                      className="mt-2 h-11 rounded-2xl border border-border bg-background"
                     />
                     <p
                       className={`mt-1.5 text-right text-xs ${
@@ -376,7 +376,7 @@ export default function BlogMakerPage() {
                       value={editing.metaDescription}
                       onChange={(e) => setEditing({ ...editing, metaDescription: e.target.value })}
                       rows={2}
-                      className="mt-2 rounded-xl border border-border/60 bg-muted/30 text-sm dark:border-white/10 dark:bg-white/5"
+                      className="mt-2 rounded-2xl border border-border bg-background text-sm"
                     />
                     <p className="mt-1.5 text-right text-xs text-muted-foreground">
                       {editing.metaDescription.length}/{SEO.META_DESCRIPTION_MAX_CHARS}
@@ -390,7 +390,7 @@ export default function BlogMakerPage() {
                       id="edit-slug"
                       value={editing.suggestedSlug ?? ""}
                       onChange={(e) => setEditing({ ...editing, suggestedSlug: e.target.value })}
-                      className="mt-2 h-11 rounded-xl border border-border/60 bg-muted/30 font-mono text-sm dark:border-white/10 dark:bg-white/5"
+                      className="mt-2 h-11 rounded-2xl border border-border bg-background font-mono text-sm"
                     />
                     <p className="mt-1.5 text-right text-xs text-muted-foreground">
                       {(editing.suggestedSlug ?? "").length}/75
@@ -399,7 +399,7 @@ export default function BlogMakerPage() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-card p-8 shadow-premium">
+              <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
                 <h3 className="text-sm font-semibold text-foreground">
                   Outline
                 </h3>
@@ -416,7 +416,7 @@ export default function BlogMakerPage() {
                           newOutline[index] = e.target.value;
                           setEditing({ ...editing, outline: newOutline });
                         }}
-                        className="rounded-xl border border-border/60 bg-muted/30 dark:border-white/10 dark:bg-white/5"
+                        className="rounded-2xl border border-border bg-background"
                       />
                     </div>
                   ))}
@@ -425,7 +425,7 @@ export default function BlogMakerPage() {
             </aside>
 
             {/* Content */}
-            <div className="rounded-2xl bg-card p-8 shadow-premium">
+            <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
               <label htmlFor="edit-content" className="block text-sm font-semibold text-foreground">
                 Content (HTML)
               </label>
@@ -434,7 +434,7 @@ export default function BlogMakerPage() {
                 value={editing.content}
                 onChange={(e) => setEditing({ ...editing, content: e.target.value })}
                 rows={28}
-                className="mt-4 rounded-xl border border-border/60 bg-muted/30 font-mono text-sm dark:border-white/10 dark:bg-white/5"
+                className="mt-4 rounded-2xl border border-border bg-background font-mono text-sm"
               />
             </div>
           </div>

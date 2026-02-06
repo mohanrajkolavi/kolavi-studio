@@ -23,7 +23,7 @@ export function LogoutButton({ className, onClick }: LogoutButtonProps) {
       onClick={handleLogout}
       type="button"
       className={cn(
-        "flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground dark:hover:bg-muted",
+        "flex shrink-0 items-center gap-2 rounded-2xl px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground dark:hover:bg-muted",
         className
       )}
     >

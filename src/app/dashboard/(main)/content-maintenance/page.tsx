@@ -159,7 +159,7 @@ export default function ContentMaintenancePage() {
         </p>
       </header>
 
-      <section className="rounded-lg border border-border/60 bg-card p-4 sm:p-5">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
         <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Filter</h2>
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -172,7 +172,7 @@ export default function ContentMaintenancePage() {
                     key={tab.value || "all"}
                     type="button"
                     onClick={() => setFilters((f) => ({ ...f, status: tab.value }))}
-                  className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`shrink-0 rounded-2xl px-3 py-1.5 text-sm font-medium transition-colors ${
                     filters.status === tab.value
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -193,7 +193,7 @@ export default function ContentMaintenancePage() {
                   placeholder="60"
                   value={filters.minAgeDays}
                   onChange={(e) => setFilters((f) => ({ ...f, minAgeDays: e.target.value }))}
-                  className="mt-2 h-11 w-28 rounded-xl border border-border/60 bg-muted/40 focus-visible:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus-visible:bg-white/[0.08]"
+                  className="mt-2 h-11 w-28 rounded-2xl border border-border bg-background focus-visible:ring-2 focus-visible:ring-ring"
                   aria-label="Min age (days)"
                 />
               </div>
@@ -206,7 +206,7 @@ export default function ContentMaintenancePage() {
                   placeholder="SEO, Marketing…"
                   value={filters.category}
                   onChange={(e) => setFilters((f) => ({ ...f, category: e.target.value }))}
-                  className="mt-2 h-11 w-40 rounded-xl border border-border/60 bg-muted/40 focus-visible:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus-visible:bg-white/[0.08] sm:w-44"
+                  className="mt-2 h-11 w-40 rounded-2xl border border-border bg-background focus-visible:ring-2 focus-visible:ring-ring sm:w-44"
                   aria-label="Filter by category"
                 />
               </div>
@@ -219,11 +219,11 @@ export default function ContentMaintenancePage() {
       <section>
         <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Posts</h2>
         {loading ? (
-          <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <TableSkeleton rows={6} columns={5} />
           </div>
         ) : posts.length === 0 ? (
-          <div className="overflow-hidden rounded-lg border border-dashed border-border/60 bg-muted/20">
+          <div className="overflow-hidden rounded-2xl border border-dashed border-border bg-muted/30">
             <EmptyState
               icon={FileText}
               heading="No posts found"
@@ -231,7 +231,7 @@ export default function ContentMaintenancePage() {
             />
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -307,7 +307,7 @@ export default function ContentMaintenancePage() {
                       </td>
                       <td className="hidden px-6 py-4 md:table-cell">
                         <span
-                          className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium ${
+                          className={`inline-flex items-center rounded-2xl px-2 py-0.5 text-xs font-medium ${
                             statusStyles[post.status] || statusStyles.unreviewed
                           }`}
                         >
@@ -325,7 +325,7 @@ export default function ContentMaintenancePage() {
                           onChange={(e) => handleStatusChange(post.slug, e.target.value)}
                           disabled={updating === post.slug}
                           onClick={(e) => e.stopPropagation()}
-                          className="h-9 rounded-xl border border-border/60 bg-muted/40 px-3 text-xs focus:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus:bg-white/[0.08]"
+                          className="h-9 rounded-2xl border border-border bg-background px-3 text-xs focus:ring-2 focus:ring-ring"
                         >
                           {STATUS_TABS.slice(1).map((t) => (
                             <option key={t.value} value={t.value}>
@@ -363,11 +363,11 @@ export default function ContentMaintenancePage() {
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Modal content: stop propagation */}
           <div
             role="document"
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-lg border border-border/60 bg-card"
+            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-sm"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 z-10 flex flex-row items-start justify-between gap-4 border-b border-border/60 bg-card p-5">
+            <div className="sticky top-0 z-10 flex flex-row items-start justify-between gap-4 border-b border-border bg-card p-5">
               <div className="min-w-0 flex-1">
                 <h2 id="post-modal-title" className="text-base font-semibold leading-snug text-foreground">
                   {selectedPost.title}
@@ -380,7 +380,7 @@ export default function ContentMaintenancePage() {
                     {selectedPost.ageDays} days old
                   </span>
                   {selectedPost.ageDays > 60 && (
-                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                    <span className="rounded-2xl bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
                       Review needed
                     </span>
                   )}
@@ -397,7 +397,7 @@ export default function ContentMaintenancePage() {
                 variant="ghost"
                 size="icon"
                 onClick={() => setSelectedPost(null)}
-                className="shrink-0 rounded-md hover:bg-muted/50"
+                className="shrink-0 rounded-2xl hover:bg-muted/50"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -413,7 +413,7 @@ export default function ContentMaintenancePage() {
                   value={selectedPost.status}
                   onChange={(e) => handleStatusChange(selectedPost.slug, e.target.value)}
                   disabled={updating === selectedPost.slug}
-                  className="mt-2 flex h-11 w-full rounded-xl border border-border/60 bg-muted/40 px-4 text-sm focus:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus:bg-white/[0.08]"
+                  className="mt-2 flex h-11 w-full rounded-2xl border border-border bg-background px-4 text-sm focus:ring-2 focus:ring-ring"
                 >
                   {STATUS_TABS.slice(1).map((t) => (
                     <option key={t.value} value={t.value}>
@@ -432,7 +432,7 @@ export default function ContentMaintenancePage() {
                   value={selectedPost.note ?? ""}
                   onChange={(e) => setSelectedPost({ ...selectedPost, note: e.target.value })}
                   onBlur={() => handleNoteUpdate(selectedPost.slug, selectedPost.note ?? "")}
-                  className="mt-2 min-h-[100px] rounded-xl border border-border/60 bg-muted/40 focus-visible:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus-visible:bg-white/[0.08]"
+                  className="mt-2 min-h-[100px] rounded-2xl border border-border bg-background focus-visible:ring-2 focus-visible:ring-ring"
                   rows={3}
                   placeholder="Add maintenance notes…"
                 />
@@ -442,7 +442,7 @@ export default function ContentMaintenancePage() {
                 <Button
                   onClick={() => handleMarkAsReviewed(selectedPost.slug)}
                   disabled={updating === selectedPost.slug}
-                  className="rounded-md bg-primary px-4 text-primary-foreground hover:bg-primary/90"
+                  className="rounded-2xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
                 >
                   Mark as reviewed
                 </Button>
@@ -450,7 +450,7 @@ export default function ContentMaintenancePage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="gap-2 rounded-md border-border/60"
+                    className="gap-2 rounded-2xl border-border"
                   >
                     <ExternalLink className="h-4 w-4" />
                     View post

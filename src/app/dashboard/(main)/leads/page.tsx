@@ -149,7 +149,7 @@ export default function LeadsPage() {
         </p>
       </header>
 
-      <section className="rounded-lg border border-border/60 bg-card p-4 sm:p-5">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <nav
@@ -164,7 +164,7 @@ export default function LeadsPage() {
                     key={opt.value || "all"}
                     type="button"
                     onClick={() => setFilters((f) => ({ ...f, status: opt.value }))}
-                  className={`shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`shrink-0 rounded-2xl px-3 py-1.5 text-sm font-medium transition-colors ${
                     filters.status === opt.value
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -185,14 +185,14 @@ export default function LeadsPage() {
                   placeholder="Search name or email..."
                   value={filters.search}
                   onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
-                  className="h-11 w-full rounded-xl border border-border/60 bg-muted/40 pl-11 focus-visible:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus-visible:bg-white/[0.08] sm:w-48"
+                  className="h-11 w-full rounded-2xl border border-border bg-background pl-11 focus-visible:ring-2 focus-visible:ring-ring sm:w-48"
                 />
               </div>
               <select
                 id="leads-source"
                 value={filters.source}
                 onChange={(e) => setFilters((f) => ({ ...f, source: e.target.value }))}
-                className="h-11 rounded-xl border border-border/60 bg-muted/40 px-4 text-sm focus:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus:bg-white/[0.08]"
+                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm focus:ring-2 focus:ring-ring"
               >
                 <option value="">All sources</option>
                 <option value="contact_form">Contact Form</option>
@@ -202,7 +202,7 @@ export default function LeadsPage() {
               </select>
               <Button
                 type="submit"
-                className="h-11 shrink-0 rounded-xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
+                className="h-11 shrink-0 rounded-2xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
               >
                 Search
               </Button>
@@ -215,11 +215,11 @@ export default function LeadsPage() {
       <section>
         <h2 className="sr-only">Leads list</h2>
         {loading ? (
-          <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <TableSkeleton rows={6} columns={6} />
           </div>
         ) : leads.length === 0 ? (
-          <div className="overflow-hidden rounded-lg border border-dashed border-border/60 bg-muted/20">
+          <div className="overflow-hidden rounded-2xl border border-dashed border-border bg-muted/30">
             <EmptyState
               icon={Users}
               heading="No leads found"
@@ -227,7 +227,7 @@ export default function LeadsPage() {
             />
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border/60 bg-card">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
@@ -277,7 +277,7 @@ export default function LeadsPage() {
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`inline-flex rounded-md px-2 py-0.5 text-xs font-medium ${
+                          className={`inline-flex rounded-2xl px-2 py-0.5 text-xs font-medium ${
                             statusStyles[lead.status] || "bg-muted text-muted-foreground"
                           }`}
                         >
@@ -295,7 +295,7 @@ export default function LeadsPage() {
                           }
                           disabled={updating === lead.id}
                           onClick={(e) => e.stopPropagation()}
-                          className="h-9 rounded-xl border border-border/60 bg-muted/40 px-3 text-xs focus:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus:bg-white/[0.08]"
+                          className="h-9 rounded-2xl border border-border bg-background px-3 text-xs focus:ring-2 focus:ring-ring"
                         >
                           {STATUS_OPTIONS.map((opt) => (
                             <option key={opt.value} value={opt.value}>
@@ -332,14 +332,14 @@ export default function LeadsPage() {
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Modal content: stop propagation except Escape so overlay can close */}
           <div
             role="document"
-            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-lg border border-border/60 bg-card"
+            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-sm"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === "Escape") setSelectedLead(null);
               else e.stopPropagation();
             }}
           >
-            <div className="sticky top-0 z-10 flex flex-row items-start justify-between gap-4 border-b border-border/60 bg-card p-5">
+            <div className="sticky top-0 z-10 flex flex-row items-start justify-between gap-4 border-b border-border bg-card p-5">
               <div className="min-w-0 flex-1">
                 <h2 id="lead-modal-title" className="text-base font-semibold text-foreground">
                   {selectedLead.name}
@@ -423,7 +423,7 @@ export default function LeadsPage() {
                     handleStatusChange(selectedLead.id, e.target.value as LeadStatus)
                   }
                   disabled={updating === selectedLead.id}
-                  className="mt-2 flex h-11 w-full max-w-xs rounded-xl border border-border/60 bg-muted/40 px-4 text-sm focus:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus:bg-white/[0.08]"
+                  className="mt-2 flex h-11 w-full max-w-xs rounded-2xl border border-border bg-background px-4 text-sm focus:ring-2 focus:ring-ring"
                 >
                   {STATUS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
@@ -446,7 +446,7 @@ export default function LeadsPage() {
                   onBlur={() => {
                     handleNotesUpdate(selectedLead.id, selectedLead.notes ?? "");
                   }}
-                  className="mt-2 min-h-[100px] rounded-xl border border-border/60 bg-muted/40 focus-visible:bg-muted/60 dark:border-white/10 dark:bg-white/5 dark:focus-visible:bg-white/[0.08]"
+                  className="mt-2 min-h-[100px] rounded-2xl border border-border bg-background focus-visible:ring-2 focus-visible:ring-ring"
                   rows={3}
                   placeholder="Add notes for your team..."
                 />

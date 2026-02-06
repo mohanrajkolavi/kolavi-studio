@@ -31,7 +31,7 @@ export function LoginForm({ redirectTo, error, unlocked }: LoginFormProps) {
           type="password"
           id="password"
           name="password"
-          className="mt-2 h-11 rounded-lg border-input"
+          className="mt-2 h-11 rounded-2xl border-input"
           placeholder="Enter your password"
           required
           autoComplete="current-password"
@@ -40,7 +40,7 @@ export function LoginForm({ redirectTo, error, unlocked }: LoginFormProps) {
 
       {unlocked && (
         <div
-          className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
+          className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
           role="status"
         >
           Lockout cleared. You can try again.
@@ -48,7 +48,7 @@ export function LoginForm({ redirectTo, error, unlocked }: LoginFormProps) {
       )}
       {error && (
         <div
-          className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
           role="alert"
         >
           {decodedError}
@@ -57,7 +57,7 @@ export function LoginForm({ redirectTo, error, unlocked }: LoginFormProps) {
 
       <Button
         type="submit"
-        className="h-11 w-full rounded-lg bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+        className="h-11 w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
       >
         Sign in
       </Button>

@@ -92,9 +92,9 @@ export default function DashboardOverviewPage() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {loading ? (
             [1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded-lg border border-border/60 bg-card p-4">
+              <div key={i} className="animate-pulse rounded-2xl border border-border bg-card p-4">
                 <div className="flex gap-4">
-                  <div className="h-12 w-12 shrink-0 rounded-lg bg-muted" />
+                  <div className="h-12 w-12 shrink-0 rounded-2xl bg-muted" />
                   <div className="flex-1 space-y-2">
                     <div className="h-4 w-24 rounded bg-muted" />
                     <div className="h-3 w-36 rounded bg-muted/70" />
@@ -107,8 +107,8 @@ export default function DashboardOverviewPage() {
               const Icon = action.icon;
               return (
                 <Link key={action.href} href={action.href}>
-                  <div className="group flex items-center gap-4 rounded-lg border border-border/60 bg-card p-5 transition-colors hover:border-border hover:bg-muted/30">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <div className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-border hover:bg-muted/30">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                       <Icon className="h-6 w-6" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">

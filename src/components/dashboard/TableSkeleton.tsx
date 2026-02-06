@@ -5,7 +5,7 @@ type TableSkeletonProps = {
 
 export function TableSkeleton({ rows = 5, columns = 6 }: TableSkeletonProps) {
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-card">
+    <div className="overflow-hidden rounded-2xl border border-border bg-card">
       <table className="w-full">
         <thead>
           <tr className="border-b border-border bg-muted/30">

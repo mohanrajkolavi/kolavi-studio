@@ -50,7 +50,7 @@ export function TagInput({
     <div
       role="button"
       tabIndex={0}
-      className={`flex min-h-10 flex-wrap gap-2 rounded-lg border border-input bg-background px-3 py-2 transition-colors focus-within:ring-1 focus-within:ring-foreground/20 dark:border-white/10 dark:bg-white/5 dark:focus-within:bg-white/[0.08] ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className}`}
+      className={`flex min-h-10 flex-wrap gap-2 rounded-2xl border border-input bg-background px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-ring ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className}`}
       onClick={() => inputRef.current?.focus()}
       onKeyDown={(e) => {
         if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
@@ -62,7 +62,7 @@ export function TagInput({
       {tags.map((tag, i) => (
         <span
           key={`${tag}-${i}`}
-          className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-0.5 text-sm"
+          className="inline-flex items-center gap-1 rounded-2xl bg-muted px-2.5 py-0.5 text-sm"
         >
           {tag}
           {!disabled && (

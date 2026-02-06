@@ -29,7 +29,7 @@ export function DashboardNavStrip() {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-colors ${
               isActive
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
