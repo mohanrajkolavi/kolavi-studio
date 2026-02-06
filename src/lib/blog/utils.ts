@@ -1,4 +1,4 @@
-import DOMPurify from "isomorphic-dompurify";
+import sanitizeHtml from "sanitize-html";
 
 /** Allowed tags for post body HTML (safe subset for WordPress content). */
 const ALLOWED_TAGS = [
@@ -14,10 +14,33 @@ const ALLOWED_ATTR = ["href", "target", "rel", "src", "alt", "width", "height", 
  */
 export function sanitizePostHtml(html: string): string {
   if (!html || typeof html !== "string") return "";
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-    ADD_ATTR: ["target"],
+  return sanitizeHtml(html, {
+    allowedTags: ALLOWED_TAGS,
+    allowedAttributes: {
+      a: ["href", "target", "rel", "id", "class"],
+      img: ["src", "alt", "width", "height", "id", "class"],
+      "*": ["id", "class"],
+    },
+    // Only allow safe URL schemes
+    allowedSchemes: ["http", "https", "mailto"],
+    allowProtocolRelative: false,
+    // Prevent reverse-tabnabbing when target=_blank exists
+    transformTags: {
+      a: (tagName, attribs) => {
+        const target = attribs.target;
+        const rel = attribs.rel;
+        const nextRel = target === "_blank"
+          ? Array.from(new Set((rel ?? "").split(/\s+/).filter(Boolean).concat(["noopener", "noreferrer"]))).join(" ")
+          : rel;
+        return {
+          tagName,
+          attribs: {
+            ...attribs,
+            ...(nextRel ? { rel: nextRel } : {}),
+          },
+        };
+      },
+    },
   });
 }
 
