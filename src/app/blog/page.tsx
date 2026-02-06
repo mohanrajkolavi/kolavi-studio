@@ -6,6 +6,7 @@ import { stripHtml } from "@/lib/blog/utils";
 import { BlogSubscribe } from "@/components/blog/BlogSubscribe";
 import { BlogContent } from "@/components/blog/BlogContent";
 import { SITE_URL, SEO } from "@/lib/constants";
+import type { WPPost } from "@/lib/graphql/types";
 
 export const revalidate = 60;
 
@@ -30,10 +31,18 @@ export const metadata = {
 
 export default async function BlogPage() {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
-  const rawPosts = await getPosts();
-  const posts = [...rawPosts].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  let posts: WPPost[];
+  try {
+    const rawPosts = await getPosts();
+    const list = Array.isArray(rawPosts) ? rawPosts : [];
+    posts = [...list].sort(
+      (a, b) =>
+        new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()
+    );
+  } catch (error) {
+    console.error("Blog page getPosts:", error);
+    posts = [];
+  }
   const categories = getCategoriesFromPosts(posts);
   const firstPost = posts[0];
 
@@ -66,10 +75,10 @@ export default async function BlogPage() {
     blogPost: posts.slice(0, 10).map((post, i) => ({
       "@type": "BlogPosting",
       position: i + 1,
-      headline: post.title,
-      url: `${SITE_URL}/blog/${post.slug}`,
-      datePublished: post.date,
-      description: stripHtml(post.excerpt || "").slice(0, SEO.META_DESCRIPTION_MAX_CHARS),
+      headline: post?.title ?? "",
+      url: `${SITE_URL}/blog/${post?.slug ?? ""}`,
+      datePublished: post?.date ?? "",
+      description: stripHtml(typeof post?.excerpt === "string" ? post.excerpt : "").slice(0, SEO.META_DESCRIPTION_MAX_CHARS),
     })),
   };
 

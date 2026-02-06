@@ -32,21 +32,28 @@ export const BLOG_LIST_DEFAULT_LIMIT = 300;
 
 export async function getPosts(): Promise<WPPost[]> {
   if (!WP_GRAPHQL_URL?.trim()) return SAMPLE_POSTS;
-  return unstable_cache(
-    async () => {
-      try {
-        const data = await request<PostsResponse>(GET_POSTS, {
-          first: BLOG_LIST_DEFAULT_LIMIT,
-        });
-        return data.posts?.nodes ?? [];
-      } catch (error) {
-        console.error("getPosts (WPGraphQL):", error);
-        return SAMPLE_POSTS;
-      }
-    },
-    ["blog-posts"],
-    { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
-  )();
+  try {
+    const result = await unstable_cache(
+      async () => {
+        try {
+          const data = await request<PostsResponse>(GET_POSTS, {
+            first: BLOG_LIST_DEFAULT_LIMIT,
+          });
+          const nodes = data?.posts?.nodes;
+          return Array.isArray(nodes) ? nodes : SAMPLE_POSTS;
+        } catch (error) {
+          console.error("getPosts (WPGraphQL):", error);
+          return SAMPLE_POSTS;
+        }
+      },
+      ["blog-posts"],
+      { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
+    )();
+    return Array.isArray(result) ? result : SAMPLE_POSTS;
+  } catch (error) {
+    console.error("getPosts (outer):", error);
+    return SAMPLE_POSTS;
+  }
 }
 
 export async function getPostBySlug(slug: string): Promise<WPPost | null> {
