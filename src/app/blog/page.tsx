@@ -6,7 +6,7 @@ import { getPosts, getCategoriesFromPosts } from "@/lib/blog/data";
 import { stripHtml } from "@/lib/blog/utils";
 import { BlogSubscribe } from "@/components/blog/BlogSubscribe";
 import { BlogContent } from "@/components/blog/BlogContent";
-import { SITE_URL, SEO } from "@/lib/constants";
+// Removed SITE_URL, SEO imports - using getSiteUrlSafe() and inline constants instead
 import type { WPPost } from "@/lib/graphql/types";
 
 export const revalidate = 60;
@@ -119,7 +119,7 @@ export default async function BlogPage() {
           headline: post?.title ?? "",
           url: `${baseUrl}/blog/${post?.slug ?? ""}`,
           datePublished: post?.date ?? "",
-          description: stripHtml(typeof post?.excerpt === "string" ? post.excerpt : "").slice(0, SEO?.META_DESCRIPTION_MAX_CHARS ?? 160),
+          description: stripHtml(typeof post?.excerpt === "string" ? post.excerpt : "").slice(0, 160),
         })),
       };
 
