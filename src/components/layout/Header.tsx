@@ -23,7 +23,7 @@ export function Header({ isAdmin = false }: HeaderProps) {
       >
         Skip to main content
       </a>
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-2xl border border-border/80 bg-card/90 px-5 shadow-premium backdrop-blur-xl sm:px-6 dark:bg-card/90 dark:border-border/80">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-[2rem] border border-border bg-background/80 px-5 shadow-sm backdrop-blur-xl sm:px-6 dark:bg-background/80 dark:border-border">
         {/* Logo */}
         <Link href="/" className="flex items-center space-x-2 transition-opacity hover:opacity-80">
           <span className="text-lg font-semibold tracking-tight text-foreground">Kolavi Studio</span>
