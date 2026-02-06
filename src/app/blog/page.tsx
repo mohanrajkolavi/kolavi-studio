@@ -227,28 +227,22 @@ export default async function BlogPage() {
       )}
 
       {/* Newsletter CTA - two-tone dark design in dark mode */}
-      <section className="border-b border-border bg-muted/30 py-16 sm:py-24">
+      <section className="border-t border-border py-12 sm:py-16">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl">
-            <div className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm dark:border-white/10 dark:bg-transparent dark:shadow-none">
-              {/* Top section: light gradient / dark warm brown-gray */}
-              <div className="border-b border-border bg-gradient-to-r from-orange-50 via-amber-50/50 to-orange-50 px-8 py-10 sm:px-12 sm:py-12 text-center dark:border-white/10 dark:bg-[#3a2f2b] dark:from-transparent dark:via-transparent dark:to-transparent">
-                <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:border dark:border-orange-400/40 dark:text-white">
-                  <svg className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                  </svg>
-                </div>
-                <h2 className="text-2xl font-bold text-foreground sm:text-3xl dark:text-white">
-                  Get the latest insights
-                </h2>
-                <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg dark:text-neutral-400">
-                  Digital marketing tips, SEO strategies, and growth tactics delivered to your inbox.
-                </p>
-              </div>
-              {/* Bottom section: light card / dark cooler gray */}
-              <div className="px-8 py-10 sm:px-12 sm:pb-12 dark:bg-[#27282d]">
-                <BlogSubscribe />
-              </div>
+          <div className="mx-auto max-w-xl text-center">
+            <div className="mb-4 inline-flex h-10 w-10 items-center justify-center text-primary">
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
+              Get the latest insights
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Digital marketing tips, SEO strategies, and growth tactics delivered to your inbox.
+            </p>
+            <div className="mt-6">
+              <BlogSubscribe />
             </div>
           </div>
         </div>

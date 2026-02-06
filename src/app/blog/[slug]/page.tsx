@@ -370,10 +370,10 @@ export default async function BlogPostPage({ params }: PageProps) {
               </section>
             )}
 
-            {/* Newsletter – horizontal layout (heading left, form right) */}
-            <div className="mb-14 flex flex-col gap-6 rounded-2xl border border-border bg-card px-5 py-6 sm:mb-16 sm:flex-row sm:items-center sm:justify-between sm:gap-8 sm:px-6 sm:py-5">
+            {/* Newsletter – compact horizontal layout */}
+            <div className="mb-12 flex flex-col gap-4 border-t border-border pt-8 sm:mb-14 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:pt-10">
               <div className="min-w-0">
-                <h2 className="text-lg font-semibold text-foreground sm:text-xl">
+                <h2 className="text-base font-medium text-foreground sm:text-lg">
                   Want product news and updates?
                 </h2>
                 <p className="mt-1 text-sm text-muted-foreground">

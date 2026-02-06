@@ -44,33 +44,33 @@ export function Process({
   className,
 }: ProcessProps) {
   return (
-    <section className={cn("border-b border-border bg-muted/30 py-16 sm:py-24", className)}>
+    <section className={cn("border-t border-border py-20 sm:py-28", className)}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-5xl">
           {sectionLabel && (
             <div className="mb-6 flex items-center justify-center gap-3">
-              <div className="h-1 w-8 rounded-full bg-orange-500" aria-hidden />
-              <span className="text-sm font-bold uppercase tracking-wider text-foreground">
+              <div className="h-0.5 w-8 bg-primary" aria-hidden />
+              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {sectionLabel}
               </span>
             </div>
           )}
           {title && (
             <div className="mx-auto max-w-2xl text-center">
-              <h2 className={cn("text-3xl font-bold tracking-tight sm:text-4xl", sectionLabel && "text-2xl sm:text-3xl")}>
+              <h2 className={cn("text-3xl font-semibold tracking-tight sm:text-4xl", sectionLabel && "text-2xl sm:text-3xl")}>
                 {title}
               </h2>
             </div>
           )}
         </div>
-        <div className={cn("mx-auto grid max-w-5xl grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4", (title || sectionLabel) ? "mt-12" : "mt-0")}>
+        <div className={cn("mx-auto grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4", (title || sectionLabel) ? "mt-16" : "mt-0")}>
           {steps.map((step, index) => (
             <div key={index} className="relative">
-              <div className="text-6xl font-bold text-primary/20">
+              <div className="text-5xl font-semibold text-primary/10">
                 {step.number}
               </div>
-              <h3 className="mt-4 text-xl font-semibold">{step.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <h3 className="mt-4 text-xl font-medium">{step.title}</h3>
+              <p className="mt-3 text-base text-muted-foreground">
                 {step.description}
               </p>
             </div>
