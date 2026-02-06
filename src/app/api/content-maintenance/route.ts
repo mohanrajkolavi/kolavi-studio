@@ -3,6 +3,14 @@ import { isAuthenticated } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { getPosts } from "@/lib/blog/data";
 
+type MaintenanceRecordRow = {
+  post_slug: string;
+  status: string;
+  note: string | null;
+  last_reviewed_at: Date | null;
+  updated_at: Date;
+};
+
 async function ensureContentMaintenanceTable() {
   // Use a minimal schema that doesn't require extensions (e.g. gen_random_uuid()).
   await sql`
@@ -30,17 +38,14 @@ export async function GET(request: NextRequest) {
     // Get all blog posts from WordPress
     const posts = await getPosts();
 
-    let maintenanceRecords:
-      | { post_slug: string; status: string; note: string | null; last_reviewed_at: Date | null; updated_at: Date }[]
-      | [] = [];
+    let maintenanceRecords: MaintenanceRecordRow[] = [];
     try {
       await ensureContentMaintenanceTable();
       // Get maintenance records from database
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- postgres types
       maintenanceRecords = (await sql`
         SELECT post_slug, status, note, last_reviewed_at, updated_at
         FROM content_maintenance
-      `) as any;
+      `) as unknown as MaintenanceRecordRow[];
     } catch (e) {
       // If DB isn't configured or table can't be created, degrade gracefully.
       console.error("Content maintenance DB unavailable:", e);
