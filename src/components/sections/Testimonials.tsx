@@ -49,7 +49,7 @@ export function Testimonials({
         <div className="mx-auto max-w-5xl">
           {sectionLabel && (
             <div className="mb-6 flex items-center justify-center gap-3">
-              <div className="h-0.5 w-8 bg-primary" aria-hidden />
+              <div className="h-0.5 w-8 rounded-full bg-orange-500" aria-hidden />
               <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {sectionLabel}
               </span>
@@ -65,7 +65,7 @@ export function Testimonials({
         </div>
         <div className={cn("mx-auto grid max-w-6xl grid-cols-1 gap-8 md:grid-cols-3", (title || sectionLabel) ? "mt-16" : "mt-0")}>
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="overflow-hidden border border-border transition-colors hover:border-primary/20">
+            <Card key={index} className="overflow-hidden rounded-2xl border border-border transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
               <CardContent className="p-6">
                 <p className="text-base leading-relaxed text-muted-foreground">
                   &quot;{testimonial.quote}&quot;

@@ -49,7 +49,7 @@ export function Process({
         <div className="mx-auto max-w-5xl">
           {sectionLabel && (
             <div className="mb-6 flex items-center justify-center gap-3">
-              <div className="h-0.5 w-8 bg-primary" aria-hidden />
+              <div className="h-0.5 w-8 rounded-full bg-orange-500" aria-hidden />
               <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {sectionLabel}
               </span>
@@ -66,7 +66,7 @@ export function Process({
         <div className={cn("mx-auto grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4", (title || sectionLabel) ? "mt-16" : "mt-0")}>
           {steps.map((step, index) => (
             <div key={index} className="relative">
-              <div className="text-5xl font-semibold text-primary/10">
+              <div className="text-5xl font-semibold text-orange-500/10 dark:text-orange-400/15">
                 {step.number}
               </div>
               <h3 className="mt-4 text-xl font-medium">{step.title}</h3>

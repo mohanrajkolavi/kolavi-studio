@@ -20,7 +20,7 @@ export function BlogSubscribe({ variant = "default" }: { variant?: "default" | "
 
   return (
     <form onSubmit={handleSubmit} className="w-full">
-      <div className="flex border border-border bg-background overflow-hidden focus-within:border-primary transition-colors">
+      <div className="flex rounded-2xl border border-border bg-background overflow-hidden focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/20 transition-colors">
         <input
           type="email"
           value={email}
@@ -33,7 +33,7 @@ export function BlogSubscribe({ variant = "default" }: { variant?: "default" | "
         />
         <button
           type="submit"
-          className="shrink-0 px-5 py-2.5 text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors"
+          className="shrink-0 px-5 py-2.5 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 transition-colors"
         >
           Join
         </button>

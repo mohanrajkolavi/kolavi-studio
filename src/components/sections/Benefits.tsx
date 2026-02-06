@@ -50,7 +50,7 @@ export function Benefits({
         <div className="mx-auto max-w-5xl">
           {sectionLabel && (
             <div className="mb-6 flex items-center justify-center gap-3">
-              <div className="h-0.5 w-8 bg-primary" aria-hidden="true" />
+              <div className="h-0.5 w-8 rounded-full bg-orange-500" aria-hidden="true" />
               <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                 {sectionLabel}
               </span>
@@ -67,7 +67,7 @@ export function Benefits({
         <div className={cn("mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4", sectionLabel && "mt-12")}>
           {benefits.map((benefit, index) => (
             <div key={index} className="text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center text-primary">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:border dark:border-orange-400/40 dark:text-white">
                 {benefit.icon}
               </div>
               <h3 className="mt-6 text-lg font-medium">{benefit.title}</h3>
