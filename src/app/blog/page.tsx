@@ -52,78 +52,99 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function BlogPage() {
-  const baseUrl = getSiteUrlSafe();
-  let nonce: string | undefined;
   try {
-    nonce = (await headers()).get("x-nonce") ?? undefined;
-  } catch {
-    nonce = undefined;
-  }
+    const baseUrl = getSiteUrlSafe();
+    let nonce: string | undefined;
+    try {
+      nonce = (await headers()).get("x-nonce") ?? undefined;
+    } catch {
+      nonce = undefined;
+    }
 
-  let posts: WPPost[];
-  try {
-    const rawPosts = await getPosts();
-    const list = Array.isArray(rawPosts) ? rawPosts : [];
-    posts = [...list].sort(
-      (a, b) =>
-        new Date(b.date ?? 0).getTime() - new Date(a.date ?? 0).getTime()
-    );
-  } catch (error) {
-    console.error("Blog page getPosts:", error);
-    posts = [];
-  }
+    let posts: WPPost[] = [];
+    try {
+      const rawPosts = await getPosts();
+      const list = Array.isArray(rawPosts) ? rawPosts : [];
+      posts = [...list].sort(
+        (a, b) =>
+          new Date((b?.date ?? 0) as string | number).getTime() - new Date((a?.date ?? 0) as string | number).getTime()
+      );
+    } catch (error) {
+      console.error("Blog page getPosts:", error);
+      posts = [];
+    }
 
-  const categories = getCategoriesFromPosts(posts);
-  const firstPost = posts[0];
+    let categories: { slug: string; name: string }[] = [];
+    try {
+      categories = getCategoriesFromPosts(posts);
+    } catch (error) {
+      console.error("Blog page getCategoriesFromPosts:", error);
+      categories = [];
+    }
 
-  const breadcrumbSchema = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: baseUrl },
-      { "@type": "ListItem", position: 2, name: "Blog", item: `${baseUrl}/blog` },
-    ],
-  };
+    const firstPost = posts[0];
 
-  const blogImage =
-    firstPost?.featuredImage?.node?.sourceUrl?.startsWith("http") === true
-      ? firstPost.featuredImage.node.sourceUrl
-      : `${baseUrl}/og-image.jpg`;
+    let breadcrumbSchemaJson = "";
+    let blogSchemaJson = "";
+    try {
+      const breadcrumbSchema = {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: baseUrl },
+          { "@type": "ListItem", position: 2, name: "Blog", item: `${baseUrl}/blog` },
+        ],
+      };
 
-  const blogSchema = {
-    "@context": "https://schema.org",
-    "@type": "Blog",
-    name: "Kolavi Studio Blog",
-    description: "Digital marketing insights, SEO strategies, and business growth resources.",
-    url: `${baseUrl}/blog`,
-    image: blogImage,
-    publisher: {
-      "@type": "Organization",
-      name: "Kolavi Studio",
-      url: baseUrl,
-    },
-    blogPost: posts.slice(0, 10).map((post, i) => ({
-      "@type": "BlogPosting",
-      position: i + 1,
-      headline: post?.title ?? "",
-      url: `${baseUrl}/blog/${post?.slug ?? ""}`,
-      datePublished: post?.date ?? "",
-      description: stripHtml(typeof post?.excerpt === "string" ? post.excerpt : "").slice(0, SEO?.META_DESCRIPTION_MAX_CHARS ?? 160),
-    })),
-  };
+      const blogImage =
+        firstPost?.featuredImage?.node?.sourceUrl?.startsWith("http") === true
+          ? firstPost.featuredImage.node.sourceUrl
+          : `${baseUrl}/og-image.jpg`;
 
-  return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
-        nonce={nonce}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogSchema) }}
-        nonce={nonce}
-      />
+      const blogSchema = {
+        "@context": "https://schema.org",
+        "@type": "Blog",
+        name: "Kolavi Studio Blog",
+        description: "Digital marketing insights, SEO strategies, and business growth resources.",
+        url: `${baseUrl}/blog`,
+        image: blogImage,
+        publisher: {
+          "@type": "Organization",
+          name: "Kolavi Studio",
+          url: baseUrl,
+        },
+        blogPost: posts.slice(0, 10).map((post, i) => ({
+          "@type": "BlogPosting",
+          position: i + 1,
+          headline: post?.title ?? "",
+          url: `${baseUrl}/blog/${post?.slug ?? ""}`,
+          datePublished: post?.date ?? "",
+          description: stripHtml(typeof post?.excerpt === "string" ? post.excerpt : "").slice(0, SEO?.META_DESCRIPTION_MAX_CHARS ?? 160),
+        })),
+      };
+
+      breadcrumbSchemaJson = JSON.stringify(breadcrumbSchema);
+      blogSchemaJson = JSON.stringify(blogSchema);
+    } catch (error) {
+      console.error("Blog page schema generation:", error);
+    }
+
+    return (
+      <>
+        {breadcrumbSchemaJson && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: breadcrumbSchemaJson }}
+            nonce={nonce}
+          />
+        )}
+        {blogSchemaJson && (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: blogSchemaJson }}
+            nonce={nonce}
+          />
+        )}
 
       <main>
       {/* Hero - minimal, aligned with dashboard */}
@@ -241,5 +262,24 @@ export default async function BlogPage() {
       </section>
       </main>
     </>
-  );
+    );
+  } catch (error) {
+    console.error("Blog page render error:", error);
+    return (
+      <main className="container mx-auto flex min-h-[60vh] flex-col items-center justify-center px-4 py-16 text-center">
+        <h1 className="text-xl font-bold text-foreground">Blog temporarily unavailable</h1>
+        <p className="mt-3 text-muted-foreground">
+          We couldn't load the blog. Please try again or come back later.
+        </p>
+        <div className="mt-6">
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center rounded-lg bg-foreground px-6 py-2.5 font-medium text-background transition-colors hover:bg-foreground/90"
+          >
+            Go home
+          </Link>
+        </div>
+      </main>
+    );
+  }
 }
