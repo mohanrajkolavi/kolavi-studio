@@ -227,7 +227,7 @@ export default function BlogMakerPage() {
                   placeholder="Add a phrase, press Enter"
                   maxTags={15}
                   disabled={generating}
-                  className="min-h-12 rounded-2xl border border-border bg-background px-4 py-3 focus-within:ring-2 focus-within:ring-ring"
+                  className="min-h-12 rounded-2xl bg-background px-4 py-3"
                 />
               </div>
             </section>
@@ -286,7 +286,7 @@ export default function BlogMakerPage() {
                 placeholder="Paste URL, press Enter"
                 maxTags={5}
                 disabled={generating}
-                className="min-h-12 rounded-2xl border border-border bg-background px-4 py-3 focus-within:ring-2 focus-within:ring-ring"
+                className="min-h-12 rounded-2xl bg-background px-4 py-3"
               />
             </section>
 
