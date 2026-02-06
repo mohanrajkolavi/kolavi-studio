@@ -1,9 +1,19 @@
 import { Metadata } from "next";
 import { SITE_NAME, SITE_DESCRIPTION, SITE_URL } from "@/lib/constants";
 
+function getMetadataBaseUrl(): URL {
+  try {
+    const u = SITE_URL?.trim();
+    if (u && u.startsWith("http")) return new URL(u);
+  } catch {
+    // invalid URL
+  }
+  return new URL("https://kolavistudio.com");
+}
+
 export function getBaseMetadata(): Metadata {
   return {
-    metadataBase: new URL(SITE_URL),
+    metadataBase: getMetadataBaseUrl(),
     title: {
       default: SITE_NAME,
       template: `%s | ${SITE_NAME}`,
@@ -65,10 +75,11 @@ export function getPageMetadata({
   twitterDescription,
   twitterImage,
 }: PageMetadataProps): Metadata {
+  const base = (SITE_URL ?? "").trim() || "https://kolavistudio.com";
   const withSiteName = (value: string) =>
     value.includes(SITE_NAME) ? value : `${value} | ${SITE_NAME}`;
-  const url = `${SITE_URL}${path}`;
-  const ogImage = image || `${SITE_URL}/og-image.jpg`;
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const ogImage = image || `${base}/og-image.jpg`;
   const ogDesc = ogDescription ?? description;
   const twTitle = twitterTitle ?? withSiteName(title);
   const twDesc = twitterDescription ?? description;

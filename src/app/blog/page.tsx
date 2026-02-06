@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { headers } from "next/headers";
+import type { Metadata } from "next";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { getPosts, getCategoriesFromPosts } from "@/lib/blog/data";
 import { stripHtml } from "@/lib/blog/utils";
@@ -10,27 +11,55 @@ import type { WPPost } from "@/lib/graphql/types";
 
 export const revalidate = 60;
 
-const blogPageMetadata = getPageMetadata({
-  title: "Blog & Resources – Digital Marketing Insights | Kolavi Studio",
-  description:
-    "Expert strategies on SEO, conversion optimization, content marketing, and business growth. Proven tactics and actionable guides for medical spas, service businesses, and brands.",
-  path: "/blog",
-  keywords:
-    "digital marketing blog, SEO tips, conversion optimization, content marketing, medical spa marketing, local SEO, web design, business growth",
-});
+function getSiteUrlSafe(): string {
+  try {
+    const raw = typeof process !== "undefined" ? process.env?.NEXT_PUBLIC_SITE_URL : undefined;
+    const u = typeof raw === "string" ? raw.trim() : "";
+    if (u && u.startsWith("http")) return u;
+  } catch {
+    // ignore
+  }
+  return "https://kolavistudio.com";
+}
 
-export const metadata = {
-  ...blogPageMetadata,
-  alternates: {
-    ...blogPageMetadata.alternates,
-    types: {
-      "application/rss+xml": `${SITE_URL}/blog/rss`,
-    },
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const base = getSiteUrlSafe();
+    const meta = getPageMetadata({
+      title: "Blog & Resources – Digital Marketing Insights | Kolavi Studio",
+      description:
+        "Expert strategies on SEO, conversion optimization, content marketing, and business growth. Proven tactics and actionable guides for medical spas, service businesses, and brands.",
+      path: "/blog",
+      keywords:
+        "digital marketing blog, SEO tips, conversion optimization, content marketing, medical spa marketing, local SEO, web design, business growth",
+    });
+    return {
+      ...meta,
+      alternates: {
+        ...meta.alternates,
+        types: {
+          "application/rss+xml": `${base}/blog/rss`,
+        },
+      },
+    };
+  } catch (e) {
+    console.error("Blog generateMetadata:", e);
+    return {
+      title: "Blog | Kolavi Studio",
+      description: "Digital marketing insights and resources.",
+    };
+  }
+}
 
 export default async function BlogPage() {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const baseUrl = getSiteUrlSafe();
+  let nonce: string | undefined;
+  try {
+    nonce = (await headers()).get("x-nonce") ?? undefined;
+  } catch {
+    nonce = undefined;
+  }
+
   let posts: WPPost[];
   try {
     const rawPosts = await getPosts();
@@ -43,6 +72,7 @@ export default async function BlogPage() {
     console.error("Blog page getPosts:", error);
     posts = [];
   }
+
   const categories = getCategoriesFromPosts(posts);
   const firstPost = posts[0];
 
@@ -50,35 +80,35 @@ export default async function BlogPage() {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL },
-      { "@type": "ListItem", position: 2, name: "Blog", item: `${SITE_URL}/blog` },
+      { "@type": "ListItem", position: 1, name: "Home", item: baseUrl },
+      { "@type": "ListItem", position: 2, name: "Blog", item: `${baseUrl}/blog` },
     ],
   };
 
   const blogImage =
     firstPost?.featuredImage?.node?.sourceUrl?.startsWith("http") === true
       ? firstPost.featuredImage.node.sourceUrl
-      : `${SITE_URL}/og-image.jpg`;
+      : `${baseUrl}/og-image.jpg`;
 
   const blogSchema = {
     "@context": "https://schema.org",
     "@type": "Blog",
     name: "Kolavi Studio Blog",
     description: "Digital marketing insights, SEO strategies, and business growth resources.",
-    url: `${SITE_URL}/blog`,
+    url: `${baseUrl}/blog`,
     image: blogImage,
     publisher: {
       "@type": "Organization",
       name: "Kolavi Studio",
-      url: SITE_URL,
+      url: baseUrl,
     },
     blogPost: posts.slice(0, 10).map((post, i) => ({
       "@type": "BlogPosting",
       position: i + 1,
       headline: post?.title ?? "",
-      url: `${SITE_URL}/blog/${post?.slug ?? ""}`,
+      url: `${baseUrl}/blog/${post?.slug ?? ""}`,
       datePublished: post?.date ?? "",
-      description: stripHtml(typeof post?.excerpt === "string" ? post.excerpt : "").slice(0, SEO.META_DESCRIPTION_MAX_CHARS),
+      description: stripHtml(typeof post?.excerpt === "string" ? post.excerpt : "").slice(0, SEO?.META_DESCRIPTION_MAX_CHARS ?? 160),
     })),
   };
 
