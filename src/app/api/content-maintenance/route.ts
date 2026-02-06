@@ -3,6 +3,20 @@ import { isAuthenticated } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { getPosts } from "@/lib/blog/data";
 
+async function ensureContentMaintenanceTable() {
+  // Use a minimal schema that doesn't require extensions (e.g. gen_random_uuid()).
+  await sql`
+    CREATE TABLE IF NOT EXISTS content_maintenance (
+      post_slug VARCHAR(255) PRIMARY KEY,
+      status VARCHAR(50) DEFAULT 'unreviewed',
+      note TEXT,
+      last_reviewed_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    )
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_content_maintenance_status ON content_maintenance(status)`;
+}
+
 export async function GET(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,11 +30,22 @@ export async function GET(request: NextRequest) {
     // Get all blog posts from WordPress
     const posts = await getPosts();
 
-    // Get maintenance records from database
-    const maintenanceRecords = await sql`
-      SELECT post_slug, status, note, last_reviewed_at, updated_at
-      FROM content_maintenance
-    `;
+    let maintenanceRecords:
+      | { post_slug: string; status: string; note: string | null; last_reviewed_at: Date | null; updated_at: Date }[]
+      | [] = [];
+    try {
+      await ensureContentMaintenanceTable();
+      // Get maintenance records from database
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- postgres types
+      maintenanceRecords = (await sql`
+        SELECT post_slug, status, note, last_reviewed_at, updated_at
+        FROM content_maintenance
+      `) as any;
+    } catch (e) {
+      // If DB isn't configured or table can't be created, degrade gracefully.
+      console.error("Content maintenance DB unavailable:", e);
+      maintenanceRecords = [];
+    }
 
     const maintenanceMap = new Map(
       maintenanceRecords.map((r) => [

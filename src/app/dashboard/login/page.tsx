@@ -24,21 +24,24 @@ export default async function LoginPage({ searchParams }: Props) {
     <div className="relative flex min-h-screen flex-col items-center justify-center px-4 sm:px-6">
       <div className="absolute inset-0 bg-gradient-to-b from-muted/50 via-background to-background dark:from-muted/20 dark:via-background dark:to-background" />
 
-      <div className="relative w-full max-w-[400px]">
+      <div className="relative w-full max-w-[420px]">
         <div className="rounded-[2rem] border border-border bg-card px-8 py-10 shadow-sm sm:px-10 sm:py-12">
           {/* Header: brand + heading */}
           <div className="text-center">
             <Link
               href="/"
-              className="inline-block text-lg font-semibold tracking-tight text-foreground hover:opacity-80"
+              className="inline-block text-lg font-semibold tracking-tight text-foreground transition-opacity hover:opacity-80"
             >
               Kolavi Studio
             </Link>
-            <h1 className="mt-6 text-2xl font-bold tracking-tight text-foreground">
-              Sign in
+            <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+              Welcome{" "}
+              <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
+                back
+              </span>
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Enter your admin password to access the dashboard
+              Sign in to access your dashboard
             </p>
           </div>
 
@@ -48,7 +51,7 @@ export default async function LoginPage({ searchParams }: Props) {
         <p className="mt-6 text-center">
           <Link
             href="/"
-            className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground"
+            className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-orange-600 dark:hover:text-orange-400"
           >
             ← Back to site
           </Link>

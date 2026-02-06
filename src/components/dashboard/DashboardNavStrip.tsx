@@ -31,7 +31,7 @@ export function DashboardNavStrip() {
             href={item.href}
             className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-colors ${
               isActive
-                ? "bg-primary text-primary-foreground"
+                ? "bg-orange-600 text-white dark:bg-orange-500"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
             aria-current={isActive ? "page" : undefined}

@@ -49,6 +49,7 @@ const statusStyles: Record<string, string> = {
 export default function ContentMaintenancePage() {
   const [posts, setPosts] = useState<PostMaintenance[]>([]);
   const [loading, setLoading] = useState(true);
+  const [persistWarning, setPersistWarning] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     status: "",
     minAgeDays: "",
@@ -58,6 +59,36 @@ export default function ContentMaintenancePage() {
   const [updating, setUpdating] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  const refreshSelectedPost = useCallback(async (slug: string, patch?: Partial<PostMaintenance>) => {
+    try {
+      const response = await fetch(`/api/content-maintenance/${slug}`, { cache: "no-store" });
+      if (!response.ok) {
+        console.error("Failed to refresh selected post", { slug, status: response.status });
+        return;
+      }
+
+      let refreshed: unknown;
+      try {
+        refreshed = await response.json();
+      } catch (error) {
+        console.error("Failed to parse refreshed post JSON", { slug, error });
+        return;
+      }
+
+      if (!refreshed || typeof refreshed !== "object" || Array.isArray(refreshed)) {
+        console.error("Invalid refreshed post payload", { slug, refreshed });
+        return;
+      }
+
+      setSelectedPost((prev) => {
+        if (!prev || prev.slug !== slug) return prev;
+        return { ...prev, ...(refreshed as Partial<PostMaintenance>), ...(patch ?? {}) };
+      });
+    } catch (error) {
+      console.error("Error refreshing selected post:", error);
+    }
+  }, []);
+
   const fetchPosts = useCallback(async () => {
     setLoading(true);
     try {
@@ -66,7 +97,7 @@ export default function ContentMaintenancePage() {
       if (filters.minAgeDays) params.append("minAgeDays", filters.minAgeDays);
       if (filters.category) params.append("category", filters.category);
 
-      const response = await fetch(`/api/content-maintenance?${params.toString()}`);
+      const response = await fetch(`/api/content-maintenance?${params.toString()}`, { cache: "no-store" });
       if (!response.ok) throw new Error("Failed to fetch posts");
       const data = await response.json();
       setPosts(data.posts);
@@ -96,11 +127,14 @@ export default function ContentMaintenancePage() {
         body: JSON.stringify({ status: newStatus }),
       });
       if (!response.ok) throw new Error("Failed to update status");
-      await fetchPosts();
-      if (selectedPost?.slug === slug) {
-        const updated = await fetch(`/api/content-maintenance/${slug}`).then((r) => r.json());
-        setSelectedPost({ ...selectedPost, ...updated });
+      const updated = await response.json();
+      if (updated?.persisted === false) {
+        setPersistWarning("Database isn’t connected, so changes won’t be saved. Add `DATABASE_URL` to enable saving.");
+      } else {
+        setPersistWarning(null);
       }
+      await fetchPosts();
+      void refreshSelectedPost(slug);
     } catch (error) {
       console.error("Error updating status:", error);
     } finally {
@@ -117,11 +151,14 @@ export default function ContentMaintenancePage() {
         body: JSON.stringify({ markAsReviewed: true, status: "up_to_date" }),
       });
       if (!response.ok) throw new Error("Failed to mark as reviewed");
-      await fetchPosts();
-      if (selectedPost?.slug === slug) {
-        const updated = await fetch(`/api/content-maintenance/${slug}`).then((r) => r.json());
-        setSelectedPost({ ...selectedPost, ...updated, status: "up_to_date" });
+      const updated = await response.json();
+      if (updated?.persisted === false) {
+        setPersistWarning("Database isn’t connected, so changes won’t be saved. Add `DATABASE_URL` to enable saving.");
+      } else {
+        setPersistWarning(null);
       }
+      await fetchPosts();
+      void refreshSelectedPost(slug, { status: "up_to_date" });
     } catch (error) {
       console.error("Error marking as reviewed:", error);
     } finally {
@@ -138,11 +175,14 @@ export default function ContentMaintenancePage() {
         body: JSON.stringify({ note }),
       });
       if (!response.ok) throw new Error("Failed to update note");
-      await fetchPosts();
-      if (selectedPost?.slug === slug) {
-        const updated = await fetch(`/api/content-maintenance/${slug}`).then((r) => r.json());
-        setSelectedPost({ ...selectedPost, ...updated });
+      const updated = await response.json();
+      if (updated?.persisted === false) {
+        setPersistWarning("Database isn’t connected, so changes won’t be saved. Add `DATABASE_URL` to enable saving.");
+      } else {
+        setPersistWarning(null);
       }
+      await fetchPosts();
+      void refreshSelectedPost(slug);
     } catch (error) {
       console.error("Error updating note:", error);
     } finally {
@@ -157,6 +197,11 @@ export default function ContentMaintenancePage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Track blog posts and keep content fresh
         </p>
+        {persistWarning && (
+          <div className="mt-4 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm text-amber-800 dark:text-amber-200">
+            {persistWarning}
+          </div>
+        )}
       </header>
 
       <section className="rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm">
@@ -174,7 +219,7 @@ export default function ContentMaintenancePage() {
                     onClick={() => setFilters((f) => ({ ...f, status: tab.value }))}
                   className={`shrink-0 rounded-2xl px-3 py-1.5 text-sm font-medium transition-colors ${
                     filters.status === tab.value
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-orange-600 text-white dark:bg-orange-500"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                   >
@@ -442,7 +487,7 @@ export default function ContentMaintenancePage() {
                 <Button
                   onClick={() => handleMarkAsReviewed(selectedPost.slug)}
                   disabled={updating === selectedPost.slug}
-                  className="rounded-2xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
+                  className="rounded-2xl bg-orange-600 px-4 text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
                 >
                   Mark as reviewed
                 </Button>

@@ -57,7 +57,7 @@ export function LoginForm({ redirectTo, error, unlocked }: LoginFormProps) {
 
       <Button
         type="submit"
-        className="h-11 w-full rounded-2xl bg-primary font-semibold text-primary-foreground hover:bg-primary/90"
+        className="h-11 w-full rounded-2xl bg-orange-600 font-semibold text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
       >
         Sign in
       </Button>

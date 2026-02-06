@@ -248,7 +248,7 @@ export default function BlogMakerPage() {
                     key={opt.value}
                     className={`inline-flex cursor-pointer items-center rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-200 ${
                       intent.includes(opt.value)
-                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                        ? "bg-orange-600 text-white shadow-md shadow-orange-500/20 dark:bg-orange-500 dark:shadow-orange-400/20"
                         : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
                     } ${generating ? "pointer-events-none opacity-60" : ""}`}
                   >
@@ -295,7 +295,7 @@ export default function BlogMakerPage() {
               <Button
                 type="submit"
                 disabled={generating || keywords.length === 0}
-                className="h-12 rounded-full bg-primary px-8 text-base font-medium text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/25 disabled:shadow-none"
+                className="h-12 rounded-full bg-orange-600 px-8 text-base font-medium text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/25 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600 disabled:shadow-none"
               >
                 <Sparkles className="mr-2 h-4 w-4" />
                 Generate post
@@ -332,7 +332,7 @@ export default function BlogMakerPage() {
                 size="sm"
                 disabled={publishing || !editing.title || !editing.content}
                 onClick={handlePublish}
-                className="rounded-full bg-primary px-6 text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90"
+                className="rounded-full bg-orange-600 px-6 text-white shadow-md shadow-orange-500/20 hover:bg-orange-700 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600"
               >
                 {publishing ? "Publishing…" : "Publish to WordPress"}
               </Button>

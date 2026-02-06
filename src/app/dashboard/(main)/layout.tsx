@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { verifySessionToken } from "@/lib/auth";
 import { DashboardNavStrip } from "@/components/dashboard/DashboardNavStrip";
+import { IdleLogout } from "@/components/dashboard/IdleLogout";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -26,6 +27,7 @@ export default async function DashboardMainLayout({
 
   return (
     <div className="min-h-screen bg-background">
+      <IdleLogout />
       <main>
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8 lg:py-12">
           <DashboardNavStrip />

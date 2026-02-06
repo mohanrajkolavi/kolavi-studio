@@ -62,30 +62,87 @@ export default function DashboardOverviewPage() {
   return (
     <div className="space-y-8">
       <header>
-        <h1 className="text-xl font-semibold text-foreground">Overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Overview</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
           Your dashboard at a glance. Use the tabs above to navigate.
         </p>
+
         {apiError && (
-          <div className="mt-4 rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
-            {apiError}
-          </div>
-        )}
-        {!loading && stats && (
-          <div className="mt-6 flex flex-wrap gap-6">
-            <span className="flex items-baseline gap-1.5">
-              <span className="text-xl font-semibold tabular-nums text-foreground">{stats.leadsTotal}</span>
-              <span className="text-sm text-muted-foreground">leads</span>
-            </span>
-            <span className="flex items-baseline gap-1.5">
-              <span className="text-xl font-semibold tabular-nums text-foreground">{stats.postsTotal}</span>
-              <span className="text-sm text-muted-foreground">posts</span>
-            </span>
-            {stats.leadsNew > 0 && <span className="text-sm text-primary">{stats.leadsNew} new</span>}
-            {stats.postsNeedsReview > 0 && <span className="text-sm text-amber-600 dark:text-amber-400">{stats.postsNeedsReview} need review</span>}
+          <div className="mt-5 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p className="font-medium">Some dashboard data couldn’t be loaded.</p>
+            <p className="mt-1 text-destructive/90">{apiError}</p>
           </div>
         )}
       </header>
+
+      {/* Stats */}
+      <section aria-label="Dashboard stats">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {loading ? (
+            [1, 2, 3, 4].map((i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-2xl border border-border bg-card p-5"
+              >
+                <div className="h-4 w-20 rounded bg-muted" />
+                <div className="mt-3 h-8 w-16 rounded bg-muted/70" />
+                <div className="mt-2 h-3 w-24 rounded bg-muted/60" />
+              </div>
+            ))
+          ) : stats ? (
+            <>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Leads</p>
+                <p className="mt-2 text-3xl font-semibold tabular-nums text-foreground">{stats.leadsTotal}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {stats.leadsNew > 0 ? (
+                    <span className="text-orange-600 dark:text-orange-400">{stats.leadsNew} new</span>
+                  ) : (
+                    "No new leads"
+                  )}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Posts</p>
+                <p className="mt-2 text-3xl font-semibold tabular-nums text-foreground">{stats.postsTotal}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {stats.postsNeedsReview > 0 ? (
+                    <span className="text-amber-600 dark:text-amber-400">{stats.postsNeedsReview} need review</span>
+                  ) : (
+                    "All up to date"
+                  )}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Quick action</p>
+                <p className="mt-2 text-base font-medium text-foreground">Create a post</p>
+                <p className="mt-1 text-sm text-muted-foreground">Generate a draft with Blog Maker.</p>
+                <Link
+                  href="/dashboard/blog"
+                  className="mt-4 inline-flex items-center rounded-2xl bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                >
+                  Open Blog Maker
+                </Link>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Quick action</p>
+                <p className="mt-2 text-base font-medium text-foreground">Review content</p>
+                <p className="mt-1 text-sm text-muted-foreground">Keep posts fresh and updated.</p>
+                <Link
+                  href="/dashboard/content-maintenance"
+                  className="mt-4 inline-flex items-center rounded-2xl border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted/50"
+                >
+                  Open Content
+                </Link>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+              Stats unavailable.
+            </div>
+          )}
+        </div>
+      </section>
 
       <section>
         <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Quick actions</h2>
@@ -107,15 +164,15 @@ export default function DashboardOverviewPage() {
               const Icon = action.icon;
               return (
                 <Link key={action.href} href={action.href}>
-                  <div className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-border hover:bg-muted/30">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <div className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-orange-200 hover:bg-muted/30 dark:hover:border-orange-800">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:text-orange-400">
                       <Icon className="h-6 w-6" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-medium text-foreground">{action.label}</h3>
                       <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{action.description}</p>
                     </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:text-foreground group-hover:translate-x-0.5" aria-hidden />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:text-orange-600 dark:group-hover:text-orange-400 group-hover:translate-x-0.5" aria-hidden />
                   </div>
                 </Link>
               );

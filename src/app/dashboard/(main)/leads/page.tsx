@@ -166,7 +166,7 @@ export default function LeadsPage() {
                     onClick={() => setFilters((f) => ({ ...f, status: opt.value }))}
                   className={`shrink-0 rounded-2xl px-3 py-1.5 text-sm font-medium transition-colors ${
                     filters.status === opt.value
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-orange-600 text-white dark:bg-orange-500"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                   >
@@ -202,7 +202,7 @@ export default function LeadsPage() {
               </select>
               <Button
                 type="submit"
-                className="h-11 shrink-0 rounded-2xl bg-primary px-4 text-primary-foreground hover:bg-primary/90"
+                className="h-11 shrink-0 rounded-2xl bg-orange-600 px-4 text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
               >
                 Search
               </Button>
@@ -256,7 +256,7 @@ export default function LeadsPage() {
                       role="button"
                       tabIndex={0}
                       className={`group border-b border-border/50 last:border-0 transition-colors hover:bg-muted/30 cursor-pointer ${
-                        lead.status === "new" ? "bg-primary/5" : ""
+                        lead.status === "new" ? "bg-orange-50 dark:bg-orange-900/20" : ""
                       }`}
                       onClick={() => setSelectedLead(lead)}
                       onKeyDown={(e) => {
