@@ -50,7 +50,7 @@ export function TagInput({
     <div
       role="button"
       tabIndex={0}
-      className={`flex min-h-10 flex-wrap gap-2 rounded-2xl border border-input bg-background px-3 py-2 transition-colors focus-within:ring-2 focus-within:ring-ring ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className}`}
+      className={`flex min-h-10 flex-wrap gap-2 rounded-2xl border border-border bg-background px-3 py-2 transition-colors focus-within:border-foreground/20 focus-within:ring-2 focus-within:ring-foreground/15 ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className}`}
       onClick={() => inputRef.current?.focus()}
       onKeyDown={(e) => {
         if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {

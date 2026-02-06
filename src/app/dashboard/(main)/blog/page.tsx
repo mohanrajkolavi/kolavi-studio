@@ -209,7 +209,7 @@ export default function BlogMakerPage() {
                   placeholder="Add a keyword, press Enter"
                   maxTags={10}
                   disabled={generating}
-                  className="min-h-12 rounded-2xl border border-border bg-background px-4 py-3 focus-within:ring-2 focus-within:ring-ring"
+                  className="min-h-12 rounded-2xl bg-background px-4 py-3"
                 />
               </div>
               <div className="space-y-3">
