@@ -50,6 +50,8 @@ export type ArticleAuditInput = {
   author?: string;
   /** URL to author bio page — recommended; credentials should be visible there */
   authorBioUrl?: string;
+  /** When true (e.g. publishing to WordPress), byline and bio are added by the CMS — audit passes these checks */
+  authorHandledByCms?: boolean;
 };
 
 export type ArticleAuditResult = {
@@ -117,6 +119,16 @@ function countAiPhrases(text: string): { phrase: string; count: number }[] {
 
 function auditAuthorByline(input: ArticleAuditInput): AuditItem[] {
   const items: AuditItem[] = [];
+  if (input.authorHandledByCms) {
+    items.push({
+      id: "author-byline",
+      severity: "pass",
+      level: 1,
+      label: "Author byline",
+      message: "Author will be added by WordPress (or CMS) when published.",
+    });
+    return items;
+  }
   const authorProvided = "author" in input;
   const hasAuthor = (input.author?.trim() ?? "").length > 0;
   if (!hasAuthor) {
@@ -146,6 +158,16 @@ function auditAuthorByline(input: ArticleAuditInput): AuditItem[] {
 
 function auditAuthorBio(input: ArticleAuditInput): AuditItem[] {
   const items: AuditItem[] = [];
+  if (input.authorHandledByCms) {
+    items.push({
+      id: "author-bio",
+      severity: "pass",
+      level: 1,
+      label: "Author bio page",
+      message: "Author and bio are handled by WordPress (or CMS) when published.",
+    });
+    return items;
+  }
   if (!input.author?.trim()) return items; // Skip if no author
   const hasBioUrl = (input.authorBioUrl?.trim() ?? "").length > 0;
   if (!hasBioUrl) {
@@ -652,16 +674,17 @@ function auditRankMathContentLength(plainText: string): AuditItem[] {
       threshold: SEO.CONTENT_MIN_WORDS_PILLAR,
     });
   } else if (wc >= SEO.CONTENT_MIN_WORDS_GENERAL) {
+    // 1500+ words: pass (lower weight). Google: quality over quantity; don't pad for 2500.
     items.push({
       id: "rm-content-length",
-      severity: "warn",
+      severity: "pass",
       level: 3,
       source: "rankmath",
       label: "Rank Math: Content length",
-      message: `${wc} words. 2500+ = Rank Math 100%; 1500–2000 = 60%. Google: quality over quantity.`,
+      message: `${wc} words. 2500+ = Rank Math 100%. Google: quality over quantity—no need to pad.`,
       value: wc,
       threshold: SEO.CONTENT_MIN_WORDS_PILLAR,
-      guideline: "Rank Math prefers 2500+ for 100%. Don't pad—only add length if it serves the reader.",
+      guideline: "Rank Math prefers 2500+ for 100%. Only add length if it serves the reader.",
     });
   } else if (wc >= 600) {
     items.push({

@@ -1,4 +1,4 @@
-`# Final Audit: Blog Generator, Humanize, Audit, Google Search Central, Rank Math
+# Final Audit: Blog Generator, Humanize, Audit, Google Search Central, Rank Math
 
 ## 1. Component vs. Area (Coverage Matrix)
 
@@ -64,8 +64,8 @@
 
 | Item | Level | Source | Purpose |
 |------|-------|--------|---------|
-| Author byline | 1 | Google (E-E-A-T) | Publication blocker |
-| Author bio URL | 1 | Google (E-E-A-T) | Publication blocker |
+| Author byline | 1 | Google (E-E-A-T) | Publication blocker (pass when `authorHandledByCms: true`, e.g. WordPress adds author at publish) |
+| Author bio URL | 1 | Google (E-E-A-T) | Publication blocker (pass when `authorHandledByCms: true`) |
 | Title present & length | 1 | Google | Publication blocker |
 | Meta description present & length | 1 | Google | Publication blocker |
 | Thin content (min word count) | 1 | Google | Publication blocker |
@@ -86,6 +86,41 @@
 
 ---
 
+## 5b. Weightage list (how the score is calculated)
+
+**Formula:** `score = (pass / total) × 100`. Every check has **equal weight (1)**. Only **pass** counts toward the numerator; **warn** and **fail** do not. So each pass = +1 to the score, each warn/fail = 0.
+
+**Publishability:** In addition to score ≥ 75, there must be **no Level 1 failures** (any L1 fail blocks publish even if score is high).
+
+| # | Check (label) | Level | Pass → score | Warn / Fail → score |
+|---|----------------|-------|--------------|----------------------|
+| 1 | Author byline | 1 | +1 | 0 (warn or N/A when `authorHandledByCms`) |
+| 2 | Author bio page | 1 | +1 | 0 (warn) |
+| 3 | Title | 1 | — | 0 (fail if missing) |
+| 4 | Title length | 1 or 2 | +1 (L2 pass) | 0 (L1 fail if >60 chars; L2 warn if long) |
+| 5 | Title keyword | 2 | +1 | 0 (warn if no focus keyword) |
+| 6 | Meta description | 1 | — | 0 (fail if missing/too long) |
+| 7 | Meta description length | 2 | +1 | 0 (warn if long) |
+| 8 | Content depth (thin content) | 1 | +1 | 0 (fail if <300 words) |
+| 9 | AI-sounding language | 1 or 2 | +1 (L2) | 0 (L1 fail if >3 phrases; L2 warn) |
+| 10 | Keyword stuffing / use | 1 or 2 | +1 (L2) | 0 (L1 fail stuffing; L2 warn repetition) |
+| 11 | Headings | 1 | +1 | 0 (warn if missing) |
+| 12 | Heading hierarchy | 2 | +1 | 0 (warn if skip levels) |
+| 13 | H1 in body | 2 | +1 | 0 (warn if H1 in body) |
+| 14 | Paragraph length | 2 | +1 | 0 (warn if any para >120 words) |
+| 15 | URL slug length | 2 | +1 | 0 (warn if long) |
+| 16 | Rank Math: Keyword in meta | 3 | +1 | 0 (warn) |
+| 17 | Rank Math: First 10% | 3 | +1 | 0 (warn) |
+| 18 | Rank Math: Slug keyword | 3 | +1 | 0 (warn) |
+| 19 | Rank Math: Subheading keyword | 3 | +1 | 0 (warn) |
+| 20 | Rank Math: Content length | 3 | +1 | 0 (warn only if 600–1499 words; 1500+ = pass) |
+| 21 | Rank Math: Keyword position in title | 3 | +1 | 0 (warn) |
+| 22 | Rank Math: Number in title | 3 | +1 | 0 (warn) |
+
+**Example:** 18 pass, 4 warn, 0 fail → total 22 → score = round(18/22 × 100) = **82%**. If any of the 4 warn were Level 1 fail, publishable would be false.
+
+---
+
 ## 6. File Reference
 
 | Component | File |
@@ -96,6 +131,27 @@
 | Generate API | `src/app/api/blog/generate/route.ts` (generate → humanize → return) |
 | Dashboard | `src/app/dashboard/(main)/blog/page.tsx` (audit on `editing`, focusKeyword from first keyword) |
 | Standalone audit script | `scripts/run-audit.mjs` (AI_PHRASES kept in sync with article-audit) |
+
+---
+
+## Flow essence: three pillars (Google, Rank Math, Human)
+
+The flow is designed so every output embodies:
+
+1. **Google Search Central** – People-first, E-E-A-T, natural language, satisfy intent, no keyword stuffing.
+2. **Rank Math** – Keyword placement (title, meta, slug, first 10%, subheadings), readability (paragraphs ≤120w), structure (FAQ, length).
+3. **Human style** – Conversational, varied sentences, no stock AI phrases, target under 30% AI detection.
+
+- **Generator:** Produces one draft that already satisfies all three pillars (PRIORITY 1 Google, PRIORITY 2 Rank Math, HUMAN STYLE throughout).
+- **Humanize:** Preserves Google and Rank Math essence (keywords, headings, structure, expert tone); strengthens human style (wording, rhythm, idioms, no stock phrases) only. Does not dilute SEO.
+
+---
+
+## Coordination (generator, humanize, audit)
+
+- **Generate API:** Runs `generateBlogPost` then `humanizeArticleContent`; returns one result. Dashboard audits that result with `focusKeyword` from the first keyword.
+- **Shared AI phrases:** The generator and humanize prompts use the same conceptual BANNED list as the audit's `AI_PHRASES`. When adding or removing a phrase, update: (1) generator system + user prompt in `src/lib/claude/client.ts`, (2) `AI_PHRASES` in `src/lib/seo/article-audit.ts`, (3) `AI_PHRASES` in `scripts/run-audit.mjs`.
+- **Detection alignment:** Generator and humanize prompts now include perplexity (unpredictable word choice), burstiness of perplexity (vary predictability), varied sentence openings, and humanize explicitly does more than paraphrase (restructure, idioms) to align with how GPTZero/ZeroGPT and similar detectors work.
 
 ---
 

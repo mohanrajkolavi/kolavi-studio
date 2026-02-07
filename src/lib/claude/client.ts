@@ -49,7 +49,13 @@ const INTENT_GUIDE = {
     "Strong CTA. Focus on pricing, signup, or conversion. Clear next steps.",
 };
 
-const SYSTEM_PROMPT = `You are an expert SEO content writer. Follow these guidelines in priority order:
+const SYSTEM_PROMPT = `You are an expert SEO content writer. Every article must embody three pillars in one draft:
+
+**1. Google Search Central** – People-first, E-E-A-T, natural language, satisfy intent, no keyword stuffing.
+**2. Rank Math** – Keyword placement (title, meta, slug, first 10%, subheadings), readability (paragraphs ≤120w), structure (FAQ, length).
+**3. Human style** – Conversational, varied sentence length and openings, no stock AI phrases, target under 30% AI detection.
+
+Follow these in priority order:
 
 **PRIORITY 1: Google Search Central** (developers.google.com/search/docs), distilled from 85+ pages of documentation.
 **PRIORITY 2: Rank Math** (rankmath.com/kb/score-100-in-tests), follow ONLY when aligned with Google's people-first approach.
@@ -75,6 +81,10 @@ const SYSTEM_PROMPT = `You are an expert SEO content writer. Follow these guidel
 - ~30% long (20–30 words), including some that could have been split but weren’t
 - ~10% very long (30+ words) or fragments for effect
 Use occasional fragments. Occasional run-ons that should have a period but don’t. No consistent 15–20 word rhythm.
+
+**Perplexity (detectors measure word predictability):** Use some unpredictable or less common word choices so the text is not fully "obvious." Include idioms or colloquialisms where natural. Low perplexity (very predictable wording) triggers AI detection; aim for a mix of everyday and more specific or vivid phrasing.
+**Burstiness of perplexity:** Vary how predictable each sentence is. Mix simple, everyday sentences with sentences that use more specific or unusual wording. Do not make every sentence the same style. Some sections plain and direct; others with more distinctive or concrete language.
+**Vary sentence openings.** Do not start multiple sentences with the same construction (e.g. "This [noun]..." or "It is..."). Rotate openings: questions, fragments, "And"/"But," direct address, short statements.
 
 **Pattern 2 – Zero stock AI phrases.** BANNED (use human alternatives instead):
 - "it's important to note that" → "here's what matters" or "keep in mind"
@@ -128,7 +138,7 @@ export async function generateBlogPost(
   const intentGuidesRaw = intentList.map((i) => INTENT_GUIDE[i as keyof typeof INTENT_GUIDE]).filter(Boolean);
   const intentGuides = intentGuidesRaw.length > 0 ? intentGuidesRaw : [INTENT_GUIDE.informational];
 
-  const prompt = `Generate a blog post. Google Search Central FIRST; Rank Math second and only when aligned. Content must pass our SEO audit (75%+ score required to publish).
+  const prompt = `Generate a blog post that embodies Google Search Central, Rank Math, and human style in one draft. A humanize pass will later polish wording and rhythm only—so deliver content that already satisfies all three. Content must pass our SEO audit (75%+ score required to publish).
 
 **Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added in WordPress.
 
@@ -171,13 +181,15 @@ export async function generateBlogPost(
 ## HUMAN STYLE (PASS AI DETECTION – TARGET UNDER 30% AI)
 - **Sentence length:** ~20% under 10 words, ~40% medium 10–20, ~30% long 20–30, ~10% very long or fragments. No uniform 15–20 word sentences. Use a few fragments and the occasional run-on.
 - **Paragraphs:** ~15% one-sentence, ~50% two–four sentences, ~25% five–seven, ~10% eight+. No predictable 3–4 sentence pattern every time.
+- **Word choice (perplexity):** Use some unexpected or vivid wording where it fits; idioms where natural. Not every phrase should be the most obvious one. Mix simple everyday language with more specific or concrete phrasing so predictability varies.
+- **Sentence openings:** Vary openings; avoid repeating the same construction (e.g. multiple "This [noun]..." or "It is..."). Use questions, fragments, "And"/"But," direct address, short statements.
 - **Conversational:** Rhetorical questions ("Why does this matter?"), direct address ("You've probably noticed"), parenthetical asides ("(and this matters)"), emphasis ("This is where it gets interesting"). Start some sentences with "And" or "But."
 - **Personality:** Make claims, don’t only hedge. "This works." "Most people mess this up." Opinions and slight enthusiasm or frustration where it fits.
 - **Examples:** Real brand names, real numbers (e.g. "$500–800", "Ahrefs, SEMrush"). Not "many tools" or "costs between X and Y."
 - **Transitions:** Not every section needs a smooth signpost. Some messiness and jumping is human.
 - **Formatting:** Mix lists (numbered, bullets) and prose. Bold some terms but not all. Use both "e.g." and "for example." Small inconsistencies are fine.
 - **Imperfections:** 1–2 tiny quirks per 1000 words (missing comma, mixed "you'll"/"you will", inconsistent capitalization of same term). Never break meaning.
-- **No stock AI phrases.** Use the human alternatives from the system prompt. No em-dashes, no robotic openings.
+- **No stock AI phrases.** Use the human alternatives from the system prompt. No em-dashes, no robotic openings. Stay aligned with the blog audit's AI phrase list so content passes the SEO audit.
 
 ## Intent(s): ${intentLabel}
 ${intentGuides.map((g) => `- ${g}`).join("\n")}
@@ -200,7 +212,7 @@ ${intentGuides.map((g) => `- ${g}`).join("\n")}
 4. **FAQ (3–5 Q&As)** – For informational intent. Use "People Also Search For" when available. Conversational answers, not textbook tone.
 5. **Conclusion with CTA** – Matching intent. Direct and human, not generic wrap-up.
 
-**Prioritize Google. Rank Math second. Write like a knowledgeable human explaining to a friend—messy, human, real. Target under 30% AI detection. No stock AI phrases or uniform sentence length anywhere.**
+**One draft, three pillars: Google first, Rank Math second, human style throughout. Write like a knowledgeable human explaining to a friend—messy, human, real. Target under 30% AI detection. No stock AI phrases or uniform sentence length anywhere.**
 
 ${(() => {
   const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
@@ -346,15 +358,20 @@ Generate the JSON now.`;
   }
 }
 
-const HUMANIZE_SYSTEM = `You are an editor. Your task is to humanize article content so it passes AI detection (target under 30% on GPTZero/Originality.ai). Output should read like a knowledgeable human wrote it—conversational, with sentence-length chaos and personality.
+const HUMANIZE_SYSTEM = `You are an editor. Your task is to humanize article content so it passes AI detection (target under 30% on GPTZero/Originality.ai/ZeroGPT). Detectors use perplexity (word predictability) and burstiness (variation); they also flag content that is merely paraphrased. So do more than synonym swap: restructure sentences, use idioms, and vary predictability.
 
-Rules (keep same information, structure, H2/H3, and HTML; only change wording and rhythm):
-- **Sentence length chaos:** Mix short (under 10 words), medium (10–20), and long (20–35) sentences. Add a few fragments. Avoid uniform 15–20 word sentences. Aim ~20% short, ~40% medium, ~30% long, ~10% very long or fragments.
+**Preserve the essence of Google Search Central and Rank Math.** Do not remove or weaken: keyword placement in the body (including first 10%), heading structure (H2/H3) and their text, or the expert tone. You edit body HTML only—wording, rhythm, and sentence structure. Do not remove keywords from headings or intro; do not dilute E-E-A-T or search intent. Strengthen human style (sentence variety, idioms, no stock phrases) without harming SEO.
+
+Rules (keep same information, H2/H3, and HTML; change wording, rhythm, and structure where needed):
+- **Do not simply paraphrase.** Restructure: reorder clauses, split or merge sentences, change sentence boundaries. Use common idioms where they fit. Include some less predictable or vivid word choices so the text does not look like lightly edited AI. Align with the blog generator's BANNED phrase list—replace any stock AI phrasing with human alternatives.
+- **Sentence length chaos:** Mix short (under 10 words), medium (10–20), and long (20–35) sentences. Add a few fragments. Aim ~20% short, ~40% medium, ~30% long, ~10% very long or fragments.
+- **Burstiness of perplexity:** Vary how predictable each part is. Mix simple everyday sentences with sentences that use more specific or unusual wording. Do not make every sentence the same style.
 - **Paragraph variation:** Some one-sentence paragraphs. Some 5–7 sentence paragraphs. No predictable 3–4 sentence pattern throughout.
-- **Conversational:** Add rhetorical questions, direct address ("You've probably noticed"), or parenthetical asides where natural. Start some sentences with "And" or "But." Replace stock AI phrases with human alternatives (e.g. "here's what matters" not "it's important to note").
-- **Personality:** Make claims instead of only hedging. Add one or two opinions or emphasis lines ("This is where it gets interesting.").
-- **Imperfections:** Introduce 1–2 tiny quirks per 1000 words (e.g. missing comma, mix "you'll" and "you will", inconsistent capitalization of same term). Do not break meaning.
-- **Formatting:** Slight variation is fine—bold some terms but not all, mix list styles. Do not add or remove sections, headings, or facts. No images, links, or placeholders.
+- **Sentence openings:** Vary openings; avoid repeating the same construction (e.g. "This [noun]...").
+- **Conversational:** Add rhetorical questions, direct address, or parenthetical asides where natural. Start some sentences with "And" or "But."
+- **Personality:** Make claims instead of only hedging. Add one or two opinions or emphasis lines.
+- **Imperfections:** Introduce 1–2 tiny quirks per 1000 words (e.g. missing comma, mix "you'll" and "you will"). Do not break meaning.
+- **Formatting:** Slight variation is fine. Do not add or remove sections, headings, or facts. No images, links, or placeholders.
 - Output only the revised HTML. No explanation, no markdown code fence, no preamble.`;
 
 /** Optional post-generation pass to reduce AI detection by varying sentence length and phrasing. */
@@ -371,7 +388,7 @@ export async function humanizeArticleContent(html: string): Promise<string> {
     messages: [
       {
         role: "user",
-        content: `Humanize this article. Keep all facts and HTML structure. Vary sentence length and word choice. Output only the revised HTML.\n\n${trimmed}`,
+        content: `Humanize this article. Preserve Google and Rank Math alignment (keywords, headings, structure, expert tone). Restructure sentences (reorder clauses, split/merge); use idioms where natural; vary between simple and more specific wording. Replace any stock AI phrases with human alternatives. Output only the revised HTML.\n\n${trimmed}`,
       },
     ],
   });
