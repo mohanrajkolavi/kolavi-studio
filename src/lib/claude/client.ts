@@ -232,7 +232,7 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
   try {
     const stream = anthropic.messages.stream({
       model: "claude-sonnet-4-5",
-      max_tokens: 65536,
+      max_tokens: 64000,
       temperature: 0.9, // Higher temp = less probable token selection = higher perplexity
       system: SYSTEM_PROMPT,
       messages: [
