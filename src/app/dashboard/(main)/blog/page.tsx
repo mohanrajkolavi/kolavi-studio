@@ -221,7 +221,6 @@ export default function BlogMakerPage() {
         content: editing.content,
         slug: editing.suggestedSlug,
         focusKeyword: keywords[0] ?? undefined,
-        authorHandledByCms: true, // WordPress adds author byline and bio when published
       });
     } catch (e) {
       return {

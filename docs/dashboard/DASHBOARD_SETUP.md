@@ -35,11 +35,6 @@ ADMIN_SECRET=your-long-random-secret-here
 # Claude API (required for blog maker)
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
-# WordPress REST API (required for blog publishing)
-WP_SITE_URL=https://your-wordpress-site.com
-WP_USERNAME=your-wordpress-username
-WP_APP_PASSWORD=xxxx xxxx xxxx xxxx xxxx xxxx
-
 # Existing variables (keep these)
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 REVALIDATE_SECRET=your-secret-here
@@ -92,8 +87,7 @@ REVALIDATE_SECRET=your-secret-here
 - Enter topic, audience, tone, keywords, length
 - Generate blog post with Claude AI
 - Edit generated content (title, meta description, outline, HTML content)
-- Publish directly to WordPress (as draft or published)
-- Automatically triggers cache revalidation
+- Copy for WordPress to paste into your CMS
 
 ### 3. Content Maintenance (`/dashboard/content-maintenance`)
 - View all blog posts from WordPress
@@ -139,12 +133,6 @@ If you're using Typeform/Tally/Google Forms, you can still use those. To sync th
 - Verify `ANTHROPIC_API_KEY` is correct
 - Check API key has sufficient credits/quota
 - Review error logs in browser console or server logs
-
-### WordPress Publishing Errors
-- Verify `WP_SITE_URL` is correct (no trailing slash)
-- Check Application Password is correct (include spaces)
-- Ensure WordPress REST API is enabled
-- Check user has permission to create posts
 
 ### Authentication Issues
 - Verify `ADMIN_SECRET` matches in `.env.local`

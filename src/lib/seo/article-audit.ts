@@ -11,6 +11,8 @@
  *
  * Audit priority: Level 1 (blockers) → Level 2 (ranking killers) → Level 3 (competitive).
  * Articles below 75% score should NOT be published — weak content damages the entire site.
+ *
+ * Note: Author byline and bio are handled by the CMS at publish time and are not audited here.
  */
 
 import { SEO } from "@/lib/constants";
@@ -25,7 +27,7 @@ export type AuditLevel = 1 | 2 | 3;
 // 2 = Ranking killer (fix before expecting traffic)
 // 3 = Competitive advantage (differentiators)
 
-export type AuditSource = "google" | "rankmath";
+export type AuditSource = "google" | "rankmath" | "editorial";
 
 export type AuditItem = {
   id: string;
@@ -46,12 +48,6 @@ export type ArticleAuditInput = {
   slug?: string;
   /** Primary focus keyword — used for title presence and stuffing detection (not density targeting) */
   focusKeyword?: string;
-  /** Author byline — required for E-E-A-T; verifiable identity is non-negotiable per Google */
-  author?: string;
-  /** URL to author bio page — recommended; credentials should be visible there */
-  authorBioUrl?: string;
-  /** When true (e.g. publishing to WordPress), byline and bio are added by the CMS — audit passes these checks */
-  authorHandledByCms?: boolean;
 };
 
 export type ArticleAuditResult = {
@@ -88,7 +84,13 @@ function getParagraphs(html: string): string[] {
   return raw.map((s) => stripHtml(s)).filter((s) => s.length > 0);
 }
 
-/** AI typography: em-dash, curly/smart quotes. Banned for AI detection (target under 30%). */
+// --- Editorial: AI content quality checks ---
+// These are editorial standards to reduce detectable AI patterns in generated content.
+// They are NOT based on Google or Rank Math documentation — Google does not penalize
+// specific vocabulary or typography. These exist because we use AI APIs to generate
+// articles and want them to read as human-written.
+
+/** AI typography: em-dash, curly/smart quotes. Editorial standard to reduce AI fingerprints. */
 // Em-dash (—) is only here; not in AI_PHRASES, to avoid double-counting with auditAiPhrases.
 const AI_TYPOGRAPHY: { char: string; label: string }[] = [
   { char: "\u2014", label: "em-dash (—)" },
@@ -113,10 +115,11 @@ function auditAiTypography(plainText: string): AuditItem[] {
         id: "ai-typography",
         severity: total >= 2 ? "fail" : "warn",
         level: total >= 2 ? 1 : 2,
-        label: "AI typography (banned)",
+        source: "editorial",
+        label: "AI typography (editorial)",
         message: `Replace: ${examples}. Use straight quotes (" ') and commas/colons instead of em-dash.`,
         value: total,
-        guideline: "Target under 30% AI detection. Em-dash and curly quotes trigger detectors.",
+        guideline: "Editorial standard: em-dash and curly quotes are common AI fingerprints. Use straight alternatives.",
       },
     ];
   }
@@ -125,29 +128,46 @@ function auditAiTypography(plainText: string): AuditItem[] {
       id: "ai-typography",
       severity: "pass",
       level: 2,
-      label: "AI typography (banned)",
+      source: "editorial",
+      label: "AI typography (editorial)",
       message: "No em-dash or curly quotes detected.",
     },
   ];
 }
 
-// AI-sounding phrases. Keep in sync with scripts/run-audit.mjs and generator BANNED list in src/lib/claude/client.ts.
-const AI_PHRASES = [
-  "delve", "delve into", "landscape", "realm", "crucial", "comprehensive", "it's important to note",
-  "it's important to note that", "in conclusion", "in today's world", "in today's digital landscape",
-  "game-changer", "leverage", "utilize", "plethora", "myriad", "robust", "seamless", "holistic",
-  "dive deep", "navigate", "unlock", "harness", "revolutionary", "cutting-edge",
-  "in this article we'll", "let's explore", "when it comes to", "certainly,", "indeed,",
-  "furthermore,", "moreover,", "it's worth noting", "in terms of", "ultimately,", "essentially,", "basically,",
-  " em-dash ", // em-dash character "—" is only in AI_TYPOGRAPHY to avoid double-counting with auditAiTypography
+/**
+ * AI-sounding phrases — split into two tiers:
+ *
+ * HIGH-CONFIDENCE: Words/phrases that are strong AI markers — rarely used by human writers
+ * in normal prose. These are weighted more heavily.
+ *
+ * COMMON: Phrases that CAN signal AI but also appear in normal instructional/how-to writing.
+ * These are only flagged when they appear in quantity.
+ *
+ * Keep in sync with scripts/run-audit.mjs and generator BANNED list in src/lib/claude/client.ts.
+ */
+const AI_PHRASES_HIGH: string[] = [
+  "delve", "delve into", "landscape", "realm", "plethora", "myriad", "holistic",
+  "game-changer", "revolutionary", "cutting-edge", "seamless", "robust",
+  "in today's world", "in today's digital landscape",
+  "it's important to note", "it's important to note that", "it's worth noting",
+  "in conclusion", "dive deep", "harness", "unlock",
+  "in this article we'll", "let's explore",
+  "unlike traditional", "over time, this builds",
+];
+
+const AI_PHRASES_COMMON: string[] = [
+  "crucial", "comprehensive", "leverage", "utilize", "navigate",
+  "when it comes to", "certainly,", "indeed,",
+  "furthermore,", "moreover,", "in terms of", "ultimately,", "essentially,", "basically,",
   "a solid ", "this guide covers", "practical steps", "helps you reach", "aligns your",
   "builds trust over time", "round out", "when it fits", "where it sounds natural",
   "ensure your", "ensure that", "consider a ", "supports the decision", "worth optimizing for",
-  "unlike traditional", "combined with", "over time, this builds", "match content to intent",
+  "combined with", "match content to intent",
   "focus on ", "start with ",
 ];
 
-/** Suggested replacements for high-impact phrases (Scaled Content Abuse). Used to make the audit alert actionable. */
+/** Suggested replacements for high-impact phrases. Used to make the audit alert actionable. */
 const AI_PHRASE_SUGGESTIONS: Record<string, string> = {
   crucial: "key, needed, or be specific",
   comprehensive: "full, complete, or describe what's covered",
@@ -172,10 +192,10 @@ const AI_PHRASE_SUGGESTIONS: Record<string, string> = {
   "unlike traditional": "say the contrast in plain language",
 };
 
-function countAiPhrases(text: string): { phrase: string; count: number }[] {
+function countPhrasesInList(text: string, phrases: string[]): { phrase: string; count: number }[] {
   const lower = text.toLowerCase();
   const found: { phrase: string; count: number }[] = [];
-  for (const phrase of AI_PHRASES) {
+  for (const phrase of phrases) {
     const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     const count = (lower.match(regex) || []).length;
     if (count > 0) found.push({ phrase: phrase.trim(), count });
@@ -183,81 +203,150 @@ function countAiPhrases(text: string): { phrase: string; count: number }[] {
   return found;
 }
 
-// --- Level 1: Publication Blockers ---
+/** Ranges [start, end) overlap iff start < otherEnd && otherStart < end */
+function rangesOverlap(
+  start: number,
+  end: number,
+  otherStart: number,
+  otherEnd: number
+): boolean {
+  return start < otherEnd && otherStart < end;
+}
 
-function auditAuthorByline(input: ArticleAuditInput): AuditItem[] {
-  const items: AuditItem[] = [];
-  if (input.authorHandledByCms) {
-    items.push({
-      id: "author-byline",
-      severity: "pass",
-      level: 1,
-      label: "Author byline",
-      message: "Author will be added by WordPress (or CMS) when published.",
-    });
-    return items;
+/**
+ * Count phrase matches with longest-first, non-overlapping strategy so that
+ * overlapping entries (e.g. "delve" and "delve into") are not double-counted.
+ * Longer phrases are matched first; any span already covered is skipped for shorter phrases.
+ */
+function countPhrasesInListNonOverlapping(
+  text: string,
+  phrases: string[]
+): { phrase: string; count: number }[] {
+  const lower = text.toLowerCase();
+  const usedRanges: { start: number; end: number }[] = [];
+  const counts = new Map<string, number>();
+
+  const sorted = [...phrases].sort((a, b) => b.length - a.length);
+  for (const phrase of sorted) {
+    const key = phrase.trim();
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp(escaped, "gi");
+    let count = 0;
+    let match: RegExpExecArray | null;
+    while ((match = regex.exec(lower)) !== null) {
+      const start = match.index;
+      const end = start + key.length;
+      const overlaps = usedRanges.some((r) =>
+        rangesOverlap(start, end, r.start, r.end)
+      );
+      if (!overlaps) {
+        count++;
+        usedRanges.push({ start, end });
+      }
+    }
+    if (count > 0) counts.set(key, (counts.get(key) ?? 0) + count);
   }
-  const authorProvided = "author" in input;
-  const hasAuthor = (input.author?.trim() ?? "").length > 0;
-  if (!hasAuthor) {
-    // Fail only when author was explicitly provided as empty; otherwise warn (add at publish)
-    const severity = authorProvided ? "fail" : "warn";
+
+  return Array.from(counts.entries(), ([phrase, count]) => ({ phrase, count }));
+}
+
+/**
+ * AI phrase detection with two-tier system:
+ * - High-confidence phrases: >2 total = fail (L1), 1-2 = warn (L2)
+ * - Common phrases: only flagged as warn (L2) when >5 total, never a blocker on their own
+ * - Combined: >5 high + common = fail (L1)
+ */
+function auditAiPhrases(plainText: string): AuditItem[] {
+  const items: AuditItem[] = [];
+  const highFound = countPhrasesInListNonOverlapping(plainText, AI_PHRASES_HIGH);
+  const commonFound = countPhrasesInList(plainText, AI_PHRASES_COMMON);
+
+  const highTotal = highFound.reduce((s, f) => s + f.count, 0);
+  const commonTotal = commonFound.reduce((s, f) => s + f.count, 0);
+  const combinedTotal = highTotal + commonTotal;
+
+  // --- High-confidence AI phrases ---
+  if (highFound.length > 0) {
+    const maxShow = 8;
+    const shown = highFound.slice(0, maxShow);
+    const parts = shown.map((f) => {
+      const suggestion = AI_PHRASE_SUGGESTIONS[f.phrase.toLowerCase()];
+      const countStr = `"${f.phrase}" (${f.count})`;
+      return suggestion ? `${countStr} → ${suggestion}` : countStr;
+    });
+    const tail = highFound.length > maxShow ? `; +${highFound.length - maxShow} more` : "";
     items.push({
-      id: "author-byline",
-      severity,
-      level: 1,
-      label: "Author byline",
-      message: authorProvided
-        ? "Author byline is required. Google: Who created it? No byline = cannot publish."
-        : "Add author byline before publishing. E-E-A-T requires verifiable author identity.",
-      guideline: "E-E-A-T: verifiable author identity is non-negotiable for blog articles.",
+      id: "ai-phrases-high",
+      severity: highTotal > 2 ? "fail" : "warn",
+      level: highTotal > 2 ? 1 : 2,
+      source: "editorial",
+      label: "AI language: strong markers",
+      message: `Replace: ${parts.join("; ")}${tail}.`,
+      value: highTotal,
+      guideline: "Editorial standard: these phrases are strong AI fingerprints. Rewrite in plain language.",
     });
   } else {
     items.push({
-      id: "author-byline",
+      id: "ai-phrases-high",
       severity: "pass",
-      level: 1,
-      label: "Author byline",
-      message: `Author "${input.author}" present.`,
+      level: 2,
+      source: "editorial",
+      label: "AI language: strong markers",
+      message: "No high-confidence AI phrases detected.",
     });
   }
-  return items;
-}
 
-function auditAuthorBio(input: ArticleAuditInput): AuditItem[] {
-  const items: AuditItem[] = [];
-  if (input.authorHandledByCms) {
-    items.push({
-      id: "author-bio",
-      severity: "pass",
-      level: 1,
-      label: "Author bio page",
-      message: "Author and bio are handled by WordPress (or CMS) when published.",
+  // --- Common phrases (only flagged in bulk) ---
+  if (commonTotal > 5) {
+    const maxShow = 6;
+    const shown = commonFound.slice(0, maxShow);
+    const parts = shown.map((f) => {
+      const suggestion = AI_PHRASE_SUGGESTIONS[f.phrase.toLowerCase()];
+      const countStr = `"${f.phrase}" (${f.count})`;
+      return suggestion ? `${countStr} → ${suggestion}` : countStr;
     });
-    return items;
-  }
-  if (!input.author?.trim()) return items; // Skip if no author
-  const hasBioUrl = (input.authorBioUrl?.trim() ?? "").length > 0;
-  if (!hasBioUrl) {
+    const tail = commonFound.length > maxShow ? `; +${commonFound.length - maxShow} more` : "";
     items.push({
-      id: "author-bio",
+      id: "ai-phrases-common",
       severity: "warn",
-      level: 1,
-      label: "Author bio page",
-      message: "Byline should link to an author bio page with credentials relevant to the topic.",
-      guideline: "Google: Who created it + credentials. For YMYL (health, etc.), bio is essential.",
+      level: 2,
+      source: "editorial",
+      label: "AI language: common phrases (in bulk)",
+      message: `${commonTotal} common AI-adjacent phrases found. Consider varying: ${parts.join("; ")}${tail}.`,
+      value: commonTotal,
+      guideline: "Editorial standard: individually fine, but clustering many together creates an AI tone.",
     });
   } else {
     items.push({
-      id: "author-bio",
+      id: "ai-phrases-common",
       severity: "pass",
-      level: 1,
-      label: "Author bio page",
-      message: "Author bio URL provided.",
+      level: 2,
+      source: "editorial",
+      label: "AI language: common phrases",
+      message: commonTotal > 0
+        ? `${commonTotal} common phrase(s) detected — within acceptable range.`
+        : "No common AI-adjacent phrases detected.",
     });
   }
+
+  // --- Combined escalation: if both tiers are heavy, escalate ---
+  if (combinedTotal > 5 && highTotal > 0 && commonTotal > 3) {
+    items.push({
+      id: "ai-phrases-combined",
+      severity: "fail",
+      level: 1,
+      source: "editorial",
+      label: "AI language: overall density",
+      message: `${combinedTotal} AI-flagged phrases total (${highTotal} strong + ${commonTotal} common). Article likely reads as AI-generated. Rewrite affected sections.`,
+      value: combinedTotal,
+      guideline: "Editorial standard: high combined count of AI markers suggests the content needs significant human editing.",
+    });
+  }
+
   return items;
 }
+
+// --- Level 1: Publication Blockers ---
 
 function auditTitle(input: ArticleAuditInput): AuditItem[] {
   const items: AuditItem[] = [];
@@ -406,40 +495,6 @@ function auditContentThinness(plainText: string): AuditItem[] {
       label: "Content depth",
       message: `Content is ${wc} words.`,
       value: wc,
-    });
-  }
-  return items;
-}
-
-function auditAiPhrases(plainText: string): AuditItem[] {
-  const items: AuditItem[] = [];
-  const found = countAiPhrases(plainText);
-  if (found.length > 0) {
-    const total = found.reduce((s, f) => s + f.count, 0);
-    const maxShow = 10;
-    const shown = found.slice(0, maxShow);
-    const parts = shown.map((f) => {
-      const suggestion = AI_PHRASE_SUGGESTIONS[f.phrase.toLowerCase()];
-      const countStr = `"${f.phrase}" (${f.count})`;
-      return suggestion ? `${countStr} → ${suggestion}` : countStr;
-    });
-    const tail = found.length > maxShow ? `; +${found.length - maxShow} more` : "";
-    items.push({
-      id: "ai-phrases",
-      severity: total > 3 ? "fail" : "warn",
-      level: total > 3 ? 1 : 2,
-      label: "AI-sounding language",
-      message: `Consider replacing: ${parts.join("; ")}${tail}.`,
-      value: total,
-      guideline: "Scaled Content Abuse: generic AI language without expert input = risk. Write like a human expert.",
-    });
-  } else {
-    items.push({
-      id: "ai-phrases",
-      severity: "pass",
-      level: 2,
-      label: "AI-sounding language",
-      message: "No flagged AI phrases detected.",
     });
   }
   return items;
@@ -840,8 +895,8 @@ function byLevelThenSeverity(a: AuditItem, b: AuditItem): number {
   const levelA = a.level ?? 2;
   const levelB = b.level ?? 2;
   if (levelA !== levelB) return levelA - levelB;
-  // Google before Rank Math when same level
-  const sourceOrder: Record<AuditSource, number> = { google: 0, rankmath: 1 };
+  // Google before Rank Math before editorial when same level
+  const sourceOrder: Record<AuditSource, number> = { google: 0, rankmath: 1, editorial: 2 };
   const sa = a.source ?? "google";
   const sb = b.source ?? "google";
   if (sa !== sb) return sourceOrder[sa] - sourceOrder[sb];
@@ -851,21 +906,22 @@ function byLevelThenSeverity(a: AuditItem, b: AuditItem): number {
 
 /**
  * Run full article audit per Google Search Central priority stack.
+ *
+ * Author byline and bio are NOT audited — they are added by the CMS at publish time.
  */
 export function auditArticle(input: ArticleAuditInput): ArticleAuditResult {
   const plainContent = stripHtml(input.content);
 
   const all: AuditItem[] = [
     // Level 1 — Publication Blockers (Google)
-    ...auditAuthorByline(input),
-    ...auditAuthorBio(input),
     ...auditTitle(input),
     ...auditMetaDescription(input.metaDescription),
     ...auditContentThinness(plainContent),
-    ...auditAiPhrases(plainContent),
-    ...auditAiTypography(plainContent),
     ...auditKeywordStuffing(plainContent, input.focusKeyword),
     ...auditHeadingStructure(input.content),
+    // Level 1/2 — Editorial: AI content quality (not Google policy)
+    ...auditAiPhrases(plainContent),
+    ...auditAiTypography(plainContent),
     // Level 2 — Ranking Killers (Google) — images/links skipped (added in WordPress)
     ...auditParagraphLength(input.content),
     ...auditSlug(input.slug),
@@ -903,7 +959,7 @@ export function auditArticle(input: ArticleAuditInput): ArticleAuditResult {
  */
 export function formatAuditReport(result: ArticleAuditResult): string {
   const lines: string[] = [
-    "--- Article audit (Google Search Central + Rank Math) ---",
+    "--- Article audit (Google Search Central + Rank Math + Editorial) ---",
     `Score: ${result.score}% (${result.summary.pass} pass, ${result.summary.warn} warn, ${result.summary.fail} fail)`,
     result.publishable ? "Publishable: Yes" : `Publishable: No (min ${MIN_PUBLISH_SCORE}% required)`,
     "",
@@ -911,7 +967,7 @@ export function formatAuditReport(result: ArticleAuditResult): string {
   for (const item of result.items) {
     const icon = item.severity === "pass" ? "✓" : item.severity === "warn" ? "⚠" : "✗";
     const lvl = item.level ? `[L${item.level}] ` : "";
-    const src = item.source === "rankmath" ? " [Rank Math]" : "";
+    const src = item.source === "rankmath" ? " [Rank Math]" : item.source === "editorial" ? " [Editorial]" : "";
     lines.push(`[${icon}] ${lvl}${item.label}${src}: ${item.message}`);
     if (item.value !== undefined) lines.push(`    value: ${item.value}${item.threshold !== undefined ? ` (threshold: ${item.threshold})` : ""}`);
     if (item.guideline) lines.push(`    guideline: ${item.guideline}`);

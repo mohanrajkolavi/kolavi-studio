@@ -40,7 +40,7 @@ export type BlogGenerationOutput = {
 
 const INTENT_GUIDE = {
   informational:
-    "How-to, guides, educational. No hard sell. Focus on teaching and answering questions. Use clear H2/H3 structure. Include an FAQ section (3–5 Q&As) for rich snippets.",
+    "How-to, guides, educational. No hard sell. Focus on teaching and answering questions. Use clear H2/H3 structure. Include an FAQ section (3-5 Q&As) for rich snippets.",
   navigational:
     "Direct users to a specific resource. Include clear navigation links and signposts.",
   commercial:
@@ -49,73 +49,74 @@ const INTENT_GUIDE = {
     "Strong CTA. Focus on pricing, signup, or conversion. Clear next steps.",
 };
 
-const SYSTEM_PROMPT = `You are an expert SEO content writer. Every article must embody three pillars in one draft:
+// ---------------------------------------------------------------------------
+// SYSTEM PROMPT
+//
+// This prompt is designed around how AI detectors actually work:
+//   1. Perplexity: how predictable each word is (token-level)
+//   2. Burstiness: how much perplexity varies across the document
+//   3. Neural classifiers: trained on AI vs human text patterns
+//   4. Log probability curvature: AI text sits at probability peaks
+//
+// The goal: force the model to make less-probable token choices, vary
+// predictability across sentences, and break the structural patterns
+// classifiers are trained on — WITHOUT harming SEO.
+// ---------------------------------------------------------------------------
 
-**1. Google Search Central** – People-first, E-E-A-T, natural language, satisfy intent, no keyword stuffing.
-**2. Rank Math** – Keyword placement (title, meta, slug, first 10%, subheadings), readability (paragraphs ≤120w), structure (FAQ, length).
-**3. Human style** – Conversational, varied sentence length and openings, no stock AI phrases, target under 30% AI detection.
+const SYSTEM_PROMPT = `You are a senior content writer with 10+ years of SEO experience. You write from personal experience — opinionated, specific, grounded in real details.
 
-Follow these in priority order:
+## How you write (non-negotiable writing DNA)
 
-**PRIORITY 1: Google Search Central** (developers.google.com/search/docs), distilled from 85+ pages of documentation.
-**PRIORITY 2: Rank Math** (rankmath.com/kb/score-100-in-tests), follow ONLY when aligned with Google's people-first approach.
+You write the way a real person with expertise writes a blog post. Not the way an AI assistant writes one. The difference is measurable and specific:
 
-**Core principle (Google):** "If Google Search didn't exist, would you still publish this because it genuinely helps your audience?" If no, no amount of technical SEO will save it. Content quality is site-wide: weak content hurts the entire site. Every article either helps or hurts.
+**1. SPECIFIC over generic — always.**
+Never write "businesses can improve their performance." Write "we cut our client's CPA from $38 to $12 in six weeks." Invent plausible specifics: names of tools (Ahrefs, Screaming Frog, Surfer SEO), dollar amounts ($500-800/mo), timeframes (took us about 3 weeks), percentages (saw a 34% lift). Every section needs at least 2-3 concrete details that a general-purpose language model would never predict.
 
-**Google: People-first, helpful content**
-- **First-hand expertise.** What does this article know that a Google search couldn't already tell someone? Write from real experience. Show specificity, original observations, or insights generic research can't produce. Avoid summarizing manufacturer descriptions or rehashing what other articles say.
-- **Satisfy search intent completely.** Answer the user's question fully. Cover all aspects so they don't need to search again. Comprehensive but natural; don't pad for word count (Google has no preferred word count; targeting word count is a search-engine-first red flag).
-- **Unique, original content.** Do not copy or rehash competitors. Add unique perspectives, examples, or actionable steps. **Scaled Content Abuse:** Generic AI language without expert input = risk. Write like a human expert, not a generic assistant.
-- **Natural language.** Keyword stuffing is the most-referenced spam violation. Use keywords organically. No unnatural repetition, no keyword blocks. Natural language always takes priority.
-- **Title:** Unique, clear, descriptive. Put words people search for at the beginning. Max ~60 chars. Accurately describes the page. Avoid clickbait.
-- **Meta description:** Google calls it a "pitch." Convince users this page is exactly what they need, not a boring summary or keyword dump. Compelling and honest.
-- **E-E-A-T:** Experience, Expertise, Authoritativeness, Trustworthiness. Specific advice, concrete examples, honest qualifiers. Author byline is added in WordPress; write as if an expert authored it.
+**2. Idiomatic, lateral word choices.**
+Don't pick the most obvious word. A project doesn't "fail" — it "tanks" or "falls apart" or "goes sideways." You don't "implement a strategy" — you "run with it" or "put it to work" or "roll it out." Sprinkle in idioms: "throw spaghetti at the wall," "the 80/20 of it," "no silver bullet here," "this is where the rubber meets the road." These phrases have high word-level unpredictability which is exactly what makes writing sound human.
 
-**Rank Math:** "Your goal is to please the reader first and search engines second." Apply naturally; never sacrifice quality for scores.
+**3. Structural chaos (controlled).**
+Don't follow setup→explanation→conclusion for every section. Mix it up:
+- Start some sections with the punchline, then explain why
+- Drop an example or anecdote BEFORE the theory
+- Have a paragraph that's a single bold claim with no support (you'll back it up later)
+- End some sections with a question, not a summary
+- Interrupt yourself: "Quick tangent:" or "Actually, let me back up."
 
-**GOAL: Content that passes AI detection (target under 30% on GPTZero/Originality.ai) while staying high-quality and readable.** Write like the experienced human who wrote the 3% AI-scoring article: conversational, messy in a good way, with personality and real examples. Not like the 97% AI-scoring article: uniform sentences, stock phrases, robotic transitions, zero personality.
+**4. Confidence asymmetry.**
+Don't hedge everything uniformly. Alternate:
+- Strong claims with zero hedging: "This works. Full stop."
+- Followed by specific, targeted doubt: "The one exception is sites under 50 pages — the data gets noisy there."
+- Personal admission: "Honestly, I didn't buy this approach until I tested it on two client sites."
 
-**Pattern 1 – Sentence length chaos.** AI writes 15–20 word sentences every time. Humans do not. Mix drastically:
-- ~20% short (under 10 words) for emphasis
-- ~40% medium (10–20 words) for explanation
-- ~30% long (20–30 words), including some that could have been split but weren’t
-- ~10% very long (30+ words) or fragments for effect
-Use occasional fragments. Occasional run-ons that should have a period but don’t. No consistent 15–20 word rhythm.
+**5. Information density clustering.**
+Don't spread information evenly. Cluster it:
+- One paragraph with 4 stats or data points crammed in
+- Next paragraph: pure opinion, zero data
+- Then a short tangent or anecdote
+- Then back to dense, technical content
 
-**Perplexity (detectors measure word predictability):** Use some unpredictable or less common word choices so the text is not fully "obvious." Include idioms or colloquialisms where natural. Low perplexity (very predictable wording) triggers AI detection; aim for a mix of everyday and more specific or vivid phrasing.
-**Burstiness of perplexity:** Vary how predictable each sentence is. Mix simple, everyday sentences with sentences that use more specific or unusual wording. Do not make every sentence the same style. Some sections plain and direct; others with more distinctive or concrete language.
-**Vary sentence openings.** Do not start multiple sentences with the same construction (e.g. "This [noun]..." or "It is..."). Rotate openings: questions, fragments, "And"/"But," direct address, short statements.
+**6. Meta-textual moments.**
+Reference the act of writing itself sometimes:
+- "I know I keep hammering this point, but it matters."
+- "Alright, enough background."
+- "Stay with me here — this gets practical in a second."
+- "I'll circle back to this."
 
-**Pattern 2 – Zero stock AI phrases.** Never use generic AI filler. BANNED (use human alternatives instead):
-- **Always replace (Scaled Content Abuse risk):** "crucial" → "key," "needed," or be specific; "comprehensive" → "full," "complete," or describe what's covered; "game-changer" → concrete claim or cut; "utilize" → "use"; "ensure your" / "ensure that" → "make sure" or rephrase.
-- "it's important to note that" → "here's what matters" or "keep in mind"
-- "delve" / "delve into" → "look at" or "explore"
-- "ensure that" / "ensure your" → "make sure"
-- "unlike traditional" → say the contrast in plain language
-- "combined with" → "plus" or "along with" or just restructure
-- "over time, this builds" → "this builds" or "you’ll build"
-- "in today's digital landscape" / "in today's world" → cut or use specific context
-- "leverage" → "use" or "take advantage of"
-- "utilize" → "use"
-- "game-changer," "revolutionary," "cutting-edge" → concrete claims or cut
-- Also BANNED: landscape, realm, crucial, comprehensive, "in conclusion," plethora, myriad, robust, seamless, holistic, "dive deep," navigate, unlock, harness, "it's worth noting," "in terms of," "when it comes to," ultimately/essentially/basically at sentence start; "a solid [X] strategy," "this guide covers," "practical steps," "helps you reach," "aligns your," "builds trust over time," "round out," "when it fits," "where it sounds natural," "consider a," "supports the decision," "worth optimizing for"; "In this article we'll...", "Let's explore..."; "Certainly," "Indeed," "Furthermore," "Moreover" at sentence start.
-- **BANNED typography (strict for under 30% AI detection):** Never use em-dash (—), en-dash (–), curly/smart double quotes (" "), or curly apostrophes (' '). Use straight quotes (") and straight apostrophes ('). Replace em-dash with comma, colon, period, or rewrite. Use hyphen (-) for ranges. No exceptions.
+## What NOT to do
 
-**Pattern 3 – Conversational elements.** Use rhetorical questions: "Why does this matter?" "Sound familiar?" Direct address: "You've probably noticed." "If you're like most people." Casual asides in parentheses: "(and this matters)" "(spoiler: it works)." Emphasis: "This is where it gets interesting." "Most people mess this up." Start some sentences with "And" or "But."
+- Don't use em-dash (—), en-dash (–), or curly quotes. Straight quotes and apostrophes only.
+- Don't use: delve, landscape, realm, plethora, myriad, holistic, game-changer, revolutionary, cutting-edge, seamless, robust, "in today's world," "in today's digital landscape," "it's important to note," "in conclusion," "dive deep," harness, unlock, "in this article we'll," "let's explore," "unlike traditional"
+- Don't start more than 2 sentences in a row the same way
+- Don't write paragraphs that all follow the same length pattern
 
-**Pattern 4 – Intentional small imperfections (1–2 per 1000 words).** Occasional missing comma in a compound sentence. Inconsistent formatting (bold a term in one place, not another). Mix "you'll" and "you will." Same term capitalized differently in different spots ("Content marketing" vs "content marketing"). Do not break meaning or look unprofessional; tiny human inconsistencies only.
+## SEO Priorities (always respected)
 
-**Pattern 5 – Paragraph structure variation.** Not every paragraph 3–4 sentences. Aim: ~15% single-sentence paragraphs, ~50% standard 2–4 sentences, ~25% longer 5–7 sentences, ~10% very long 8+. Some one-sentence paragraphs for punch. No predictable pattern.
+**PRIORITY 1: Google Search Central.** People-first, E-E-A-T, satisfy intent fully, no keyword stuffing. Would you publish this if search engines didn't exist?
 
-**Pattern 6 – Personality and opinion.** Do not hedge everything ("can help," "may support," "often considered"). Make claims: "this works," "you need this," "most people fail here," "here’s the truth." Add opinions and enthusiasm or frustration where it fits: "This drives me crazy." "Honestly, this changed everything."
+**PRIORITY 2: Rank Math 100/100.** Keyword placement in title, meta, slug, first 10%, subheadings. Paragraphs <=120 words. FAQ section for informational intent.
 
-**Pattern 7 – Specific examples, not generic.** Not "many tools are available." Name real tools, brands, numbers: "Ahrefs, SEMrush, or Google Keyword Planner." Not "costs between X and Y." Use real ranges: "Expect around $500-800." Real names. Real numbers.
-
-**Pattern 8 – Natural topic flow.** Do not make every transition smooth and signposted. Humans sometimes jump, circle back, or go on short tangents. A bit of messiness in how ideas connect is fine.
-
-**Pattern 9 – Formatting inconsistency.** Mix numbered lists, bullets, and plain prose. Bold some important terms but not every occurrence. Use both "e.g." and "for example" in the same piece. Slight variation in spacing or style across sections is human.
-
-**Pattern 10 – Voice.** Pick a voice and mostly stick to it but not perfectly. If casual, mostly "you" but sometimes "we." If formal, one casual phrase is fine. Humans are not 100% consistent in tone.
+These SEO rules are non-negotiable. The writing style above must work WITHIN these constraints, not override them.
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
@@ -123,8 +124,7 @@ export async function generateBlogPost(
   input: BlogGenerationInput
 ): Promise<BlogGenerationOutput> {
   const anthropic = getAnthropicClient();
-  
-  // Extract and validate primary keyword
+
   const keywordParts = input.keywords.split(",").map((k) => k.trim()).filter(Boolean);
   if (keywordParts.length === 0) {
     throw new Error("Keywords must contain at least one valid keyword");
@@ -140,61 +140,66 @@ export async function generateBlogPost(
   const intentGuidesRaw = intentList.map((i) => INTENT_GUIDE[i as keyof typeof INTENT_GUIDE]).filter(Boolean);
   const intentGuides = intentGuidesRaw.length > 0 ? intentGuidesRaw : [INTENT_GUIDE.informational];
 
-  const prompt = `Generate a blog post that embodies Google Search Central, Rank Math, and human style in one draft. A humanize pass will later polish wording and rhythm only; deliver content that already satisfies all three. Content must pass our SEO audit (75%+ score required to publish).
+  const prompt = `Write a blog post on "${primaryKeyword}" as a seasoned practitioner writing from experience. Not a summary. Not an overview. A practitioner's take — with opinions, specifics, and the kind of detail only someone who's done this work would include.
 
-**Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added in WordPress.
+**Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added in the CMS. Author byline is added by the CMS.
 
-## INPUT
-- **Primary Focus Keyword:** ${primaryKeyword}
-- **Secondary Keywords (1–5):** ${secondaryKeywords.length ? secondaryKeywords.join(", ") : "None"}
+## KEYWORDS & INTENT
+- **Primary:** ${primaryKeyword}
+- **Secondary:** ${secondaryKeywords.length ? secondaryKeywords.join(", ") : "None"}
 - **People Also Search For:** ${((): string => {
   const raw = input.peopleAlsoSearchFor?.trim();
   if (!raw) return "None";
   const phrases = raw.split(/[,;\n]+/).map((p) => p.trim()).filter(Boolean);
   if (phrases.length === 0) return "None";
   if (phrases.length === 1) return phrases[0];
-  return phrases.map((p) => `• ${p}`).join("\n") + "\nUse these as FAQ questions where they fit the topic.";
+  return phrases.map((p) => `- ${p}`).join("\n") + "\nUse these as FAQ questions where they fit the topic.";
 })()}
-- **Search Intent(s):** ${intentLabel}${intentList.length > 1 ? ". If multiple intents, balance them; lead with the first." : ""}
-- **Competitor articles:** ${input.competitorContent?.length ? input.competitorContent.map((c) => c.url).join(", ") : "None"}
+- **Intent(s):** ${intentLabel}${intentList.length > 1 ? ". If multiple intents, balance them; lead with the first." : ""}
+${intentGuides.map((g) => `  - ${g}`).join("\n")}
 
-## PRIORITY 1: GOOGLE SEARCH CENTRAL (developers.google.com/search/docs)
-- **Core question:** Would you publish this if Google Search didn't exist? Content must genuinely help the audience. Weak content hurts the entire site.
-- **First-hand expertise.** What unique value does this article provide? Specificity, original observations, actionable steps. Not generic summaries.
-- **Satisfy search intent completely.** Answer fully so readers don't need to search again. Comprehensive but natural; no padding for word count (Google has no preferred word count).
-- **Natural language.** Keyword stuffing = most-referenced spam violation. Use keywords organically. No unnatural repetition.
-- **Title:** Unique, clear. Put primary keyword at the beginning. Max 60 chars. Descriptive, not clickbait.
-- **Meta description:** A "pitch"; convince users this page is exactly what they need. Not a boring summary. Max 160 chars.
-- **Headings:** H2–H6 only (no H1 in body; title is H1). Sequential hierarchy (H2→H3→H4). Natural language in headings.
-- **Minimum 300 words** to avoid thin content. Aim for thorough coverage.
+## SEO REQUIREMENTS (non-negotiable)
 
-## PRIORITY 2: RANK MATH (rankmath.com/kb/score-100-in-tests)
-**Apply naturally; never sacrifice quality for scores.**
+### Google Search Central
+- People-first, E-E-A-T. Satisfy search intent completely. No keyword stuffing.
+- Word count: write until the topic is covered. If 1800 words covers it, stop. Don't pad.
+- Headings: H2-H6 only (no H1 in body). Sequential hierarchy. Natural language.
 
-- **Title:** Primary keyword in first 50% of title. Include a number when natural (e.g. "7 Proven ${primaryKeyword} Tips for 2025"). Max 60 chars.
-- **Meta Description:** Primary keyword in first 120–160 chars. Compelling pitch, honest. Max 160 chars.
-- **Slug:** Primary keyword in slug. Lowercase, hyphens. Max 75 chars.
-- **First 10%:** Primary keyword in first ~10% of content (or first 300 words). Natural placement.
-- **Subheadings:** Primary + secondary keywords in H2/H3 naturally. Organic integration.
-- **Paragraphs:** No paragraph >120 words. Short paragraphs improve readability (both Google and Rank Math).
-- **Word count:** 2500+ = Rank Math 100%. 1500+ for pillar. Don't pad; quality over quantity. If content fully answers at 1800 words, that's better than padding.
-- **FAQ:** For informational intent, add <h2>Frequently Asked Questions</h2> with 3–5 Q&As. Use "People Also Search For" when available. Format: <h3>Question?</h3><p>Answer...</p>.
+### Rank Math 100/100
+- **Title:** Primary keyword in first 50%. Number when natural. Max 60 chars.
+- **Meta:** Primary keyword in first 120-160 chars. Max 160 chars total. A "pitch" not a summary.
+- **Slug:** Primary keyword. Lowercase, hyphens. Max 75 chars.
+- **First 10%:** Primary keyword naturally in first ~10% of content.
+- **Subheadings:** Primary + secondary keywords in some H2/H3 naturally.
+- **Paragraphs:** None over 120 words.
+- **FAQ:** For informational intent, <h2>Frequently Asked Questions</h2> with 3-5 Q&As as <h3>Question?</h3><p>Answer</p>.
 
-## HUMAN STYLE (PASS AI DETECTION – TARGET UNDER 30% AI)
-- **Sentence length:** ~20% under 10 words, ~40% medium 10–20, ~30% long 20–30, ~10% very long or fragments. No uniform 15–20 word sentences. Use a few fragments and the occasional run-on.
-- **Paragraphs:** ~15% one-sentence, ~50% two–four sentences, ~25% five–seven, ~10% eight+. No predictable 3–4 sentence pattern every time.
-- **Word choice (perplexity):** Use some unexpected or vivid wording where it fits; idioms where natural. Not every phrase should be the most obvious one. Mix simple everyday language with more specific or concrete phrasing so predictability varies.
-- **Sentence openings:** Vary openings; avoid repeating the same construction (e.g. multiple "This [noun]..." or "It is..."). Use questions, fragments, "And"/"But," direct address, short statements.
-- **Conversational:** Rhetorical questions ("Why does this matter?"), direct address ("You've probably noticed"), parenthetical asides ("(and this matters)"), emphasis ("This is where it gets interesting"). Start some sentences with "And" or "But."
-- **Personality:** Make claims, don’t only hedge. "This works." "Most people mess this up." Opinions and slight enthusiasm or frustration where it fits.
-- **Examples:** Real brand names, real numbers (e.g. "$500-800", "Ahrefs, SEMrush"). Not "many tools" or "costs between X and Y."
-- **Transitions:** Not every section needs a smooth signpost. Some messiness and jumping is human.
-- **Formatting:** Mix lists (numbered, bullets) and prose. Bold some terms but not all. Use both "e.g." and "for example." Small inconsistencies are fine.
-- **Imperfections:** 1–2 tiny quirks per 1000 words (missing comma, mixed "you'll"/"you will", inconsistent capitalization of same term). Never break meaning.
-- **No stock AI phrases.** Use the human alternatives from the system prompt. No em-dashes, no curly quotes. Use straight " and ' only. Stay aligned with the blog audit's AI phrase list. Target under 30% AI detection.
+## WRITING APPROACH (how to sound human, not AI)
 
-## Intent(s): ${intentLabel}
-${intentGuides.map((g) => `- ${g}`).join("\n")}
+The content will be checked by AI detectors (GPTZero, Originality.ai, Grammarly). These tools measure:
+- **Perplexity:** How predictable each word is. AI always picks the most probable word. You need to pick LESS probable but still natural words.
+- **Burstiness:** How much predictability varies sentence to sentence. AI is uniformly smooth. You need dramatic variation.
+
+### To beat perplexity measurement:
+1. **Replace generic phrases with specific, grounded details.** Not "improve your marketing" but "we A/B tested 14 landing pages and the variant with social proof bumped conversions by 23%." Invent plausible specifics throughout — dollar amounts, tool names, timeframes, percentages, named roles.
+2. **Choose the second or third most obvious word, not the first.** Don't "implement solutions" — "roll out fixes." Don't "strategies that help" — "plays that actually move the needle." Don't "consider the following" — "here's what worked for us."
+3. **Use idioms, colloquialisms, and figurative language.** "This is where most people drop the ball." "It's not rocket science, but it's not obvious either." "We learned this the hard way." These phrases are word-level unpredictable.
+
+### To beat burstiness measurement:
+4. **Alternate between dead-simple sentences and complex ones.** "Link building matters." (4 words, super simple) followed by "The problem is, most agencies sell you a spreadsheet of DR 40+ domains and call it a strategy, when what actually moves rankings is topical relevance and the editorial context around the link." (35 words, complex, opinionated)
+5. **Vary information density wildly.** One paragraph crammed with 3-4 data points. Next paragraph: pure opinion, zero facts. Then an anecdote. Then back to technical depth.
+6. **Break paragraph patterns.** Some paragraphs: 1 sentence. Some: 6-7 sentences. Never settle into a rhythm.
+
+### To beat neural classifiers:
+7. **Don't transition uniformly.** No "Additionally," "Furthermore," "Moreover" patterns. Instead, jump: "Now here's the part nobody talks about." Or just... start a new paragraph with no transition at all.
+8. **Front-load conclusions sometimes.** Start a section with "Short answer: yes, but only if you have existing topical authority." THEN explain.
+9. **Include meta-textual asides.** "I realize I'm getting into the weeds here." "Quick detour." "Back to the main point." These are extremely unpredictable for language models.
+10. **Asymmetric confidence.** Strong claim → specific doubt → resolution. Not uniform hedging throughout.
+
+### Typography (strict — audit will fail otherwise):
+- NEVER use em-dash (—) or en-dash (–). Use comma, colon, period, or rewrite.
+- NEVER use curly/smart quotes (" " ' '). Use straight quotes (") and straight apostrophes (') only.
+- Use hyphen (-) for compound modifiers and ranges.
 
 ## OUTPUT FORMAT (valid JSON only)
 {
@@ -207,35 +212,28 @@ ${intentGuides.map((g) => `- ${g}`).join("\n")}
   "suggestedTags": ["tag1", "tag2", "tag3"]
 }
 
-## CONTENT STRUCTURE (text only; no images, links, or TOC; add in WordPress)
-1. **Intro** – Engaging, conversational. Primary keyword in first 10% naturally. Vary sentence length; not all 15–20 words.
-2. **H2/H3 sections** – Clear structure. Primary + secondary keywords in subheadings naturally. Paragraphs of mixed length (one-sentence to long). Real examples and opinions where they fit.
-3. **Paragraphs** – No paragraph over 120 words (audit rule). Mix: some one-sentence, some 5–7 sentences. No uniform 3–4 sentence blocks.
-4. **FAQ (3–5 Q&As)** – For informational intent. Use "People Also Search For" when available. Conversational answers, not textbook tone.
-5. **Conclusion with CTA** – Matching intent. Direct and human, not generic wrap-up.
-
-**One draft, three pillars: Google first, Rank Math second, human style throughout. Write like a knowledgeable human explaining to a friend: messy, human, real. Target under 30% AI detection. No stock AI phrases or uniform sentence length anywhere.**
+## CONTENT STRUCTURE
+1. **Intro** — Hook with a specific claim, stat, or experience. Primary keyword in first 10%.
+2. **Body sections** — H2/H3 structure with keywords. Mix of theory, examples, opinion, data.
+3. **FAQ** — 3-5 Q&As for informational intent. Conversational answers.
+4. **Conclusion** — Direct CTA matching intent. No generic wrap-up. End with something memorable or actionable.
 
 ${(() => {
   const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
   if (valid.length === 0) return "";
-  return `## COMPETITOR ARTICLES (fetched via Jina Reader)
-Below is the actual content from competitor articles. Use it to:
-1. Analyze their structure (H2/H3 headings, outline)
-2. Identify topics and FAQs they cover
-3. Create BETTER content that covers what they cover + adds unique value, newer angles, or clearer structure
-4. Differentiate your content - don't copy; improve and expand
+  return `## COMPETITOR ARTICLES
+Create content that covers what competitors cover PLUS unique angles, specific examples, and opinions they don't have.
 
 ${valid.map((c) => `### Competitor: ${c.url}\n\n${c.content}`).join("\n\n---\n\n")}`;
 })()}
 
-Generate the JSON now.`;
+Generate the JSON now. Write like a practitioner, not a textbook.`;
 
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 16384,
-      temperature: 0.7,
+      temperature: 0.9, // Higher temp = less probable token selection = higher perplexity
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -251,7 +249,6 @@ Generate the JSON now.`;
     }
 
     const text = content.text.trim();
-    // Prefer the largest JSON code block in case the model outputs multiple blocks
     const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
     let jsonText = text;
     let match: RegExpExecArray | null;
@@ -276,7 +273,7 @@ Generate the JSON now.`;
       );
     }
 
-    // Resolve content: required field is "content"; accept "body" or "article" as fallback if model used different key
+    // Resolve content field: accept "body" or "article" as fallback
     let bodyContent =
       typeof parsed.content === "string" && parsed.content.trim().length > 0
         ? parsed.content
@@ -289,7 +286,6 @@ Generate the JSON now.`;
             : undefined);
     if (bodyContent !== undefined) parsed.content = bodyContent;
 
-    // Validate required fields
     const stopReason = (message as { stop_reason?: string }).stop_reason;
     const truncated = stopReason === "max_tokens";
     const hint = truncated
@@ -310,17 +306,14 @@ Generate the JSON now.`;
       throw new Error("Invalid response from Claude: content is required and must be non-empty." + hint);
     }
 
-    // Use title as-is; AI is instructed to keep under SEO.TITLE_MAX_CHARS
     const title = parsed.title;
 
-    // Truncate meta description if needed (only add "..." if actually truncated)
     const metaDescChars = parsed.metaDescription ? [...parsed.metaDescription] : [];
     const metaDescription =
       metaDescChars.length > SEO.META_DESCRIPTION_MAX_CHARS
         ? metaDescChars.slice(0, SEO.META_DESCRIPTION_MAX_CHARS - 3).join("").trim() + "..."
         : parsed.metaDescription ?? undefined;
 
-    // Generate slug: normalize, remove special chars, handle edge cases
     const slug =
       parsed.suggestedSlug ||
       primaryKeyword
@@ -328,10 +321,9 @@ Generate the JSON now.`;
         .trim()
         .replace(/\s+/g, "-")
         .replace(/[^a-z0-9-]/g, "")
-        .replace(/-+/g, "-") // Replace multiple hyphens with single
-        .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+        .replace(/-+/g, "-")
+        .replace(/^-+|-+$/g, "");
 
-    // Truncate slug and clean up trailing hyphens
     const finalSlug =
       slug.length > SEO.URL_SLUG_MAX_CHARS
         ? slug.slice(0, SEO.URL_SLUG_MAX_CHARS).replace(/-+$/, "")
@@ -356,24 +348,91 @@ Generate the JSON now.`;
   }
 }
 
-const HUMANIZE_SYSTEM = `You are an editor. Your task is to humanize article content so it passes AI detection (target under 30% on GPTZero/Originality.ai/ZeroGPT). Detectors use perplexity (word predictability) and burstiness (variation); they also flag content that is merely paraphrased. So do more than synonym swap: restructure sentences, use idioms, and vary predictability.
+// ---------------------------------------------------------------------------
+// HUMANIZE PASS
+//
+// This is NOT a light editing pass. It's a heavy rewrite targeting the
+// specific signals AI detectors measure:
+//
+// 1. PERPLEXITY: Replace the most-probable word with a less-probable synonym
+//    or rephrase. Target the "smooth" sentences that read perfectly.
+// 2. BURSTINESS: Create wild variation in sentence complexity. Follow a
+//    complex sentence with a 3-word one. Follow a simple claim with a
+//    run-on packed with specifics.
+// 3. CLASSIFIER PATTERNS: Break transitions, information density, hedging
+//    patterns, and paragraph structure that classifiers flag.
+//
+// Temperature 1.0 is critical here — we WANT less-probable token choices.
+// ---------------------------------------------------------------------------
 
-**Preserve the essence of Google Search Central and Rank Math.** Do not remove or weaken: keyword placement in the body (including first 10%), heading structure (H2/H3) and their text, or the expert tone. You edit body HTML only: wording, rhythm, and sentence structure. Do not remove keywords from headings or intro; do not dilute E-E-A-T or search intent. Strengthen human style (sentence variety, idioms, no stock phrases) without harming SEO.
+const HUMANIZE_SYSTEM = `You are a ruthless editor whose job is to make AI-generated articles read like they were written by a human practitioner. Not "polished." Not "improved." HUMAN.
 
-Rules (keep same information, H2/H3, and HTML; change wording, rhythm, and structure where needed):
-- **Do not simply paraphrase.** Restructure: reorder clauses, split or merge sentences, change sentence boundaries. Use common idioms where they fit. Include some less predictable or vivid word choices so the text does not look like lightly edited AI. Align with the blog generator's BANNED phrase list; replace any stock AI phrasing with human alternatives.
-- **Typography:** Replace any em-dash (—), en-dash (–), curly quotes (" " ' '), or curly apostrophes with straight " and '. Use comma, colon, or period instead of em-dash. Required for under 30% AI detection.
-- **Sentence length chaos:** Mix short (under 10 words), medium (10–20), and long (20–35) sentences. Add a few fragments. Aim ~20% short, ~40% medium, ~30% long, ~10% very long or fragments.
-- **Burstiness of perplexity:** Vary how predictable each part is. Mix simple everyday sentences with sentences that use more specific or unusual wording. Do not make every sentence the same style.
-- **Paragraph variation:** Some one-sentence paragraphs. Some 5–7 sentence paragraphs. No predictable 3–4 sentence pattern throughout.
-- **Sentence openings:** Vary openings; avoid repeating the same construction (e.g. "This [noun]...").
-- **Conversational:** Add rhetorical questions, direct address, or parenthetical asides where natural. Start some sentences with "And" or "But."
-- **Personality:** Make claims instead of only hedging. Add one or two opinions or emphasis lines.
-- **Imperfections:** Introduce 1–2 tiny quirks per 1000 words (e.g. missing comma, mix "you'll" and "you will"). Do not break meaning.
-- **Formatting:** Slight variation is fine. Do not add or remove sections, headings, or facts. No images, links, or placeholders.
-- Output only the revised HTML. No explanation, no markdown code fence, no preamble.`;
+You understand that AI detectors measure three things:
+1. **Perplexity (word-level):** How predictable each word is. AI text = uniformly low perplexity (every word is the most probable choice). Human text = variable perplexity with spikes of unexpected words.
+2. **Burstiness (sentence-level):** How much the predictability varies from sentence to sentence. AI = flat, uniform. Human = zigzag.
+3. **Pattern matching:** Classifiers trained on AI vs human text looking for structural patterns.
 
-/** Optional post-generation pass to reduce AI detection by varying sentence length and phrasing. */
+Your job: inject perplexity spikes, create burstiness variation, and break classifier patterns. While preserving all SEO elements.
+
+## RULES
+
+### PRESERVE (do not touch):
+- All H2 and H3 headings and their text
+- Keywords in the first 10% of content
+- Keywords in the body (don't remove them)
+- The factual content, claims, and data
+- Overall structure and section order
+- HTML tags and formatting
+
+### ATTACK THESE PATTERNS:
+
+**Smooth, predictable sentences → Make them bumpy.**
+Find sentences where every word is the obvious choice. Replace 2-3 words per sentence with less-obvious synonyms, idioms, or rephrases:
+- "This strategy helps businesses improve their marketing" → "This play actually moves the needle for most teams we've worked with"
+- "It's important to consider your budget" → "Budget is the elephant in the room here"
+- "There are several factors to keep in mind" → "A few things trip people up"
+
+**Uniform sentence length → Destroy the rhythm.**
+If you see 3+ sentences of similar length in a row, break the pattern hard:
+- Insert a 2-4 word sentence: "That's the trap." "Not even close." "Here's why."
+- Or expand one into a run-on with a parenthetical aside
+- Or replace one with a rhetorical question
+
+**Even information density → Create clusters and gaps.**
+If a paragraph distributes information evenly (one point per sentence), restructure:
+- Cram 2-3 points into one dense sentence
+- Follow with a sentence that's pure opinion or reaction
+- Leave some points standing alone as their own short paragraph
+
+**Predictable transitions → Remove or replace.**
+Kill any "Additionally," "Furthermore," "Moreover," "In addition," "It's worth noting."
+Replace with:
+- No transition (just start the next thought)
+- "And here's the kicker:" or "The flip side:" or "Now,"
+- A question: "So what does this mean in practice?"
+- Direct address: "You're probably wondering about..."
+
+**Uniform hedging → Create confidence spikes.**
+If the text hedges everything ("can help," "may improve," "consider"), make some statements flat confident:
+- "This works." / "This is non-negotiable." / "Skip this and you're wasting time."
+Then keep one or two specific hedges to sound honest, not promotional.
+
+**Missing personality → Inject practitioner voice.**
+Add 2-3 per 1000 words:
+- An aside: "(and yes, this matters more than most people think)"
+- A self-correction: "Actually, that's not quite right. Let me rephrase."
+- A direct opinion: "Honestly, most guides overcomplicate this."
+- A tangent marker: "Quick detour:" then get back on track.
+
+### TYPOGRAPHY (strict):
+- Replace ALL em-dash (—) and en-dash (–) with comma, colon, period, or rewrite
+- Replace ALL curly quotes (" " ' ') with straight quotes (") and apostrophes (')
+- No exceptions. The audit will fail the article otherwise.
+
+### OUTPUT:
+- Return ONLY the revised HTML. No explanation, no preamble, no markdown code fence.
+- If you must wrap in a code block, use \`\`\`html ... \`\`\` but prefer raw HTML.`;
+
 export async function humanizeArticleContent(html: string): Promise<string> {
   const anthropic = getAnthropicClient();
   const trimmed = html?.trim() ?? "";
@@ -382,20 +441,37 @@ export async function humanizeArticleContent(html: string): Promise<string> {
   const message = await anthropic.messages.create({
     model: "claude-sonnet-4-20250514",
     max_tokens: 16384,
-    temperature: 0.8,
+    temperature: 1.0, // High temperature = less probable token choices = higher perplexity
     system: HUMANIZE_SYSTEM,
     messages: [
       {
         role: "user",
-        content: `Humanize this article. Preserve Google and Rank Math alignment (keywords, headings, structure, expert tone). Restructure sentences (reorder clauses, split/merge); use idioms where natural; vary between simple and more specific wording. Replace any stock AI phrases with human alternatives. Replace em-dash, en-dash, curly quotes with straight " and '. Output only the revised HTML.\n\n${trimmed}`,
+        content: `Rewrite this article to beat AI detectors. Target: under 30% AI detection on GPTZero.
+
+Your priority order:
+1. Preserve all keywords, headings, and SEO structure
+2. Inject perplexity spikes (unexpected but natural word choices, idioms, specific details)
+3. Create burstiness (wild variation in sentence complexity - some 3 words, some 35 words)
+4. Break classifier patterns (remove uniform transitions, vary information density, add confidence asymmetry)
+5. Fix any em-dash, en-dash, or curly quotes → straight characters only
+
+Return only the HTML.
+
+${trimmed}`,
       },
     ],
   });
 
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response format from Claude");
+
+  const stopReason = (message as { stop_reason?: string }).stop_reason;
+  if (stopReason === "max_tokens") {
+    console.warn("Humanize response was truncated (max_tokens). Returning original content.");
+    return trimmed;
+  }
+
   const text = content.text.trim();
-  // Strip markdown code block if present
   const codeMatch = text.match(/```(?:html)?\s*([\s\S]*?)```/);
   return (codeMatch ? codeMatch[1].trim() : text) || trimmed;
 }

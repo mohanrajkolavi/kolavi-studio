@@ -12,7 +12,6 @@ This project uses Claude API, WordPress, and a database. Follow these practices 
 | `RATE_LIMIT_UNLOCK_CODE` | Clears login lockout when entered | Set a unique code. Required for unlock; no default in source. |
 | `DATABASE_URL` | Postgres connection | Never expose. Use connection pooling. |
 | `ANTHROPIC_API_KEY` | Claude API | Protects AI usage. Rotate if exposed. |
-| `WP_SITE_URL`, `WP_USERNAME`, `WP_APP_PASSWORD` | WordPress REST API | Application password, not main WP password. |
 | `REVALIDATE_SECRET` | Cache revalidation webhook | Required for `POST /api/revalidate`. |
 | `JINA_API_KEY` | Optional, Jina Reader | Only if you use it. |
 
