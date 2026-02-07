@@ -120,11 +120,62 @@ These SEO rules are non-negotiable. The writing style above must work WITHIN the
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
+/**
+ * Attempts to repair JSON that was truncated mid-response (e.g. max_tokens).
+ * Tries closing incomplete strings, the outline array, and adding minimal required fields.
+ */
+function tryRepairTruncatedBlogJson(
+  raw: string
+): (Record<string, unknown> & BlogGenerationOutput) | null {
+  if (!raw || raw.length < 10) return null;
+
+  const requiredSuffix = (content: string) =>
+    `, "content": ${JSON.stringify(content)}, "suggestedSlug": "", "suggestedCategories": [], "suggestedTags": []}`;
+
+  const strategies: (() => string)[] = [
+    // Truncated inside outline array (e.g. ..., "Thr): close string, close array, add rest
+    () => raw + '"' + "]" + requiredSuffix(""),
+    // Truncated right after "outline": [ (no elements yet)
+    () => (raw.trimEnd().endsWith("[") ? raw + "]" + requiredSuffix("") : raw),
+  ];
+
+  // If we have "content": " then we're truncated inside the HTML
+  if (/"content"\s*:\s*"/.test(raw)) {
+    strategies.push(
+      () => raw + '"' + ', "suggestedSlug": "", "suggestedCategories": [], "suggestedTags": []}'
+    );
+  }
+
+  // Try closing only brackets (generic repair)
+  const openBraces = (raw.match(/{/g) ?? []).length - (raw.match(/}/g) ?? []).length;
+  const openBrackets = (raw.match(/\[/g) ?? []).length - (raw.match(/]/g) ?? []).length;
+  if (openBraces > 0 || openBrackets > 0) {
+    const end = raw.trimEnd();
+    const endsInsideString = (end.match(/"([^"]|\\")*$/g) ?? []).length % 2 === 1;
+    if (endsInsideString) strategies.push(() => raw + '"' + "]".repeat(openBrackets) + "}".repeat(openBraces));
+    else strategies.push(() => raw + "]".repeat(openBrackets) + "}".repeat(openBraces));
+  }
+
+  for (const build of strategies) {
+    try {
+      const candidate = build();
+      const parsed = JSON.parse(candidate) as Record<string, unknown> & BlogGenerationOutput;
+      if (parsed && typeof parsed.title === "string" && Array.isArray(parsed.outline)) return parsed;
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
+
 export async function generateBlogPost(
   input: BlogGenerationInput
 ): Promise<BlogGenerationOutput> {
   const anthropic = getAnthropicClient();
 
+  if (typeof input.keywords !== "string") {
+    throw new Error("keywords must be a string");
+  }
   const keywordParts = input.keywords.split(",").map((k) => k.trim()).filter(Boolean);
   if (keywordParts.length === 0) {
     throw new Error("Keywords must contain at least one valid keyword");
@@ -244,6 +295,9 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
     });
     const message = await stream.finalMessage();
 
+    if (!message.content?.length) {
+      throw new Error("Claude returned an empty response");
+    }
     const content = message.content[0];
     if (content.type !== "text") {
       throw new Error("Unexpected response format from Claude");
@@ -273,11 +327,27 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
     let parsed: Record<string, unknown> & BlogGenerationOutput;
     try {
       parsed = JSON.parse(jsonText.trim()) as Record<string, unknown> & BlogGenerationOutput;
-    } catch (parseError) {
-      const snippet = jsonText.slice(0, 500);
-      throw new Error(
-        `Claude returned invalid JSON.${truncationHint} Raw output (first 500 chars): ${snippet}`
-      );
+    } catch {
+      // Attempt to repair truncated JSON (common when response hits max_tokens mid-output)
+      const repaired = tryRepairTruncatedBlogJson(jsonText.trim());
+      if (repaired) {
+        parsed = repaired;
+        if (!parsed.content || typeof parsed.content !== "string" || parsed.content.trim().length === 0) {
+          throw new Error(
+            "Blog response was cut off (token limit). Try again with fewer keywords, fewer competitor URLs, or a narrower topic."
+          );
+        }
+      } else {
+        const snippet = jsonText.slice(0, 500);
+        const looksTruncated =
+          !/}\s*$/.test(jsonText.trim()) || stopReason === "max_tokens";
+        const hint = looksTruncated
+          ? " Response may have been cut off. Try fewer keywords or less competitor content."
+          : truncationHint;
+        throw new Error(
+          `Claude returned invalid JSON.${hint} Raw output (first 500 chars): ${snippet}`
+        );
+      }
     }
 
     // Resolve content field: accept "body" or "article" as fallback
@@ -313,14 +383,19 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
 
     const title = parsed.title;
 
-    const metaDescChars = parsed.metaDescription ? [...parsed.metaDescription] : [];
+    const metaDescRaw = typeof parsed.metaDescription === "string" ? parsed.metaDescription : "";
+    const metaDescChars = [...metaDescRaw];
     const metaDescription =
       metaDescChars.length > SEO.META_DESCRIPTION_MAX_CHARS
         ? metaDescChars.slice(0, SEO.META_DESCRIPTION_MAX_CHARS - 3).join("").trim() + "..."
-        : parsed.metaDescription ?? undefined;
+        : metaDescRaw;
 
+    const slugRaw =
+      typeof parsed.suggestedSlug === "string" && parsed.suggestedSlug.trim().length > 0
+        ? parsed.suggestedSlug.trim()
+        : "";
     const slug =
-      parsed.suggestedSlug ||
+      slugRaw ||
       primaryKeyword
         .toLowerCase()
         .trim()
@@ -334,14 +409,22 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
         ? slug.slice(0, SEO.URL_SLUG_MAX_CHARS).replace(/-+$/, "")
         : slug;
 
+    const outline = Array.isArray(parsed.outline) ? parsed.outline.filter((h): h is string => typeof h === "string") : [];
+    const suggestedCategories = Array.isArray(parsed.suggestedCategories)
+      ? parsed.suggestedCategories.filter((c): c is string => typeof c === "string")
+      : undefined;
+    const suggestedTags = Array.isArray(parsed.suggestedTags)
+      ? parsed.suggestedTags.filter((t): t is string => typeof t === "string")
+      : undefined;
+
     return {
       title,
       metaDescription,
-      outline: parsed.outline || [],
+      outline,
       content: parsed.content,
       suggestedSlug: finalSlug,
-      suggestedCategories: parsed.suggestedCategories,
-      suggestedTags: parsed.suggestedTags,
+      suggestedCategories: suggestedCategories?.length ? suggestedCategories : undefined,
+      suggestedTags: suggestedTags?.length ? suggestedTags : undefined,
     };
   } catch (error) {
     console.error("Claude API error:", error);

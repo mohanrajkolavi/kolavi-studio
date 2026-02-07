@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
     if (!keywords || typeof keywords !== "string" || keywords.trim().length === 0) {
       return NextResponse.json(
-        { error: "Keywords (1.1) are required" },
+        { error: "Keywords are required" },
         { status: 400 }
       );
     }
