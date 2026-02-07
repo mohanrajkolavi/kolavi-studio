@@ -120,6 +120,15 @@ These SEO rules are non-negotiable. The writing style above must work WITHIN the
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
+/** Normalize JSON string: replace curly/smart quotes so JSON.parse can succeed. */
+function normalizeJsonString(s: string): string {
+  return s
+    .replace(/\u201C/g, '"')
+    .replace(/\u201D/g, '"')
+    .replace(/\u2018/g, "'")
+    .replace(/\u2019/g, "'");
+}
+
 /**
  * Attempts to repair JSON that was truncated mid-response (e.g. max_tokens).
  * Tries closing incomplete strings, the outline array, and adding minimal required fields.
@@ -127,6 +136,7 @@ These SEO rules are non-negotiable. The writing style above must work WITHIN the
 function tryRepairTruncatedBlogJson(
   raw: string
 ): (Record<string, unknown> & BlogGenerationOutput) | null {
+  raw = raw.trim();
   if (!raw || raw.length < 10) return null;
 
   const requiredSuffix = (content: string) =>
@@ -135,8 +145,10 @@ function tryRepairTruncatedBlogJson(
   const strategies: (() => string)[] = [
     // Truncated inside outline array (e.g. ..., "Thr): close string, close array, add rest
     () => raw + '"' + "]" + requiredSuffix(""),
+    // Truncated after comma before next outline item: ..., "Last Item",
+    () => (/\,\s*$/.test(raw) ? raw.replace(/,\s*$/, "]") + requiredSuffix("") : raw),
     // Truncated right after "outline": [ (no elements yet)
-    () => (raw.trimEnd().endsWith("[") ? raw + "]" + requiredSuffix("") : raw),
+    () => (raw.endsWith("[") ? raw + "]" + requiredSuffix("") : raw),
   ];
 
   // If we have "content": " then we're truncated inside the HTML
@@ -150,7 +162,7 @@ function tryRepairTruncatedBlogJson(
   const openBraces = (raw.match(/{/g) ?? []).length - (raw.match(/}/g) ?? []).length;
   const openBrackets = (raw.match(/\[/g) ?? []).length - (raw.match(/]/g) ?? []).length;
   if (openBraces > 0 || openBrackets > 0) {
-    const end = raw.trimEnd();
+    const end = raw;
     const endsInsideString = (end.match(/"([^"]|\\")*$/g) ?? []).length % 2 === 1;
     if (endsInsideString) strategies.push(() => raw + '"' + "]".repeat(openBrackets) + "}".repeat(openBraces));
     else strategies.push(() => raw + "]".repeat(openBrackets) + "}".repeat(openBraces));
@@ -253,6 +265,8 @@ The content will be checked by AI detectors (GPTZero, Originality.ai, Grammarly)
 - Use hyphen (-) for compound modifiers and ranges.
 
 ## OUTPUT FORMAT (valid JSON only)
+- Use only straight double quotes (") for JSON keys and string values. No curly/smart quotes.
+- Keep outline to 6-8 H2 headings so the response fits; prefer depth in fewer sections.
 {
   "title": "...",
   "metaDescription": "...",
@@ -317,6 +331,8 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
       const singleMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
       if (singleMatch) jsonText = singleMatch[1].trim();
     }
+    // Normalize so JSON can parse: curly/smart quotes -> straight quotes
+    jsonText = normalizeJsonString(jsonText);
 
     const stopReason = (message as { stop_reason?: string }).stop_reason;
     const truncated = stopReason === "max_tokens";
