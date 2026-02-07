@@ -231,8 +231,8 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
 
   try {
     const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 16384,
+      model: "claude-sonnet-4-5",
+      max_tokens: 65536,
       temperature: 0.9, // Higher temp = less probable token selection = higher perplexity
       system: SYSTEM_PROMPT,
       messages: [
@@ -263,13 +263,19 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
       if (singleMatch) jsonText = singleMatch[1].trim();
     }
 
+    const stopReason = (message as { stop_reason?: string }).stop_reason;
+    const truncated = stopReason === "max_tokens";
+    const truncationHint = truncated
+      ? " Response was cut off (token limit). Try fewer keywords or less competitor content."
+      : "";
+
     let parsed: Record<string, unknown> & BlogGenerationOutput;
     try {
       parsed = JSON.parse(jsonText.trim()) as Record<string, unknown> & BlogGenerationOutput;
     } catch (parseError) {
       const snippet = jsonText.slice(0, 500);
       throw new Error(
-        `Claude returned invalid JSON. Raw output (first 500 chars): ${snippet}`
+        `Claude returned invalid JSON.${truncationHint} Raw output (first 500 chars): ${snippet}`
       );
     }
 
@@ -286,8 +292,6 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
             : undefined);
     if (bodyContent !== undefined) parsed.content = bodyContent;
 
-    const stopReason = (message as { stop_reason?: string }).stop_reason;
-    const truncated = stopReason === "max_tokens";
     const hint = truncated
       ? " Response was cut off (token limit). Try fewer keywords or a narrower topic."
       : " Try again or use fewer keywords.";
@@ -439,7 +443,7 @@ export async function humanizeArticleContent(html: string): Promise<string> {
   if (trimmed.length === 0) throw new Error("Content is required for humanization");
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: "claude-sonnet-4-5",
     max_tokens: 16384,
     temperature: 1.0, // High temperature = less probable token choices = higher perplexity
     system: HUMANIZE_SYSTEM,
