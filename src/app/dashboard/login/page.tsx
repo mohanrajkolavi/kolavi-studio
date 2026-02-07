@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LoginForm } from "@/components/dashboard/LoginForm";
+import { Logo } from "@/components/layout/Logo";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -32,7 +33,7 @@ export default async function LoginPage({ searchParams }: Props) {
               href="/"
               className="inline-block text-lg font-semibold tracking-tight text-foreground transition-opacity hover:opacity-80"
             >
-              Kolavi Studio
+              <Logo withPeriod={false} />
             </Link>
             <h1 className="mt-6 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               Welcome{" "}

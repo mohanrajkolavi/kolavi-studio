@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
-import { generateBlogPost, type BlogGenerationInput } from "@/lib/claude/client";
+import { generateBlogPost, humanizeArticleContent, type BlogGenerationInput } from "@/lib/claude/client";
 import { fetchCompetitorUrls } from "@/lib/jina/reader";
 
 const ALLOWED_INTENTS = new Set(["informational", "navigational", "commercial", "transactional"]);
 
-/** Stay under typical serverless timeout (e.g. 60s); return 504 if exceeded. */
-const GENERATION_TIMEOUT_MS = 55_000;
+/** Allow long posts to complete (generation + humanize pass); return 504 if exceeded. */
+const GENERATION_TIMEOUT_MS = 210_000;
 
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
@@ -23,11 +23,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate that keywords contain actual content after splitting
+    // Validate that keywords contain actual content after splitting (max 6)
     const keywordParts = keywords.split(",").map((k) => k.trim()).filter(Boolean);
     if (keywordParts.length === 0) {
       return NextResponse.json(
         { error: "Keywords must contain at least one valid keyword" },
+        { status: 400 }
+      );
+    }
+    if (keywordParts.length > 6) {
+      return NextResponse.json(
+        { error: "Keywords: max 6 allowed" },
         { status: 400 }
       );
     }
@@ -37,7 +43,7 @@ export async function POST(request: NextRequest) {
       ? (typeof competitorUrls === "string"
           ? competitorUrls.split(/\n|,/).map((u: string) => u.trim()).filter(Boolean)
           : Array.isArray(competitorUrls)
-          ? competitorUrls.slice(0, 5).map((u: string) => String(u).trim()).filter(Boolean)
+          ? competitorUrls.slice(0, 2).map((u: string) => String(u).trim()).filter(Boolean)
           : [])
           .filter((url) => {
             // Basic URL validation - must start with http:// or https:// or be a valid domain
@@ -50,6 +56,18 @@ export async function POST(request: NextRequest) {
             );
           })
       : [];
+
+    // Normalize "people also search for" (max 3 phrases to avoid prompt bloat)
+    const peopleAlsoRaw = peopleAlsoSearchFor != null
+      ? (Array.isArray(peopleAlsoSearchFor)
+          ? peopleAlsoSearchFor.slice(0, 3).map((p) => String(p).trim()).filter(Boolean)
+          : String(peopleAlsoSearchFor)
+              .split(/[,;\n]+/)
+              .map((p) => p.trim())
+              .filter(Boolean)
+              .slice(0, 3))
+      : [];
+    const peopleAlsoStr = peopleAlsoRaw.length > 0 ? peopleAlsoRaw.join(", ") : undefined;
 
     // Validate and normalize intents
     const intentList = Array.isArray(intent)
@@ -82,11 +100,13 @@ export async function POST(request: NextRequest) {
       }
       const input: BlogGenerationInput = {
         keywords: keywords.trim(),
-        peopleAlsoSearchFor: peopleAlsoSearchFor?.trim() || undefined,
+        peopleAlsoSearchFor: peopleAlsoStr,
         intent: intentList.length > 0 ? intentList : ["informational"],
         competitorContent: competitorContent.length > 0 ? competitorContent : undefined,
       };
-      return generateBlogPost(input);
+      const result = await generateBlogPost(input);
+      const humanizedContent = await humanizeArticleContent(result.content);
+      return { ...result, content: humanizedContent };
     };
 
     const result = await Promise.race([
@@ -105,7 +125,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Generation timed out. Try fewer competitor URLs or try again. For long runs, consider background jobs.",
+            "Generation took too long. Try again with fewer keywords, or try again later. For very long posts, consider background jobs.",
         },
         { status: 504 }
       );

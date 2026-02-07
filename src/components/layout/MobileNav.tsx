@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { NAV_LINKS } from "@/lib/constants";
 import { LogoutButton } from "@/components/dashboard/LogoutButton";
+import { Logo } from "./Logo";
 import { cn } from "@/lib/utils";
 
 const EXIT_MS = 280;
@@ -69,7 +70,7 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
           className="text-lg font-semibold tracking-tight text-foreground"
           onClick={() => onOpenChange(false)}
         >
-          Kolavi Studio
+          <Logo withPeriod={false} />
         </Link>
         <button
           type="button"

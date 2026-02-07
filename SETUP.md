@@ -111,6 +111,25 @@ CREATE INDEX IF NOT EXISTS idx_contact_rate_limit_reset_at ON contact_rate_limit
 
 `CREATE TABLE IF NOT EXISTS` is safe to run multiple times; it will not overwrite existing tables.
 
+### Blog Maker history (Supabase only)
+
+If you use **Supabase** and want the Blog Maker "Recent" (last 5 posts) feature, add `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `.env.local`, then run this in Supabase Dashboard → SQL Editor:
+
+```sql
+CREATE TABLE IF NOT EXISTS blog_generation_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  title TEXT NOT NULL,
+  meta_description TEXT NOT NULL,
+  outline JSONB NOT NULL DEFAULT '[]',
+  content TEXT NOT NULL,
+  suggested_slug TEXT,
+  suggested_categories JSONB,
+  suggested_tags JSONB
+);
+CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_generation_history(created_at DESC);
+```
+
 ## Project Structure
 
 ```

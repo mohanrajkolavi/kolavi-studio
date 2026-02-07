@@ -51,34 +51,59 @@ const INTENT_GUIDE = {
 
 const SYSTEM_PROMPT = `You are an expert SEO content writer. Follow these guidelines in priority order:
 
-**PRIORITY 1: Google Search Central** (developers.google.com/search/docs) – SEO Starter Guide, Creating Helpful Content
-**PRIORITY 2: Rank Math** (rankmath.com/kb/score-100-in-tests) – Follow Rank Math guidelines ONLY when they don't conflict with Google's people-first approach.
+**PRIORITY 1: Google Search Central** (developers.google.com/search/docs), distilled from 85+ pages of documentation.
+**PRIORITY 2: Rank Math** (rankmath.com/kb/score-100-in-tests), follow ONLY when aligned with Google's people-first approach.
 
-**Google: People-first, helpful content (Helpful Content Update, March 2024)**
-- **Write for humans first, search engines second.** Create content people find compelling and useful. Prioritize readers over search engines.
-- **Demonstrate real expertise.** Write from first-hand knowledge and experience. Show you understand the topic deeply, not just summarizing others.
-- **Satisfy search intent completely.** Answer the user's question fully so they don't need to search again. Cover all aspects of the topic thoroughly.
-- **Unique, original content.** Do not copy or rehash competitors. Create based on your expertise; add unique insights, examples, or perspectives.
-- **Easy-to-read, well organized.** Free of spelling/grammar errors. Break into paragraphs and sections with clear headings. Use logical flow.
-- **Expect readers' search terms.** Anticipate keyword variations (e.g., "charcuterie" vs "cheese board"). Write for different knowledge levels—beginner to advanced.
-- **Demonstrate E-E-A-T** (Experience, Expertise, Authoritativeness, Trustworthiness) through:
-  - Specific, actionable advice based on real experience
-  - Concrete examples, case studies, or data
-  - Expert sources cited where helpful
-  - Honest, transparent information (use qualifiers like "often," "typically" instead of unsupported superlatives)
-- **Natural language.** Google: "Keyword stuffing is against spam policies." Keep language natural; avoid excessive keyword repetition. Keywords should appear organically.
-- **Good title:** Unique to the page, clear, concise, accurately describes contents. Avoid clickbait; manage expectations.
-- **Good meta description:** Short, unique, includes most relevant points. Compelling but honest.
+**Core principle (Google):** "If Google Search didn't exist, would you still publish this because it genuinely helps your audience?" If no, no amount of technical SEO will save it. Content quality is site-wide: weak content hurts the entire site. Every article either helps or hurts.
 
-**Rank Math:** "Your goal is to please the reader first and search engines second."
+**Google: People-first, helpful content**
+- **First-hand expertise.** What does this article know that a Google search couldn't already tell someone? Write from real experience. Show specificity, original observations, or insights generic research can't produce. Avoid summarizing manufacturer descriptions or rehashing what other articles say.
+- **Satisfy search intent completely.** Answer the user's question fully. Cover all aspects so they don't need to search again. Comprehensive but natural; don't pad for word count (Google has no preferred word count; targeting word count is a search-engine-first red flag).
+- **Unique, original content.** Do not copy or rehash competitors. Add unique perspectives, examples, or actionable steps. Scaled Content Abuse (March 2024): AI content without human expertise layered in = risk.
+- **Natural language.** Keyword stuffing is the most-referenced spam violation. Use keywords organically. No unnatural repetition, no keyword blocks. Natural language always takes priority.
+- **Title:** Unique, clear, descriptive. Put words people search for at the beginning. Max ~60 chars. Accurately describes the page. Avoid clickbait.
+- **Meta description:** Google calls it a "pitch." Convince users this page is exactly what they need, not a boring summary or keyword dump. Compelling and honest.
+- **E-E-A-T:** Experience, Expertise, Authoritativeness, Trustworthiness. Specific advice, concrete examples, honest qualifiers. Author byline is added in WordPress; write as if an expert authored it.
 
-**Do NOT sound like AI.** Write like a 10 plus years of experience human expert in Content Marketing, SEO and Copywriting. Avoid:
-- Em-dashes (—). Use commas, semicolons, or separate sentences instead.
-- AI-ish phrases: "delve," "landscape," "realm," "crucial," "comprehensive," "it's important to note," "in conclusion," "in today's world," "game-changer," "leverage," "utilize" (use "use"), "plethora," "myriad," "robust," "seamless," "holistic," "dive deep," "navigate," "unlock," "harness."
-- Overused openings: "In this article we'll...", "Let's explore...", "When it comes to..."
-- Filler: "Certainly," "Indeed," "Furthermore," "Moreover" at sentence start; repetitive "However" / "Therefore."
-- Lists or bullets for every point; use full sentences and normal prose.
-- Same sentence length; vary it. Short. Then a longer one that adds detail.
+**Rank Math:** "Your goal is to please the reader first and search engines second." Apply naturally; never sacrifice quality for scores.
+
+**GOAL: Content that passes AI detection (target under 30% on GPTZero/Originality.ai) while staying high-quality and readable.** Write like the experienced human who wrote the 3% AI-scoring article: conversational, messy in a good way, with personality and real examples. Not like the 97% AI-scoring article: uniform sentences, stock phrases, robotic transitions, zero personality.
+
+**Pattern 1 – Sentence length chaos.** AI writes 15–20 word sentences every time. Humans do not. Mix drastically:
+- ~20% short (under 10 words) for emphasis
+- ~40% medium (10–20 words) for explanation
+- ~30% long (20–30 words), including some that could have been split but weren’t
+- ~10% very long (30+ words) or fragments for effect
+Use occasional fragments. Occasional run-ons that should have a period but don’t. No consistent 15–20 word rhythm.
+
+**Pattern 2 – Zero stock AI phrases.** BANNED (use human alternatives instead):
+- "it's important to note that" → "here's what matters" or "keep in mind"
+- "delve" / "delve into" → "look at" or "explore"
+- "ensure that" / "ensure your" → "make sure"
+- "unlike traditional" → say the contrast in plain language
+- "combined with" → "plus" or "along with" or just restructure
+- "over time, this builds" → "this builds" or "you’ll build"
+- "in today's digital landscape" / "in today's world" → cut or use specific context
+- "leverage" → "use" or "take advantage of"
+- "utilize" → "use"
+- "game-changer," "revolutionary," "cutting-edge" → concrete claims or cut
+- Also BANNED: landscape, realm, crucial, comprehensive, "in conclusion," plethora, myriad, robust, seamless, holistic, "dive deep," navigate, unlock, harness, "it's worth noting," "in terms of," "when it comes to," ultimately/essentially/basically at sentence start; "a solid [X] strategy," "this guide covers," "practical steps," "helps you reach," "aligns your," "builds trust over time," "round out," "when it fits," "where it sounds natural," "consider a," "supports the decision," "worth optimizing for"; "In this article we'll...", "Let's explore..."; "Certainly," "Indeed," "Furthermore," "Moreover" at sentence start. No em-dashes (—). No excessive scare quotes.
+
+**Pattern 3 – Conversational elements.** Use rhetorical questions: "Why does this matter?" "Sound familiar?" Direct address: "You've probably noticed." "If you're like most people." Casual asides in parentheses: "(and this matters)" "(spoiler: it works)." Emphasis: "This is where it gets interesting." "Most people mess this up." Start some sentences with "And" or "But."
+
+**Pattern 4 – Intentional small imperfections (1–2 per 1000 words).** Occasional missing comma in a compound sentence. Inconsistent formatting (bold a term in one place, not another). Mix "you'll" and "you will." Same term capitalized differently in different spots ("Content marketing" vs "content marketing"). Do not break meaning or look unprofessional; tiny human inconsistencies only.
+
+**Pattern 5 – Paragraph structure variation.** Not every paragraph 3–4 sentences. Aim: ~15% single-sentence paragraphs, ~50% standard 2–4 sentences, ~25% longer 5–7 sentences, ~10% very long 8+. Some one-sentence paragraphs for punch. No predictable pattern.
+
+**Pattern 6 – Personality and opinion.** Do not hedge everything ("can help," "may support," "often considered"). Make claims: "this works," "you need this," "most people fail here," "here’s the truth." Add opinions and enthusiasm or frustration where it fits: "This drives me crazy." "Honestly, this changed everything."
+
+**Pattern 7 – Specific examples, not generic.** Not "many tools are available." Name real tools, brands, numbers: "Ahrefs, SEMrush, or Google Keyword Planner." Not "costs between X and Y." Use real ranges: "Expect around $500–800." Real names. Real numbers.
+
+**Pattern 8 – Natural topic flow.** Do not make every transition smooth and signposted. Humans sometimes jump, circle back, or go on short tangents. A bit of messiness in how ideas connect is fine.
+
+**Pattern 9 – Formatting inconsistency.** Mix numbered lists, bullets, and plain prose. Bold some important terms but not every occurrence. Use both "e.g." and "for example" in the same piece. Slight variation in spacing or style across sections is human.
+
+**Pattern 10 – Voice.** Pick a voice and mostly stick to it but not perfectly. If casual, mostly "you" but sometimes "we." If formal, one casual phrase is fine. Humans are not 100% consistent in tone.
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
@@ -93,7 +118,7 @@ export async function generateBlogPost(
     throw new Error("Keywords must contain at least one valid keyword");
   }
   const primaryKeyword = keywordParts[0];
-  const secondaryKeywords = keywordParts.slice(1, 10);
+  const secondaryKeywords = keywordParts.slice(1, 6);
   const intentList = Array.isArray(input.intent)
     ? input.intent
     : input.intent
@@ -103,64 +128,56 @@ export async function generateBlogPost(
   const intentGuidesRaw = intentList.map((i) => INTENT_GUIDE[i as keyof typeof INTENT_GUIDE]).filter(Boolean);
   const intentGuides = intentGuidesRaw.length > 0 ? intentGuidesRaw : [INTENT_GUIDE.informational];
 
-  const prompt = `Generate a blog post following Google Search Central guidelines FIRST, then Rank Math guidelines where they align.
+  const prompt = `Generate a blog post. Google Search Central FIRST; Rank Math second and only when aligned. Content must pass our SEO audit (75%+ score required to publish).
 
-**PRIORITY: Google guidelines take precedence. Rank Math guidelines are secondary and should only be followed when they don't conflict with Google's people-first approach.**
-
-**Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added later in WordPress.
+**Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added in WordPress.
 
 ## INPUT
 - **Primary Focus Keyword:** ${primaryKeyword}
-- **Secondary Keywords (1–9):** ${secondaryKeywords.length ? secondaryKeywords.join(", ") : "None"}
-- **People Also Search For:** ${input.peopleAlsoSearchFor || "None"}
-- **Search Intent(s):** ${intentLabel}
+- **Secondary Keywords (1–5):** ${secondaryKeywords.length ? secondaryKeywords.join(", ") : "None"}
+- **People Also Search For:** ${((): string => {
+  const raw = input.peopleAlsoSearchFor?.trim();
+  if (!raw) return "None";
+  const phrases = raw.split(/[,;\n]+/).map((p) => p.trim()).filter(Boolean);
+  if (phrases.length === 0) return "None";
+  if (phrases.length === 1) return phrases[0];
+  return phrases.map((p) => `• ${p}`).join("\n") + "\nUse these as FAQ questions where they fit the topic.";
+})()}
+- **Search Intent(s):** ${intentLabel}${intentList.length > 1 ? ". If multiple intents, balance them; lead with the first." : ""}
 - **Competitor articles:** ${input.competitorContent?.length ? input.competitorContent.map((c) => c.url).join(", ") : "None"}
 
-## PRIORITY 1: GOOGLE SEARCH CENTRAL GUIDELINES (developers.google.com/search/docs) - Helpful Content Update
-- **People-first content.** Write for humans first, search engines second. Create content that genuinely helps readers.
-- **Satisfy search intent completely.** Answer the user's question fully. Cover all aspects so readers don't need additional searches.
-- **Demonstrate real expertise.** Write from first-hand knowledge. Show deep understanding through specific examples, actionable steps, data, or case studies.
-- **Unique, original content.** Do not copy or rehash competitors. Add unique insights, perspectives, or approaches based on your expertise.
-- **Easy-to-read, well organized.** Clear paragraphs, logical sections, proper headings. No spelling/grammar errors.
-- **Expect readers' search terms.** Anticipate keyword variations and synonyms. Write for different knowledge levels (beginner to advanced).
-- **Demonstrate E-E-A-T** (Experience, Expertise, Authoritativeness, Trustworthiness):
-  - Show experience through real examples and case studies
-  - Demonstrate expertise with specific, actionable advice
-  - Build authority through accurate, well-researched information
-  - Establish trust with honest, transparent content (use qualifiers, avoid unsupported claims)
-- **Natural language.** Google's spam policies prohibit keyword stuffing. Keywords should appear organically in natural, conversational language.
-- **Complete answers.** Don't leave readers hanging. Provide comprehensive information that fully addresses their query.
+## PRIORITY 1: GOOGLE SEARCH CENTRAL (developers.google.com/search/docs)
+- **Core question:** Would you publish this if Google Search didn't exist? Content must genuinely help the audience. Weak content hurts the entire site.
+- **First-hand expertise.** What unique value does this article provide? Specificity, original observations, actionable steps. Not generic summaries.
+- **Satisfy search intent completely.** Answer fully so readers don't need to search again. Comprehensive but natural; no padding for word count (Google has no preferred word count).
+- **Natural language.** Keyword stuffing = most-referenced spam violation. Use keywords organically. No unnatural repetition.
+- **Title:** Unique, clear. Put primary keyword at the beginning. Max 60 chars. Descriptive, not clickbait.
+- **Meta description:** A "pitch"; convince users this page is exactly what they need. Not a boring summary. Max 160 chars.
+- **Headings:** H2–H6 only (no H1 in body; title is H1). Sequential hierarchy (H2→H3→H4). Natural language in headings.
+- **Minimum 300 words** to avoid thin content. Aim for thorough coverage.
 
-## PRIORITY 2: RANK MATH GUIDELINES (rankmath.com/kb/score-100-in-tests)
-**Follow these ONLY when they align with Google's people-first approach. Never sacrifice content quality for Rank Math scores.**
+## PRIORITY 2: RANK MATH (rankmath.com/kb/score-100-in-tests)
+**Apply naturally; never sacrifice quality for scores.**
 
-### Basic SEO (Rank Math) - Apply naturally, don't force:
-- **Title:** Primary keyword within first 50 characters (Google shows ~60 desktop, ~50 mobile). Max 60 chars. Natural, compelling title. E.g. "7 Proven ${primaryKeyword} Tips for 2025".
-- **Meta Description:** Primary keyword in first 120–160 chars. Max 160 chars. Compelling, click-worthy, but honest (no clickbait). End with CTA when appropriate.
-- **URL Slug:** Primary keyword in slug. Lowercase, hyphens. Max 75 chars. Keep it natural and readable.
-- **First 10%:** Primary keyword in first 10% of content (or first 300 words if post is short). Appear naturally, not forced.
-- **Keywords in content:** All focus keywords (primary + secondary) appear naturally. Singular and plural both count. Natural integration only.
-- **Keyword density:** 1–1.5% target. Never exceed 2.5% (Rank Math warns, Google penalizes stuffing). Natural language always takes priority.
-- **Word count:** 2500+ words = 100% Rank Math score. Minimum 1500 for pillar content. (2000–2500 = 70%, 1500–2000 = 60%) Don't pad for word count—quality over quantity. If content naturally ends at 1800 words and fully answers the query, that's better than padding to 2500.
+- **Title:** Primary keyword in first 50% of title. Include a number when natural (e.g. "7 Proven ${primaryKeyword} Tips for 2025"). Max 60 chars.
+- **Meta Description:** Primary keyword in first 120–160 chars. Compelling pitch, honest. Max 160 chars.
+- **Slug:** Primary keyword in slug. Lowercase, hyphens. Max 75 chars.
+- **First 10%:** Primary keyword in first ~10% of content (or first 300 words). Natural placement.
+- **Subheadings:** Primary + secondary keywords in H2/H3 naturally. Organic integration.
+- **Paragraphs:** No paragraph >120 words. Short paragraphs improve readability (both Google and Rank Math).
+- **Word count:** 2500+ = Rank Math 100%. 1500+ for pillar. Don't pad; quality over quantity. If content fully answers at 1800 words, that's better than padding.
+- **FAQ:** For informational intent, add <h2>Frequently Asked Questions</h2> with 3–5 Q&As. Use "People Also Search For" when available. Format: <h3>Question?</h3><p>Answer...</p>.
 
-### Additional SEO (Rank Math) - Apply naturally:
-- **Subheadings:** Primary AND secondary keywords in H2/H3 naturally. Rank Math runs this test on all focus keywords. Include these organically in content structure.
-
-### Title Readability (Rank Math) - When appropriate:
-- Primary keyword in first 50% of title (when natural).
-- Evoke strong sentiment (curiosity, value, urgency; avoid clickbait per Google).
-- Power words when they add value: Proven, Essential, Best, Ultimate, Complete, Simple, Easy, etc.
-- Numbers in title when suitable (7, 10, 5) and accurate.
-
-### Content Readability (Rank Math) - Aligns with Google:
-- **Short paragraphs:** No paragraph >120 words. Rank Math fails this test if any paragraph exceeds 120. This also improves readability per Google.
-- **FAQ:** For informational intent, add <h2>Frequently Asked Questions</h2> with 3–5 Q&As. Use "People Also Search For" questions when available. Format: <h3>Question?</h3><p>Answer...</p>. Enables FAQ rich snippets (Google supports this).
-
-## VOICE: HUMAN, NOT AI
-- **No em-dashes (—).** Use commas, semicolons, or new sentences.
-- **No AI telltales:** delve, landscape, realm, crucial, comprehensive, "it's important to note," "in conclusion," "in today's world," game-changer, leverage, utilize (use "use"), plethora, myriad, robust, seamless, holistic, "dive deep," navigate, unlock, harness.
-- **No stock openings:** "In this article we'll...", "Let's explore...", "When it comes to..."
-- **Vary sentence length.** Mix short and longer sentences. Prefer normal prose over bullet-heavy lists.
+## HUMAN STYLE (PASS AI DETECTION – TARGET UNDER 30% AI)
+- **Sentence length:** ~20% under 10 words, ~40% medium 10–20, ~30% long 20–30, ~10% very long or fragments. No uniform 15–20 word sentences. Use a few fragments and the occasional run-on.
+- **Paragraphs:** ~15% one-sentence, ~50% two–four sentences, ~25% five–seven, ~10% eight+. No predictable 3–4 sentence pattern every time.
+- **Conversational:** Rhetorical questions ("Why does this matter?"), direct address ("You've probably noticed"), parenthetical asides ("(and this matters)"), emphasis ("This is where it gets interesting"). Start some sentences with "And" or "But."
+- **Personality:** Make claims, don’t only hedge. "This works." "Most people mess this up." Opinions and slight enthusiasm or frustration where it fits.
+- **Examples:** Real brand names, real numbers (e.g. "$500–800", "Ahrefs, SEMrush"). Not "many tools" or "costs between X and Y."
+- **Transitions:** Not every section needs a smooth signpost. Some messiness and jumping is human.
+- **Formatting:** Mix lists (numbered, bullets) and prose. Bold some terms but not all. Use both "e.g." and "for example." Small inconsistencies are fine.
+- **Imperfections:** 1–2 tiny quirks per 1000 words (missing comma, mixed "you'll"/"you will", inconsistent capitalization of same term). Never break meaning.
+- **No stock AI phrases.** Use the human alternatives from the system prompt. No em-dashes, no robotic openings.
 
 ## Intent(s): ${intentLabel}
 ${intentGuides.map((g) => `- ${g}`).join("\n")}
@@ -176,16 +193,14 @@ ${intentGuides.map((g) => `- ${g}`).join("\n")}
   "suggestedTags": ["tag1", "tag2", "tag3"]
 }
 
-## CONTENT STRUCTURE (text only – no images, links, or TOC; add those in WordPress)
-**Follow Google's people-first approach first, then naturally incorporate Rank Math elements:**
+## CONTENT STRUCTURE (text only; no images, links, or TOC; add in WordPress)
+1. **Intro** – Engaging, conversational. Primary keyword in first 10% naturally. Vary sentence length; not all 15–20 words.
+2. **H2/H3 sections** – Clear structure. Primary + secondary keywords in subheadings naturally. Paragraphs of mixed length (one-sentence to long). Real examples and opinions where they fit.
+3. **Paragraphs** – No paragraph over 120 words (audit rule). Mix: some one-sentence, some 5–7 sentences. No uniform 3–4 sentence blocks.
+4. **FAQ (3–5 Q&As)** – For informational intent. Use "People Also Search For" when available. Conversational answers, not textbook tone.
+5. **Conclusion with CTA** – Matching intent. Direct and human, not generic wrap-up.
 
-1. **Intro (2–4 sentences)** - Engaging, helpful opening. Primary keyword appears naturally in first 10% (Rank Math requirement, but must feel natural per Google).
-2. **H2/H3 sections** - Clear structure per Google. Primary + secondary keywords in subheadings naturally (Rank Math requirement, but must be organic per Google).
-3. **Short paragraphs (≤120 words each)** - Improves readability (both Google and Rank Math).
-4. **FAQ section (3–5 Q&As)** - For informational intent. Helps users (Google) and enables rich snippets (Rank Math).
-5. **Conclusion with CTA** - Matching intent, helpful and honest (Google). Natural CTA (Rank Math).
-
-**Remember: If Rank Math requirements conflict with Google's people-first approach, prioritize Google. Natural, helpful content always wins.**
+**Prioritize Google. Rank Math second. Write like a knowledgeable human explaining to a friend—messy, human, real. Target under 30% AI detection. No stock AI phrases or uniform sentence length anywhere.**
 
 ${(() => {
   const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
@@ -205,8 +220,8 @@ Generate the JSON now.`;
   try {
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 8192,
-      temperature: 0.6,
+      max_tokens: 16384,
+      temperature: 0.7,
       system: SYSTEM_PROMPT,
       messages: [
         {
@@ -222,14 +237,24 @@ Generate the JSON now.`;
     }
 
     const text = content.text.trim();
-    const jsonMatch =
-      text.match(/```json\s*([\s\S]*?)\s*```/) ||
-      text.match(/```\s*([\s\S]*?)\s*```/);
-    const jsonText = jsonMatch ? jsonMatch[1].trim() : text;
+    // Prefer the largest JSON code block in case the model outputs multiple blocks
+    const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+    let jsonText = text;
+    let match: RegExpExecArray | null;
+    let largest = "";
+    while ((match = jsonBlockRegex.exec(text)) !== null) {
+      const block = match[1].trim();
+      if (block.length > largest.length) largest = block;
+    }
+    if (largest.length > 0) jsonText = largest;
+    else {
+      const singleMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
+      if (singleMatch) jsonText = singleMatch[1].trim();
+    }
 
-    let parsed: BlogGenerationOutput;
+    let parsed: Record<string, unknown> & BlogGenerationOutput;
     try {
-      parsed = JSON.parse(jsonText.trim()) as BlogGenerationOutput;
+      parsed = JSON.parse(jsonText.trim()) as Record<string, unknown> & BlogGenerationOutput;
     } catch (parseError) {
       const snippet = jsonText.slice(0, 500);
       throw new Error(
@@ -237,12 +262,38 @@ Generate the JSON now.`;
       );
     }
 
+    // Resolve content: required field is "content"; accept "body" or "article" as fallback if model used different key
+    let bodyContent =
+      typeof parsed.content === "string" && parsed.content.trim().length > 0
+        ? parsed.content
+        : (typeof (parsed as Record<string, unknown>).body === "string" &&
+            ((parsed as Record<string, unknown>).body as string).trim().length > 0
+          ? ((parsed as Record<string, unknown>).body as string)
+          : typeof (parsed as Record<string, unknown>).article === "string" &&
+              ((parsed as Record<string, unknown>).article as string).trim().length > 0
+            ? ((parsed as Record<string, unknown>).article as string)
+            : undefined);
+    if (bodyContent !== undefined) parsed.content = bodyContent;
+
     // Validate required fields
+    const stopReason = (message as { stop_reason?: string }).stop_reason;
+    const truncated = stopReason === "max_tokens";
+    const hint = truncated
+      ? " Response was cut off (token limit). Try fewer keywords or a narrower topic."
+      : " Try again or use fewer keywords.";
+
     if (!parsed.title || typeof parsed.title !== "string" || parsed.title.trim().length === 0) {
-      throw new Error("Invalid response from Claude: title is required and must be non-empty");
+      throw new Error("Invalid response from Claude: title is required and must be non-empty." + hint);
     }
     if (!parsed.content || typeof parsed.content !== "string" || parsed.content.trim().length === 0) {
-      throw new Error("Invalid response from Claude: content is required and must be non-empty");
+      const keys = Object.keys(parsed).join(", ");
+      console.error(
+        "Claude blog response missing content. stop_reason=%s, parsed keys: [%s], content length=%s",
+        stopReason ?? "unknown",
+        keys,
+        typeof parsed.content === "string" ? parsed.content.length : "not a string"
+      );
+      throw new Error("Invalid response from Claude: content is required and must be non-empty." + hint);
     }
 
     // Truncate title if needed (only add "..." if actually truncated)
@@ -293,4 +344,42 @@ Generate the JSON now.`;
         : "Failed to generate blog post"
     );
   }
+}
+
+const HUMANIZE_SYSTEM = `You are an editor. Your task is to humanize article content so it passes AI detection (target under 30% on GPTZero/Originality.ai). Output should read like a knowledgeable human wrote it—conversational, with sentence-length chaos and personality.
+
+Rules (keep same information, structure, H2/H3, and HTML; only change wording and rhythm):
+- **Sentence length chaos:** Mix short (under 10 words), medium (10–20), and long (20–35) sentences. Add a few fragments. Avoid uniform 15–20 word sentences. Aim ~20% short, ~40% medium, ~30% long, ~10% very long or fragments.
+- **Paragraph variation:** Some one-sentence paragraphs. Some 5–7 sentence paragraphs. No predictable 3–4 sentence pattern throughout.
+- **Conversational:** Add rhetorical questions, direct address ("You've probably noticed"), or parenthetical asides where natural. Start some sentences with "And" or "But." Replace stock AI phrases with human alternatives (e.g. "here's what matters" not "it's important to note").
+- **Personality:** Make claims instead of only hedging. Add one or two opinions or emphasis lines ("This is where it gets interesting.").
+- **Imperfections:** Introduce 1–2 tiny quirks per 1000 words (e.g. missing comma, mix "you'll" and "you will", inconsistent capitalization of same term). Do not break meaning.
+- **Formatting:** Slight variation is fine—bold some terms but not all, mix list styles. Do not add or remove sections, headings, or facts. No images, links, or placeholders.
+- Output only the revised HTML. No explanation, no markdown code fence, no preamble.`;
+
+/** Optional post-generation pass to reduce AI detection by varying sentence length and phrasing. */
+export async function humanizeArticleContent(html: string): Promise<string> {
+  const anthropic = getAnthropicClient();
+  const trimmed = html?.trim() ?? "";
+  if (trimmed.length === 0) throw new Error("Content is required for humanization");
+
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 16384,
+    temperature: 0.8,
+    system: HUMANIZE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `Humanize this article. Keep all facts and HTML structure. Vary sentence length and word choice. Output only the revised HTML.\n\n${trimmed}`,
+      },
+    ],
+  });
+
+  const content = message.content[0];
+  if (content.type !== "text") throw new Error("Unexpected response format from Claude");
+  const text = content.text.trim();
+  // Strip markdown code block if present
+  const codeMatch = text.match(/```(?:html)?\s*([\s\S]*?)```/);
+  return (codeMatch ? codeMatch[1].trim() : text) || trimmed;
 }

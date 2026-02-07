@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { NAV_LINKS, LEGAL_LINKS } from "@/lib/constants";
+import { Logo } from "./Logo";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -15,7 +16,7 @@ export function Footer() {
               href="/"
               className="inline-block text-2xl font-bold tracking-tight text-foreground transition-opacity hover:opacity-90 sm:text-3xl"
             >
-              Kolavi Studio.
+              <Logo withPeriod />
             </Link>
             <p className="mt-4 max-w-sm text-base leading-relaxed text-muted-foreground">
               Digital marketing agency specializing in medical spas, dental practices, and law firms.

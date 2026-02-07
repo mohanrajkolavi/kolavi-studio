@@ -7,6 +7,7 @@ import { NAV_LINKS } from "@/lib/constants";
 import { MobileNav } from "./MobileNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LogoutButton } from "@/components/dashboard/LogoutButton";
+import { Logo } from "./Logo";
 
 type HeaderProps = {
   isAdmin?: boolean;
@@ -26,9 +27,7 @@ export function Header({ isAdmin = false }: HeaderProps) {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-[2rem] border border-border bg-background/80 px-5 shadow-sm backdrop-blur-xl sm:px-6 dark:bg-background/80 dark:border-border">
         {/* Logo */}
         <Link href="/" className="flex items-center space-x-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-lg">
-          <span className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-            Kolavi Studio.
-          </span>
+          <Logo className="text-xl font-bold tracking-tight text-foreground sm:text-2xl" withPeriod />
         </Link>
 
         {/* Desktop Navigation (centered, SaaS-style nav links) */}
