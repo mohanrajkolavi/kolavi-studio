@@ -41,6 +41,30 @@ const AI_PHRASES = [
   "focus on ", "start with ",
 ];
 
+const AI_PHRASE_SUGGESTIONS = {
+  crucial: "key, needed, or be specific",
+  comprehensive: "full, complete, or describe what's covered",
+  "game-changer": "concrete claim or cut",
+  utilize: "use",
+  "ensure your": "make sure",
+  "ensure that": "make sure",
+  leverage: "use or take advantage of",
+  delve: "look at or explore",
+  "delve into": "look at or explore",
+  myriad: "many or list examples",
+  plethora: "many or list examples",
+  holistic: "full or whole",
+  "in conclusion": "cut or end with a concrete takeaway",
+  "it's important to note": "here's what matters or keep in mind",
+  "it's important to note that": "here's what matters or keep in mind",
+  "in today's digital landscape": "cut or use specific context",
+  "in today's world": "cut or use specific context",
+  revolutionary: "concrete claim or cut",
+  "cutting-edge": "concrete claim or cut",
+  "combined with": "plus or along with",
+  "unlike traditional": "say the contrast in plain language",
+};
+
 const AI_TYPOGRAPHY = [
   { char: "\u2014", label: "em-dash (—)" },
   { char: "\u2013", label: "en-dash (–)" },
@@ -116,11 +140,19 @@ if (!article.metaDescription?.trim()) {
 if (wc < 300) results.push({ icon: "✗", label: "Content depth", msg: `${wc} words; very thin.`, level: 1 });
 else results.push({ icon: "✓", label: "Content depth", msg: `${wc} words.`, level: 1 });
 
-// AI phrases (L1)
+// AI phrases (L1) – include suggested replacements when available
 if (aiFound.length > 0) {
   const total = aiFound.reduce((s, f) => s + f.count, 0);
-  const examples = aiFound.slice(0, 6).map((f) => `"${f.phrase}" (${f.count})`).join(", ");
-  results.push({ icon: total > 3 ? "✗" : "⚠", label: "AI-sounding language", msg: `Consider replacing: ${examples}.`, level: 1 });
+  const maxShow = 10;
+  const shown = aiFound.slice(0, maxShow);
+  const parts = shown.map((f) => {
+    const key = f.phrase.trim().toLowerCase();
+    const suggestion = AI_PHRASE_SUGGESTIONS[key];
+    const countStr = `"${f.phrase.trim()}" (${f.count})`;
+    return suggestion ? `${countStr} → ${suggestion}` : countStr;
+  });
+  const tail = aiFound.length > maxShow ? `; +${aiFound.length - maxShow} more` : "";
+  results.push({ icon: total > 3 ? "✗" : "⚠", label: "AI-sounding language", msg: `Consider replacing: ${parts.join("; ")}${tail}.`, level: 1 });
 } else {
   results.push({ icon: "✓", label: "AI-sounding language", msg: "No flagged phrases.", level: 1 });
 }

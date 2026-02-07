@@ -147,13 +147,38 @@ const AI_PHRASES = [
   "focus on ", "start with ",
 ];
 
+/** Suggested replacements for high-impact phrases (Scaled Content Abuse). Used to make the audit alert actionable. */
+const AI_PHRASE_SUGGESTIONS: Record<string, string> = {
+  crucial: "key, needed, or be specific",
+  comprehensive: "full, complete, or describe what's covered",
+  "game-changer": "concrete claim or cut",
+  utilize: "use",
+  "ensure your": "make sure",
+  "ensure that": "make sure",
+  leverage: "use or take advantage of",
+  delve: "look at or explore",
+  "delve into": "look at or explore",
+  myriad: "many or list examples",
+  plethora: "many or list examples",
+  holistic: "full or whole",
+  "in conclusion": "cut or end with a concrete takeaway",
+  "it's important to note": "here's what matters or keep in mind",
+  "it's important to note that": "here's what matters or keep in mind",
+  "in today's digital landscape": "cut or use specific context",
+  "in today's world": "cut or use specific context",
+  revolutionary: "concrete claim or cut",
+  "cutting-edge": "concrete claim or cut",
+  "combined with": "plus or along with",
+  "unlike traditional": "say the contrast in plain language",
+};
+
 function countAiPhrases(text: string): { phrase: string; count: number }[] {
   const lower = text.toLowerCase();
   const found: { phrase: string; count: number }[] = [];
   for (const phrase of AI_PHRASES) {
     const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     const count = (lower.match(regex) || []).length;
-    if (count > 0) found.push({ phrase, count });
+    if (count > 0) found.push({ phrase: phrase.trim(), count });
   }
   return found;
 }
@@ -391,13 +416,20 @@ function auditAiPhrases(plainText: string): AuditItem[] {
   const found = countAiPhrases(plainText);
   if (found.length > 0) {
     const total = found.reduce((s, f) => s + f.count, 0);
-    const examples = found.slice(0, 5).map((f) => `"${f.phrase}" (${f.count})`).join("; ");
+    const maxShow = 10;
+    const shown = found.slice(0, maxShow);
+    const parts = shown.map((f) => {
+      const suggestion = AI_PHRASE_SUGGESTIONS[f.phrase.toLowerCase()];
+      const countStr = `"${f.phrase}" (${f.count})`;
+      return suggestion ? `${countStr} → ${suggestion}` : countStr;
+    });
+    const tail = found.length > maxShow ? `; +${found.length - maxShow} more` : "";
     items.push({
       id: "ai-phrases",
       severity: total > 3 ? "fail" : "warn",
       level: total > 3 ? 1 : 2,
       label: "AI-sounding language",
-      message: `Consider replacing: ${examples}.`,
+      message: `Consider replacing: ${parts.join("; ")}${tail}.`,
       value: total,
       guideline: "Scaled Content Abuse: generic AI language without expert input = risk. Write like a human expert.",
     });

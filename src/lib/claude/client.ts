@@ -65,7 +65,7 @@ Follow these in priority order:
 **Google: People-first, helpful content**
 - **First-hand expertise.** What does this article know that a Google search couldn't already tell someone? Write from real experience. Show specificity, original observations, or insights generic research can't produce. Avoid summarizing manufacturer descriptions or rehashing what other articles say.
 - **Satisfy search intent completely.** Answer the user's question fully. Cover all aspects so they don't need to search again. Comprehensive but natural; don't pad for word count (Google has no preferred word count; targeting word count is a search-engine-first red flag).
-- **Unique, original content.** Do not copy or rehash competitors. Add unique perspectives, examples, or actionable steps. Scaled Content Abuse (March 2024): AI content without human expertise layered in = risk.
+- **Unique, original content.** Do not copy or rehash competitors. Add unique perspectives, examples, or actionable steps. **Scaled Content Abuse:** Generic AI language without expert input = risk. Write like a human expert, not a generic assistant.
 - **Natural language.** Keyword stuffing is the most-referenced spam violation. Use keywords organically. No unnatural repetition, no keyword blocks. Natural language always takes priority.
 - **Title:** Unique, clear, descriptive. Put words people search for at the beginning. Max ~60 chars. Accurately describes the page. Avoid clickbait.
 - **Meta description:** Google calls it a "pitch." Convince users this page is exactly what they need, not a boring summary or keyword dump. Compelling and honest.
@@ -86,7 +86,8 @@ Use occasional fragments. Occasional run-ons that should have a period but don�
 **Burstiness of perplexity:** Vary how predictable each sentence is. Mix simple, everyday sentences with sentences that use more specific or unusual wording. Do not make every sentence the same style. Some sections plain and direct; others with more distinctive or concrete language.
 **Vary sentence openings.** Do not start multiple sentences with the same construction (e.g. "This [noun]..." or "It is..."). Rotate openings: questions, fragments, "And"/"But," direct address, short statements.
 
-**Pattern 2 – Zero stock AI phrases.** BANNED (use human alternatives instead):
+**Pattern 2 – Zero stock AI phrases.** Never use generic AI filler. BANNED (use human alternatives instead):
+- **Always replace (Scaled Content Abuse risk):** "crucial" → "key," "needed," or be specific; "comprehensive" → "full," "complete," or describe what's covered; "game-changer" → concrete claim or cut; "utilize" → "use"; "ensure your" / "ensure that" → "make sure" or rephrase.
 - "it's important to note that" → "here's what matters" or "keep in mind"
 - "delve" / "delve into" → "look at" or "explore"
 - "ensure that" / "ensure your" → "make sure"
@@ -309,12 +310,8 @@ Generate the JSON now.`;
       throw new Error("Invalid response from Claude: content is required and must be non-empty." + hint);
     }
 
-    // Truncate title if needed (only add "..." if actually truncated)
-    const titleChars = [...parsed.title];
-    const title =
-      titleChars.length > SEO.TITLE_MAX_CHARS
-        ? titleChars.slice(0, SEO.TITLE_MAX_CHARS - 3).join("").trim() + "..."
-        : parsed.title;
+    // Use title as-is; AI is instructed to keep under SEO.TITLE_MAX_CHARS
+    const title = parsed.title;
 
     // Truncate meta description if needed (only add "..." if actually truncated)
     const metaDescChars = parsed.metaDescription ? [...parsed.metaDescription] : [];
