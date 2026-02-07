@@ -6,7 +6,7 @@ import { fetchCompetitorUrls } from "@/lib/jina/reader";
 const ALLOWED_INTENTS = new Set(["informational", "navigational", "commercial", "transactional"]);
 
 /** Allow long posts to complete (generation + humanize pass); return 504 if exceeded. */
-const GENERATION_TIMEOUT_MS = 210_000;
+const GENERATION_TIMEOUT_MS = 600_000; // 10 minutes for full post + humanize
 
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
