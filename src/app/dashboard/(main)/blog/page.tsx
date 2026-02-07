@@ -628,16 +628,18 @@ export default function BlogMakerPage() {
                         </span>
                       )}
                     </div>
-                    {seoAudit.items.some((i) => i.id === "ai-phrases" && (i.severity === "warn" || i.severity === "fail")) && (
+                    {(seoAudit.items.some((i) => i.id === "ai-phrases" && (i.severity === "warn" || i.severity === "fail")) ||
+                      seoAudit.items.some((i) => i.id === "ai-typography" && (i.severity === "warn" || i.severity === "fail"))) && (
                       <p className="mb-3 text-[11px] text-muted-foreground">
-                        Replace flagged phrases to reduce AI detection.
+                        Replace flagged phrases and em-dashes/curly quotes. Target under 30% AI detection.
                       </p>
                     )}
                     <ul className="space-y-2">
                       {[...seoAudit.items]
                         .sort((a, b) => {
-                          const aAi = a.id === "ai-phrases" && (a.severity === "warn" || a.severity === "fail");
-                          const bAi = b.id === "ai-phrases" && (b.severity === "warn" || b.severity === "fail");
+                          const aiItems = ["ai-phrases", "ai-typography"];
+                          const aAi = aiItems.includes(a.id ?? "") && (a.severity === "warn" || a.severity === "fail");
+                          const bAi = aiItems.includes(b.id ?? "") && (b.severity === "warn" || b.severity === "fail");
                           if (aAi && !bAi) return -1;
                           if (!aAi && bAi) return 1;
                           return 0;

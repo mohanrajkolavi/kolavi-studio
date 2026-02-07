@@ -18,7 +18,7 @@
 | People-first ("Would you publish if Google didn't exist?") | Core principle in system + user prompt | Keeps meaning; doesn't re-evaluate | Not a direct check; thin content + quality checks support it |
 | First-hand expertise, unique value | Explicit in system prompt; "specificity, original observations" | Preserves content | E-E-A-T implied via author byline/bio (L1) |
 | Satisfy search intent, no padding | In user prompt; "comprehensive but natural" | No change to intent | Thin content (min words) L1 |
-| Natural language, no keyword stuffing | BANNED phrases + "use keywords organically" | Replaces stock phrases only | L1: auditKeywordStuffing; L1: auditAiPhrases |
+| Natural language, no keyword stuffing | BANNED phrases + "use keywords organically" | Replaces stock phrases only | L1: auditKeywordStuffing; L1: auditAiPhrases; L1/L2: auditAiTypography |
 | Title: unique, clear, ~60 chars, keyword early | User prompt: "Max 60 chars, primary keyword at beginning" | Does not change title | L1: auditTitle (length, presence) |
 | Meta: "pitch", compelling, ~160 chars | User prompt: "Max 160 chars, pitch" | N/A (meta not humanized) | L1: auditMetaDescription |
 | E-E-A-T | "Write as if an expert authored it"; author byline in WordPress | N/A | L1: auditAuthorByline, auditAuthorBio |
@@ -50,6 +50,7 @@
 | Sentence length mix (short/medium/long/fragments) | ~20% / ~40% / ~30% / ~10%; fragments and run-ons allowed | Same targets; "add a few fragments" | No direct check |
 | Paragraph mix (1 / 2–4 / 5–7 / 8+ sentences) | ~15% / ~50% / ~25% / ~10% | "One-sentence and 5–7 sentence paragraphs" | No direct check |
 | No stock AI phrases | Full BANNED list + human alternatives in system prompt | "Replace stock AI phrases with human alternatives" | L1: auditAiPhrases (AI_PHRASES list) |
+| No AI typography (em-dash, curly quotes) | BANNED: straight " ' only. Target under 30% AI detection | "Replace em-dash, curly quotes with straight punctuation" | L1/L2: auditAiTypography |
 | Conversational (questions, "And"/"But", asides) | Pattern 3 in system; HUMAN STYLE in user prompt | "Rhetorical questions, direct address, asides" | No direct check |
 | Personality and opinion | Pattern 6; "Make claims, don't only hedge" | "Make claims; opinions or emphasis lines" | No direct check |
 | Real examples (brands, numbers) | Pattern 7; "Ahrefs, SEMrush, $500–800" | Preserves content | No direct check |
@@ -70,6 +71,7 @@
 | Meta description present & length | 1 | Google | Publication blocker |
 | Thin content (min word count) | 1 | Google | Publication blocker |
 | AI-sounding phrases | 1 | Google / Scaled content | Publication blocker (fail if >3) or warn |
+| AI typography (em-dash, curly quotes) | 1 or 2 | AI detection (target under 30%) | Publication blocker (fail if ≥2) or warn |
 | Keyword stuffing | 1 | Google (spam) | Publication blocker |
 | Heading structure (H2–H6, hierarchy) | 1 | Google | Publication blocker |
 | Paragraph length (≤120 words) | 2 | Google / Rank Math | Ranking killer |
@@ -103,21 +105,22 @@
 | 7 | Meta description length | 2 | +1 | 0 (warn if long) |
 | 8 | Content depth (thin content) | 1 | +1 | 0 (fail if <300 words) |
 | 9 | AI-sounding language | 1 or 2 | +1 (L2) | 0 (L1 fail if >3 phrases; L2 warn) |
-| 10 | Keyword stuffing / use | 1 or 2 | +1 (L2) | 0 (L1 fail stuffing; L2 warn repetition) |
-| 11 | Headings | 1 | +1 | 0 (warn if missing) |
-| 12 | Heading hierarchy | 2 | +1 | 0 (warn if skip levels) |
-| 13 | H1 in body | 2 | +1 | 0 (warn if H1 in body) |
-| 14 | Paragraph length | 2 | +1 | 0 (warn if any para >120 words) |
-| 15 | URL slug length | 2 | +1 | 0 (warn if long) |
-| 16 | Rank Math: Keyword in meta | 3 | +1 | 0 (warn) |
-| 17 | Rank Math: First 10% | 3 | +1 | 0 (warn) |
-| 18 | Rank Math: Slug keyword | 3 | +1 | 0 (warn) |
-| 19 | Rank Math: Subheading keyword | 3 | +1 | 0 (warn) |
-| 20 | Rank Math: Content length | 3 | +1 | 0 (warn only if 600–1499 words; 1500+ = pass) |
-| 21 | Rank Math: Keyword position in title | 3 | +1 | 0 (warn) |
-| 22 | Rank Math: Number in title | 3 | +1 | 0 (warn) |
+| 10 | AI typography (em-dash, curly quotes) | 1 or 2 | +1 (L2) | 0 (L1 fail if >=2; L2 warn) |
+| 11 | Keyword stuffing / use | 1 or 2 | +1 (L2) | 0 (L1 fail stuffing; L2 warn repetition) |
+| 12 | Headings | 1 | +1 | 0 (warn if missing) |
+| 13 | Heading hierarchy | 2 | +1 | 0 (warn if skip levels) |
+| 14 | H1 in body | 2 | +1 | 0 (warn if H1 in body) |
+| 15 | Paragraph length | 2 | +1 | 0 (warn if any para >120 words) |
+| 16 | URL slug length | 2 | +1 | 0 (warn if long) |
+| 17 | Rank Math: Keyword in meta | 3 | +1 | 0 (warn) |
+| 18 | Rank Math: First 10% | 3 | +1 | 0 (warn) |
+| 19 | Rank Math: Slug keyword | 3 | +1 | 0 (warn) |
+| 20 | Rank Math: Subheading keyword | 3 | +1 | 0 (warn) |
+| 21 | Rank Math: Content length | 3 | +1 | 0 (warn only if 600-1499 words; 1500+ = pass) |
+| 22 | Rank Math: Keyword position in title | 3 | +1 | 0 (warn) |
+| 23 | Rank Math: Number in title | 3 | +1 | 0 (warn) |
 
-**Example:** 18 pass, 4 warn, 0 fail → total 22 → score = round(18/22 × 100) = **82%**. If any of the 4 warn were Level 1 fail, publishable would be false.
+**Example:** 19 pass, 4 warn, 0 fail → total 23 → score = round(19/23 × 100) = **83%**. If any of the 4 warn were Level 1 fail, publishable would be false.
 
 ---
 
@@ -151,7 +154,7 @@ The flow is designed so every output embodies:
 
 - **Generate API:** Runs `generateBlogPost` then `humanizeArticleContent`; returns one result. Dashboard audits that result with `focusKeyword` from the first keyword.
 - **Shared AI phrases:** The generator and humanize prompts use the same conceptual BANNED list as the audit's `AI_PHRASES`. When adding or removing a phrase, update: (1) generator system + user prompt in `src/lib/claude/client.ts`, (2) `AI_PHRASES` in `src/lib/seo/article-audit.ts`, (3) `AI_PHRASES` in `scripts/run-audit.mjs`.
-- **Typography:** Em-dashes and curly quotes allowed in moderation for readability. Soft guidance in prompts: avoid excessive overuse. UX-first.
+- **Typography (strict for under 30% AI detection):** Em-dash, en-dash, curly quotes BANNED. Use straight " and ' only. Synced in auditAiTypography and generator/humanize prompts. No exceptions.
 - **Detection alignment:** Generator and humanize prompts now include perplexity (unpredictable word choice), burstiness of perplexity (vary predictability), varied sentence openings, and humanize explicitly does more than paraphrase (restructure, idioms) to align with how GPTZero/ZeroGPT and similar detectors work.
 
 ---

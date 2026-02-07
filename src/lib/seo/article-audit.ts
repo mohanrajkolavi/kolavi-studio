@@ -88,6 +88,49 @@ function getParagraphs(html: string): string[] {
   return raw.map((s) => stripHtml(s)).filter((s) => s.length > 0);
 }
 
+/** AI typography: em-dash, curly/smart quotes. Banned for AI detection (target under 30%). */
+// Em-dash (—) is only here; not in AI_PHRASES, to avoid double-counting with auditAiPhrases.
+const AI_TYPOGRAPHY: { char: string; label: string }[] = [
+  { char: "\u2014", label: "em-dash (—)" },
+  { char: "\u2013", label: "en-dash (–)" },
+  { char: "\u201C", label: "curly left double quote (\")" },
+  { char: "\u201D", label: "curly right double quote (\")" },
+  { char: "\u2018", label: "curly left single quote (')" },
+  { char: "\u2019", label: "curly apostrophe/quote (')" },
+];
+
+function auditAiTypography(plainText: string): AuditItem[] {
+  const found: { label: string; count: number }[] = [];
+  for (const { char, label } of AI_TYPOGRAPHY) {
+    const count = (plainText.match(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+    if (count > 0) found.push({ label, count });
+  }
+  if (found.length > 0) {
+    const total = found.reduce((s, f) => s + f.count, 0);
+    const examples = found.map((f) => `${f.label} (${f.count})`).join("; ");
+    return [
+      {
+        id: "ai-typography",
+        severity: total >= 2 ? "fail" : "warn",
+        level: total >= 2 ? 1 : 2,
+        label: "AI typography (banned)",
+        message: `Replace: ${examples}. Use straight quotes (" ') and commas/colons instead of em-dash.`,
+        value: total,
+        guideline: "Target under 30% AI detection. Em-dash and curly quotes trigger detectors.",
+      },
+    ];
+  }
+  return [
+    {
+      id: "ai-typography",
+      severity: "pass",
+      level: 2,
+      label: "AI typography (banned)",
+      message: "No em-dash or curly quotes detected.",
+    },
+  ];
+}
+
 // AI-sounding phrases. Keep in sync with scripts/run-audit.mjs and generator BANNED list in src/lib/claude/client.ts.
 const AI_PHRASES = [
   "delve", "delve into", "landscape", "realm", "crucial", "comprehensive", "it's important to note",
@@ -96,6 +139,7 @@ const AI_PHRASES = [
   "dive deep", "navigate", "unlock", "harness", "revolutionary", "cutting-edge",
   "in this article we'll", "let's explore", "when it comes to", "certainly,", "indeed,",
   "furthermore,", "moreover,", "it's worth noting", "in terms of", "ultimately,", "essentially,", "basically,",
+  " em-dash ", // em-dash character "—" is only in AI_TYPOGRAPHY to avoid double-counting with auditAiTypography
   "a solid ", "this guide covers", "practical steps", "helps you reach", "aligns your",
   "builds trust over time", "round out", "when it fits", "where it sounds natural",
   "ensure your", "ensure that", "consider a ", "supports the decision", "worth optimizing for",
@@ -787,6 +831,7 @@ export function auditArticle(input: ArticleAuditInput): ArticleAuditResult {
     ...auditMetaDescription(input.metaDescription),
     ...auditContentThinness(plainContent),
     ...auditAiPhrases(plainContent),
+    ...auditAiTypography(plainContent),
     ...auditKeywordStuffing(plainContent, input.focusKeyword),
     ...auditHeadingStructure(input.content),
     // Level 2 — Ranking Killers (Google) — images/links skipped (added in WordPress)

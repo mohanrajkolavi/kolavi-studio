@@ -33,12 +33,21 @@ const AI_PHRASES = [
   "game-changer", "leverage", "utilize", "plethora", "myriad", "robust", "seamless", "holistic",
   "dive deep", "navigate", "unlock", "harness", "revolutionary", "cutting-edge",
   "in this article we'll", "let's explore", "when it comes to", "certainly,", "indeed,",
-  "furthermore,", "moreover,", "it's worth noting", "in terms of",   "ultimately,", "essentially,", "basically,",
+  "furthermore,", "moreover,", "it's worth noting", "in terms of",   "ultimately,", "essentially,", "basically,", "—", " em-dash ",
   "a solid ", "this guide covers", "practical steps", "helps you reach", "aligns your",
   "builds trust over time", "round out", "when it fits", "where it sounds natural",
   "ensure your", "ensure that", "consider a ", "supports the decision", "worth optimizing for",
   "unlike traditional", "combined with", "over time, this builds", "match content to intent",
   "focus on ", "start with ",
+];
+
+const AI_TYPOGRAPHY = [
+  { char: "\u2014", label: "em-dash (—)" },
+  { char: "\u2013", label: "en-dash (–)" },
+  { char: "\u201C", label: "curly left double quote (\")" },
+  { char: "\u201D", label: "curly right double quote (\")" },
+  { char: "\u2018", label: "curly left single quote (')" },
+  { char: "\u2019", label: "curly apostrophe/quote (')" },
 ];
 
 function stripHtml(html) {
@@ -114,6 +123,20 @@ if (aiFound.length > 0) {
   results.push({ icon: total > 3 ? "✗" : "⚠", label: "AI-sounding language", msg: `Consider replacing: ${examples}.`, level: 1 });
 } else {
   results.push({ icon: "✓", label: "AI-sounding language", msg: "No flagged phrases.", level: 1 });
+}
+
+// AI typography (L1/L2) - target under 30% AI detection
+const typoFound = [];
+for (const { char, label } of AI_TYPOGRAPHY) {
+  const count = (plainContent.match(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+  if (count > 0) typoFound.push({ label, count });
+}
+if (typoFound.length > 0) {
+  const total = typoFound.reduce((s, f) => s + f.count, 0);
+  const examples = typoFound.map((f) => `${f.label} (${f.count})`).join("; ");
+  results.push({ icon: total >= 2 ? "✗" : "⚠", label: "AI typography (banned)", msg: `Replace: ${examples}. Use straight quotes and commas/colons.`, level: total >= 2 ? 1 : 2 });
+} else {
+  results.push({ icon: "✓", label: "AI typography (banned)", msg: "No em-dash or curly quotes.", level: 2 });
 }
 
 // Keyword stuffing (L1)

@@ -98,7 +98,7 @@ Use occasional fragments. Occasional run-ons that should have a period but don�
 - "utilize" → "use"
 - "game-changer," "revolutionary," "cutting-edge" → concrete claims or cut
 - Also BANNED: landscape, realm, crucial, comprehensive, "in conclusion," plethora, myriad, robust, seamless, holistic, "dive deep," navigate, unlock, harness, "it's worth noting," "in terms of," "when it comes to," ultimately/essentially/basically at sentence start; "a solid [X] strategy," "this guide covers," "practical steps," "helps you reach," "aligns your," "builds trust over time," "round out," "when it fits," "where it sounds natural," "consider a," "supports the decision," "worth optimizing for"; "In this article we'll...", "Let's explore..."; "Certainly," "Indeed," "Furthermore," "Moreover" at sentence start.
-- **Typography:** Em-dashes and curly quotes are fine in moderation for readability. Avoid excessive overuse (e.g., multiple em-dashes per paragraph) which can feel templated. Prioritize what reads best for the user.
+- **BANNED typography (strict for under 30% AI detection):** Never use em-dash (—), en-dash (–), curly/smart double quotes (" "), or curly apostrophes (' '). Use straight quotes (") and straight apostrophes ('). Replace em-dash with comma, colon, period, or rewrite. Use hyphen (-) for ranges. No exceptions.
 
 **Pattern 3 – Conversational elements.** Use rhetorical questions: "Why does this matter?" "Sound familiar?" Direct address: "You've probably noticed." "If you're like most people." Casual asides in parentheses: "(and this matters)" "(spoiler: it works)." Emphasis: "This is where it gets interesting." "Most people mess this up." Start some sentences with "And" or "But."
 
@@ -108,7 +108,7 @@ Use occasional fragments. Occasional run-ons that should have a period but don�
 
 **Pattern 6 – Personality and opinion.** Do not hedge everything ("can help," "may support," "often considered"). Make claims: "this works," "you need this," "most people fail here," "here’s the truth." Add opinions and enthusiasm or frustration where it fits: "This drives me crazy." "Honestly, this changed everything."
 
-**Pattern 7 – Specific examples, not generic.** Not "many tools are available." Name real tools, brands, numbers: "Ahrefs, SEMrush, or Google Keyword Planner." Not "costs between X and Y." Use real ranges: "Expect around $500–800." Real names. Real numbers.
+**Pattern 7 – Specific examples, not generic.** Not "many tools are available." Name real tools, brands, numbers: "Ahrefs, SEMrush, or Google Keyword Planner." Not "costs between X and Y." Use real ranges: "Expect around $500-800." Real names. Real numbers.
 
 **Pattern 8 – Natural topic flow.** Do not make every transition smooth and signposted. Humans sometimes jump, circle back, or go on short tangents. A bit of messiness in how ideas connect is fine.
 
@@ -139,7 +139,7 @@ export async function generateBlogPost(
   const intentGuidesRaw = intentList.map((i) => INTENT_GUIDE[i as keyof typeof INTENT_GUIDE]).filter(Boolean);
   const intentGuides = intentGuidesRaw.length > 0 ? intentGuidesRaw : [INTENT_GUIDE.informational];
 
-  const prompt = `Generate a blog post that embodies Google Search Central, Rank Math, and human style in one draft. A humanize pass will later polish wording and rhythm only—so deliver content that already satisfies all three. Content must pass our SEO audit (75%+ score required to publish).
+  const prompt = `Generate a blog post that embodies Google Search Central, Rank Math, and human style in one draft. A humanize pass will later polish wording and rhythm only; deliver content that already satisfies all three. Content must pass our SEO audit (75%+ score required to publish).
 
 **Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added in WordPress.
 
@@ -186,11 +186,11 @@ export async function generateBlogPost(
 - **Sentence openings:** Vary openings; avoid repeating the same construction (e.g. multiple "This [noun]..." or "It is..."). Use questions, fragments, "And"/"But," direct address, short statements.
 - **Conversational:** Rhetorical questions ("Why does this matter?"), direct address ("You've probably noticed"), parenthetical asides ("(and this matters)"), emphasis ("This is where it gets interesting"). Start some sentences with "And" or "But."
 - **Personality:** Make claims, don’t only hedge. "This works." "Most people mess this up." Opinions and slight enthusiasm or frustration where it fits.
-- **Examples:** Real brand names, real numbers (e.g. "$500–800", "Ahrefs, SEMrush"). Not "many tools" or "costs between X and Y."
+- **Examples:** Real brand names, real numbers (e.g. "$500-800", "Ahrefs, SEMrush"). Not "many tools" or "costs between X and Y."
 - **Transitions:** Not every section needs a smooth signpost. Some messiness and jumping is human.
 - **Formatting:** Mix lists (numbered, bullets) and prose. Bold some terms but not all. Use both "e.g." and "for example." Small inconsistencies are fine.
 - **Imperfections:** 1–2 tiny quirks per 1000 words (missing comma, mixed "you'll"/"you will", inconsistent capitalization of same term). Never break meaning.
-- **No stock AI phrases.** Use the human alternatives from the system prompt. Stay aligned with the blog audit's AI phrase list so content passes the SEO audit.
+- **No stock AI phrases.** Use the human alternatives from the system prompt. No em-dashes, no curly quotes. Use straight " and ' only. Stay aligned with the blog audit's AI phrase list. Target under 30% AI detection.
 
 ## Intent(s): ${intentLabel}
 ${intentGuides.map((g) => `- ${g}`).join("\n")}
@@ -213,7 +213,7 @@ ${intentGuides.map((g) => `- ${g}`).join("\n")}
 4. **FAQ (3–5 Q&As)** – For informational intent. Use "People Also Search For" when available. Conversational answers, not textbook tone.
 5. **Conclusion with CTA** – Matching intent. Direct and human, not generic wrap-up.
 
-**One draft, three pillars: Google first, Rank Math second, human style throughout. Write like a knowledgeable human explaining to a friend—messy, human, real. Target under 30% AI detection. No stock AI phrases or uniform sentence length anywhere.**
+**One draft, three pillars: Google first, Rank Math second, human style throughout. Write like a knowledgeable human explaining to a friend: messy, human, real. Target under 30% AI detection. No stock AI phrases or uniform sentence length anywhere.**
 
 ${(() => {
   const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
@@ -361,11 +361,11 @@ Generate the JSON now.`;
 
 const HUMANIZE_SYSTEM = `You are an editor. Your task is to humanize article content so it passes AI detection (target under 30% on GPTZero/Originality.ai/ZeroGPT). Detectors use perplexity (word predictability) and burstiness (variation); they also flag content that is merely paraphrased. So do more than synonym swap: restructure sentences, use idioms, and vary predictability.
 
-**Preserve the essence of Google Search Central and Rank Math.** Do not remove or weaken: keyword placement in the body (including first 10%), heading structure (H2/H3) and their text, or the expert tone. You edit body HTML only—wording, rhythm, and sentence structure. Do not remove keywords from headings or intro; do not dilute E-E-A-T or search intent. Strengthen human style (sentence variety, idioms, no stock phrases) without harming SEO.
+**Preserve the essence of Google Search Central and Rank Math.** Do not remove or weaken: keyword placement in the body (including first 10%), heading structure (H2/H3) and their text, or the expert tone. You edit body HTML only: wording, rhythm, and sentence structure. Do not remove keywords from headings or intro; do not dilute E-E-A-T or search intent. Strengthen human style (sentence variety, idioms, no stock phrases) without harming SEO.
 
 Rules (keep same information, H2/H3, and HTML; change wording, rhythm, and structure where needed):
 - **Do not simply paraphrase.** Restructure: reorder clauses, split or merge sentences, change sentence boundaries. Use common idioms where they fit. Include some less predictable or vivid word choices so the text does not look like lightly edited AI. Align with the blog generator's BANNED phrase list; replace any stock AI phrasing with human alternatives.
-- **Typography:** Em-dashes and curly quotes are fine in moderation. Avoid excessive overuse; prioritize readability for the user.
+- **Typography:** Replace any em-dash (—), en-dash (–), curly quotes (" " ' '), or curly apostrophes with straight " and '. Use comma, colon, or period instead of em-dash. Required for under 30% AI detection.
 - **Sentence length chaos:** Mix short (under 10 words), medium (10–20), and long (20–35) sentences. Add a few fragments. Aim ~20% short, ~40% medium, ~30% long, ~10% very long or fragments.
 - **Burstiness of perplexity:** Vary how predictable each part is. Mix simple everyday sentences with sentences that use more specific or unusual wording. Do not make every sentence the same style.
 - **Paragraph variation:** Some one-sentence paragraphs. Some 5–7 sentence paragraphs. No predictable 3–4 sentence pattern throughout.
@@ -390,7 +390,7 @@ export async function humanizeArticleContent(html: string): Promise<string> {
     messages: [
       {
         role: "user",
-        content: `Humanize this article. Preserve Google and Rank Math alignment (keywords, headings, structure, expert tone). Restructure sentences (reorder clauses, split/merge); use idioms where natural; vary between simple and more specific wording. Replace any stock AI phrases with human alternatives. Output only the revised HTML.\n\n${trimmed}`,
+        content: `Humanize this article. Preserve Google and Rank Math alignment (keywords, headings, structure, expert tone). Restructure sentences (reorder clauses, split/merge); use idioms where natural; vary between simple and more specific wording. Replace any stock AI phrases with human alternatives. Replace em-dash, en-dash, curly quotes with straight " and '. Output only the revised HTML.\n\n${trimmed}`,
       },
     ],
   });
