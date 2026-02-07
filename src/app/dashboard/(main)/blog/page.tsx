@@ -622,7 +622,9 @@ export default function BlogMakerPage() {
                         </span>
                       ) : (
                         <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                          Below {MIN_PUBLISH_SCORE}% — fix before publishing
+                          {seoAudit.score < MIN_PUBLISH_SCORE
+                            ? `Below ${MIN_PUBLISH_SCORE}% — fix before publishing`
+                            : "Fix critical issues before publishing"}
                         </span>
                       )}
                     </div>

@@ -151,6 +151,7 @@ The flow is designed so every output embodies:
 
 - **Generate API:** Runs `generateBlogPost` then `humanizeArticleContent`; returns one result. Dashboard audits that result with `focusKeyword` from the first keyword.
 - **Shared AI phrases:** The generator and humanize prompts use the same conceptual BANNED list as the audit's `AI_PHRASES`. When adding or removing a phrase, update: (1) generator system + user prompt in `src/lib/claude/client.ts`, (2) `AI_PHRASES` in `src/lib/seo/article-audit.ts`, (3) `AI_PHRASES` in `scripts/run-audit.mjs`.
+- **Typography:** Em-dashes and curly quotes allowed in moderation for readability. Soft guidance in prompts: avoid excessive overuse. UX-first.
 - **Detection alignment:** Generator and humanize prompts now include perplexity (unpredictable word choice), burstiness of perplexity (vary predictability), varied sentence openings, and humanize explicitly does more than paraphrase (restructure, idioms) to align with how GPTZero/ZeroGPT and similar detectors work.
 
 ---

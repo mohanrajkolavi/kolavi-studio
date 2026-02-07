@@ -33,15 +33,13 @@ const AI_PHRASES = [
   "game-changer", "leverage", "utilize", "plethora", "myriad", "robust", "seamless", "holistic",
   "dive deep", "navigate", "unlock", "harness", "revolutionary", "cutting-edge",
   "in this article we'll", "let's explore", "when it comes to", "certainly,", "indeed,",
-  "furthermore,", "moreover,", "it's worth noting", "in terms of", "ultimately,", "essentially,",
-  "basically,", "—", " em-dash ",
+  "furthermore,", "moreover,", "it's worth noting", "in terms of",   "ultimately,", "essentially,", "basically,",
   "a solid ", "this guide covers", "practical steps", "helps you reach", "aligns your",
   "builds trust over time", "round out", "when it fits", "where it sounds natural",
   "ensure your", "ensure that", "consider a ", "supports the decision", "worth optimizing for",
   "unlike traditional", "combined with", "over time, this builds", "match content to intent",
   "focus on ", "start with ",
 ];
-
 
 function stripHtml(html) {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();

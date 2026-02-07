@@ -97,7 +97,8 @@ Use occasional fragments. Occasional run-ons that should have a period but don�
 - "leverage" → "use" or "take advantage of"
 - "utilize" → "use"
 - "game-changer," "revolutionary," "cutting-edge" → concrete claims or cut
-- Also BANNED: landscape, realm, crucial, comprehensive, "in conclusion," plethora, myriad, robust, seamless, holistic, "dive deep," navigate, unlock, harness, "it's worth noting," "in terms of," "when it comes to," ultimately/essentially/basically at sentence start; "a solid [X] strategy," "this guide covers," "practical steps," "helps you reach," "aligns your," "builds trust over time," "round out," "when it fits," "where it sounds natural," "consider a," "supports the decision," "worth optimizing for"; "In this article we'll...", "Let's explore..."; "Certainly," "Indeed," "Furthermore," "Moreover" at sentence start. No em-dashes (—). No excessive scare quotes.
+- Also BANNED: landscape, realm, crucial, comprehensive, "in conclusion," plethora, myriad, robust, seamless, holistic, "dive deep," navigate, unlock, harness, "it's worth noting," "in terms of," "when it comes to," ultimately/essentially/basically at sentence start; "a solid [X] strategy," "this guide covers," "practical steps," "helps you reach," "aligns your," "builds trust over time," "round out," "when it fits," "where it sounds natural," "consider a," "supports the decision," "worth optimizing for"; "In this article we'll...", "Let's explore..."; "Certainly," "Indeed," "Furthermore," "Moreover" at sentence start.
+- **Typography:** Em-dashes and curly quotes are fine in moderation for readability. Avoid excessive overuse (e.g., multiple em-dashes per paragraph) which can feel templated. Prioritize what reads best for the user.
 
 **Pattern 3 – Conversational elements.** Use rhetorical questions: "Why does this matter?" "Sound familiar?" Direct address: "You've probably noticed." "If you're like most people." Casual asides in parentheses: "(and this matters)" "(spoiler: it works)." Emphasis: "This is where it gets interesting." "Most people mess this up." Start some sentences with "And" or "But."
 
@@ -189,7 +190,7 @@ export async function generateBlogPost(
 - **Transitions:** Not every section needs a smooth signpost. Some messiness and jumping is human.
 - **Formatting:** Mix lists (numbered, bullets) and prose. Bold some terms but not all. Use both "e.g." and "for example." Small inconsistencies are fine.
 - **Imperfections:** 1–2 tiny quirks per 1000 words (missing comma, mixed "you'll"/"you will", inconsistent capitalization of same term). Never break meaning.
-- **No stock AI phrases.** Use the human alternatives from the system prompt. No em-dashes, no robotic openings. Stay aligned with the blog audit's AI phrase list so content passes the SEO audit.
+- **No stock AI phrases.** Use the human alternatives from the system prompt. Stay aligned with the blog audit's AI phrase list so content passes the SEO audit.
 
 ## Intent(s): ${intentLabel}
 ${intentGuides.map((g) => `- ${g}`).join("\n")}
@@ -363,7 +364,8 @@ const HUMANIZE_SYSTEM = `You are an editor. Your task is to humanize article con
 **Preserve the essence of Google Search Central and Rank Math.** Do not remove or weaken: keyword placement in the body (including first 10%), heading structure (H2/H3) and their text, or the expert tone. You edit body HTML only—wording, rhythm, and sentence structure. Do not remove keywords from headings or intro; do not dilute E-E-A-T or search intent. Strengthen human style (sentence variety, idioms, no stock phrases) without harming SEO.
 
 Rules (keep same information, H2/H3, and HTML; change wording, rhythm, and structure where needed):
-- **Do not simply paraphrase.** Restructure: reorder clauses, split or merge sentences, change sentence boundaries. Use common idioms where they fit. Include some less predictable or vivid word choices so the text does not look like lightly edited AI. Align with the blog generator's BANNED phrase list—replace any stock AI phrasing with human alternatives.
+- **Do not simply paraphrase.** Restructure: reorder clauses, split or merge sentences, change sentence boundaries. Use common idioms where they fit. Include some less predictable or vivid word choices so the text does not look like lightly edited AI. Align with the blog generator's BANNED phrase list; replace any stock AI phrasing with human alternatives.
+- **Typography:** Em-dashes and curly quotes are fine in moderation. Avoid excessive overuse; prioritize readability for the user.
 - **Sentence length chaos:** Mix short (under 10 words), medium (10–20), and long (20–35) sentences. Add a few fragments. Aim ~20% short, ~40% medium, ~30% long, ~10% very long or fragments.
 - **Burstiness of perplexity:** Vary how predictable each part is. Mix simple everyday sentences with sentences that use more specific or unusual wording. Do not make every sentence the same style.
 - **Paragraph variation:** Some one-sentence paragraphs. Some 5–7 sentence paragraphs. No predictable 3–4 sentence pattern throughout.
