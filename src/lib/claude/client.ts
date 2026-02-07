@@ -230,7 +230,7 @@ ${valid.map((c) => `### Competitor: ${c.url}\n\n${c.content}`).join("\n\n---\n\n
 Generate the JSON now. Write like a practitioner, not a textbook.`;
 
   try {
-    const message = await anthropic.messages.create({
+    const stream = anthropic.messages.stream({
       model: "claude-sonnet-4-5",
       max_tokens: 65536,
       temperature: 0.9, // Higher temp = less probable token selection = higher perplexity
@@ -242,6 +242,7 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
         },
       ],
     });
+    const message = await stream.finalMessage();
 
     const content = message.content[0];
     if (content.type !== "text") {
@@ -442,7 +443,7 @@ export async function humanizeArticleContent(html: string): Promise<string> {
   const trimmed = html?.trim() ?? "";
   if (trimmed.length === 0) throw new Error("Content is required for humanization");
 
-  const message = await anthropic.messages.create({
+  const stream = anthropic.messages.stream({
     model: "claude-sonnet-4-5",
     max_tokens: 16384,
     temperature: 1.0, // High temperature = less probable token choices = higher perplexity
@@ -465,6 +466,7 @@ ${trimmed}`,
       },
     ],
   });
+  const message = await stream.finalMessage();
 
   const content = message.content[0];
   if (content.type !== "text") throw new Error("Unexpected response format from Claude");
