@@ -1,5 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { SEO } from "@/lib/constants";
+import type {
+  ResearchBrief,
+  CurrentData,
+  EditorialStyle,
+  TitleMetaVariant,
+  GapTopicWithAction,
+} from "@/lib/pipeline/types";
+import { ClaudeDraftOutputSchema } from "@/lib/pipeline/types";
 
 let _client: Anthropic | null = null;
 
@@ -21,6 +29,7 @@ export type CompetitorContent = {
   success: boolean;
 };
 
+/** @deprecated Use pipeline writeDraft(ResearchBrief) instead. */
 export type BlogGenerationInput = {
   keywords: string;
   peopleAlsoSearchFor?: string;
@@ -180,6 +189,7 @@ function tryRepairTruncatedBlogJson(
   return null;
 }
 
+/** @deprecated Use pipeline writeDraft(ResearchBrief) instead. */
 export async function generateBlogPost(
   input: BlogGenerationInput
 ): Promise<BlogGenerationOutput> {
@@ -453,6 +463,324 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
 }
 
 // ---------------------------------------------------------------------------
+// PIPELINE v3: writeDraft (brief-only), fillContentGaps
+// ---------------------------------------------------------------------------
+
+function stripJsonFromResponse(text: string): string {
+  const trimmed = text.trim();
+  const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  let largest = "";
+  let match: RegExpExecArray | null;
+  while ((match = jsonBlockRegex.exec(trimmed)) !== null) {
+    const block = match[1].trim();
+    if (block.length > largest.length) largest = block;
+  }
+  if (largest.length > 0) return largest;
+  const singleMatch = trimmed.match(/```json\s*([\s\S]*?)\s*```/) || trimmed.match(/```\s*([\s\S]*?)\s*```/);
+  if (singleMatch) return singleMatch[1].trim();
+  // No code fence: try to extract a single top-level {...} object (handles preamble/extra text)
+  const firstBrace = trimmed.indexOf("{");
+  if (firstBrace !== -1) {
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let quote = '"';
+    for (let i = firstBrace; i < trimmed.length; i++) {
+      const c = trimmed[i];
+      if (inString) {
+        if (c === "\\") {
+          escape = true;
+          continue;
+        }
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (c === quote) {
+          inString = false;
+          continue;
+        }
+        continue;
+      }
+      if (c === '"' || c === "'") {
+        inString = true;
+        quote = c;
+        continue;
+      }
+      if (c === "{") depth++;
+      else if (c === "}") {
+        depth--;
+        if (depth === 0) return trimmed.slice(firstBrace, i + 1);
+      }
+    }
+  }
+  return trimmed;
+}
+
+/** Remove trailing commas before ] or } so JSON.parse can succeed. */
+function removeTrailingCommas(jsonStr: string): string {
+  return jsonStr
+    .replace(/,(\s*])/g, "$1")
+    .replace(/,(\s*})/g, "$1");
+}
+
+/**
+ * Write article draft from the strategic research brief only. Follows mandatory outline,
+ * dynamic editorial style, uses ONLY provided current data. Returns 2-3 title/meta variants.
+ */
+export async function writeDraft(
+  brief: ResearchBrief
+): Promise<{
+  titleMetaVariants: TitleMetaVariant[];
+  outline: string[];
+  content: string;
+  suggestedSlug: string;
+  suggestedCategories: string[];
+  suggestedTags: string[];
+}> {
+  const anthropic = getAnthropicClient();
+
+  const outlineBlock = brief.outline.sections
+    .map(
+      (s) =>
+        `- ${s.heading} (${s.level}) — ${s.targetWords} words. Topics: ${s.topics.join(", ")}${s.geoNote ? `. GEO: ${s.geoNote}` : ""}`
+    )
+    .join("\n");
+
+  const currentDataWarning = brief.currentData.groundingVerified
+    ? ""
+    : "\nWARNING: Current data may not be verified (no grounding sources). Use with caution and avoid stating these as confirmed facts.\n";
+
+  const styleBlock = brief.editorialStyleFallback
+    ? `Use standard human-like style: avg sentence ~15 words, mix short/medium/long; avg paragraph ~3 sentences; semi-formal, direct address; 70% prose, 20% lists, 10% tables.`
+    : `Match this editorial style: Sentence length avg ${brief.editorialStyle.sentenceLength.average} words, distribution ${brief.editorialStyle.sentenceLength.distribution.short}% short / ${brief.editorialStyle.sentenceLength.distribution.medium}% medium / ${brief.editorialStyle.sentenceLength.distribution.long}% long / ${brief.editorialStyle.sentenceLength.distribution.veryLong}% very long. Paragraph avg ${brief.editorialStyle.paragraphLength.averageSentences} sentences. Tone: ${brief.editorialStyle.tone}. Reading level: ${brief.editorialStyle.readingLevel}. Content mix: ${brief.editorialStyle.contentMix.prose}% prose, ${brief.editorialStyle.contentMix.lists}% lists, ${brief.editorialStyle.contentMix.tables}% tables. Data density: ${brief.editorialStyle.dataDensity}. Intro: ${brief.editorialStyle.introStyle}. CTA: ${brief.editorialStyle.ctaStyle}.`;
+
+  const factsBlock =
+    brief.currentData.facts.length > 0
+      ? `Current data (use ONLY these for statistics; do NOT invent numbers):\n${brief.currentData.facts.map((f) => `- ${f.fact} (Source: ${f.source})`).join("\n")}
+
+   USE ONLY PROVIDED CURRENT DATA — WITH NATURAL ATTRIBUTION:
+
+   ZERO HALLUCINATION RULE — MECHANICAL CHECK:
+   Before writing ANY specific number (dollar amount, percentage, count, growth rate, market share, ratio, score, benchmark), STOP and ask yourself: can I point to this exact number in the currentData section below?
+   - If YES: use it exactly as provided. No rounding, no adjusting, no combining with memory.
+   - If NO: do NOT write it. Use qualitative language instead.
+
+   WRONG — number from your training data, not in currentData:
+   'Market share reached 47%' → RIGHT: 'Market share climbed significantly'
+   'The company spends $8.2 billion on R&D' → RIGHT: 'The company invests heavily in R&D'
+   'Customer retention exceeds 90%' → RIGHT: 'Customer retention remains exceptionally high'
+   'Battery lasts 14 hours' → RIGHT: 'Battery life ranks among the longest in its class'
+   'Response time improved by 35%' → RIGHT: 'Response time improved substantially'
+
+   The ONLY numbers allowed in your article are:
+   1. Numbers that appear verbatim in the currentData section
+   2. Simple math derived from two currentData numbers (e.g., difference, ratio — only if BOTH input numbers are in currentData)
+   3. Non-data numbers for general context ('founded over 40 years ago', 'across 3 product categories') that are not statistical claims
+
+   Every specific number you write will be automatically cross-checked against currentData after generation. Any number not traceable to currentData will be flagged as a hallucination.
+
+   ATTRIBUTION: When citing a statistic, naturally reference WHERE the data comes from using plain language — no URLs, no links, no footnotes. Only use source names that appear in the currentData.
+   - If currentData source is an earnings report or financial filing: 'per its earnings release', 'the company reported', 'according to its quarterly filing'
+   - If currentData source is a research firm: 'according to [exact firm name from currentData]', '[firm name] estimates'
+   - If currentData source is a product spec sheet or official page: 'the manufacturer lists', 'per the official specs'
+   - If currentData source is a government or regulatory body: 'per [agency name]', 'according to [regulatory body]'
+   - If currentData source is a news outlet: 'as reported by [outlet name]'
+
+   Not every number needs attribution — but every MAJOR claim (revenue, market share, growth rate, benchmark result, key specification) should reference its source at least once. If multiple nearby facts come from the same source, attribute once and let proximity carry. Keep attributions conversational, not academic. Do NOT add URLs or a Sources section — linking is handled separately in the CMS.`
+      : "No current data provided. Do not invent specific statistics; use general language where needed.";
+
+  const userPrompt = `Write a blog post using ONLY the following research brief. Do not add image placeholders, internal/external links, or ToC.
+
+## KEYWORD & INTENT
+- Primary: ${brief.keyword.primary}
+- Secondary: ${brief.keyword.secondary.join(", ") || "None"}
+- PASF: ${brief.keyword.pasf.join(", ") || "None"}
+${currentDataWarning}
+## MANDATORY OUTLINE (follow exactly; do not skip, reorder, or add H2s; you may add H3s within H2s)
+${outlineBlock}
+
+## TOPIC CHECKLIST (cover every topic; essential = meaningful coverage; differentiator = expand for unique value)
+${brief.topicChecklist.map((t) => `- ${t.topic} (${t.importance}): ${t.guidanceNote}. Depth: ${t.targetDepth}`).join("\n")}
+
+## GAPS TO ADDRESS (uniqueness opportunities)
+${brief.gaps.length ? brief.gaps.join("\n") : "None"}
+
+## CURRENT DATA — WITH NATURAL ATTRIBUTION
+Use the statistics and facts provided in the currentData section. Do NOT invent numbers from your training data. If you need a stat and it's not in the brief, write around it or use general language without specific numbers.
+
+${factsBlock}
+
+## EDITORIAL STYLE
+${styleBlock}
+
+## GEO REQUIREMENTS
+- Direct answer: ${brief.geoRequirements.directAnswer}
+- Stats: ${brief.geoRequirements.statDensity}
+- Entities: ${brief.geoRequirements.entities}
+- FAQ ANSWERS — HARD CHARACTER LIMIT: Each FAQ answer MUST be 300 characters or fewer (hard limit). Format: exactly 2 sentences — first = direct factual answer; second = one new insight or angle NOT covered in the article body. If over 300 characters, shorten. After writing each answer, count characters; if over 300, rewrite shorter. This limit is mechanically enforced after generation.
+- FAQ ANTI-REDUNDANCY: Each FAQ answer MUST provide information or framing that does NOT appear in the article body. Before writing each answer, scan the body: if a reader could learn this exact thing from the body alone, your answer is redundant — write something different (new angle, practical takeaway, contrast, forward-looking twist, or caveat). Do not restate stats or summarize what a section already explains.
+${brief.geoRequirements.faqStrategy ? `- FAQ strategy: ${brief.geoRequirements.faqStrategy}` : ""}
+
+## SEO
+- ${brief.geoRequirements.directAnswer}
+- Title: ${brief.seoRequirements.keywordInTitle}; first 10%: ${brief.seoRequirements.keywordInFirst10Percent}; subheadings: ${brief.seoRequirements.keywordInSubheadings}; max paragraph words: ${brief.seoRequirements.maxParagraphWords}; FAQ count: ${brief.seoRequirements.faqCount}
+
+## WORD COUNT (guideline)
+Target: ${brief.wordCount.target}. ${brief.wordCount.note}
+
+## EXPERIENCE SIGNALS (2-3 per article)
+Weave in 2-3 shared-experience references that signal firsthand familiarity with the subject. Use 'you' and 'anyone who' framing — NOT fabricated personal stories or credentials.
+- Product/brand topics: 'Anyone who's [common user action with this product] knows...'
+- Technical/how-to topics: 'If you've ever [common frustration related to this task], you'll recognize...'
+- Business/strategy topics: 'Walk into any [relevant setting for this industry] and you'll see...'
+- Comparison topics: 'The difference becomes obvious the moment you [action that reveals the gap]...'
+- Review topics: 'After [realistic usage period], you start to notice...'
+- Informational topics: 'Ask anyone who's [relevant experience] and they'll tell you...'
+Rules: 2-3 total per article, placed where they strengthen the argument. Never fake credentials ('as a financial analyst...', 'in my 10 years...'). Each must connect to a key point. Use shared common experience, not individual personal anecdote. If the topic doesn't naturally lend itself to experience signals, use fewer rather than forcing them.
+
+## OUTPUT FORMAT (valid JSON only)
+Generate 2-3 title and meta description pairs. Each a different approach: Option 1 = Direct keyword-first; Option 2 = Curiosity hook or question; Option 3 = Data-led or number-based (if data supports it). All options: primary keyword in first 50% of title, in meta description; title max 60 chars, meta 120-160 chars.
+
+{
+  "titleMetaVariants": [
+    { "title": "...", "metaDescription": "...", "approach": "Direct keyword-first" },
+    { "title": "...", "metaDescription": "...", "approach": "Curiosity hook" },
+    { "title": "...", "metaDescription": "...", "approach": "Data-led" }
+  ],
+  "outline": ["H2 1", "H2 2", ...],
+  "content": "<p>...</p><h2>...</h2>...",
+  "suggestedSlug": "lowercase-hyphenated",
+  "suggestedCategories": ["cat1", "cat2"],
+  "suggestedTags": ["tag1", "tag2", "tag3"]
+}
+
+Generate the JSON now.`;
+
+  const stream = anthropic.messages.stream({
+    model: "claude-sonnet-4-5",
+    max_tokens: 64000,
+    temperature: 0.7,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const message = await stream.finalMessage();
+  const content = message.content?.[0];
+  if (!content || content.type !== "text") {
+    throw new Error("Claude writeDraft returned an empty or non-text response");
+  }
+  const rawExtracted = stripJsonFromResponse(content.text);
+  const jsonText = removeTrailingCommas(normalizeJsonString(rawExtracted));
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(jsonText) as Record<string, unknown>;
+  } catch (err) {
+    const snippet = content.text.slice(0, 600);
+    const errMsg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Claude writeDraft returned invalid JSON: ${errMsg}. First 600 chars: ${snippet}`);
+  }
+
+  const validated = ClaudeDraftOutputSchema.safeParse(parsed);
+  if (validated.success) {
+    const v = validated.data;
+    const slugRaw = v.suggestedSlug?.trim() || brief.keyword.primary.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+    const slug = slugRaw.length > SEO.URL_SLUG_MAX_CHARS ? slugRaw.slice(0, SEO.URL_SLUG_MAX_CHARS).replace(/-+$/, "") : slugRaw;
+    return {
+      titleMetaVariants: v.titleMetaVariants,
+      outline: v.outline,
+      content: v.content,
+      suggestedSlug: slug,
+      suggestedCategories: v.suggestedCategories ?? [],
+      suggestedTags: v.suggestedTags ?? [],
+    };
+  }
+
+  const contentOnly = typeof parsed.content === "string" && parsed.content.trim().length > 0;
+  if (!contentOnly) {
+    console.error("[claude] writeDraft Zod errors:", validated.error.flatten());
+    throw new Error("Claude writeDraft response missing or empty content");
+  }
+  const fallbackTitle = brief.keyword.primary;
+  const titleMetaVariants: TitleMetaVariant[] = Array.isArray(parsed.titleMetaVariants) && parsed.titleMetaVariants.length > 0
+    ? parsed.titleMetaVariants.slice(0, 3).map((x: unknown) => {
+        const t = x as Record<string, unknown>;
+        return {
+          title: (typeof t.title === "string" ? t.title : fallbackTitle).slice(0, 60),
+          metaDescription: (typeof t.metaDescription === "string" ? t.metaDescription : "").slice(0, 160),
+          approach: typeof t.approach === "string" ? t.approach : "Direct",
+        };
+      })
+    : [{ title: fallbackTitle.slice(0, 60), metaDescription: "", approach: "Direct keyword-first" }];
+  const outline = Array.isArray(parsed.outline) ? parsed.outline.filter((h): h is string => typeof h === "string") : [];
+  const slugRaw = (typeof parsed.suggestedSlug === "string" ? parsed.suggestedSlug : "").trim() || brief.keyword.primary.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
+  const slug = slugRaw.length > SEO.URL_SLUG_MAX_CHARS ? slugRaw.slice(0, SEO.URL_SLUG_MAX_CHARS).replace(/-+$/, "") : slugRaw;
+  return {
+    titleMetaVariants,
+    outline,
+    content: parsed.content as string,
+    suggestedSlug: slug,
+    suggestedCategories: Array.isArray(parsed.suggestedCategories) ? parsed.suggestedCategories.filter((c): c is string => typeof c === "string") : [],
+    suggestedTags: Array.isArray(parsed.suggestedTags) ? parsed.suggestedTags.filter((t): t is string => typeof t === "string") : [],
+  };
+}
+
+/**
+ * Surgically add content for gap topics that scored below threshold. Inserts at logical positions; does not rewrite existing content.
+ */
+export async function fillContentGaps(
+  draftHtml: string,
+  gaps: GapTopicWithAction[],
+  currentData: CurrentData,
+  editorialStyle: EditorialStyle
+): Promise<string> {
+  if (gaps.length === 0) return draftHtml;
+  const anthropic = getAnthropicClient();
+  const factsBlock =
+    currentData.facts.length > 0
+      ? currentData.facts.map((f) => `- ${f.fact} (${f.source})`).join("\n")
+      : "No additional stats provided.";
+  const prompt = `The following article was scored for topic coverage. These topics scored below threshold and need additional content.
+
+ZERO HALLUCINATION RULE: Every specific number you add MUST appear verbatim in the provided currentData. Before writing any number, verify it exists in currentData. If it doesn't, use qualitative language instead. Your output will be automatically fact-checked against source data — any unverifiable number will be flagged.
+
+GAP TOPICS (add 100-200 words each at the most logical position — after a related H2, or as a new H3 under an existing H2):
+${gaps.map((g) => `- ${g.topic}: ${g.recommendedAction}`).join("\n")}
+
+Use this current data for any statistics:
+${factsBlock}
+
+Match the existing writing style: sentence length ~${editorialStyle.sentenceLength.average} words, tone: ${editorialStyle.tone}, reading level: ${editorialStyle.readingLevel}.
+
+INSTRUCTIONS: INSERT content only. Do NOT rewrite existing content. Preserve all existing HTML structure, headings, and formatting. Return the COMPLETE article HTML with the new content inserted.`;
+
+  const stream = anthropic.messages.stream({
+    model: "claude-sonnet-4-5",
+    max_tokens: 32000,
+    temperature: 0.7,
+    system: "You are an editor. Insert new sections or paragraphs to fill content gaps. Preserve all existing HTML and structure. Return only the full HTML article.",
+    messages: [
+      {
+        role: "user",
+        content: (() => {
+          const limit = 50000;
+          if (draftHtml.length <= limit) return `Article HTML:\n\n${draftHtml}\n\n---\n\n${prompt}`;
+          const slice = draftHtml.slice(0, limit);
+          const lastClose = slice.lastIndexOf(">");
+          const cut = lastClose >= 0 ? slice.slice(0, lastClose + 1) : slice;
+          return `Article HTML:\n\n${cut}\n\n---\n\n${prompt}`;
+        })(),
+      },
+    ],
+  });
+  const message = await stream.finalMessage();
+  const part = message.content?.[0];
+  if (!part || part.type !== "text") return draftHtml;
+  const text = part.text.trim();
+  const codeMatch = text.match(/```(?:html)?\s*([\s\S]*?)```/);
+  return (codeMatch ? codeMatch[1].trim() : text) || draftHtml;
+}
+
+// ---------------------------------------------------------------------------
 // HUMANIZE PASS
 //
 // This is NOT a light editing pass. It's a heavy rewrite targeting the
@@ -471,6 +799,26 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
 
 const HUMANIZE_SYSTEM = `You are a ruthless editor whose job is to make AI-generated articles read like they were written by a human practitioner. Not "polished." Not "improved." HUMAN.
 
+## CONTENT SAFETY — THESE RULES OVERRIDE ALL OTHERS
+
+The humanization pass exists to change linguistic patterns. It does NOT exist to change content. If any linguistic rule below would require removing, shortening, or diluting content — SKIP that specific application of the rule and move on.
+
+NEVER DO ANY OF THESE:
+- Remove or shorten any section, paragraph, or substantive sentence to create variation. ADD variation by splitting or merging — never by deleting.
+- Remove, alter, or round any statistic, number, percentage, date, or financial figure. '$143.8 billion' stays '$143.8 billion' — never 'over $140 billion' or 'nearly $144 billion'.
+- Invent, add, or generate ANY new statistic, number, or data point that wasn't in the original draft. The humanizer ONLY rephrases existing content — it never creates new claims or data.
+- Invent, add, or change ANY source attribution name. If the draft says 'per its earnings release', do not change it to 'according to Bloomberg' or any other source.
+- Remove or rephrase source attribution phrases ('per its earnings release', 'according to [source]'). These are E-E-A-T trustworthiness signals.
+- Remove, reorder, or merge any H2 or H3 section. The outline structure is strategically decided — do not touch it.
+- Remove or weaken any FAQ question or answer. FAQ answers must stay under 300 characters — do not expand them either.
+- Remove experience signal sentences ('Anyone who's tried...', 'If you've followed...'). These are deliberate E-E-A-T experience markers.
+- Remove or dilute the direct answer in the opening 30-40 words. This is the GEO extraction target.
+- Remove entity mentions (company names, product names, person names, place names). These are GEO entity signals.
+- Shorten any section below its target word count from the outline. Depth is a ranking signal — don't sacrifice it for style.
+- Change the article from helpful to vague. If a sentence makes a specific, useful claim backed by data — keep the specificity. Rephrase the delivery, not the substance.
+
+IN SHORT: The article must be EQUALLY helpful, data-rich, well-structured, fresh, and comprehensive AFTER humanization as it was before. The only thing that changes is the linguistic texture — word choices, sentence rhythms, transitions, tone variation. A Google Search quality rater evaluating the pre-humanized and post-humanized versions should score them identically on helpfulness, expertise, and comprehensiveness.
+
 You understand that AI detectors measure three things:
 1. **Perplexity (word-level):** How predictable each word is. AI text = uniformly low perplexity (every word is the most probable choice). Human text = variable perplexity with spikes of unexpected words.
 2. **Burstiness (sentence-level):** How much the predictability varies from sentence to sentence. AI = flat, uniform. Human = zigzag.
@@ -480,13 +828,35 @@ Your job: inject perplexity spikes, create burstiness variation, and break class
 
 ## RULES
 
-### PRESERVE (do not touch):
-- All H2 and H3 headings and their text
-- Keywords in the first 10% of content
-- Keywords in the body (don't remove them)
-- The factual content, claims, and data
-- Overall structure and section order
-- HTML tags and formatting
+### ABSOLUTE PRESERVE LIST — do NOT change during humanization, regardless of article type:
+- All H2 and H3 headings (exact text, exact order, exact hierarchy)
+- All statistics, numbers, percentages, dates, and financial figures (exact values — no rounding)
+- All source attribution phrases ('per [source]', 'according to [source name]', '[source] reported'). These are E-E-A-T trustworthiness signals — do NOT remove, rephrase, or swap them for different source names.
+- GEO elements: direct answer in opening paragraph, FAQ Q&A structure, entity mentions
+- Experience signal sentences ('Anyone who's...', 'If you've...', 'Walk into any...')
+- FAQ answer content and length (under 300 characters — do not expand or shorten)
+- HTML structure and tags
+- Section order and nesting
+- Summary tables, comparison tables, and all structured list content
+- The overall word count (humanized version must be within ±5% of original)
+
+### CHANGE FREELY:
+- Sentence lengths and rhythm (make them varied)
+- Word choices (make them less predictable)
+- Transitions between paragraphs (remove smooth connectors, use abrupt shifts)
+- Paragraph break points (split long paragraphs, merge short ones — but never delete content)
+- Tone and register variation (mix formal and informal)
+- Opening words of sentences (vary aggressively — never 3+ sentences starting the same way)
+
+### ADDITIONAL LINGUISTIC ENFORCEMENT — apply on top of existing rules:
+
+These rules change HOW things are written. They NEVER change WHAT is written. Do not remove content, data, sections, or coverage to satisfy these rules.
+
+1. SENTENCE LENGTH VARIATION: Scan for any run of 3+ sentences within 5 words of each other in length. Break the pattern — shorten one to 3-6 words or extend one past 30 words. Ensure at least 15% of all sentences are very short (1-7 words) for punch. Examples: 'That's the trade-off.' / 'No way around it.' / 'Full stop.' / 'Worth watching.'
+2. PARAGRAPH VARIANCE: Never let 3 consecutive paragraphs have the same sentence count. Use at least 3-4 single-sentence paragraphs per article for emphasis. Occasionally let one paragraph run to 5-6 sentences when building a complex argument.
+3. TRANSITION PURGE: Actively find and delete: 'Furthermore', 'Additionally', 'Moreover', 'In addition', 'It's worth noting', 'It's important to note', 'Consequently', 'As a result'. Replace with nothing (just start the next thought directly), or with opinionated starters: 'But here's the thing -', 'Look,', 'The real story:', 'What matters more:'.
+4. REGISTER MIXING: Within any 3-paragraph span, at least one sentence should be noticeably more casual than its neighbors. Drop in unexpected informality once every 300-400 words: 'bonkers', 'gutsy', 'no-brainer', 'that ship has sailed', 'good luck with that'. This breaks the uniform register that detectors flag.
+5. CONFIDENCE SPIKES: Add 3-4 moments per article where the voice becomes unusually direct: 'This isn't debatable.' / 'That's just math.' / 'You'll lose.' These bursts of conviction are the opposite of AI's uniform hedging.
 
 ### ATTACK THESE PATTERNS:
 
@@ -545,7 +915,7 @@ export async function humanizeArticleContent(html: string): Promise<string> {
   const stream = anthropic.messages.stream({
     model: "claude-sonnet-4-5",
     max_tokens: 16384,
-    temperature: 1.0, // High temperature = less probable token choices = higher perplexity
+    temperature: 0.8,
     system: HUMANIZE_SYSTEM,
     messages: [
       {

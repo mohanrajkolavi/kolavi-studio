@@ -5,9 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { TagInput } from "@/components/dashboard/TagInput";
+import { useBlogGeneration } from "@/components/dashboard/BlogGenerationProvider";
 import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, History, ChevronDown } from "lucide-react";
 import { SEO } from "@/lib/constants";
 import { auditArticle, MIN_PUBLISH_SCORE } from "@/lib/seo/article-audit";
+import type { GeneratedContent, PipelineResult } from "@/lib/blog/generation-types";
+import { pipelineToGenerated } from "@/lib/blog/generation-types";
 
 /** API history entry (snake_case). */
 type HistoryEntry = {
@@ -62,16 +65,6 @@ function htmlToPlainText(html: string): string {
     .replace(/&quot;/g, '"');
   return t.replace(/\n{3,}/g, "\n\n").replace(/\n\s*\n/g, "\n\n").trim();
 }
-
-type GeneratedContent = {
-  title: string;
-  metaDescription: string;
-  outline: string[];
-  content: string;
-  suggestedSlug?: string;
-  suggestedCategories?: string[];
-  suggestedTags?: string[];
-};
 
 type IntentType = "informational" | "navigational" | "commercial" | "transactional";
 
@@ -155,16 +148,34 @@ const SAMPLE_OUTPUT: GeneratedContent = {
 };
 
 export default function BlogMakerPage() {
+  const {
+    generating,
+    generated: contextGenerated,
+    result: contextResult,
+    error: generationError,
+    startGeneration,
+    clearResult,
+    clearError,
+    setSelectedTitleIndex,
+  } = useBlogGeneration();
+
   const [keywords, setKeywords] = useState<string[]>([]);
   const [peopleAlsoSearchFor, setPeopleAlsoSearchFor] = useState<string[]>([]);
   const [intent, setIntent] = useState<IntentType[]>([]);
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
-  const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState<GeneratedContent | null>(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [sampleOutput, setSampleOutput] = useState<GeneratedContent | null>(null);
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
   const [contentView, setContentView] = useState<"preview" | "text">("preview");
+
+  const generated = contextGenerated ?? sampleOutput;
+  const pipelineResult = contextResult?.pipelineResult ?? null;
+  const selectedTitleIndex = contextResult?.selectedTitleIndex ?? 0;
+  const generationInput = contextResult?.input ?? { keywords: [], peopleAlsoSearchFor: [], intent: [], competitorUrls: [] };
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [metaCopyField, setMetaCopyField] = useState<"title" | "metaDescription" | "slug" | null>(null);
+  const [schemaOpen, setSchemaOpen] = useState(false);
+  const [qualityChecksOpen, setQualityChecksOpen] = useState(false);
   const [status, setStatus] = useState<{
     type: "success" | "error" | null;
     message: string;
@@ -175,6 +186,11 @@ export default function BlogMakerPage() {
   const [historyError, setHistoryError] = useState<"auth" | "config" | "error" | null>(null);
   const [recentOpen, setRecentOpen] = useState(false);
   const recentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (generated) setEditing({ ...generated });
+  }, [generated]);
+
   useEffect(() => {
     if (!recentOpen) return;
     function handleClick(e: MouseEvent) {
@@ -214,13 +230,16 @@ export default function BlogMakerPage() {
 
   const seoAudit = useMemo(() => {
     if (!editing) return null;
+    if (pipelineResult?.auditResult) {
+      return pipelineResult.auditResult as ReturnType<typeof auditArticle>;
+    }
     try {
       return auditArticle({
         title: editing.title,
         metaDescription: editing.metaDescription,
         content: editing.content,
         slug: editing.suggestedSlug,
-        focusKeyword: keywords[0] ?? undefined,
+        focusKeyword: generationInput.keywords[0] ?? keywords[0] ?? undefined,
       });
     } catch (e) {
       return {
@@ -237,7 +256,7 @@ export default function BlogMakerPage() {
         publishable: false,
       };
     }
-  }, [editing, keywords]);
+  }, [editing, keywords, generationInput.keywords, pipelineResult?.auditResult]);
 
   async function handleCopyForWordPress() {
     if (!editing?.content) return;
@@ -267,50 +286,16 @@ export default function BlogMakerPage() {
     }
   }
 
-  async function handleGenerate(e: React.FormEvent<HTMLFormElement>) {
+  function handleGenerate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setGenerating(true);
     setStatus({ type: null, message: "" });
-
-    try {
-      const response = await fetch("/api/blog/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          keywords: keywords.join(", "),
-          peopleAlsoSearchFor: peopleAlsoSearchFor.join(", "),
-          intent: intent.length > 0 ? intent : ["informational"],
-          competitorUrls: competitorUrls,
-        }),
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Failed to generate blog post";
-        try {
-          const data = await response.json();
-          errorMessage = data.error || errorMessage;
-        } catch {
-          // If response is not JSON, use status text
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
-      }
-
-      const result = await response.json();
-      setGenerated(result);
-      setEditing({ ...result });
-      setContentView("preview");
-    } catch (error) {
-      setStatus({
-        type: "error",
-        message:
-          error instanceof Error
-            ? error.message
-            : "Failed to generate blog post",
-      });
-    } finally {
-      setGenerating(false);
-    }
+    startGeneration({
+      keywords,
+      peopleAlsoSearchFor,
+      intent: intent.length > 0 ? intent : ["informational"],
+      competitorUrls,
+    });
+    setContentView("preview");
   }
 
   return (
@@ -322,7 +307,7 @@ export default function BlogMakerPage() {
             Blog Maker
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Generate SEO-optimized posts with AI. Tip: up to 6 keywords, 3 people also search for, and 2 competitors for best results.
+            Enter a keyword to generate an SEO-optimized post. Competitor URLs are found automatically.
           </p>
         </div>
         {generated ? (
@@ -332,7 +317,8 @@ export default function BlogMakerPage() {
             size="sm"
             onClick={() => {
               const current = editing;
-              setGenerated(null);
+              clearResult();
+              setSampleOutput(null);
               setEditing(null);
               if (current && current.title !== SAMPLE_OUTPUT.title) {
                 fetch("/api/blog/history", {
@@ -357,7 +343,7 @@ export default function BlogMakerPage() {
               setKeywords(["medical spa SEO", "aesthetic practice marketing"]);
               setPeopleAlsoSearchFor(["how long for SEO results", "medical spa blog"]);
               setIntent(["informational"]);
-              setGenerated(SAMPLE_OUTPUT);
+              setSampleOutput(SAMPLE_OUTPUT);
               setEditing({ ...SAMPLE_OUTPUT });
               setContentView("preview");
             }}
@@ -368,7 +354,7 @@ export default function BlogMakerPage() {
         )}
       </header>
 
-      {status.type && (
+      {(status.type || generationError) && (
         <div
           role="alert"
           className={`flex items-start justify-between gap-4 rounded-2xl px-5 py-4 text-sm ${
@@ -378,7 +364,7 @@ export default function BlogMakerPage() {
           }`}
         >
           <div className="min-w-0 flex-1">
-            <p>{status.message}</p>
+            <p>{status.message || generationError}</p>
             {status.type === "success" && status.link && (
               <a
                 href={status.link}
@@ -392,7 +378,10 @@ export default function BlogMakerPage() {
           </div>
           <button
             type="button"
-            onClick={() => setStatus({ type: null, message: "", link: undefined })}
+            onClick={() => {
+              setStatus({ type: null, message: "", link: undefined });
+              clearError();
+            }}
             className="shrink-0 rounded-2xl p-1 opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-foreground/20"
             aria-label="Dismiss"
           >
@@ -494,24 +483,31 @@ export default function BlogMakerPage() {
               </div>
             </section>
 
-            {/* Competitor URLs */}
-            <section className="space-y-3 border-t border-border/50 p-8 sm:p-10">
-              <div>
-                <h3 className="text-sm font-medium text-foreground">
-                  Competitor articles
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  URLs for structure reference. Fetched via Jina Reader. Max 2.
-                </p>
-              </div>
-              <TagInput
-                tags={competitorUrls}
-                onTagsChange={setCompetitorUrls}
-                placeholder="Paste URL, press Enter"
-                maxTags={2}
-                disabled={generating}
-                className="min-h-12 rounded-2xl bg-background px-4 py-3"
-              />
+            {/* Advanced: optional competitor URLs override */}
+            <section className="border-t border-border/50 p-8 sm:p-10">
+              <button
+                type="button"
+                onClick={() => setAdvancedOpen((o) => !o)}
+                className="flex w-full items-center justify-between text-left text-sm font-medium text-foreground"
+              >
+                Advanced
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
+              </button>
+              {advancedOpen && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Optional: paste competitor URLs to use instead of auto-found results. Leave empty to use automatic search.
+                  </p>
+                  <TagInput
+                    tags={competitorUrls}
+                    onTagsChange={setCompetitorUrls}
+                    placeholder="Paste URL, press Enter"
+                    maxTags={5}
+                    disabled={generating}
+                    className="min-h-12 rounded-2xl bg-background px-4 py-3"
+                  />
+                </div>
+              )}
             </section>
 
             {/* Submit: Recent button (same size as Generate post) opposite Generate post */}
@@ -547,7 +543,8 @@ export default function BlogMakerPage() {
                               type="button"
                               onClick={() => {
                                 const content = historyEntryToContent(entry);
-                                setGenerated(content);
+                                clearResult();
+                                setSampleOutput(content);
                                 setEditing(content);
                                 setContentView("preview");
                                 setRecentOpen(false);
@@ -683,7 +680,48 @@ export default function BlogMakerPage() {
                 </div>
               )}
 
-              {(keywords.length > 0 || peopleAlsoSearchFor.length > 0) && (
+              {/* Topic coverage (pipeline v3) */}
+              {pipelineResult?.topicScoreReport && (
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Topic coverage
+                    </p>
+                    <span
+                      className={`text-sm font-bold tabular-nums ${
+                        pipelineResult.topicScoreReport.overallScore >= 75
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : pipelineResult.topicScoreReport.overallScore >= 50
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {pipelineResult.topicScoreReport.overallScore}/100
+                    </span>
+                  </div>
+                  <ul className="space-y-1.5 p-4">
+                    {pipelineResult.topicScoreReport.topicScores.map((t, i) => (
+                      <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-2.5 py-2">
+                        <span className="min-w-0 truncate text-xs text-foreground">{t.topic}</span>
+                        <span
+                          className={`shrink-0 text-xs font-medium ${
+                            t.score >= 75 ? "text-emerald-600" : t.score >= 50 ? "text-amber-600" : "text-red-600"
+                          }`}
+                        >
+                          {t.score}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {pipelineResult.topicScoreReport.gapTopics.length > 0 && (
+                    <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+                      Gaps auto-filled where possible. Review recommended actions in the report.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(generationInput.keywords.length > 0 || generationInput.peopleAlsoSearchFor.length > 0) && (
                 <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                   <div className="border-b border-border px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -691,13 +729,13 @@ export default function BlogMakerPage() {
                     </p>
                   </div>
                   <div className="space-y-4 p-4">
-                    {keywords.length > 0 && (
+                    {generationInput.keywords.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           Keywords
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {keywords.map((k, i) => (
+                          {generationInput.keywords.map((k, i) => (
                             <span
                               key={i}
                               className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
@@ -708,13 +746,13 @@ export default function BlogMakerPage() {
                         </div>
                       </div>
                     )}
-                    {peopleAlsoSearchFor.length > 0 && (
+                    {generationInput.peopleAlsoSearchFor.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           People also search for
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {peopleAlsoSearchFor.map((p, i) => (
+                          {generationInput.peopleAlsoSearchFor.map((p, i) => (
                             <span
                               key={i}
                               className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
@@ -725,13 +763,13 @@ export default function BlogMakerPage() {
                         </div>
                       </div>
                     )}
-                    {intent.length > 0 && (
+                    {generationInput.intent.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                           Intent
                         </p>
                         <div className="flex flex-wrap gap-2">
-                          {intent.map((i) => (
+                          {generationInput.intent.map((i) => (
                             <span
                               key={i}
                               className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
@@ -775,11 +813,267 @@ export default function BlogMakerPage() {
                   ))}
                 </div>
               </div>
+
+              {/* Source URLs (pipeline v3) */}
+              {pipelineResult?.sourceUrls && pipelineResult.sourceUrls.length > 0 && (
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="border-b border-border px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Sources used in this article
+                    </p>
+                  </div>
+                  <ul className="max-h-40 space-y-1 overflow-y-auto p-4">
+                    {pipelineResult.sourceUrls.slice(0, 15).map((url, i) => (
+                      <li key={i}>
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="truncate text-xs text-orange-600 underline hover:no-underline dark:text-orange-400"
+                        >
+                          {url}
+                        </a>
+                      </li>
+                    ))}
+                    {pipelineResult.sourceUrls.length > 15 && (
+                      <li className="text-[11px] text-muted-foreground">+{pipelineResult.sourceUrls.length - 15} more</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+
+              {/* Schema markup preview (pipeline v3) */}
+              {pipelineResult?.schemaMarkup && (
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Schema markup
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSchemaOpen((o) => !o)}
+                      className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      {schemaOpen ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    <p className="mb-2 text-[11px] text-muted-foreground">
+                      Article ✓ · FAQ {pipelineResult.schemaMarkup.faq ? "✓" : "✗"} · Breadcrumb ✓
+                      {pipelineResult.schemaMarkup.faqSchemaNote ? (
+                        <span className="ml-1" title={pipelineResult.schemaMarkup.faqSchemaNote}>
+                          (i)
+                        </span>
+                      ) : null}
+                    </p>
+                    {schemaOpen && (
+                      <div className="mt-2 rounded-lg bg-muted/50 p-3">
+                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">
+                          {JSON.stringify(
+                            {
+                              article: pipelineResult.schemaMarkup.article,
+                              faq: pipelineResult.schemaMarkup.faq,
+                              breadcrumb: pipelineResult.schemaMarkup.breadcrumb,
+                              faqSchemaNote: pipelineResult.schemaMarkup.faqSchemaNote,
+                            },
+                            null,
+                            2
+                          )}
+                        </pre>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2 h-8 text-xs"
+                          onClick={() => {
+                            const sm = pipelineResult.schemaMarkup;
+                            if (!sm) return;
+                            const json = JSON.stringify(
+                              {
+                                "@context": "https://schema.org",
+                                ...sm.article,
+                                ...(sm.faq && { faqPage: sm.faq }),
+                                ...(sm.breadcrumb && { breadcrumb: sm.breadcrumb }),
+                              },
+                              null,
+                              2
+                            );
+                            navigator.clipboard.writeText(json).then(() => setStatus({ type: "success", message: "Schema copied" }));
+                          }}
+                        >
+                          <Copy className="mr-1.5 h-3.5 w-3.5" />
+                          Copy schema
+                        </Button>
+                      </div>
+                    )}
+                    <p className="mt-2 text-[10px] text-muted-foreground">
+                      Injected by CMS on publish.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Quality checks (v4.1: content integrity, FAQ enforcement, fact check) */}
+              {(pipelineResult?.contentIntegrity || pipelineResult?.faqEnforcement || pipelineResult?.factCheck) && (
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Quality checks
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setQualityChecksOpen((o) => !o)}
+                      className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                    >
+                      {qualityChecksOpen ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {pipelineResult.contentIntegrity && (
+                      <div className="rounded-lg bg-muted/30 px-3 py-2">
+                        <p className="text-[11px] font-medium text-muted-foreground">Content integrity (post-humanize)</p>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs">
+                          {pipelineResult.contentIntegrity.passed ? (
+                            <span className="text-emerald-600 dark:text-emerald-400">✓ Passed</span>
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              ⚠ {pipelineResult.contentIntegrity.issues.length} issue{pipelineResult.contentIntegrity.issues.length !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                          {pipelineResult.contentIntegrity.restorations?.length > 0 && (
+                            <span className="text-[10px] text-muted-foreground">({pipelineResult.contentIntegrity.restorations.length} restored)</span>
+                          )}
+                        </p>
+                        {qualityChecksOpen && pipelineResult.contentIntegrity.issues.length > 0 && (
+                          <ul className="mt-2 max-h-32 overflow-y-auto space-y-1 text-[11px] text-muted-foreground list-disc list-inside">
+                            {pipelineResult.contentIntegrity.issues.map((issue, i) => (
+                              <li key={i}>{issue}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {qualityChecksOpen && ((pipelineResult.contentIntegrity.restorations?.length ?? 0) > 0) && (
+                          <>
+                            <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">Restorations:</p>
+                            <ul className="mt-0.5 max-h-24 overflow-y-auto space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
+                              {pipelineResult.contentIntegrity.restorations!.map((r, i) => (
+                                <li key={i}>{r}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                        {qualityChecksOpen && ((pipelineResult.contentIntegrity.postRestorationIssues?.length ?? 0) > 0) && (
+                          <>
+                            <p className="mt-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">Post-restoration issues:</p>
+                            <ul className="mt-0.5 max-h-24 overflow-y-auto space-y-0.5 text-[11px] list-disc list-inside">
+                              {pipelineResult.contentIntegrity.postRestorationIssues!.map((issue, i) => (
+                                <li key={i}>{issue}</li>
+                              ))}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    {pipelineResult.faqEnforcement && (
+                      <div className="rounded-lg bg-muted/30 px-3 py-2">
+                        <p className="text-[11px] font-medium text-muted-foreground" title="FAQ answers over 300 characters are auto-truncated to stay within limit">
+                          FAQ character limit (300)
+                        </p>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs">
+                          {pipelineResult.faqEnforcement.passed ? (
+                            <span className="text-emerald-600 dark:text-emerald-400">✓ Passed</span>
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400" title="Answers were shortened to 300 chars in the final content">
+                              ⚠ {pipelineResult.faqEnforcement.violations.length} answer(s) truncated
+                            </span>
+                          )}
+                        </p>
+                        {qualityChecksOpen && pipelineResult.faqEnforcement.violations.length > 0 && (
+                          <ul className="mt-2 max-h-24 overflow-y-auto space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
+                            {pipelineResult.faqEnforcement.violations.map((v, i) => (
+                              <li key={i}>{v.question?.slice(0, 50)}… ({v.charCount} chars)</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    {pipelineResult.factCheck && (
+                      <div className="rounded-lg bg-muted/30 px-3 py-2">
+                        <p className="text-[11px] font-medium text-muted-foreground">Fact check vs sources</p>
+                        <p className="mt-0.5 flex items-center gap-1.5 text-xs">
+                          {pipelineResult.factCheck.verified ? (
+                            <span className="text-emerald-600 dark:text-emerald-400">✓ Verified</span>
+                          ) : (
+                            <span className="text-amber-600 dark:text-amber-400">
+                              ⚠ {pipelineResult.factCheck.hallucinations.length} potential hallucination{pipelineResult.factCheck.hallucinations.length !== 1 ? "s" : ""}
+                            </span>
+                          )}
+                        </p>
+                        {qualityChecksOpen && pipelineResult.factCheck.hallucinations.length > 0 && (
+                          <ul className="mt-2 max-h-32 overflow-y-auto space-y-1 text-[11px] text-muted-foreground list-disc list-inside">
+                            {pipelineResult.factCheck.hallucinations.map((h, i) => (
+                              <li key={i}>{h}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {qualityChecksOpen && ((pipelineResult.factCheck.skippedRhetorical?.length ?? 0) > 0) && (
+                          <>
+                            <p className="mt-1.5 text-[11px] font-medium text-muted-foreground" title="Numbers in comparative or approximate phrasing (e.g. “nearly X”, “top 5”) — not flagged as hallucinations">
+                              Skipped (rhetorical):
+                            </p>
+                            <ul className="mt-0.5 max-h-20 overflow-y-auto space-y-0.5 text-[10px] text-muted-foreground list-disc list-inside">
+                              {pipelineResult.factCheck.skippedRhetorical!.slice(0, 5).map((s, i) => (
+                                <li key={i}>{s}</li>
+                              ))}
+                              {pipelineResult.factCheck.skippedRhetorical!.length > 5 && (
+                                <li>+{pipelineResult.factCheck.skippedRhetorical!.length - 5} more</li>
+                              )}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <p className="text-[10px] text-muted-foreground">
+                      Pipeline runs these after humanize and audit. Review issues before publish.
+                    </p>
+                  </div>
+                </div>
+              )}
             </aside>
 
             {/* Right: Content panel – absolute wrapper so row height = outline only; content box ends exactly where outline ends */}
             <div className="order-2 relative min-h-0 min-w-0 lg:order-none">
               <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+              {/* Title / Meta variant selector (pipeline v3) */}
+              {pipelineResult && pipelineResult.titleMetaVariants.length > 1 && (
+                <div className="shrink-0 border-b border-border p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Choose title & meta (pick one)
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {pipelineResult.titleMetaVariants.map((v, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTitleIndex(i);
+                          const content = pipelineToGenerated(pipelineResult, i);
+                          setEditing((prev) => (prev ? { ...prev, title: content.title, metaDescription: content.metaDescription } : null));
+                        }}
+                        className={`max-w-[280px] rounded-xl border-2 p-3 text-left transition-all ${
+                          selectedTitleIndex === i
+                            ? "border-orange-500 bg-orange-50/50 dark:bg-orange-950/30 dark:border-orange-400"
+                            : "border-border bg-muted/30 hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        <p className="text-xs font-medium text-muted-foreground">{v.approach}</p>
+                        <p className="mt-1 line-clamp-2 text-sm font-medium text-foreground">{v.title}</p>
+                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.metaDescription}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Meta – header bar + fields with inline copy */}
               <div className="shrink-0 flex flex-col border-b border-border">
                 <div className="flex items-center px-4 py-3 bg-muted/30">
@@ -927,7 +1221,13 @@ export default function BlogMakerPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setEditing({ ...generated! })}
+                        onClick={() => {
+                          if (pipelineResult) {
+                            setEditing(pipelineToGenerated(pipelineResult, selectedTitleIndex));
+                          } else {
+                            setEditing({ ...generated! });
+                          }
+                        }}
                         className="h-8 rounded-lg border-border bg-background px-3 text-xs font-medium"
                       >
                         Reset edits

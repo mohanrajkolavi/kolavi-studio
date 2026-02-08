@@ -1,0 +1,126 @@
+/**
+ * Serper API client — automated Google search for competitor article URLs.
+ * Replaces manual URL pasting: user enters keyword, we return top 5 article URLs.
+ */
+
+import type { SerpResult } from "@/lib/pipeline/types";
+
+const SERPER_API_URL = "https://google.serper.dev/search";
+
+const NON_ARTICLE_DOMAINS = new Set([
+  "reddit.com",
+  "www.reddit.com",
+  "quora.com",
+  "www.quora.com",
+  "youtube.com",
+  "www.youtube.com",
+  "twitter.com",
+  "www.twitter.com",
+  "x.com",
+  "www.x.com",
+  "facebook.com",
+  "www.facebook.com",
+  "instagram.com",
+  "www.instagram.com",
+  "pinterest.com",
+  "www.pinterest.com",
+  "linkedin.com",
+  "www.linkedin.com",
+  "amazon.com",
+  "www.amazon.com",
+  "ebay.com",
+  "www.ebay.com",
+]);
+
+const FILE_EXTENSIONS = /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|zip)(\?|$)/i;
+
+const CATEGORY_TAG_PATHS = /^\/(category|tag|author)(\/|$)/i;
+
+function getDomain(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function getPath(url: string): string {
+  try {
+    const u = new URL(url);
+    return u.pathname;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Returns true if the URL looks like an article (has substantive path, not homepage/category/file).
+ */
+function isArticleUrl(url: string): boolean {
+  const path = getPath(url);
+  const domain = getDomain(url);
+
+  if (NON_ARTICLE_DOMAINS.has(domain)) return false;
+  if (FILE_EXTENSIONS.test(url)) return false;
+  if (CATEGORY_TAG_PATHS.test(path)) return false;
+
+  const segments = path.split("/").filter(Boolean);
+  if (segments.length === 0) return false;
+  if (segments.length === 1 && ["blog", "news", "articles"].includes(segments[0].toLowerCase())) return false;
+
+  return segments.length >= 2 || path.length > 10;
+}
+
+/**
+ * Search Google via Serper and return top 5 filtered article URLs as SerpResult[].
+ * Filters out homepages, non-article domains, file URLs, and category/tag pages.
+ */
+export async function searchCompetitorUrls(keyword: string): Promise<SerpResult[]> {
+  const apiKey = process.env.SERPER_API_KEY;
+  if (!apiKey) {
+    throw new Error("SERPER_API_KEY is not set. Get a key at https://serper.dev");
+  }
+
+  const response = await fetch(SERPER_API_URL, {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ q: keyword.trim(), num: 10 }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Serper API error: ${response.status} ${response.statusText}. ${text || ""}`);
+  }
+
+  const data = (await response.json()) as {
+    organic?: Array<{ link?: string; title?: string; snippet?: string; position?: number }>;
+  };
+  const organic = data.organic ?? [];
+  const beforeCount = organic.length;
+
+  const filtered: SerpResult[] = [];
+  for (const item of organic) {
+    const url = item.link?.trim();
+    if (!url) continue;
+    if (!isArticleUrl(url)) continue;
+    filtered.push({
+      url,
+      title: item.title ?? "",
+      position: item.position ?? filtered.length + 1,
+      snippet: item.snippet ?? "",
+      isArticle: true,
+    });
+    if (filtered.length >= 5) break;
+  }
+
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[serper] keyword="${keyword}": ${beforeCount} results before filter, ${filtered.length} after (top 5 articles)`);
+  }
+
+  return filtered;
+}

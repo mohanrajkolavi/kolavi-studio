@@ -4,6 +4,8 @@
  * No API key required for basic use (20 RPM). Use JINA_API_KEY for higher limits.
  */
 
+import type { CompetitorArticle } from "@/lib/pipeline/types";
+
 const JINA_READER_BASE = "https://r.jina.ai";
 
 export type FetchResult = {
@@ -12,6 +14,23 @@ export type FetchResult = {
   success: boolean;
   error?: string;
 };
+
+function wordCount(text: string): number {
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+function extractTitleFromContent(content: string, url: string): string {
+  const firstLine = content.split("\n").find((l) => l.startsWith("# "));
+  if (firstLine) return firstLine.replace(/^#\s+/, "").trim();
+  try {
+    const path = new URL(url).pathname;
+    const slug = path.split("/").filter(Boolean).pop();
+    if (slug) return decodeURIComponent(slug).replace(/-/g, " ");
+  } catch {
+    // ignore
+  }
+  return url;
+}
 
 /**
  * Fetch a single URL via Jina Reader.
@@ -99,4 +118,34 @@ export async function fetchCompetitorUrls(urls: string[]): Promise<FetchResult[]
   }
 
   return results;
+}
+
+/**
+ * Fetch competitor content from URLs. Without JINA_API_KEY, enforces ~2s delay between
+ * fetches (same as fetchCompetitorUrls) to avoid rate limits (20 RPM). With API key,
+ * fetches sequentially with delay for consistency. Failed fetches return an entry
+ * with fetchSuccess: false and empty content (no throw).
+ */
+export async function fetchCompetitorContent(urls: string[]): Promise<CompetitorArticle[]> {
+  const toFetch = urls.slice(0, 5).map((u) => u.trim()).filter(Boolean);
+  const results: Awaited<ReturnType<typeof fetchViaJinaReader>>[] = [];
+  for (const url of toFetch) {
+    const result = await fetchViaJinaReader(url);
+    results.push(result);
+    if (toFetch.indexOf(url) < toFetch.length - 1) {
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+
+  return results.map((r, i): CompetitorArticle => {
+    const url = toFetch[i] ?? "";
+    const title = r.success ? extractTitleFromContent(r.content, r.url) : "";
+    return {
+      url: r.url,
+      title,
+      content: r.content,
+      wordCount: wordCount(r.content),
+      fetchSuccess: r.success,
+    };
+  });
 }

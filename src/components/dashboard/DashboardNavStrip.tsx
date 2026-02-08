@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileEdit, FileSearch } from "lucide-react";
+import { LayoutDashboard, Users, FileEdit, FileSearch, Loader2 } from "lucide-react";
+import { useBlogGenerationOptional } from "@/components/dashboard/BlogGenerationProvider";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -14,6 +15,8 @@ const navItems = [
 export function DashboardNavStrip() {
   const pathname = usePathname();
   const safePath = pathname ?? "";
+  const blogGen = useBlogGenerationOptional();
+  const isGenerating = blogGen?.generating ?? false;
 
   return (
     <nav
@@ -25,6 +28,8 @@ export function DashboardNavStrip() {
           safePath === item.href ||
           (item.href !== "/dashboard" && safePath.startsWith(item.href));
         const Icon = item.icon;
+        const isBlogMaker = item.href === "/dashboard/blog";
+        const showGenerating = isBlogMaker && isGenerating;
         return (
           <Link
             key={item.href}
@@ -36,8 +41,15 @@ export function DashboardNavStrip() {
             }`}
             aria-current={isActive ? "page" : undefined}
           >
-            <Icon className="h-4 w-4 shrink-0" aria-hidden />
+            {showGenerating ? (
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+            ) : (
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+            )}
             {item.label}
+            {showGenerating && (
+              <span className="ml-1 text-xs opacity-90">Generating…</span>
+            )}
           </Link>
         );
       })}

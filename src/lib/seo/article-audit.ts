@@ -15,7 +15,14 @@
  * Note: Author byline and bio are handled by the CMS at publish time and are not audited here.
  */
 
-import { SEO } from "@/lib/constants";
+import { SEO, SITE_URL } from "@/lib/constants";
+import type {
+  SchemaMarkup,
+  TopicScoreResult,
+  TopicScore,
+  GapTopicWithAction,
+  CurrentData,
+} from "@/lib/pipeline/types";
 
 /** Minimum audit score to publish. Below this = actively hurts site-wide rankings. */
 export const MIN_PUBLISH_SCORE = 75;
@@ -56,6 +63,14 @@ export type ArticleAuditResult = {
   summary: { pass: number; warn: number; fail: number };
   /** True when score >= MIN_PUBLISH_SCORE and no Level 1 failures */
   publishable: boolean;
+  /** From pipeline Step 5; included when topicScoreResult is passed to auditArticle */
+  topicCoverage?: {
+    overallScore: number;
+    topics: TopicScore[];
+    gaps: GapTopicWithAction[];
+  };
+  /** Auto-generated JSON-LD when title/meta/slug/keyword provided */
+  schemaMarkup?: SchemaMarkup;
 };
 
 // --- Helpers ---
@@ -904,12 +919,479 @@ function byLevelThenSeverity(a: AuditItem, b: AuditItem): number {
   return severityOrder[a.severity] - severityOrder[b.severity];
 }
 
+// --- Content integrity and fact-check (v4) ---
+
+function extractH2H3Text(html: string): string[] {
+  const headings = extractHeadings(html);
+  return headings.filter((h) => h.level === 2 || h.level === 3).map((h) => h.text.trim());
+}
+
+function extractNumbersFromText(text: string): string[] {
+  const numbers: string[] = [];
+  // Dollar amounts: $1.2B, $143.8 billion, $50 million
+  const dollarRe = /\$[\d,]+(?:\.\d+)?\s*(?:billion|million|B|M|bn|mn)?/gi;
+  let m: RegExpExecArray | null;
+  while ((m = dollarRe.exec(text)) !== null) numbers.push(m[0].replace(/\s+/g, " "));
+  // Percentages: 57%, 47.2 percent
+  const pctRe = /[\d,]+(?:\.\d+)?\s*%/g;
+  while ((m = pctRe.exec(text)) !== null) numbers.push(m[0]);
+  // X billion/million (units)
+  const unitRe = /\d+(?:\.\d+)?\s*(?:billion|million)\s+(?:active\s+)?(?:devices|users|etc\.?)/gi;
+  while ((m = unitRe.exec(text)) !== null) numbers.push(m[0]);
+  const plainNumRe = /\d+(?:\.\d+)?(?:\s*(?:billion|million|%|percent))?/g;
+  while ((m = plainNumRe.exec(text)) !== null) {
+    const n = m[0];
+    if (n.length <= 30 && !numbers.includes(n)) numbers.push(n);
+  }
+  return [...new Set(numbers)];
+}
+
+/** Exclude "per capita", "per unit", "per year", etc. — not source attributions. */
+function isNonAttributionPhrase(phrase: string): boolean {
+  const lower = phrase.toLowerCase();
+  return /^per\s+(capita|unit|year|integration|platform|segment|month|day)(\s|$|[.,;])/.test(lower) || /^\s*per\s+(capita|unit|year|integration|platform|segment|month|day)\s*$/.test(lower);
+}
+
+function extractAttributionPhrases(text: string): string[] {
+  const out: string[] = [];
+  const perRe = /per\s+([^.,;]+?)(?=[.,;]|$)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = perRe.exec(text)) !== null) {
+    const phrase = ("per " + m[1]).trim();
+    if (!isNonAttributionPhrase(phrase)) out.push(phrase);
+  }
+  const accordRe = /according\s+to\s+([^.,;]+?)(?=[.,;]|$)/gi;
+  while ((m = accordRe.exec(text)) !== null) out.push(("according to " + m[1]).trim());
+  const reportedRe = /([A-Za-z0-9\s&]+)\s+reported\s+/g;
+  while ((m = reportedRe.exec(text)) !== null) out.push((m[1].trim() + " reported").trim());
+  return [...new Set(out)];
+}
+
+function extractFaqBlock(html: string): { questions: string[]; answers: string[] } {
+  const faqH2 = /<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i.exec(html);
+  if (!faqH2) return { questions: [], answers: [] };
+  const afterFaq = html.indexOf(faqH2[0]) + faqH2[0].length;
+  const block = html.slice(afterFaq);
+  const h3Regex = /<h3[^>]*>([\s\S]*?)<\/h3>/gi;
+  const qMatches = [...block.matchAll(h3Regex)];
+  const questions: string[] = [];
+  const answers: string[] = [];
+  for (let i = 0; i < qMatches.length; i++) {
+    questions.push(stripHtml(qMatches[i][1]).trim());
+    const afterH3 = qMatches[i].index! + qMatches[i][0].length;
+    const nextH3 = qMatches.slice(i + 1)[0];
+    const end = nextH3
+      ? qMatches[i].index! + block.slice(afterH3 - qMatches[i].index!).indexOf(nextH3[0])
+      : block.length;
+    const rawAnswer = block.slice(afterH3, end);
+    const pMatch = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(rawAnswer);
+    const text = stripHtml(pMatch ? pMatch[1] : rawAnswer).trim();
+    answers.push(text);
+  }
+  return { questions, answers };
+}
+
+/**
+ * Post-humanization content integrity check. Compares pre vs post HTML for heading,
+ * statistic, attribution, section count, word count, FAQ, and entity preservation.
+ */
+export function verifyContentIntegrity(
+  preHumanizeHtml: string,
+  postHumanizeHtml: string
+): { passed: boolean; issues: string[] } {
+  const issues: string[] = [];
+  const preText = stripHtml(preHumanizeHtml);
+  const postText = stripHtml(postHumanizeHtml);
+
+  // 1. Heading integrity
+  const preHeadings = extractH2H3Text(preHumanizeHtml);
+  const postHeadings = extractH2H3Text(postHumanizeHtml);
+  if (preHeadings.length !== postHeadings.length) {
+    issues.push(
+      `HEADING COUNT: Original has ${preHeadings.length} H2/H3 sections, humanized has ${postHeadings.length}`
+    );
+  }
+  for (let i = 0; i < Math.min(preHeadings.length, postHeadings.length); i++) {
+    if (preHeadings[i] !== postHeadings[i]) {
+      issues.push(`HEADING ALTERED: "${preHeadings[i]}" changed to "${postHeadings[i]}"`);
+    }
+  }
+  if (postHeadings.length < preHeadings.length) {
+    for (let i = postHeadings.length; i < preHeadings.length; i++) {
+      issues.push(`HEADING MISSING: "${preHeadings[i]}" not found in humanized version`);
+    }
+  }
+
+  // 2. Statistic preservation
+  const preNums = extractNumbersFromText(preText);
+  const postNums = extractNumbersFromText(postText);
+  for (const n of preNums) {
+    if (!postNums.some((p) => p === n || p.includes(n) || n.includes(p))) {
+      issues.push(`STAT MISSING: "${n}" found in original but not in humanized version`);
+    }
+  }
+
+  // 3. Source attribution preservation
+  const preAttrib = extractAttributionPhrases(preText);
+  const postAttrib = extractAttributionPhrases(postText);
+  for (const a of preAttrib) {
+    const found = postAttrib.some((p) => p.toLowerCase().includes(a.toLowerCase().slice(0, 15)));
+    if (!found) {
+      issues.push(`ATTRIBUTION DROPPED: "${a}" not found in humanized version`);
+    }
+  }
+
+  // 4. Section count
+  const preH2 = (preHumanizeHtml.match(/<h2[^>]*>/gi) ?? []).length;
+  const postH2 = (postHumanizeHtml.match(/<h2[^>]*>/gi) ?? []).length;
+  const preH3 = (preHumanizeHtml.match(/<h3[^>]*>/gi) ?? []).length;
+  const postH3 = (postHumanizeHtml.match(/<h3[^>]*>/gi) ?? []).length;
+  if (preH2 !== postH2) issues.push(`SECTION LOST: Original has ${preH2} H2 sections, humanized has ${postH2}`);
+  if (preH3 !== postH3) issues.push(`SECTION LOST: Original has ${preH3} H3 sections, humanized has ${postH3}`);
+
+  // 5. Word count drift
+  const preWords = wordCount(preText);
+  const postWords = wordCount(postText);
+  const drift = preWords > 0 ? (postWords - preWords) / preWords : 0;
+  if (Math.abs(drift) > 0.05) {
+    const pct = (drift * 100).toFixed(1);
+    issues.push(
+      `WORD COUNT DRIFT: Original ${preWords} words, humanized ${postWords} words (${Number(pct) >= 0 ? "+" : ""}${pct}%) — exceeds ±5% tolerance`
+    );
+  }
+
+  // 6. FAQ preservation
+  const preFaq = extractFaqBlock(preHumanizeHtml);
+  const postFaq = extractFaqBlock(postHumanizeHtml);
+  if (preFaq.questions.length !== postFaq.questions.length) {
+    issues.push(
+      `FAQ QUESTION COUNT: Original has ${preFaq.questions.length}, humanized has ${postFaq.questions.length}`
+    );
+  }
+  for (let i = 0; i < Math.min(preFaq.questions.length, postFaq.questions.length); i++) {
+    if (preFaq.questions[i].trim() !== postFaq.questions[i].trim()) {
+      issues.push(`FAQ QUESTION CHANGED: "${preFaq.questions[i]}" became "${postFaq.questions[i]}"`);
+    }
+  }
+  for (let i = 0; i < postFaq.answers.length; i++) {
+    if (postFaq.answers[i].length > 300) {
+      issues.push(`FAQ ANSWER EXPANDED: Answer to question ${i + 1} is ${postFaq.answers[i].length} characters (limit: 300)`);
+    }
+  }
+
+  // 7. Entity preservation (simple: key numbers and attributions already checked; optional entity-name extraction)
+  // 8. Direct answer opening — soft check: first 60 words contain at least one key number or attribution from pre
+  const postFirst60 = postText.split(/\s+/).slice(0, 60).join(" ");
+  const preFirst60 = preText.split(/\s+/).slice(0, 60).join(" ");
+  const preNumsInOpening = preNums.filter((n) => preFirst60.includes(n));
+  if (preNumsInOpening.length > 0 && !preNumsInOpening.some((n) => postFirst60.includes(n))) {
+    issues.push("GEO OPENING WEAKENED: Key number(s) from original opening not found in first 60 words of humanized version");
+  }
+
+  return { passed: issues.length === 0, issues };
+}
+
+/**
+ * Surgically restore damaged content from pre-humanized HTML. Does not retry humanization.
+ */
+export function restoreContentIntegrity(
+  preHumanizeHtml: string,
+  postHumanizeHtml: string,
+  issues: string[]
+): { restoredHtml: string; restorations: string[] } {
+  const restorations: string[] = [];
+  let restored = postHumanizeHtml;
+
+  // Restore missing/altered headings
+  const preHeadings = extractH2H3Text(preHumanizeHtml);
+  const postHeadings = extractH2H3Text(postHumanizeHtml);
+  if (preHeadings.length !== postHeadings.length || preHeadings.some((h, i) => postHeadings[i] !== h)) {
+    const preH2Matches = [...preHumanizeHtml.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
+    const postH2Matches = [...restored.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
+    for (let i = 0; i < Math.min(preH2Matches.length, postH2Matches.length); i++) {
+      const preText = stripHtml(preH2Matches[i][1]).trim();
+      const postText = stripHtml(postH2Matches[i][1]).trim();
+      if (preText !== postText) {
+        restored = restored.replace(postH2Matches[i][0], preH2Matches[i][0]);
+        restorations.push(`Restored H2 heading: "${preText}"`);
+      }
+    }
+    const preH3Matches = [...preHumanizeHtml.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi)];
+    const postH3Matches = [...restored.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi)];
+    for (let i = 0; i < Math.min(preH3Matches.length, postH3Matches.length); i++) {
+      const preText = stripHtml(preH3Matches[i][1]).trim();
+      const postText = stripHtml(postH3Matches[i][1]).trim();
+      if (preText !== postText) {
+        restored = restored.replace(postH3Matches[i][0], preH3Matches[i][0]);
+        restorations.push(`Restored H3 heading: "${preText}"`);
+      }
+    }
+  }
+
+  // Restore FAQ block if any answer was expanded or changed
+  const preFaq = extractFaqBlock(preHumanizeHtml);
+  const postFaq = extractFaqBlock(restored);
+  const faqNeedsRestore = issues.some((x) => x.includes("FAQ")) &&
+    (postFaq.answers.some((a, j) => a.length > 300 || (preFaq.answers[j] && preFaq.answers[j] !== a)));
+  if (faqNeedsRestore) {
+    const preFaqH2 = preHumanizeHtml.match(/<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i);
+    const postFaqH2 = restored.match(/<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i);
+    if (preFaqH2 && postFaqH2) {
+      const preStart = preHumanizeHtml.indexOf(preFaqH2[0]);
+      const afterPreFaq = preHumanizeHtml.slice(preStart + 1);
+      const preNextH2Match = afterPreFaq.match(/<h2[^>]*>/i);
+      const preEnd = preNextH2Match ? preStart + 1 + afterPreFaq.indexOf(preNextH2Match[0]) : preHumanizeHtml.length;
+      const preBlock = preHumanizeHtml.slice(preStart, preEnd);
+      const postStart = restored.indexOf(postFaqH2[0]);
+      const afterPostFaq = restored.slice(postStart + 1);
+      const postNextH2Match = afterPostFaq.match(/<h2[^>]*>/i);
+      const postEnd = postNextH2Match ? postStart + 1 + afterPostFaq.indexOf(postNextH2Match[0]) : restored.length;
+      restored = restored.slice(0, postStart) + preBlock + restored.slice(postEnd);
+      restorations.push("Restored full FAQ block from pre-humanized version");
+    }
+  }
+
+  return { restoredHtml: restored, restorations };
+}
+
+/**
+ * Enforce hard 300-character limit on FAQ answers. Truncate if over.
+ */
+export function enforceFaqCharacterLimit(
+  articleHtml: string,
+  maxChars: number = 300
+): { passed: boolean; violations: { question: string; answer: string; charCount: number }[]; fixedHtml: string } {
+  const { questions, answers } = extractFaqBlock(articleHtml);
+  const violations: { question: string; answer: string; charCount: number }[] = [];
+  let fixedHtml = articleHtml;
+  const faqH2 = /<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i.exec(articleHtml);
+  if (!faqH2) return { passed: true, violations: [], fixedHtml: articleHtml };
+  const afterFaq = articleHtml.indexOf(faqH2[0]) + faqH2[0].length;
+  const block = articleHtml.slice(afterFaq);
+  const h3Regex = /<h3[^>]*>([\s\S]*?)<\/h3>/gi;
+  const qMatches = [...block.matchAll(h3Regex)];
+
+  for (let i = answers.length - 1; i >= 0; i--) {
+    const ans = answers[i];
+    if (ans.length <= maxChars) continue;
+    violations.push({ question: questions[i] ?? "", answer: ans, charCount: ans.length });
+    const sentences = ans.match(/[^.!?]+[.!?]+/g) ?? [ans];
+    let truncated = sentences.slice(0, 2).join(" ").trim();
+    if (truncated.length > maxChars) truncated = (sentences[0] ?? ans).trim();
+    if (truncated.length > maxChars) {
+      const lastSpace = truncated.slice(0, maxChars - 1).lastIndexOf(" ");
+      truncated = (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated.slice(0, maxChars - 1)).trim() + ".";
+    }
+    if (qMatches[i]) {
+      const segmentStart = afterFaq + qMatches[i].index! + qMatches[i][0].length;
+      const segmentEnd = qMatches[i + 1] ? afterFaq + qMatches[i + 1].index! : articleHtml.length;
+      const segment = fixedHtml.slice(segmentStart, segmentEnd);
+      const pMatch = segment.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+      if (pMatch) {
+        const oldP = pMatch[0];
+        const newP = oldP.replace(pMatch[1], truncated);
+        const globalIndex = fixedHtml.indexOf(oldP, segmentStart);
+        if (globalIndex !== -1) {
+          fixedHtml = fixedHtml.slice(0, globalIndex) + newP + fixedHtml.slice(globalIndex + oldP.length);
+        }
+      }
+    }
+  }
+
+  return { passed: violations.length === 0, violations, fixedHtml };
+}
+
+/** Check if number is in rhetorical context (skip, don't flag as hallucination). */
+function isRhetoricalNumber(snippet: string, num: string): boolean {
+  const lower = snippet.toLowerCase();
+  if (/\d+\s*%\s*of\s+the\s+(quality|cost|price|value)/.test(lower)) return true;
+  if (/\d+\s*%\s*(cheaper|faster|better|more|less)/.test(lower)) return true;
+  if (/nearly\s+\d|almost\s+\d|roughly\s+\d|about\s+\d/.test(lower)) return true;
+  if (/\d+\s*years?\s+ago|over\s+\d+\s+years?|past\s+\d+\s+decades?/.test(lower)) return true;
+  if (/first\s+\d+|top\s+\d+|number\s+\d+|#\s*\d+/.test(lower)) return true;
+  if (/\d+x\s+more|\d+x\s+faster|\d+x\s+better/.test(lower)) return true;
+  return false;
+}
+
+/** Build alias set for currentData sources (earnings release, domain, firm names, etc.). */
+function buildSourceAliases(currentData: CurrentData): Set<string> {
+  const aliases = new Set<string>();
+  const add = (s: string) => s && aliases.add(s.toLowerCase().trim());
+  for (const f of currentData.facts) {
+    try {
+      const u = new URL(f.source);
+      add(u.hostname.replace(/^www\./, ""));
+    } catch {
+      add(f.source.slice(0, 80));
+    }
+    const accord = /according\s+to\s+([^.,;]+)/gi.exec(f.fact);
+    if (accord) add(accord[1].trim());
+    const per = /per\s+([^.,;]+)/gi.exec(f.fact);
+    if (per) add(per[1].trim());
+  }
+  const corporatePhrases = ["earnings release", "earnings call", "company filings", "investor call", "quarterly report", "annual report", "its earnings release", "its investor call", "the company's disclosures", "the company reported"];
+  corporatePhrases.forEach(add);
+  return aliases;
+}
+
+/**
+ * Verify article facts against currentData. Flags numbers not in source data and fabricated source names.
+ */
+export function verifyFactsAgainstSource(
+  articleHtml: string,
+  currentData: CurrentData
+): { verified: boolean; issues: string[]; hallucinations: string[]; skippedRhetorical: string[] } {
+  const issues: string[] = [];
+  const hallucinations: string[] = [];
+  const skippedRhetorical: string[] = [];
+  const text = stripHtml(articleHtml);
+
+  const refNumbers = new Set<string>();
+  for (const f of currentData.facts) {
+    const nums = extractNumbersFromText(f.fact);
+    nums.forEach((n) => refNumbers.add(n));
+    const numPartRe = /(\d+(?:\.\d+)?)/g;
+    let mm: RegExpExecArray | null;
+    while ((mm = numPartRe.exec(f.fact)) !== null) refNumbers.add(mm[1]);
+  }
+
+  const sourceAliases = buildSourceAliases(currentData);
+
+  const statLikeRe = /\$[\d,]+(?:\.\d+)?\s*(?:billion|million|B|M|bn|mn)?|[\d,]+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*(?:billion|million)\s+/gi;
+  const articleStatMatches = [...text.matchAll(statLikeRe)];
+  for (const m of articleStatMatches) {
+    const n = m[0];
+    const snippet = text.slice(Math.max(0, m.index! - 50), m.index! + n.length + 50);
+    if (isRhetoricalNumber(snippet, n)) {
+      skippedRhetorical.push(`Skipped rhetorical: "${n}" in "${snippet.trim().slice(0, 60)}…`);
+      continue;
+    }
+    const numVal = parseFloat(n.replace(/[^0-9.]/g, ""));
+    if (Number.isNaN(numVal)) continue;
+    const inRef = [...refNumbers].some((r) => {
+      const rVal = parseFloat(r.replace(/[^0-9.]/g, ""));
+      if (Number.isNaN(rVal)) return r.includes(n) || n.includes(r);
+      const tolerance = Math.max(rVal * 0.005, 0.01);
+      return Math.abs(numVal - rVal) <= tolerance || r.includes(String(numVal)) || n.includes(String(rVal));
+    });
+    if (!inRef) {
+      hallucinations.push(`"${snippet.trim()}" contains "${n}" which is not in currentData`);
+    }
+  }
+
+  const articleAttrib = extractAttributionPhrases(text);
+  for (const a of articleAttrib) {
+    if (isNonAttributionPhrase(a)) continue;
+    const name = a.replace(/^(per|according to)\s+/i, "").trim().split(/[.,;]/)[0].trim();
+    const nameLower = name.toLowerCase();
+    const allowed = [...sourceAliases].some(
+      (s) => s.includes(nameLower) || nameLower.includes(s)
+    );
+    if (!allowed && name.length > 2) {
+      hallucinations.push(`FABRICATED SOURCE: "${name}" is not in currentData sources`);
+    }
+  }
+
+  return {
+    verified: hallucinations.length === 0,
+    issues,
+    hallucinations,
+    skippedRhetorical,
+  };
+}
+
+/** Validation summary for generated schema (v3). */
+export type SchemaValidationSummary = {
+  article: "valid" | "invalid";
+  faq: "valid" | "invalid" | "not_detected";
+  breadcrumb: "valid" | "invalid";
+};
+
+const GEO_FAQ_ANSWER_MAX_CHARS = 300;
+
+/**
+ * Generate JSON-LD schema markup from article HTML. Parses FAQ (H2 FAQ + H3 Q / P A) and
+ * step-by-step patterns. Author/publisher/image added by CMS.
+ */
+export function generateSchemaMarkup(
+  articleHtml: string,
+  title: string,
+  metaDescription: string,
+  slug: string,
+  keyword: string
+): SchemaMarkup {
+  const now = new Date().toISOString().slice(0, 10);
+  const article = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title || "Article",
+    description: metaDescription || "",
+    keywords: keyword || "",
+    datePublished: now,
+    dateModified: now,
+  };
+
+  let faq: SchemaMarkup["faq"] = null;
+  const faqH2 = /<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i.exec(articleHtml);
+  if (faqH2) {
+    const afterFaq = articleHtml.indexOf(faqH2[0]) + faqH2[0].length;
+    const block = articleHtml.slice(afterFaq);
+    const h3Regex = /<h3[^>]*>([\s\S]*?)<\/h3>/gi;
+    const qMatches = [...block.matchAll(h3Regex)];
+    const mainEntity: Array<{ "@type": string; name: string; acceptedAnswer: { "@type": string; text: string } }> = [];
+    for (let i = 0; i < qMatches.length; i++) {
+      const name = stripHtml(qMatches[i][1]);
+      const afterH3 = qMatches[i].index! + qMatches[i][0].length;
+      const nextH3 = qMatches.slice(i + 1)[0];
+      const end = nextH3 ? qMatches[i].index! + block.slice(afterH3 - qMatches[i].index!).indexOf(nextH3[0]) : block.length;
+      const rawAnswer = block.slice(afterH3, end);
+      const pMatch = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(rawAnswer);
+      const text = stripHtml(pMatch ? pMatch[1] : rawAnswer).slice(0, GEO_FAQ_ANSWER_MAX_CHARS);
+      if (name && text) {
+        mainEntity.push({
+          "@type": "Question",
+          name,
+          acceptedAnswer: { "@type": "Answer", text },
+        });
+      }
+    }
+    if (mainEntity.length > 0) {
+      faq = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity,
+      };
+    }
+  }
+
+  const faqSchemaNote = faq
+    ? "FAQPage schema generated for AI engine optimization (Perplexity, ChatGPT, AI Overviews). Note: Google FAQ rich results only display for well-known authoritative domains per September 2024 update. This schema will NOT produce FAQ rich snippets on most blog domains but WILL help AI engines extract Q&A content."
+    : "No FAQ section detected.";
+
+  const breadcrumb = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: SITE_URL + "/" },
+      { "@type": "ListItem", position: 2, name: "Blog", item: SITE_URL + "/blog" },
+      { "@type": "ListItem", position: 3, name: title || "Article", item: SITE_URL + "/blog/" + (slug || "") },
+    ],
+  };
+
+  return { article, faq, breadcrumb, faqSchemaNote };
+}
+
 /**
  * Run full article audit per Google Search Central priority stack.
+ * Optionally pass topicScoreResult to include topicCoverage and an L3 warning when overallScore < 50.
+ * Schema markup is auto-generated when title/meta/slug/keyword are available.
  *
  * Author byline and bio are NOT audited — they are added by the CMS at publish time.
  */
-export function auditArticle(input: ArticleAuditInput): ArticleAuditResult {
+export function auditArticle(
+  input: ArticleAuditInput,
+  options?: { topicScoreResult?: TopicScoreResult }
+): ArticleAuditResult {
   const plainContent = stripHtml(input.content);
 
   const all: AuditItem[] = [
@@ -946,11 +1428,47 @@ export function auditArticle(input: ArticleAuditInput): ArticleAuditResult {
   const level1Fails = all.filter((i) => i.level === 1 && i.severity === "fail").length;
   const publishable = score >= MIN_PUBLISH_SCORE && level1Fails === 0;
 
+  const topicScoreResult = options?.topicScoreResult;
+  if (topicScoreResult && topicScoreResult.overallScore < 50) {
+    sorted.push({
+      id: "topic-coverage-low",
+      severity: "warn",
+      level: 3,
+      source: "editorial",
+      label: "Topic coverage",
+      message: `Overall topic coverage score is ${topicScoreResult.overallScore}/100. Consider adding content for gap topics.`,
+      value: topicScoreResult.overallScore,
+      threshold: 50,
+    });
+  }
+
+  const topicCoverage =
+    topicScoreResult != null
+      ? {
+          overallScore: topicScoreResult.overallScore,
+          topics: topicScoreResult.topicScores,
+          gaps: topicScoreResult.gapTopics,
+        }
+      : undefined;
+
+  const schemaMarkup =
+    input.title && (input.metaDescription ?? "") !== undefined && (input.slug ?? "") !== undefined
+      ? generateSchemaMarkup(
+          input.content,
+          input.title,
+          input.metaDescription ?? "",
+          input.slug ?? "",
+          input.focusKeyword ?? ""
+        )
+      : undefined;
+
   return {
     items: sorted,
     score,
     summary: { pass, warn, fail },
     publishable,
+    topicCoverage,
+    schemaMarkup,
   };
 }
 
