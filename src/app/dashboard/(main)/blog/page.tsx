@@ -586,7 +586,7 @@ export default function BlogMakerPage() {
         console.error("Failed to auto-save to history:", err);
         // Don't mark as saved on error so we can retry
       });
-  }, [generated, result, keywords, generationInput.keywords, pipelineResult?.generationTimeMs]);
+  }, [generated, result, keywords, generationInput.keywords, pipelineResult?.generationTimeMs, generating]);
 
   // Load history entry if historyId query param is present
   useEffect(() => {

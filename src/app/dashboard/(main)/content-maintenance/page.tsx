@@ -773,6 +773,7 @@ export default function ContentMaintenancePage() {
 
       {/* Post detail modal */}
       {selectedPost && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- modal backdrop needs click/key to close
         <div
           ref={modalRef}
           role="dialog"
@@ -786,13 +787,16 @@ export default function ContentMaintenancePage() {
           onKeyDown={(e) => {
             if (e.key === "Escape") closeModal();
           }}
+          onMouseDown={(e) => e.target === e.currentTarget && e.preventDefault()}
         >
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- stopPropagation for modal content */}
           <div
             ref={modalContentRef}
             role="document"
             className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card shadow-lg"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-border/50 bg-card p-5">
               <div className="min-w-0 flex-1">

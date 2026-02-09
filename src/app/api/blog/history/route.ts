@@ -66,10 +66,11 @@ export async function GET(request: NextRequest) {
       .eq("id", id)
       .single();
     if (error) {
+      const err = error as { code?: string; status?: number };
       const notFound =
         data === null ||
-        error.code === "PGRST116" ||
-        (error as { status?: number }).status === 404;
+        err.code === "PGRST116" ||
+        err.status === 404;
       if (notFound) {
         return NextResponse.json({ error: "Entry not found" }, { status: 404 });
       }

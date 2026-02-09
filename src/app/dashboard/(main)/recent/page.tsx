@@ -256,15 +256,25 @@ export default function RecentPage() {
       )}
 
       {confirmDeleteId && entryToConfirm && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- modal backdrop needs click/key to close
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
           aria-modal="true"
           aria-labelledby="delete-dialog-title"
+          tabIndex={-1}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
           onClick={() => setConfirmDeleteId(null)}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setConfirmDeleteId(null);
+          }}
         >
+          {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- stopPropagation for modal content */}
           <div
+            role="document"
+            tabIndex={-1}
             className="w-full max-w-sm rounded-xl border border-border bg-card p-6 shadow-lg"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
           >
             <h2 id="delete-dialog-title" className="text-lg font-semibold text-foreground">
               Delete article?
