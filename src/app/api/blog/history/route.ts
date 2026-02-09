@@ -3,7 +3,7 @@ import { isAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin, type BlogHistoryRow } from "@/lib/supabase/server";
 
 const TABLE = "blog_generation_history";
-const MAX_HISTORY = 15;
+const MAX_HISTORY = 10;
 /** Fetch more rows so we can dedupe by keyword and still return up to MAX_HISTORY. */
 const FETCH_LIMIT = 80;
 
@@ -29,7 +29,9 @@ function normalizeKeyword(kw: string | null | undefined): string {
 function dedupeByKeyword(rows: BlogHistoryRow[]): BlogHistoryRow[] {
   const byKey = new Map<string, BlogHistoryRow>();
   for (const row of rows) {
-    const key = normalizeKeyword(row.focus_keyword) || `__no_keyword_${row.id}`;
+    // Use focus_keyword directly - it's the primary keyword entered by the user
+    const keyword = normalizeKeyword(row.focus_keyword);
+    const key = keyword || `__no_keyword_${row.id}`;
     const existing = byKey.get(key);
     if (!existing || new Date(row.created_at) > new Date(existing.created_at)) {
       byKey.set(key, row);
@@ -40,7 +42,8 @@ function dedupeByKeyword(rows: BlogHistoryRow[]): BlogHistoryRow[] {
   );
 }
 
-/** GET: last 15 entries, one per keyword (latest edited for that keyword). */
+/** GET: last 10 entries, one per keyword (latest edited for that keyword). */
+/** GET with ?id=...: fetch a single entry by ID. */
 export async function GET(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -52,6 +55,34 @@ export async function GET(request: NextRequest) {
       { status: 503 }
     );
   }
+
+  // Check if requesting a single entry by ID
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (id) {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) {
+      const notFound =
+        data === null ||
+        error.code === "PGRST116" ||
+        (error as { status?: number }).status === 404;
+      if (notFound) {
+        return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+      }
+      console.error("[blog/history] GET by ID error:", error);
+      return NextResponse.json(
+        { error: "Failed to load entry" },
+        { status: 500 }
+      );
+    }
+    return NextResponse.json(data as BlogHistoryRow);
+  }
+
+  // Otherwise, return list of recent entries
   const { data, error } = await supabase
     .from(TABLE)
     .select("*")
@@ -66,7 +97,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(deduped.slice(0, MAX_HISTORY));
 }
 
-/** POST: insert one entry and trim to last 15. */
+/** POST: insert one entry and trim to last 10. */
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -138,4 +169,32 @@ export async function POST(request: NextRequest) {
     await supabase.from(TABLE).delete().in("id", toDelete);
   }
   return NextResponse.json({ ok: true }, { status: 201 });
+}
+
+/** DELETE: delete a single entry by ID. */
+export async function DELETE(request: NextRequest) {
+  if (!(await isAuthenticated(request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return NextResponse.json(
+      { error: "Blog history not configured (Supabase env missing)" },
+      { status: 503 }
+    );
+  }
+
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "ID parameter is required" }, { status: 400 });
+  }
+
+  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  if (error) {
+    console.error("[blog/history] DELETE error:", error);
+    return NextResponse.json({ error: "Failed to delete entry" }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

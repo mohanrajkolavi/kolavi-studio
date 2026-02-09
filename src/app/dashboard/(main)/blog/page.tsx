@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -471,6 +472,8 @@ const SAMPLE_RESULT: ResultState = {
 };
 
 export default function BlogMakerPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const {
     generating,
     generated: contextGenerated,
@@ -493,6 +496,7 @@ export default function BlogMakerPage() {
   const [sampleResult, setSampleResult] = useState<ResultState | null>(null);
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
   const [contentView, setContentView] = useState<"preview" | "outline">("preview");
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const result = contextResult ?? sampleResult;
   const generated = contextGenerated ?? sampleOutput;
@@ -526,10 +530,119 @@ export default function BlogMakerPage() {
   /** Last (title, content) we sent to E-E-A-T successfully; used to debounce re-run on meta/content edits */
   const lastEeatInputRef = useRef<{ title: string; content: string } | null>(null);
   const editingSnapshotRef = useRef<{ title: string; content: string }>({ title: "", content: "" });
+  /** Track if we've auto-saved this generation to avoid duplicate saves */
+  const autoSavedRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (generated) setEditing({ ...generated });
   }, [generated]);
+
+  // Reset auto-save flag when starting new generation
+  useEffect(() => {
+    if (generating) {
+      autoSavedRef.current = null;
+    }
+  }, [generating]);
+
+  // Auto-save to history when generation completes
+  useEffect(() => {
+    if (!generated || !result || generating) return;
+    // Skip sample output
+    if (generated.title === SAMPLE_OUTPUT.title) return;
+    // Skip if already saved (check by title + content hash to avoid duplicates)
+    const contentHash = `${generated.title}-${generated.content.slice(0, 100)}`;
+    if (autoSavedRef.current === contentHash) return;
+    
+    // Get primary keyword
+    const currentKw = keywords[0]?.trim();
+    const genKw = generationInput.keywords[0]?.trim();
+    const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
+    
+    // Get generation time
+    const generationTimeMs = pipelineResult?.generationTimeMs;
+    
+    // Save to history
+    fetch("/api/blog/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: generated.title,
+        metaDescription: generated.metaDescription,
+        outline: generated.outline,
+        content: generated.content,
+        suggestedSlug: generated.suggestedSlug,
+        suggestedCategories: generated.suggestedCategories,
+        suggestedTags: generated.suggestedTags,
+        focusKeyword,
+        ...(typeof generationTimeMs === "number" && { generationTimeMs }),
+      }),
+      credentials: "include",
+    })
+      .then(() => {
+        // Mark as saved
+        autoSavedRef.current = contentHash;
+      })
+      .catch((err) => {
+        console.error("Failed to auto-save to history:", err);
+        // Don't mark as saved on error so we can retry
+      });
+  }, [generated, result, keywords, generationInput.keywords, pipelineResult?.generationTimeMs]);
+
+  // Load history entry if historyId query param is present
+  useEffect(() => {
+    const historyId = searchParams.get("historyId");
+    if (!historyId || loadingHistory || editing) return;
+
+    setLoadingHistory(true);
+    fetch(`/api/blog/history?id=${historyId}`, { credentials: "include" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to load history entry");
+        return res.json();
+      })
+      .then((data) => {
+        // Convert history entry to GeneratedContent format
+        const historyContent: GeneratedContent = {
+          title: data.title,
+          metaDescription: data.meta_description,
+          outline: data.outline || [],
+          content: data.content,
+          suggestedSlug: data.suggested_slug || undefined,
+          suggestedCategories: data.suggested_categories || undefined,
+          suggestedTags: data.suggested_tags || undefined,
+        };
+        setEditing(historyContent);
+        setSampleOutput(historyContent);
+        // Set keywords state so primary keyword is available when saving
+        if (data.focus_keyword) {
+          setKeywords([data.focus_keyword]);
+        }
+        setSampleResult({
+          pipelineResult: null,
+          fallbackGenerated: historyContent,
+          selectedTitleIndex: 0,
+          input: {
+            keywords: data.focus_keyword ? [data.focus_keyword] : [],
+            peopleAlsoSearchFor: [],
+            intent: [],
+            competitorUrls: [],
+          },
+        });
+        // Remove historyId from URL
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("historyId");
+        router.replace(`/dashboard/blog${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+      })
+      .catch((err) => {
+        console.error("Failed to load history entry:", err);
+        setStatus({
+          type: "error",
+          message: "Failed to load previous generation. Please try again.",
+        });
+      })
+      .finally(() => {
+        setLoadingHistory(false);
+      });
+  }, [searchParams, loadingHistory, editing, router]);
 
   // Reset E-E-A-T auto-run flag and retry counter when pipeline result changes (e.g. new generation)
   useEffect(() => {
@@ -793,7 +906,11 @@ export default function BlogMakerPage() {
               setSampleResult(null);
               setEditing(null);
               if (current && current.title !== SAMPLE_OUTPUT.title) {
-                const focusKeyword = generationInput.keywords[0] ?? keywords[0] ?? undefined;
+                // Primary keyword is always the first keyword entered by the user
+                // Use current keywords state if available and non-empty, otherwise fall back to generation input
+                const currentKw = keywords[0]?.trim();
+                const genKw = generationInput.keywords[0]?.trim();
+                const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
                 const generationTimeMs = pipelineResult?.generationTimeMs;
                 fetch("/api/blog/history", {
                   method: "POST",
