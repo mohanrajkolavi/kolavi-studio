@@ -190,10 +190,19 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "ID parameter is required" }, { status: 400 });
   }
 
-  const { error } = await supabase.from(TABLE).delete().eq("id", id);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .delete()
+    .eq("id", id)
+    .select();
+
   if (error) {
     console.error("[blog/history] DELETE error:", error);
     return NextResponse.json({ error: "Failed to delete entry" }, { status: 500 });
+  }
+
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   return NextResponse.json({ ok: true });
