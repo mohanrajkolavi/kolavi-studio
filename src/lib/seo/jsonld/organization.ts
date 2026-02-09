@@ -10,6 +10,9 @@ export function getOrganizationSchema() {
     description: "Digital marketing agency specializing in medical spas, dental practices, and law firms.",
     address: {
       "@type": "PostalAddress",
+      streetAddress: process.env.NEXT_PUBLIC_ORG_STREET_ADDRESS ?? "",
+      addressLocality: process.env.NEXT_PUBLIC_ORG_ADDRESS_LOCALITY ?? "",
+      postalCode: process.env.NEXT_PUBLIC_ORG_POSTAL_CODE ?? "",
       addressCountry: "US",
     },
     sameAs: [

@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import type { WPPost } from "@/lib/graphql/types";
 import { stripHtml, truncateToWords, calculateReadingTime } from "@/lib/blog/utils";
+import { IMAGE_EAGER_COUNT, IMAGE_BLUR_PLACEHOLDER } from "@/lib/constants";
 
 function getCategoryPostCount(posts: WPPost[], slug: string): number {
   return posts.filter((post) =>
@@ -91,14 +92,16 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
               >
                 <article className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-stretch">
                   {featuredPost.featuredImage && (
-                    <div className="relative min-w-0 h-56 w-full overflow-hidden bg-muted md:h-full md:min-h-[18rem]">
+                    <div className="img-hover-zoom relative min-w-0 h-56 w-full overflow-hidden bg-muted md:h-full md:min-h-[18rem]">
                       <Image
                         src={featuredPost.featuredImage.node.sourceUrl}
                         alt={featuredPost.featuredImage.node.altText || featuredPost.title}
                         fill
-                        className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
+                        className="object-cover object-center transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none"
                         sizes="(max-width: 768px) 100vw, 50vw"
                         priority
+                        placeholder="blur"
+                        blurDataURL={IMAGE_BLUR_PLACEHOLDER}
                       />
                     </div>
                   )}
@@ -223,14 +226,16 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
                   <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
                     <article className="h-full overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
                       {post.featuredImage && (
-                        <div className="relative aspect-[16/10] overflow-hidden">
+                        <div className="img-hover-zoom relative aspect-[16/10] overflow-hidden">
                           <Image
                             src={post.featuredImage.node.sourceUrl}
                             alt={post.featuredImage.node.altText || post.title}
                             fill
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none"
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            loading={index < 6 ? "eager" : "lazy"}
+                            loading={index < IMAGE_EAGER_COUNT ? "eager" : "lazy"}
+                            placeholder="blur"
+                            blurDataURL={IMAGE_BLUR_PLACEHOLDER}
                           />
                           <div className="absolute left-3 top-3">
                             {post.categories?.nodes?.[0] && (

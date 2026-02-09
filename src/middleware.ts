@@ -2,19 +2,38 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 
-/** Nonce-based CSP: one-time random value per request so inline scripts/styles are allowlisted without 'unsafe-inline'. */
+/**
+ * Nonce-based CSP. In production, allow 'unsafe-inline' for style-src so
+ * framework/dependency inline styles (e.g. next-themes) don't trigger CSP
+ * violations when pages are served from cache and nonce isn't applied.
+ * Script hash allows common inline script (e.g. GA) when nonce is missing on cached HTML.
+ */
 function getCspWithNonce(nonce: string): string {
   const isDev = process.env.NODE_ENV === "development";
+  const scriptSrc = [
+    "'self'",
+    "'nonce-" + nonce + "'",
+    "'strict-dynamic'",
+    "https://www.googletagmanager.com",
+    "https://www.google-analytics.com",
+    "https://embed.typeform.com",
+    "https://tally.so",
+    // Allow GA inline script when nonce is missing on cached/ISR pages (Next.js issue #55638)
+    "'sha256-n46vPwSWuMC0W703pBofImv82226xo4LXymvAE9caPk='",
+    ...(isDev ? ["'unsafe-eval'"] : []),
+  ].join(" ");
+  const styleSrc = [
+    "'self'",
+    "'nonce-" + nonce + "'",
+    "https://fonts.googleapis.com",
+    // Framework/deps may inject inline styles without nonce on cached pages
+    "'unsafe-inline'",
+    ...(isDev ? [] : []),
+  ].join(" ");
   return [
     "default-src 'self'",
-    "script-src 'self' 'nonce-" +
-      nonce +
-      "' 'strict-dynamic' https://www.googletagmanager.com https://www.google-analytics.com https://embed.typeform.com https://tally.so" +
-      (isDev ? " 'unsafe-eval'" : ""),
-    "style-src 'self' 'nonce-" +
-      nonce +
-      "' https://fonts.googleapis.com" +
-      (isDev ? " 'unsafe-inline'" : ""),
+    "script-src " + scriptSrc,
+    "style-src " + styleSrc,
     "img-src 'self' data: blob: https:",
     "font-src 'self' https://fonts.gstatic.com data:",
     "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://form.typeform.com https://embed.typeform.com https://www.typeform.com https://tally.so",
@@ -72,6 +91,15 @@ export async function middleware(request: NextRequest) {
   response.headers.set("Content-Security-Policy", cspHeader);
   for (const [key, value] of Object.entries(SECURITY_HEADERS_STATIC)) {
     response.headers.set(key, value);
+  }
+
+  // Cache HTML for blog (ISR) to satisfy "Use efficient cache lifetimes" in PageSpeed
+  const pathname = request.nextUrl.pathname;
+  if (request.method === "GET" && pathname.startsWith("/blog/") && pathname !== "/blog/rss") {
+    response.headers.set(
+      "Cache-Control",
+      "public, s-maxage=60, stale-while-revalidate=120"
+    );
   }
 
   if (process.env.NODE_ENV === "production") {

@@ -6,7 +6,7 @@ import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
 import { getCategoryBySlug, getAllCategorySlugs } from "@/lib/blog/data";
 import { truncateToWords } from "@/lib/blog/utils";
-import { SITE_URL } from "@/lib/constants";
+import { SITE_URL, IMAGE_EAGER_COUNT, IMAGE_BLUR_PLACEHOLDER } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
@@ -223,14 +223,16 @@ export default async function CategoryPage({ params }: PageProps) {
               >
                 <article className="grid gap-0 md:grid-cols-2">
                   {latestPost.featuredImage?.node?.sourceUrl && (
-                    <div className="relative h-64 md:h-full">
+                    <div className="img-hover-zoom relative h-64 overflow-hidden md:h-full">
                       <Image
                         src={latestPost.featuredImage.node.sourceUrl}
                         alt={latestPost.featuredImage.node.altText || latestPost.title}
                         fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none"
                         sizes="(max-width: 768px) 100vw, 50vw"
                         priority
+                        placeholder="blur"
+                        blurDataURL={IMAGE_BLUR_PLACEHOLDER}
                       />
                     </div>
                   )}
@@ -283,14 +285,16 @@ export default async function CategoryPage({ params }: PageProps) {
                   >
                     <article className="h-full overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:shadow-lg dark:hover:border-orange-800">
                       {post.featuredImage?.node?.sourceUrl ? (
-                        <div className="relative h-48 overflow-hidden">
+                        <div className="img-hover-zoom relative h-48 overflow-hidden">
                           <Image
                             src={post.featuredImage.node.sourceUrl}
                             alt={post.featuredImage.node.altText || post.title}
                             fill
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none"
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            loading={index < 6 ? "eager" : "lazy"}
+                            loading={index < IMAGE_EAGER_COUNT ? "eager" : "lazy"}
+                            placeholder="blur"
+                            blurDataURL={IMAGE_BLUR_PLACEHOLDER}
                           />
                         </div>
                       ) : (

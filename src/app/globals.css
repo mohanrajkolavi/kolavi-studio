@@ -148,4 +148,26 @@
   .dashboard-card {
     @apply rounded-lg border border-border bg-card;
   }
+
+  /*
+   * Image hover zoom (Google-style UX).
+   * Smooth scale on hover; disabled when user prefers reduced motion (a11y/SEO).
+   */
+  .img-hover-zoom {
+    @apply overflow-hidden;
+  }
+  .img-hover-zoom img {
+    transition: transform 0.25s ease-out;
+  }
+  .img-hover-zoom:hover img {
+    transform: scale(1.05);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .img-hover-zoom img {
+      transition: none;
+    }
+    .img-hover-zoom:hover img {
+      transform: none;
+    }
+  }
 }

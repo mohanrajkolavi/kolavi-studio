@@ -66,3 +66,16 @@ export const VERTICAL_LINKS = [
   { name: "Dental Practices", href: "/dental", available: false },
   { name: "Law Firms", href: "/law-firms", available: false },
 ];
+
+/**
+ * Image loading (UX/SEO): number of grid items to load eagerly (above-the-fold).
+ * Rest use loading="lazy". Industry practice: 2–3 for first row.
+ */
+export const IMAGE_EAGER_COUNT = 3;
+
+/**
+ * Blur placeholder for Next.js Image placeholder="blur" with remote URLs.
+ * Small base64 JPEG; improves perceived performance while image loads.
+ */
+export const IMAGE_BLUR_PLACEHOLDER =
+  "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBEQACEQADAP/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAQUA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPwF/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQH/2Q==";

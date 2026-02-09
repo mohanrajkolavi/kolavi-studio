@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "cms.kolavistudio.com" },
       { protocol: "http", hostname: "localhost" },
     ],
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 86400, // 24h for external images (PageSpeed / LCP)
   },
 };
 

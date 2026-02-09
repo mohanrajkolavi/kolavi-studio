@@ -7,7 +7,7 @@ import { getPageMetadata } from "@/lib/seo/metadata";
 import { getBreadcrumbSchema } from "@/lib/seo/jsonld/breadcrumb";
 import { getPosts, getTagsFromPosts } from "@/lib/blog/data";
 import { stripHtml, truncateToWords } from "@/lib/blog/utils";
-import { SITE_URL } from "@/lib/constants";
+import { SITE_URL, IMAGE_BLUR_PLACEHOLDER } from "@/lib/constants";
 
 export const revalidate = 60; // ISR: revalidate every 60 seconds
 
@@ -142,13 +142,16 @@ export default async function TagPage({ params }: PageProps) {
                 <Link key={post.id} href={`/blog/${post.slug}`}>
                   <Card className="h-full hover:shadow-lg transition-shadow">
                     {post.featuredImage?.node?.sourceUrl && (
-                      <div className="relative h-48 w-full">
+                      <div className="img-hover-zoom relative h-48 w-full overflow-hidden">
                         <Image
                           src={post.featuredImage.node.sourceUrl}
                           alt={post.featuredImage.node.altText || post.title}
                           fill
                           className="rounded-t-xl object-cover"
                           sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                          loading="lazy"
+                          placeholder="blur"
+                          blurDataURL={IMAGE_BLUR_PLACEHOLDER}
                         />
                       </div>
                     )}

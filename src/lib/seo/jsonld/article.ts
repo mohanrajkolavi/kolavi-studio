@@ -18,6 +18,14 @@ function fullUrl(pathOrUrl: string): string {
   return pathOrUrl.startsWith("http") ? pathOrUrl : `${SITE_URL}${pathOrUrl}`;
 }
 
+/** Ensures ISO datetime has timezone for schema.org (e.g. 2026-02-09T17:45:11 → 2026-02-09T17:45:11Z). */
+function withTimezone(isoDate: string): string {
+  if (!isoDate || typeof isoDate !== "string") return isoDate;
+  const trimmed = isoDate.trim();
+  if (/Z$|[+-]\d{2}:?\d{2}$/.test(trimmed)) return trimmed;
+  return trimmed + "Z";
+}
+
 export function getArticleSchema({
   headline,
   description,
@@ -43,8 +51,8 @@ export function getArticleSchema({
       width: imageWidth,
       height: imageHeight,
     },
-    datePublished,
-    dateModified,
+    datePublished: withTimezone(datePublished),
+    dateModified: withTimezone(dateModified),
     ...(wordCount != null && { wordCount }),
     author: {
       "@type": authorName === SITE_NAME ? "Organization" : "Person",
