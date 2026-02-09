@@ -599,7 +599,7 @@ export default function BlogMakerPage() {
     if (editing) {
       editingSnapshotRef.current = { title: editing.title, content: editing.content };
     }
-  }, [editing?.title, editing?.content]);
+  }, [editing]);
 
   // Re-run E-E-A-T when user edits title or content (debounced); no LLM tokens, Python only
   useEffect(() => {

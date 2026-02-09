@@ -25,6 +25,11 @@ function runWithPython(
       cwd: process.cwd(),
     });
 
+    if (!py.stdout || !py.stderr || !py.stdin) {
+      reject(new Error("Failed to create stdio pipes"));
+      return;
+    }
+
     let stdout = "";
     let stderr = "";
     py.stdout.setEncoding("utf8");
