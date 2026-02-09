@@ -227,6 +227,25 @@ export default async function BlogPostPage({ params }: PageProps) {
               {leadText}
             </p>
 
+            {/* Author + Share – single card */}
+            <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5 sm:py-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-100 to-amber-100 text-sm font-bold text-orange-700">
+                  {getPostAuthorName(post).charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-foreground">{getPostAuthorName(post)}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
+                    Digital marketing insights for service businesses
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 border-t border-border pt-3 sm:border-t-0 sm:border-l sm:border-border sm:pl-5 sm:pt-0">
+                <span className="text-sm font-medium text-muted-foreground">Share</span>
+                <ShareButtons url={postUrl} title={post.title} showLabel={false} />
+              </div>
+            </div>
+
             {/* Featured image */}
             {post.featuredImage && (
               <figure className="mt-8">
@@ -247,25 +266,6 @@ export default async function BlogPostPage({ params }: PageProps) {
                 </figcaption>
               </figure>
             )}
-
-            {/* Author + Share – single card */}
-            <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:px-5 sm:py-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-100 to-amber-100 text-sm font-bold text-orange-700">
-                  {getPostAuthorName(post).charAt(0)}
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-foreground">{getPostAuthorName(post)}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground sm:text-sm">
-                    Digital marketing insights for service businesses
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 border-t border-border pt-3 sm:border-t-0 sm:border-l sm:border-border sm:pl-5 sm:pt-0">
-                <span className="text-sm font-medium text-muted-foreground">Share</span>
-                <ShareButtons url={postUrl} title={post.title} showLabel={false} />
-              </div>
-            </div>
 
             {/* TOC mobile */}
             {tocHeadings.length > 0 && (
