@@ -5,6 +5,8 @@
  * - Google Search Central: developers.google.com/search/docs/fundamentals/creating-helpful-content
  * - Google Spam Policies: developers.google.com/search/docs/essentials/spam-policies
  * - Rank Math 100/100: rankmath.com/kb/score-100-in-tests
+ * - Sentiment in title: rankmath.com/kb/score-100-in-tests/#sentiment-in-a-title
+ * - Power words: rankmath.com/blog/power-words/
  *
  * AUDIT ARCHITECTURE (no duplication):
  * - SEO Audit (this file): Google Search Central + Rank Math technical SEO + editorial quality.
@@ -94,6 +96,36 @@ function getParagraphs(html: string): string[] {
   const fragment = html.replace(/<p[^>]*>/gi, "\n<p>").replace(/<\/p>/gi, "</p>\n");
   const raw = fragment.split(/\n/).filter((s) => s.trim().length > 0);
   return raw.map((s) => stripHtml(s)).filter((s) => s.length > 0);
+}
+
+// --- Rank Math: Title Readability (sentiment + power words) ---
+// References: rankmath.com/kb/score-100-in-tests/#sentiment-in-a-title, rankmath.com/blog/power-words/
+// Checked as whole-word (\\b) to avoid false positives.
+
+const SENTIMENT_WORDS = new Set([
+  "amazing", "best", "essential", "powerful", "proven", "simple", "free", "new", "ultimate", "complete",
+  "effective", "easy", "quick", "secret", "discover", "guarantee", "success", "strong", "great", "perfect",
+  "incredible", "powerful", "brilliant", "ultimate", "guaranteed", "instant", "effortless", "breakthrough",
+  "avoid", "warning", "mistake", "fail", "risk", "critical", "urgent", "danger", "hidden", "truth",
+  "shocking", "terrible", "worst", "never", "don't", "stop", "deadly", "exposed", "secret", "revealed",
+]);
+
+const POWER_WORDS = new Set([
+  "how to", "step-by-step", "guide", "tips", "tricks", "proven", "secret", "discover", "essential",
+  "powerful", "simple", "free", "new", "ultimate", "complete", "effective", "easy", "quick", "guarantee",
+  "success", "best", "great", "perfect", "amazing", "incredible", "instant", "effortless", "breakthrough",
+  "exclusive", "insider", "guaranteed", "official", "authority", "expert", "master", "win", "proven",
+  "discover", "revealed", "secret", "hidden", "powerful", "ultimate", "complete", "fast", "quick",
+  "easy", "simple", "free", "new", "improved", "ultimate", "full", "total", "maximum", "minimum",
+]);
+
+function titleContainsWordFromSet(title: string, wordSet: Set<string>): boolean {
+  const lower = title.toLowerCase();
+  for (const w of wordSet) {
+    const re = new RegExp("\\b" + w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
+    if (re.test(lower)) return true;
+  }
+  return false;
 }
 
 // --- Editorial quality checks ---
@@ -393,6 +425,53 @@ function auditTitle(input: ArticleAuditInput): AuditItem[] {
       });
     }
   }
+
+  // Rank Math: Sentiment in title (evoke strong emotion — positive or negative)
+  if (titleContainsWordFromSet(title, SENTIMENT_WORDS)) {
+    items.push({
+      id: "title-sentiment",
+      severity: "pass",
+      level: 3,
+      source: "rankmath",
+      label: "Sentiment in title",
+      message: "Title contains a sentiment word (evokes emotion).",
+      guideline: "Rank Math: titles that evoke strong emotions get more clicks. https://rankmath.com/kb/score-100-in-tests/#sentiment-in-a-title",
+    });
+  } else {
+    items.push({
+      id: "title-sentiment",
+      severity: "warn",
+      level: 3,
+      source: "rankmath",
+      label: "Sentiment in title",
+      message: "Your title doesn't contain a positive or negative sentiment word.",
+      guideline: "Rank Math: add a word that evokes emotion (e.g. amazing, proven, secret, avoid, warning). https://rankmath.com/kb/score-100-in-tests/#sentiment-in-a-title",
+    });
+  }
+
+  // Rank Math: Power word in title (compels clicks)
+  if (titleContainsWordFromSet(title, POWER_WORDS)) {
+    items.push({
+      id: "title-power-word",
+      severity: "pass",
+      level: 3,
+      source: "rankmath",
+      label: "Power word in title",
+      message: "Title contains a power word.",
+      guideline: "Rank Math: power words increase CTR. https://rankmath.com/blog/power-words/",
+    });
+  } else {
+    items.push({
+      id: "title-power-word",
+      severity: "warn",
+      level: 3,
+      source: "rankmath",
+      label: "Power word in title",
+      message: "Your title doesn't contain a power word. Add at least one.",
+      guideline: "Rank Math: use words like proven, secret, discover, essential, how to, guide, ultimate. https://rankmath.com/blog/power-words/",
+    });
+  }
+
   return items;
 }
 

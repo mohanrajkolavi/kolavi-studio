@@ -847,6 +847,10 @@ Minimum 300 words (Google thin-content threshold). Value over length: ensure the
 ## OUTPUT FORMAT (valid JSON only)
 Generate exactly 4 title/meta pairs for a 2x2 choice grid: (1) Direct keyword-first, (2) Curiosity hook, (3) Data-led, (4) Question or list hook. All: keyword in first 50% of title and in meta; title max 60 chars; meta 120-160 chars.
 
+**Rank Math Title Readability (required for each title):**
+- **Sentiment:** Each title MUST contain at least one positive or negative sentiment word that evokes emotion (e.g. amazing, proven, secret, essential, avoid, warning, ultimate, powerful, discover, shocking).
+- **Power word:** Each title MUST contain at least one power word that compels clicks (e.g. how to, guide, proven, secret, discover, essential, ultimate, best, easy, free, new, guaranteed, step-by-step). See rankmath.com/blog/power-words/
+
 {
   "titleMetaVariants": [
     { "title": "...", "metaDescription": "...", "approach": "Direct keyword-first" },
@@ -865,7 +869,7 @@ Generate exactly 4 title/meta pairs for a 2x2 choice grid: (1) Direct keyword-fi
 These run automatically after generation. Write to PASS them:
 
 **SEO Audit (blocks publishing if score < 80%):**
-Title keyword in first 50% + max 60 chars + number. Meta 120-160 chars with keyword. Slug with keyword. Keyword in first 10% and in at least one H2/H3 subheading. No paragraph over 120 words. No stuffing. Sequential heading hierarchy.
+Title keyword in first 50% + max 60 chars + number. Meta 120-160 chars with keyword. Slug with keyword. Keyword in first 10% and in at least one H2/H3 subheading. No paragraph over 120 words. No stuffing. Sequential heading hierarchy. **Title must include at least one sentiment word and one power word** (Rank Math: sentiment + power word in title).
 
 **Typography (blocks publishing):**
 Zero em-dashes. Zero en-dashes. Zero curly quotes.

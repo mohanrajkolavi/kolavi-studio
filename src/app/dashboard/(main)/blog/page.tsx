@@ -691,17 +691,6 @@ export default function BlogMakerPage() {
     return Boolean(expFail || lazyFail || sentenceFail || dataDensityFail);
   }, [eeatResult]);
 
-  /** Combined health: green/amber/red considering SEO + Quality + E-E-A-T. */
-  const combinedHealth = useMemo<{ color: "green" | "amber" | "red"; label: string }>(() => {
-    if (!seoAudit) return { color: "amber", label: "Waiting for audit" };
-    const seoOk = seoAudit.publishable;
-    const hasHallucinations = (pipelineResult?.factCheck?.hallucinations?.length ?? 0) > 0;
-    const eeatOk = eeatResult?.results ? !eeatHasCriticalIssues : true; // no E-E-A-T data = neutral
-    if (seoOk && !hasHallucinations && eeatOk) return { color: "green", label: "All checks pass" };
-    if (!seoOk || hasHallucinations) return { color: "red", label: "Fix issues before publishing" };
-    return { color: "amber", label: "E-E-A-T needs attention" };
-  }, [seoAudit, pipelineResult?.factCheck?.hallucinations, eeatResult, eeatHasCriticalIssues]);
-
   async function handleCopyForWordPress() {
     if (!editing?.content) return;
     try {
@@ -1042,34 +1031,6 @@ export default function BlogMakerPage() {
           <div className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr] lg:items-stretch">
             {/* Left: outline column. Right: content column. Both columns match height; content box ends where outline ends. */}
             <aside className="order-1 flex min-w-0 flex-col gap-4 lg:order-none">
-              {/* Combined health indicator */}
-              {editing && seoAudit && (
-                <div
-                  className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-[12px] font-medium ${
-                    combinedHealth.color === "green"
-                      ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
-                      : combinedHealth.color === "red"
-                        ? "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200"
-                        : "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
-                      combinedHealth.color === "green"
-                        ? "bg-emerald-500"
-                        : combinedHealth.color === "red"
-                          ? "bg-red-500"
-                          : "bg-amber-500"
-                    }`}
-                  />
-                  <span>{combinedHealth.label}</span>
-                  <span className="ml-auto text-[10px] font-normal opacity-70">
-                    SEO {seoAudit.score}%
-                    {pipelineResult?.factCheck ? ` · ${pipelineResult.factCheck.hallucinations.length} halluc.` : ""}
-                    {eeatResult?.results ? ` · E-E-A-T ${eeatHasCriticalIssues ? "warn" : "ok"}` : ""}
-                  </span>
-                </div>
-              )}
               {/* SEO Audit — Google Search Central + Rank Math compliance */}
               {editing && seoAudit && (
                 <div className="flex h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -1159,7 +1120,7 @@ export default function BlogMakerPage() {
                         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-5">
                           {SEO_CATEGORY_ORDER.filter((cat) => (byCategory.get(cat)?.length ?? 0) > 0).map((cat) => (
                             <div key={cat} className="space-y-1.5">
-                              <p className="sticky top-0 z-10 bg-card/95 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                              <p className="sticky top-0 z-20 -mt-px bg-card py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                                 {SEO_CATEGORY_LABELS[cat]}
                               </p>
                               <ul className="space-y-3">
@@ -1346,9 +1307,16 @@ export default function BlogMakerPage() {
                   </div>
                   <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-5">
                     {eeatError && (
-                      <p className="rounded-xl bg-red-50 px-3 py-2 text-[11px] text-red-700 dark:bg-red-950/50 dark:text-red-200">
-                        {eeatError}
-                      </p>
+                      <div className="space-y-1">
+                        <p className="rounded-xl bg-red-50 px-3 py-2 text-[11px] text-red-700 dark:bg-red-950/50 dark:text-red-200">
+                          {eeatError}
+                        </p>
+                        {eeatError.includes("not available") && (
+                          <p className="text-[11px] text-muted-foreground">
+                            See <code className="rounded bg-muted px-1">content_audit/README.md</code> for setup.
+                          </p>
+                        )}
+                      </div>
                     )}
                     {eeatResult?.results && (
                       <EeatResultsDisplay results={eeatResult.results} open={eeatListFilter === "issues"} filter={eeatListFilter} />

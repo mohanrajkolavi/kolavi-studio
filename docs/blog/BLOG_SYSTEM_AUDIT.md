@@ -80,7 +80,7 @@
 | Keyword in first 10% | 3 | Rank Math | Competitive |
 | Keyword in slug | 3 | Rank Math | Competitive |
 | Keyword in subheadings | 3 | Rank Math | Competitive |
-| Content length (2500+ etc.) | 3 | Rank Math | Competitive |
+| Content length (2500+ etc.) | 3 | Rank Math | Competitive (excluded from score; see Section 5b) |
 | Title keyword position | 3 | Rank Math | Competitive |
 | Number in title | 3 | Rank Math | Competitive |
 
@@ -90,7 +90,7 @@
 
 ## 5b. Weightage list (how the score is calculated)
 
-**Formula:** `score = (pass / total) × 100`. Every check has **equal weight (1)**. Only **pass** counts toward the numerator; **warn** and **fail** do not. So each pass = +1 to the score, each warn/fail = 0.
+**Formula:** `score = (pass / total) × 100`. Every **scored** check has **equal weight (1)**. Only **pass** counts toward the numerator; **warn** and **fail** do not. So each pass = +1 to the score, each warn/fail = 0. **Total** is the number of scored checks (check #21, Rank Math content length, is excluded from the denominator; see table below).
 
 **Publishability:** In addition to score ≥ 75, there must be **no Level 1 failures** (any L1 fail blocks publish even if score is high).
 
@@ -116,11 +116,11 @@
 | 18 | Rank Math: First 10% | 3 | +1 | 0 (warn) |
 | 19 | Rank Math: Slug keyword | 3 | +1 | 0 (warn) |
 | 20 | Rank Math: Subheading keyword | 3 | +1 | 0 (warn) |
-| 21 | Rank Math: Content length | 3 | +1 | 0 (warn only if 600-1499 words; 1500+ = pass) |
+| 21 | Rank Math: Content length | 3 | Excluded from score (informational only) | 1500+ = pass, 600–1499 = warn; not counted in total |
 | 22 | Rank Math: Keyword position in title | 3 | +1 | 0 (warn) |
 | 23 | Rank Math: Number in title | 3 | +1 | 0 (warn) |
 
-**Example:** 19 pass, 4 warn, 0 fail → total 23 → score = round(19/23 × 100) = **83%**. If any of the 4 warn were Level 1 fail, publishable would be false.
+**Example:** 19 pass, 3 warn, 0 fail → 22 checks counted (Rank Math content length #21 excluded from score) → score = round(19/22 × 100) = **86%**. If any of the 3 warn were Level 1 fail, publishable would be false.
 
 ---
 
@@ -167,8 +167,10 @@ This section maps **every audit check** to the **Content Writer pipeline** (Brie
 
 1. **Input** → Serper/Jina/Gemini → Topic extraction (OpenAI) → **Brief** (OpenAI)
 2. **Draft** (Claude) → **FAQ enforcement** (300-char truncation) → **SEO audit** → **Fact check**
-3. (Optional) **Humanize** (dashboard) → audit can be re-run on humanized content
-4. **Publishable** = `auditResult.score >= 75` and `level1Fails === 0`; fact-check hallucinations are non-blocking (warning only).
+3. **Humanize** — two distinct flows:
+   - **Generate API (automatic):** The Generate API (`/api/blog/generate`) invokes `generateBlogPost` then **automatically** runs `humanizeArticleContent` on the draft and returns a single result. The dashboard then runs the SEO audit on that result. So in the API path, humanize is always applied before the user sees the content; there is no separate “humanize step” for the user to trigger for that path.
+   - **Dashboard (manual re-run):** On the dashboard, the user can optionally **re-run humanize** on existing content (e.g. after editing or when re-humanizing a previously generated post). After a manual humanize, the user can **re-run the audit** on the updated content. The same publishable criteria apply: `auditResult.score >= 75` and `level1Fails === 0`. Re-auditing after humanize updates `score` and `level1Fails`, so publishable status can change (e.g. humanize may fix AI phrases and improve score, or wording changes could introduce new warns/fails).
+4. **Publishable** = `auditResult.score >= 75` and `level1Fails === 0`; fact-check hallucinations are non-blocking (warning only). This applies to the content as currently audited (whether from the API path after automatic humanize, or after a dashboard manual humanize + re-audit).
 
 ### Audit check ↔ Writer/Brief alignment
 
@@ -187,7 +189,7 @@ This section maps **every audit check** to the **Content Writer pipeline** (Brie
 | **Rank Math: first 10%** | 3 | Draft: "Primary keyword in first 10%" / "first 100 words" | ✓ |
 | **Rank Math: slug keyword** | 3 | Draft: "slug with keyword" | ✓ |
 | **Rank Math: subheading keyword** | 3 | Draft: "Primary keyword in at least one H2 or H3"; Brief: outline must include keyword in ≥1 heading | ✓ (reinforced in brief) |
-| **Rank Math: content length** | 3 | Excluded from score; value-over-length in draft | ✓ |
+| **Rank Math: content length** | 3 | Excluded from score (informational only); value-over-length in draft | ✓ |
 | **Rank Math: title keyword position** | 3 | Draft: "first 50% of title" | ✓ |
 | **Rank Math: number in title** | 3 | Draft: "Include a number when natural" | ✓ |
 | **Extra value coverage** (brief themes in content) | 3 | Brief: extraValueThemes; Draft: "EXTRA VALUE TO INCLUDE" block | ✓ |
