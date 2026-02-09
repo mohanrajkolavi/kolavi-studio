@@ -54,9 +54,12 @@ REVALIDATE_SECRET=your-secret-here
      ```
 
 2. **Verify tables created**:
-   - `leads` table (for contact form submissions)
-   - `content_maintenance` table (for blog post tracking)
-   - `login_rate_limit` table (for login brute-force protection)
+   - `leads` (contact form submissions)
+   - `content_maintenance` (blog post tracking)
+   - `login_rate_limit` (login brute-force protection)
+   - `contact_rate_limit` (contact form rate limiting)
+
+For **Recent** (last 5 generations), use Supabase and create `blog_generation_history` as described in [SETUP.md](../../SETUP.md) (Blog Maker history section).
 
 ## Running Locally
 
@@ -76,30 +79,33 @@ REVALIDATE_SECRET=your-secret-here
 
 ## Features
 
-### 1. Leads Dashboard (`/dashboard`)
+### 1. Overview (`/dashboard`)
+- Dashboard home; quick access to Leads, Content Writer, Recent, and Content Maintenance.
+
+### 2. Leads (`/dashboard/leads`)
 - View all contact form submissions
 - Filter by status, source, search by name/email
 - Update lead status (new → contacted → proposal_sent → won/lost)
 - Add internal notes
 - Click a lead to see full details
 
-### 2. Blog Maker (`/dashboard/blog`)
+### 3. Content Writer (`/dashboard/blog`) – formerly “Blog Maker”
 - Enter topic, audience, tone, keywords, length
-- Generate blog post with Claude AI
+- AI pipeline: Serper/Jina/Gemini, OpenAI brief, Claude draft, humanize, SEO audit, fact check
 - Edit generated content (title, meta description, outline, HTML content)
-- Copy for WordPress to paste into your CMS
+- Publishable when audit score ≥ 75% and no Level 1 fails
+- Copy for WordPress or use publish flow
 
-### 3. Content Maintenance (`/dashboard/content-maintenance`)
+### 4. Recent (`/dashboard/recent`)
+- Last 5 blog generations (requires Supabase: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`)
+- Shows title, focus keyword, creation time, generation duration
+- Link to Content Writer to continue editing
+
+### 5. Content Maintenance (`/dashboard/content-maintenance`)
 - View all blog posts from WordPress
 - See age of each post (months since last modified)
-- Track maintenance status:
-  - Unreviewed (default)
-  - Up to Date
-  - Needs Review
-  - Planned Refresh
-- Add notes for each post
-- Filter by status, age, category
-- Mark posts as reviewed
+- Track maintenance status: Unreviewed, Up to Date, Needs Review, Planned Refresh
+- Add notes; filter by status, age, category; mark posts as reviewed
 
 ## Contact Form Integration
 

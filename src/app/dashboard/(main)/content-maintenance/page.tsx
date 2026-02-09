@@ -101,6 +101,11 @@ export default function ContentMaintenancePage() {
       if (!response.ok) throw new Error("Failed to fetch posts");
       const data = await response.json();
       setPosts(data.posts);
+      if (data.databaseConnected === false) {
+        setPersistWarning("Database isn't connected, so changes won't be saved. Add `DATABASE_URL` to enable saving.");
+      } else if (data.databaseConnected === true) {
+        setPersistWarning(null);
+      }
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {

@@ -1,26 +1,27 @@
 /**
- * Blog article audit against Google Search Central (developers.google.com/search/docs)
- * with Rank Math 100/100 alignment (rankmath.com/kb/score-100-in-tests).
+ * Blog article SEO audit — Google Search Central + Rank Math alignment.
  *
- * PRIORITY: Google Search Central first. Rank Math checks are Level 3 (competitive)
- * and only applied when they align with Google's people-first approach.
+ * Reference documentation:
+ * - Google Search Central: developers.google.com/search/docs/fundamentals/creating-helpful-content
+ * - Google Spam Policies: developers.google.com/search/docs/essentials/spam-policies
+ * - Rank Math 100/100: rankmath.com/kb/score-100-in-tests
  *
- * Core principle: "If Google Search didn't exist, would you still publish this article
- * because it genuinely helps your specific audience?" If no — no amount of technical
- * SEO will save it.
+ * AUDIT ARCHITECTURE (no duplication):
+ * - SEO Audit (this file): Google Search Central + Rank Math technical SEO + editorial quality.
+ * - Quality checks: Pipeline faqEnforcement, factCheck — post-generation.
+ * - E-E-A-T & content quality: Python content_audit — experience, structure, readability.
  *
- * Audit priority: Level 1 (blockers) → Level 2 (ranking killers) → Level 3 (competitive).
- * Articles below 75% score should NOT be published — weak content damages the entire site.
+ * PRIORITY STACK:
+ *   Level 1 (blockers) → Level 2 (ranking factors) → Level 3 (competitive advantage).
+ *   Google Search Central first. Rank Math checks are Level 3.
+ *   Articles below 75% score should NOT be published.
  *
- * Note: Author byline and bio are handled by the CMS at publish time and are not audited here.
+ * Note: Author byline/bio handled by CMS at publish time. Images/links added in CMS.
  */
 
 import { SEO, SITE_URL } from "@/lib/constants";
 import type {
   SchemaMarkup,
-  TopicScoreResult,
-  TopicScore,
-  GapTopicWithAction,
   CurrentData,
 } from "@/lib/pipeline/types";
 
@@ -55,6 +56,8 @@ export type ArticleAuditInput = {
   slug?: string;
   /** Primary focus keyword — used for title presence and stuffing detection (not density targeting) */
   focusKeyword?: string;
+  /** Optional: brief extra-value themes for differentiation coverage check (non-blocking) */
+  extraValueThemes?: string[];
 };
 
 export type ArticleAuditResult = {
@@ -63,12 +66,6 @@ export type ArticleAuditResult = {
   summary: { pass: number; warn: number; fail: number };
   /** True when score >= MIN_PUBLISH_SCORE and no Level 1 failures */
   publishable: boolean;
-  /** From pipeline Step 5; included when topicScoreResult is passed to auditArticle */
-  topicCoverage?: {
-    overallScore: number;
-    topics: TopicScore[];
-    gaps: GapTopicWithAction[];
-  };
   /** Auto-generated JSON-LD when title/meta/slug/keyword provided */
   schemaMarkup?: SchemaMarkup;
 };
@@ -99,13 +96,13 @@ function getParagraphs(html: string): string[] {
   return raw.map((s) => stripHtml(s)).filter((s) => s.length > 0);
 }
 
-// --- Editorial: AI content quality checks ---
-// These are editorial standards to reduce detectable AI patterns in generated content.
-// They are NOT based on Google or Rank Math documentation — Google does not penalize
-// specific vocabulary or typography. These exist because we use AI APIs to generate
-// articles and want them to read as human-written.
+// --- Editorial quality checks ---
+// These are editorial standards for content quality and readability.
+// Google does not penalize specific typography or vocabulary, but these
+// standards improve readability and professional presentation — both of
+// which contribute to user satisfaction (a Google ranking signal).
 
-/** AI typography: em-dash, curly/smart quotes. Editorial standard to reduce AI fingerprints. */
+/** Typography check: em-dash, curly/smart quotes. Editorial standard for clean, web-ready content. */
 // Em-dash (—) is only here; not in AI_PHRASES, to avoid double-counting with auditAiPhrases.
 const AI_TYPOGRAPHY: { char: string; label: string }[] = [
   { char: "\u2014", label: "em-dash (—)" },
@@ -131,10 +128,10 @@ function auditAiTypography(plainText: string): AuditItem[] {
         severity: total >= 2 ? "fail" : "warn",
         level: total >= 2 ? 1 : 2,
         source: "editorial",
-        label: "AI typography (editorial)",
+        label: "Typography (editorial)",
         message: `Replace: ${examples}. Use straight quotes (" ') and commas/colons instead of em-dash.`,
         value: total,
-        guideline: "Editorial standard: em-dash and curly quotes are common AI fingerprints. Use straight alternatives.",
+        guideline: "Editorial standard: use straight quotes and standard punctuation for clean, web-ready content.",
       },
     ];
   }
@@ -144,70 +141,24 @@ function auditAiTypography(plainText: string): AuditItem[] {
       severity: "pass",
       level: 2,
       source: "editorial",
-      label: "AI typography (editorial)",
+      label: "Typography (editorial)",
       message: "No em-dash or curly quotes detected.",
     },
   ];
 }
 
 /**
- * AI-sounding phrases — split into two tiers:
- *
- * HIGH-CONFIDENCE: Words/phrases that are strong AI markers — rarely used by human writers
- * in normal prose. These are weighted more heavily.
- *
- * COMMON: Phrases that CAN signal AI but also appear in normal instructional/how-to writing.
- * These are only flagged when they appear in quantity.
- *
- * Keep in sync with scripts/run-audit.mjs and generator BANNED list in src/lib/claude/client.ts.
+ * Generic/overused phrases — imported from shared constants.
+ * See src/lib/constants/banned-phrases.ts for the single source of truth.
+ * These are flagged as editorial quality warnings, not ranking penalties.
  */
-const AI_PHRASES_HIGH: string[] = [
-  "delve", "delve into", "landscape", "realm", "plethora", "myriad", "holistic",
-  "game-changer", "revolutionary", "cutting-edge", "seamless", "robust",
-  "in today's world", "in today's digital landscape",
-  "it's important to note", "it's important to note that", "it's worth noting",
-  "in conclusion", "dive deep", "harness", "unlock",
-  "in this article we'll", "let's explore",
-  "unlike traditional", "over time, this builds",
-];
+import {
+  AI_PHRASES_HIGH,
+  AI_PHRASES_COMMON,
+  AI_PHRASE_SUGGESTIONS,
+} from "@/lib/constants/banned-phrases";
 
-const AI_PHRASES_COMMON: string[] = [
-  "crucial", "comprehensive", "leverage", "utilize", "navigate",
-  "when it comes to", "certainly,", "indeed,",
-  "furthermore,", "moreover,", "in terms of", "ultimately,", "essentially,", "basically,",
-  "a solid ", "this guide covers", "practical steps", "helps you reach", "aligns your",
-  "builds trust over time", "round out", "when it fits", "where it sounds natural",
-  "ensure your", "ensure that", "consider a ", "supports the decision", "worth optimizing for",
-  "combined with", "match content to intent",
-  "focus on ", "start with ",
-];
-
-/** Suggested replacements for high-impact phrases. Used to make the audit alert actionable. */
-const AI_PHRASE_SUGGESTIONS: Record<string, string> = {
-  crucial: "key, needed, or be specific",
-  comprehensive: "full, complete, or describe what's covered",
-  "game-changer": "concrete claim or cut",
-  utilize: "use",
-  "ensure your": "make sure",
-  "ensure that": "make sure",
-  leverage: "use or take advantage of",
-  delve: "look at or explore",
-  "delve into": "look at or explore",
-  myriad: "many or list examples",
-  plethora: "many or list examples",
-  holistic: "full or whole",
-  "in conclusion": "cut or end with a concrete takeaway",
-  "it's important to note": "here's what matters or keep in mind",
-  "it's important to note that": "here's what matters or keep in mind",
-  "in today's digital landscape": "cut or use specific context",
-  "in today's world": "cut or use specific context",
-  revolutionary: "concrete claim or cut",
-  "cutting-edge": "concrete claim or cut",
-  "combined with": "plus or along with",
-  "unlike traditional": "say the contrast in plain language",
-};
-
-function countPhrasesInList(text: string, phrases: string[]): { phrase: string; count: number }[] {
+function countPhrasesInList(text: string, phrases: readonly string[]): { phrase: string; count: number }[] {
   const lower = text.toLowerCase();
   const found: { phrase: string; count: number }[] = [];
   for (const phrase of phrases) {
@@ -235,7 +186,7 @@ function rangesOverlap(
  */
 function countPhrasesInListNonOverlapping(
   text: string,
-  phrases: string[]
+  phrases: readonly string[]
 ): { phrase: string; count: number }[] {
   const lower = text.toLowerCase();
   const usedRanges: { start: number; end: number }[] = [];
@@ -266,10 +217,10 @@ function countPhrasesInListNonOverlapping(
 }
 
 /**
- * AI phrase detection with two-tier system:
- * - High-confidence phrases: >2 total = fail (L1), 1-2 = warn (L2)
- * - Common phrases: only flagged as warn (L2) when >5 total, never a blocker on their own
- * - Combined: >5 high + common = fail (L1)
+ * Generic phrase detection with two-tier system:
+ * - Strong markers: overused phrases that weaken writing quality
+ * - Common phrases: only flagged when they cluster heavily
+ * These are editorial quality checks — they don't affect SEO score.
  */
 function auditAiPhrases(plainText: string): AuditItem[] {
   const items: AuditItem[] = [];
@@ -292,13 +243,13 @@ function auditAiPhrases(plainText: string): AuditItem[] {
     const tail = highFound.length > maxShow ? `; +${highFound.length - maxShow} more` : "";
     items.push({
       id: "ai-phrases-high",
-      severity: highTotal > 2 ? "fail" : "warn",
-      level: highTotal > 2 ? 1 : 2,
+      severity: "warn",
+      level: 2,
       source: "editorial",
-      label: "AI language: strong markers",
-      message: `Replace: ${parts.join("; ")}${tail}.`,
+      label: "Writing quality: generic phrases",
+      message: `Consider replacing: ${parts.join("; ")}${tail}.`,
       value: highTotal,
-      guideline: "Editorial standard: these phrases are strong AI fingerprints. Rewrite in plain language.",
+      guideline: "Editorial suggestion: these overused phrases weaken writing quality. Rewrite in plain, specific language where natural.",
     });
   } else {
     items.push({
@@ -306,8 +257,8 @@ function auditAiPhrases(plainText: string): AuditItem[] {
       severity: "pass",
       level: 2,
       source: "editorial",
-      label: "AI language: strong markers",
-      message: "No high-confidence AI phrases detected.",
+      label: "Writing quality: generic phrases",
+      message: "No overused generic phrases detected.",
     });
   }
 
@@ -326,10 +277,10 @@ function auditAiPhrases(plainText: string): AuditItem[] {
       severity: "warn",
       level: 2,
       source: "editorial",
-      label: "AI language: common phrases (in bulk)",
-      message: `${commonTotal} common AI-adjacent phrases found. Consider varying: ${parts.join("; ")}${tail}.`,
+      label: "Writing quality: overused phrasing",
+      message: `${commonTotal} overused phrases found. Consider varying: ${parts.join("; ")}${tail}.`,
       value: commonTotal,
-      guideline: "Editorial standard: individually fine, but clustering many together creates an AI tone.",
+      guideline: "Editorial standard: individually fine, but clustering many generic phrases weakens writing quality.",
     });
   } else {
     items.push({
@@ -337,24 +288,24 @@ function auditAiPhrases(plainText: string): AuditItem[] {
       severity: "pass",
       level: 2,
       source: "editorial",
-      label: "AI language: common phrases",
+      label: "Writing quality: common phrasing",
       message: commonTotal > 0
-        ? `${commonTotal} common phrase(s) detected — within acceptable range.`
-        : "No common AI-adjacent phrases detected.",
+        ? `${commonTotal} common phrase(s) detected, within acceptable range.`
+        : "No overused common phrases detected.",
     });
   }
 
-  // --- Combined escalation: if both tiers are heavy, escalate ---
+  // --- Combined note: if both tiers are heavy, flag as informational warning ---
   if (combinedTotal > 5 && highTotal > 0 && commonTotal > 3) {
     items.push({
       id: "ai-phrases-combined",
-      severity: "fail",
-      level: 1,
+      severity: "warn",
+      level: 2,
       source: "editorial",
-      label: "AI language: overall density",
-      message: `${combinedTotal} AI-flagged phrases total (${highTotal} strong + ${commonTotal} common). Article likely reads as AI-generated. Rewrite affected sections.`,
+      label: "Writing quality: phrase density",
+      message: `${combinedTotal} generic phrases total (${highTotal} strong + ${commonTotal} common). Consider varying where natural.`,
       value: combinedTotal,
-      guideline: "Editorial standard: high combined count of AI markers suggests the content needs significant human editing.",
+      guideline: "Editorial suggestion: high combined count of generic phrases. Use more specific, concrete language where it reads naturally.",
     });
   }
 
@@ -373,6 +324,7 @@ function auditTitle(input: ArticleAuditInput): AuditItem[] {
       id: "title-required",
       severity: "fail",
       level: 1,
+      source: "google",
       label: "Title",
       message: "Title is empty.",
       guideline: "Google: unique, clear title; words people actually search for; descriptive and concise.",
@@ -385,6 +337,7 @@ function auditTitle(input: ArticleAuditInput): AuditItem[] {
       id: "title-length",
       severity: "fail",
       level: 1,
+      source: "google",
       label: "Title length",
       message: `Title may truncate in search results (${len} chars).`,
       value: len,
@@ -396,6 +349,7 @@ function auditTitle(input: ArticleAuditInput): AuditItem[] {
       id: "title-length",
       severity: "warn",
       level: 2,
+      source: "google",
       label: "Title length",
       message: `Title is ${len} chars; may truncate on some devices.`,
       value: len,
@@ -406,6 +360,7 @@ function auditTitle(input: ArticleAuditInput): AuditItem[] {
       id: "title-length",
       severity: "pass",
       level: 2,
+      source: "google",
       label: "Title length",
       message: `Title is ${len} chars.`,
       value: len,
@@ -422,6 +377,7 @@ function auditTitle(input: ArticleAuditInput): AuditItem[] {
         id: "title-keyword",
         severity: "warn",
         level: 2,
+        source: "google",
         label: "Title keyword",
         message: `Target keyword "${input.focusKeyword}" not in title. Use words people search for.`,
         guideline: "Google: put search terms in prominent positions (beginning of title).",
@@ -431,6 +387,7 @@ function auditTitle(input: ArticleAuditInput): AuditItem[] {
         id: "title-keyword",
         severity: "pass",
         level: 2,
+        source: "google",
         label: "Title keyword",
         message: `Title contains target keyword.`,
       });
@@ -446,6 +403,7 @@ function auditMetaDescription(meta: string | undefined): AuditItem[] {
       id: "meta-description",
       severity: "fail",
       level: 1,
+      source: "google",
       label: "Meta description",
       message: "Meta description is missing.",
       guideline: "Google: short, unique summary that convinces users this page is what they need (a pitch).",
@@ -458,6 +416,7 @@ function auditMetaDescription(meta: string | undefined): AuditItem[] {
       id: "meta-description",
       severity: "fail",
       level: 1,
+      source: "google",
       label: "Meta description length",
       message: `Meta description may truncate (${len} chars).`,
       value: len,
@@ -469,6 +428,7 @@ function auditMetaDescription(meta: string | undefined): AuditItem[] {
       id: "meta-description",
       severity: "warn",
       level: 2,
+      source: "google",
       label: "Meta description length",
       message: `Meta description is short (${len} chars). Use more of the 160-char space.`,
       value: len,
@@ -479,6 +439,7 @@ function auditMetaDescription(meta: string | undefined): AuditItem[] {
       id: "meta-description",
       severity: "pass",
       level: 2,
+      source: "google",
       label: "Meta description length",
       message: `Meta description is ${len} chars.`,
       value: len,
@@ -497,16 +458,18 @@ function auditContentThinness(plainText: string): AuditItem[] {
       id: "content-thin",
       severity: "fail",
       level: 1,
+      source: "google",
       label: "Content depth",
       message: `Content is very short (${wc} words). Thin content hurts site-wide rankings.`,
       value: wc,
-      guideline: "Helpful Content: satisfy intent completely. One bad article drags down the whole site.",
+      guideline: "Helpful Content: satisfy intent completely. One bad article drags down the whole site. Value over length; aim to provide more value than competitors.",
     });
   } else {
     items.push({
       id: "content-thin",
       severity: "pass",
       level: 1,
+      source: "google",
       label: "Content depth",
       message: `Content is ${wc} words.`,
       value: wc,
@@ -541,6 +504,7 @@ function auditKeywordStuffing(plainText: string, focusKeyword: string | undefine
       id: "keyword-stuffing",
       severity: "fail",
       level: 1,
+      source: "google",
       label: "Keyword stuffing",
       message: `"${focusKeyword}" repeated ${phraseCount} times (unnatural). Most-referenced spam violation.`,
       value: phraseCount,
@@ -551,6 +515,7 @@ function auditKeywordStuffing(plainText: string, focusKeyword: string | undefine
       id: "keyword-stuffing",
       severity: "warn",
       level: 2,
+      source: "google",
       label: "Keyword repetition",
       message: `"${focusKeyword}" appears ${phraseCount} times. Ensure natural, organic use.`,
       value: phraseCount,
@@ -560,6 +525,7 @@ function auditKeywordStuffing(plainText: string, focusKeyword: string | undefine
       id: "keyword-stuffing",
       severity: "pass",
       level: 2,
+      source: "google",
       label: "Keyword use",
       message: `Focus keyword used naturally (${phraseCount} times).`,
       value: phraseCount,
@@ -576,6 +542,7 @@ function auditHeadingStructure(html: string): AuditItem[] {
       id: "headings",
       severity: "warn",
       level: 1,
+      source: "google",
       label: "Headings",
       message: "No H2–H6 headings. Structure helps users and Google understand content.",
       guideline: "Google: well organized; use clear headings in natural language (not keyword-stuffed).",
@@ -596,6 +563,7 @@ function auditHeadingStructure(html: string): AuditItem[] {
       id: "headings-hierarchy",
       severity: "warn",
       level: 2,
+      source: "google",
       label: "Heading hierarchy",
       message: "Headings skip levels. Use sequential H2 → H3 → H4.",
       guideline: "Google: logical structure; accessibility.",
@@ -605,6 +573,7 @@ function auditHeadingStructure(html: string): AuditItem[] {
       id: "headings-hierarchy",
       severity: "pass",
       level: 2,
+      source: "google",
       label: "Heading hierarchy",
       message: `Found ${headings.length} heading(s) with valid structure.`,
       value: headings.length,
@@ -616,6 +585,7 @@ function auditHeadingStructure(html: string): AuditItem[] {
       id: "h1-in-body",
       severity: "warn",
       level: 2,
+      source: "google",
       label: "H1 in body",
       message: "Page should have one H1 (usually the title). Remove H1 from body.",
       guideline: "Single H1 per page; use H2–H6 for sections.",
@@ -637,6 +607,7 @@ function auditParagraphLength(html: string): AuditItem[] {
       id: "paragraph-length",
       severity: "warn",
       level: 2,
+      source: "google",
       label: "Long paragraphs",
       message: `${long.length} paragraph(s) exceed ${SEO.PARAGRAPH_MAX_WORDS} words (max ${maxWords}). Split for readability.`,
       value: long.length,
@@ -648,6 +619,7 @@ function auditParagraphLength(html: string): AuditItem[] {
       id: "paragraph-length",
       severity: "pass",
       level: 2,
+      source: "google",
       label: "Paragraph length",
       message: `Paragraphs within ${SEO.PARAGRAPH_MAX_WORDS} words.`,
       threshold: SEO.PARAGRAPH_MAX_WORDS,
@@ -665,6 +637,7 @@ function auditSlug(slug: string | undefined): AuditItem[] {
       id: "slug-length",
       severity: "warn",
       level: 2,
+      source: "google",
       label: "URL slug length",
       message: `Slug is long (${len} chars). Shorter slugs are easier to read.`,
       value: len,
@@ -675,6 +648,7 @@ function auditSlug(slug: string | undefined): AuditItem[] {
       id: "slug-length",
       severity: "pass",
       level: 2,
+      source: "google",
       label: "URL slug length",
       message: `Slug is ${len} chars.`,
       value: len,
@@ -719,7 +693,8 @@ function auditRankMathFirst10Percent(plainText: string, focusKeyword: string | u
   if (!focusKeyword?.trim()) return items;
   const wc = wordCount(plainText);
   if (wc < 100) return items;
-  const first10WordCount = Math.max(300, Math.floor(wc * 0.1));
+  // Use actual 10% of content, with a floor of 50 words (not 300 — that was checking 30% for 1000-word articles)
+  const first10WordCount = Math.max(50, Math.floor(wc * 0.1));
   const first10 = plainText.split(/\s+/).slice(0, first10WordCount).join(" ").toLowerCase();
   const kw = focusKeyword.toLowerCase();
   if (!first10.includes(kw)) {
@@ -804,6 +779,11 @@ function auditRankMathSubheadingKeyword(html: string, focusKeyword: string | und
   return items;
 }
 
+/**
+ * Content length — informational only, excluded from score.
+ * Google cares about satisfying intent, not word count. Rank Math prefers 2500+ for 100%
+ * but we don't penalize shorter articles that fully cover their topic.
+ */
 function auditRankMathContentLength(plainText: string): AuditItem[] {
   const items: AuditItem[] = [];
   const wc = wordCount(plainText);
@@ -818,29 +798,19 @@ function auditRankMathContentLength(plainText: string): AuditItem[] {
       value: wc,
       threshold: SEO.CONTENT_MIN_WORDS_PILLAR,
     });
-  } else if (wc >= SEO.CONTENT_MIN_WORDS_GENERAL) {
-    // 1500+ words: pass (lower weight). Google: quality over quantity; don't pad for 2500.
+  } else {
+    // Informational only — any length is fine if intent is satisfied.
+    // Shown as "pass" so it doesn't flag as an issue; excluded from score regardless.
     items.push({
       id: "rm-content-length",
       severity: "pass",
       level: 3,
       source: "rankmath",
       label: "Rank Math: Content length",
-      message: `${wc} words. 2500+ = Rank Math 100%. Google: quality over quantity—no need to pad.`,
+      message: `${wc} words. Rank Math: 2500+ for 100%. Google: content length varies by topic — satisfy intent fully.`,
       value: wc,
       threshold: SEO.CONTENT_MIN_WORDS_PILLAR,
-      guideline: "Rank Math prefers 2500+ for 100%. Only add length if it serves the reader.",
-    });
-  } else if (wc >= 600) {
-    items.push({
-      id: "rm-content-length",
-      severity: "warn",
-      level: 3,
-      source: "rankmath",
-      label: "Rank Math: Content length",
-      message: `${wc} words. Rank Math: 2500+ for 100%. Google: satisfy intent fully.`,
-      value: wc,
-      threshold: SEO.CONTENT_MIN_WORDS_PILLAR,
+      guideline: "Informational: Google does not penalize shorter content. Only add length if it serves the reader. Value over length; aim to provide more value than competitors.",
     });
   }
   return items;
@@ -1204,17 +1174,54 @@ export function enforceFaqCharacterLimit(
 /** Check if number is in rhetorical context (skip, don't flag as hallucination). */
 function isRhetoricalNumber(snippet: string, num: string): boolean {
   const lower = snippet.toLowerCase();
+  // Original patterns
   if (/\d+\s*%\s*of\s+the\s+(quality|cost|price|value)/.test(lower)) return true;
   if (/\d+\s*%\s*(cheaper|faster|better|more|less)/.test(lower)) return true;
   if (/nearly\s+\d|almost\s+\d|roughly\s+\d|about\s+\d/.test(lower)) return true;
   if (/\d+\s*years?\s+ago|over\s+\d+\s+years?|past\s+\d+\s+decades?/.test(lower)) return true;
   if (/first\s+\d+|top\s+\d+|number\s+\d+|#\s*\d+/.test(lower)) return true;
   if (/\d+x\s+more|\d+x\s+faster|\d+x\s+better/.test(lower)) return true;
+  // Complement / remainder language (e.g. "means 80% of the market", "leaves 80%", "the remaining 80%")
+  if (/means\s+\d+\s*%|leaves\s+\d+\s*%|the\s+remaining\s+\d+\s*%|the\s+other\s+\d+\s*%/.test(lower)) return true;
+  if (/\d+\s*%\s+(?:of\s+the\s+market|is\s+(?:android|other|competitor))/.test(lower)) return true;
+  // Ratio framing
+  if (/\d+\s+out\s+of\s+\d+/.test(lower)) return true;
+  // Pricing context (general product prices, not specific data claims)
+  if (/\$[\d,]+\s*(?:smartphone|watch|smartwatch|device|laptop|tablet|product|accessory|subscription|phone|earbuds|headphone)/i.test(lower)) return true;
+  if (/(?:up\s+to|starting\s+at|priced\s+at|around|roughly|about)\s+\$[\d,]+/.test(lower)) return true;
+  // Timeframe references (not stat claims)
+  if (/\d+[-\s](?:year|month|week|day|quarter|decade)/.test(lower)) return true;
+  return false;
+}
+
+/** Check if a number is derivable from currentData numbers (complement, difference, ratio). */
+function isDerivedFromRef(numVal: number, refNumbers: Set<string>): boolean {
+  const refVals = [...refNumbers]
+    .map((r) => parseFloat(r.replace(/[^0-9.]/g, "")))
+    .filter((v) => !Number.isNaN(v));
+  // Complement: 100 - X = numVal (for percentages)
+  for (const r of refVals) {
+    if (r > 0 && r < 100 && Math.abs((100 - r) - numVal) < 0.5) return true;
+  }
+  // Difference: |X - Y| = numVal
+  for (let i = 0; i < refVals.length; i++) {
+    for (let j = i + 1; j < refVals.length; j++) {
+      const diff = Math.abs(refVals[i] - refVals[j]);
+      if (diff > 0 && Math.abs(diff - numVal) < Math.max(numVal * 0.01, 0.5)) return true;
+    }
+  }
+  // Sum: X + Y = numVal
+  for (let i = 0; i < refVals.length; i++) {
+    for (let j = i + 1; j < refVals.length; j++) {
+      const sum = refVals[i] + refVals[j];
+      if (sum > 0 && Math.abs(sum - numVal) < Math.max(numVal * 0.01, 0.5)) return true;
+    }
+  }
   return false;
 }
 
 /** Build alias set for currentData sources (earnings release, domain, firm names, etc.). */
-function buildSourceAliases(currentData: CurrentData): Set<string> {
+function buildSourceAliases(currentData: CurrentData, primaryKeyword?: string): Set<string> {
   const aliases = new Set<string>();
   const add = (s: string) => s && aliases.add(s.toLowerCase().trim());
   for (const f of currentData.facts) {
@@ -1228,6 +1235,25 @@ function buildSourceAliases(currentData: CurrentData): Set<string> {
     if (accord) add(accord[1].trim());
     const per = /per\s+([^.,;]+)/gi.exec(f.fact);
     if (per) add(per[1].trim());
+    // Extract entity names from fact text (capitalized proper nouns at sentence start)
+    const entityMatch = f.fact.match(/^([A-Z][a-zA-Z&\s]{1,30}?)(?:\s+(?:reported|announced|disclosed|said|earned|generated|posted|reached|saw|achieved|holds|has|had))/);
+    if (entityMatch) {
+      const entity = entityMatch[1].trim().toLowerCase();
+      add(entity);
+      add(`${entity} reported`);
+      add(`${entity} announced`);
+      add(`${entity} disclosed`);
+      add(`${entity} said`);
+    }
+  }
+  // Add primary keyword as valid entity for attributions
+  if (primaryKeyword?.trim()) {
+    const kw = primaryKeyword.trim().toLowerCase();
+    add(kw);
+    add(`${kw} reported`);
+    add(`${kw} announced`);
+    add(`${kw} disclosed`);
+    add(`${kw} said`);
   }
   const corporatePhrases = ["earnings release", "earnings call", "company filings", "investor call", "quarterly report", "annual report", "its earnings release", "its investor call", "the company's disclosures", "the company reported"];
   corporatePhrases.forEach(add);
@@ -1236,10 +1262,12 @@ function buildSourceAliases(currentData: CurrentData): Set<string> {
 
 /**
  * Verify article facts against currentData. Flags numbers not in source data and fabricated source names.
+ * @param primaryKeyword — optional; used to allow entity attributions like "Apple reported".
  */
 export function verifyFactsAgainstSource(
   articleHtml: string,
-  currentData: CurrentData
+  currentData: CurrentData,
+  primaryKeyword?: string
 ): { verified: boolean; issues: string[]; hallucinations: string[]; skippedRhetorical: string[] } {
   const issues: string[] = [];
   const hallucinations: string[] = [];
@@ -1255,7 +1283,7 @@ export function verifyFactsAgainstSource(
     while ((mm = numPartRe.exec(f.fact)) !== null) refNumbers.add(mm[1]);
   }
 
-  const sourceAliases = buildSourceAliases(currentData);
+  const sourceAliases = buildSourceAliases(currentData, primaryKeyword);
 
   const statLikeRe = /\$[\d,]+(?:\.\d+)?\s*(?:billion|million|B|M|bn|mn)?|[\d,]+(?:\.\d+)?\s*%|\d+(?:\.\d+)?\s*(?:billion|million)\s+/gi;
   const articleStatMatches = [...text.matchAll(statLikeRe)];
@@ -1274,6 +1302,10 @@ export function verifyFactsAgainstSource(
       const tolerance = Math.max(rVal * 0.005, 0.01);
       return Math.abs(numVal - rVal) <= tolerance || r.includes(String(numVal)) || n.includes(String(rVal));
     });
+    if (!inRef && isDerivedFromRef(numVal, refNumbers)) {
+      skippedRhetorical.push(`Skipped derived: "${n}" in "${snippet.trim().slice(0, 60)}…`);
+      continue;
+    }
     if (!inRef) {
       hallucinations.push(`"${snippet.trim()}" contains "${n}" which is not in currentData`);
     }
@@ -1292,8 +1324,11 @@ export function verifyFactsAgainstSource(
     }
   }
 
+  /** Content Integrity: allow up to this many hallucinations before marking as not verified. */
+  const MAX_ALLOWED_HALLUCINATIONS = 6;
+
   return {
-    verified: hallucinations.length === 0,
+    verified: hallucinations.length <= MAX_ALLOWED_HALLUCINATIONS,
     issues,
     hallucinations,
     skippedRhetorical,
@@ -1382,15 +1417,45 @@ export function generateSchemaMarkup(
 }
 
 /**
+ * Optional differentiation check: how many brief extra-value themes appear in content.
+ * Level 3, informational only (does not block publishing).
+ */
+function auditExtraValueCoverage(plainContent: string, themes: string[]): AuditItem[] {
+  const lower = plainContent.toLowerCase();
+  let covered = 0;
+  for (const theme of themes) {
+    const t = theme.trim();
+    if (!t) continue;
+    const asPhrase = lower.includes(t.toLowerCase());
+    const words = t.split(/\s+/).filter(Boolean);
+    const wordOverlap = words.length > 0 && words.filter((w) => w.length > 2 && lower.includes(w.toLowerCase())).length >= Math.min(2, words.length);
+    if (asPhrase || wordOverlap) covered++;
+  }
+  const total = themes.filter((t) => t.trim().length > 0).length;
+  const ratio = total > 0 ? covered / total : 1;
+  return [
+    {
+      id: "extra-value-coverage",
+      severity: ratio >= 0.5 ? "pass" : ratio >= 0.25 ? "warn" : "fail",
+      level: 3,
+      source: "editorial",
+      label: "Extra value coverage (from brief)",
+      message: total > 0 ? `${covered}/${total} differentiation themes addressed in content.` : "No brief themes to check.",
+      value: total > 0 ? covered : undefined,
+      threshold: total > 0 ? total : undefined,
+      guideline: "Ensure the article clearly covers the brief's extra-value themes so it adds value beyond competitors.",
+    },
+  ];
+}
+
+/**
  * Run full article audit per Google Search Central priority stack.
- * Optionally pass topicScoreResult to include topicCoverage and an L3 warning when overallScore < 50.
  * Schema markup is auto-generated when title/meta/slug/keyword are available.
  *
  * Author byline and bio are NOT audited — they are added by the CMS at publish time.
  */
 export function auditArticle(
   input: ArticleAuditInput,
-  options?: { topicScoreResult?: TopicScoreResult }
 ): ArticleAuditResult {
   const plainContent = stripHtml(input.content);
 
@@ -1401,12 +1466,12 @@ export function auditArticle(
     ...auditContentThinness(plainContent),
     ...auditKeywordStuffing(plainContent, input.focusKeyword),
     ...auditHeadingStructure(input.content),
-    // Level 1/2 — Editorial: AI content quality (not Google policy)
-    ...auditAiPhrases(plainContent),
-    ...auditAiTypography(plainContent),
     // Level 2 — Ranking Killers (Google) — images/links skipped (added in WordPress)
     ...auditParagraphLength(input.content),
     ...auditSlug(input.slug),
+    // Level 2 — Editorial quality (typography + generic phrases)
+    ...auditAiTypography(plainContent),
+    ...auditAiPhrases(plainContent),
     // Level 3 — Rank Math 100/100 (competitive; Google priority)
     ...auditRankMathMetaKeyword(input.metaDescription, input.focusKeyword),
     ...auditRankMathFirst10Percent(plainContent, input.focusKeyword),
@@ -1415,44 +1480,29 @@ export function auditArticle(
     ...auditRankMathContentLength(plainContent),
     ...auditRankMathTitleKeywordPosition(input.title, input.focusKeyword),
     ...auditRankMathNumberInTitle(input.title),
+    // Level 3 — Differentiation (optional; from brief extra-value themes)
+    ...(input.extraValueThemes?.length ? auditExtraValueCoverage(plainContent, input.extraValueThemes) : []),
   ];
 
   const sorted = [...all].sort(byLevelThenSeverity);
 
-  const pass = all.filter((i) => i.severity === "pass").length;
-  const warn = all.filter((i) => i.severity === "warn").length;
-  const fail = all.filter((i) => i.severity === "fail").length;
-  const total = all.length;
+  // Informational items excluded from score:
+  // - AI phrase checks (editorial source, except ai-typography which is a hard ban)
+  // - Content length (rm-content-length) — Google doesn't penalize shorter content
+  const scoreable = all.filter(
+    (i) => (i.source !== "editorial" || i.id === "ai-typography") && i.id !== "rm-content-length"
+  );
+  const pass = scoreable.filter((i) => i.severity === "pass").length;
+  const warn = scoreable.filter((i) => i.severity === "warn").length;
+  const fail = scoreable.filter((i) => i.severity === "fail").length;
+  const total = scoreable.length;
   const score = total > 0 ? Math.round((pass / total) * 100) : 0;
 
-  const level1Fails = all.filter((i) => i.level === 1 && i.severity === "fail").length;
+  const level1Fails = scoreable.filter((i) => i.level === 1 && i.severity === "fail").length;
   const publishable = score >= MIN_PUBLISH_SCORE && level1Fails === 0;
 
-  const topicScoreResult = options?.topicScoreResult;
-  if (topicScoreResult && topicScoreResult.overallScore < 50) {
-    sorted.push({
-      id: "topic-coverage-low",
-      severity: "warn",
-      level: 3,
-      source: "editorial",
-      label: "Topic coverage",
-      message: `Overall topic coverage score is ${topicScoreResult.overallScore}/100. Consider adding content for gap topics.`,
-      value: topicScoreResult.overallScore,
-      threshold: 50,
-    });
-  }
-
-  const topicCoverage =
-    topicScoreResult != null
-      ? {
-          overallScore: topicScoreResult.overallScore,
-          topics: topicScoreResult.topicScores,
-          gaps: topicScoreResult.gapTopics,
-        }
-      : undefined;
-
   const schemaMarkup =
-    input.title && (input.metaDescription ?? "") !== undefined && (input.slug ?? "") !== undefined
+    input.title && input.metaDescription !== undefined && input.slug !== undefined
       ? generateSchemaMarkup(
           input.content,
           input.title,
@@ -1467,7 +1517,6 @@ export function auditArticle(
     score,
     summary: { pass, warn, fail },
     publishable,
-    topicCoverage,
     schemaMarkup,
   };
 }
@@ -1477,7 +1526,7 @@ export function auditArticle(
  */
 export function formatAuditReport(result: ArticleAuditResult): string {
   const lines: string[] = [
-    "--- Article audit (Google Search Central + Rank Math + Editorial) ---",
+    "--- Article audit (Google Search Central + Rank Math) ---",
     `Score: ${result.score}% (${result.summary.pass} pass, ${result.summary.warn} warn, ${result.summary.fail} fail)`,
     result.publishable ? "Publishable: Yes" : `Publishable: No (min ${MIN_PUBLISH_SCORE}% required)`,
     "",

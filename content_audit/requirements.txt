@@ -1,0 +1,6 @@
+# E-E-A-T & Content Integrity audit (GoogleQualityAuditor)
+nltk>=3.8
+textblob>=0.17.1
+vaderSentiment>=3.3.2
+spacy>=3.7.0
+beautifulsoup4>=4.12.0

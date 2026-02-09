@@ -2,18 +2,19 @@
 
 ## Project structure
 
-- **`src/app/`** – Routes and page composition only (pages, layouts, API routes, sitemap/robots). No shared UI components.
-- **`src/components/`** – Reusable UI: `blog/` (BlogContent, BlogSubscribe, BlogPostTOC, ShareButtons), `layout/` (Header, Footer, CTAStrip, MobileNav), `sections/`, `ui/`, `contact/`.
-- **`src/lib/`** – Shared logic: `blog/` (data, utils, sample-posts), `graphql/` (client, queries, types), `seo/` (metadata, JSON-LD, canonical, rank-math), `constants.ts`, `utils.ts`, `sitemap-index.ts`.
-- **`docs/`** – `architecture/`, `integrations/`, `dashboard/`.
+- **`src/app/`** – Routes and page composition: pages (home, about, contact, services, portfolio, industries, medical-spas, privacy, terms, disclaimer, cookies), blog (index, [slug], category, tag, rss), dashboard (login, (main): Overview, leads, blog, recent, content-maintenance), API routes (auth, blog, contact, content-audit, content-maintenance, leads, revalidate), sitemap, robots. No shared UI in app.
+- **`src/components/`** – Reusable UI: `blog/` (BlogContent, BlogSubscribe, BlogPostTOC, ShareButtons), `layout/` (Header, Footer, CTAStrip, MobileNav, LayoutShell, Logo), `sections/`, `ui/` (shadcn), `contact/`, `dashboard/`, `legal/`.
+- **`src/lib/`** – Shared logic: `auth/` (auth, login-rate-limit), `blog/` (data, utils, sample-posts, generation-types), `graphql/` (client, queries, types), `seo/` (metadata, JSON-LD, canonical, article-audit, rank-math-parser), `pipeline/` (orchestrator, types for Content Writer), `claude/`, `gemini/`, `openai/` (AI clients), `jina/`, `serper/`, `supabase/`, `db/`, `constants/` (constants, banned-phrases), `utils.ts`, `sitemap-index.ts`.
+- **`docs/`** – `architecture/`, `integrations/`, `dashboard/`, `blog/`. Optional Python tool: `content_audit/` at repo root.
 
 ## Environment variables
 
 All public config is via `NEXT_PUBLIC_*`; no server secrets are exposed to the client.
 
 - **NEXT_PUBLIC_SITE_URL** – Canonical base URL (canonical links, Open Graph, sitemap, RSS). Set to production URL in prod.
-- **NEXT_PUBLIC_WP_GRAPHQL_URL** – WordPress GraphQL endpoint. When set, blog data comes from WordPress; when unset, sample data is used so the site runs without WP.
+- **NEXT_PUBLIC_WP_GRAPHQL_URL** – WordPress GraphQL endpoint. When set, blog data comes from WordPress; when unset, sample data is used.
 - **NEXT_PUBLIC_GA_MEASUREMENT_ID** – Optional GA4 Measurement ID. When set, GA4 scripts load on every page.
+- Dashboard/AI: **DATABASE_URL**, **ADMIN_SECRET**, **ANTHROPIC_API_KEY**, **OPENAI_API_KEY**, **GEMINI_API_KEY** (or **GOOGLE_AI_API_KEY**), **SERPER_API_KEY**, **JINA_API_KEY**; optional **NEXT_PUBLIC_SUPABASE_URL**, **SUPABASE_SERVICE_ROLE_KEY** for Blog Maker Recent.
 
 See [INTEGRATIONS.md](../integrations/INTEGRATIONS.md) for full list and GTM notes.
 

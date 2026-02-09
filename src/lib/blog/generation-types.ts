@@ -10,7 +10,27 @@ export type GeneratedContent = {
   suggestedTags?: string[];
 };
 
-/** Pipeline v3 output (from /api/blog/generate). */
+/** Best-version brief summary (strategy/differentiation). */
+export type BriefSummary = {
+  similaritySummary?: string;
+  extraValueThemes?: string[];
+  freshnessNote?: string;
+};
+
+/** Outline drift: draft H2s vs brief outline (non-blocking). */
+export type OutlineDrift = {
+  passed: boolean;
+  expected: string[];
+  actual: string[];
+  missing: string[];
+  extra: string[];
+};
+
+/**
+ * Pipeline v3 output (from /api/blog/generate).
+ * Feeds the complete audit system: SEO Audit (auditResult + schema),
+ * Quality checks (faqEnforcement, factCheck). E-E-A-T runs separately via content_audit API.
+ */
 export type PipelineResult = {
   article: {
     content: string;
@@ -21,19 +41,16 @@ export type PipelineResult = {
   };
   titleMetaVariants: Array<{ title: string; metaDescription: string; approach: string }>;
   selectedTitleMeta: { title: string; metaDescription: string; approach: string } | null;
-  topicScoreReport?: {
-    topicScores: Array<{ topic: string; score: number; status: string; notes: string }>;
-    overallScore: number;
-    gapTopics: Array<{ topic: string; score: number; recommendedAction: string }>;
-    decision: string;
-  };
   sourceUrls?: string[];
   auditResult?: { items: unknown[]; score: number; summary: { pass: number; warn: number; fail: number }; publishable: boolean };
   schemaMarkup?: { article: object; faq: object | null; breadcrumb: object | null; faqSchemaNote?: string };
-  contentIntegrity?: { passed: boolean; issues: string[]; restorations: string[]; postRestorationIssues: string[] };
   faqEnforcement?: { passed: boolean; violations: { question: string; answer?: string; charCount: number }[] };
   factCheck?: { verified: boolean; hallucinations: string[]; issues: string[]; skippedRhetorical?: string[] };
   publishTracking?: { keyword: string };
+  /** Total pipeline execution time in milliseconds. */
+  generationTimeMs?: number;
+  briefSummary?: BriefSummary;
+  outlineDrift?: OutlineDrift;
 };
 
 function humanizeSlug(slug: string): string {
@@ -76,4 +93,8 @@ export type GenerationInput = {
   peopleAlsoSearchFor: string[];
   intent: string[];
   competitorUrls: string[];
+  /** Word count guideline: "auto" | "concise" | "standard" | "in_depth" | "custom". */
+  wordCountPreset?: "auto" | "concise" | "standard" | "in_depth" | "custom";
+  /** Target words when wordCountPreset is "custom". */
+  wordCountCustom?: number;
 };

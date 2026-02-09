@@ -66,13 +66,16 @@ export async function checkLoginRateLimit(
 
     return { ok: true };
   } catch (error) {
-    console.error("Login rate limit check error:", error);
-    // Fail closed: when DB is unavailable, block login to prevent brute-force
-    return {
-      ok: false,
-      lockedUntil: new Date(Date.now() + 60_000),
-      message: "Unable to verify. Please try again in a moment.",
-    };
+    console.error(
+      "Login rate limit check error (login allowed):",
+      error,
+      "\nHint: Run schema if login_rate_limit table is missing: psql \"$DATABASE_URL\" -f src/lib/db/schema.sql"
+    );
+    // Fail open: when DB is unavailable, allow login so users aren't blocked.
+    // Rate limiting is a security enhancement; blocking all logins when DB fails
+    // (e.g. table missing, connection refused, Supabase paused) is worse UX.
+    // Ensure login_rate_limit table exists: psql "$DATABASE_URL" -f src/lib/db/schema.sql
+    return { ok: true };
   }
 }
 

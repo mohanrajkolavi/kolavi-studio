@@ -11,9 +11,13 @@ This project uses Claude API, WordPress, and a database. Follow these practices 
 | `ADMIN_SECRET` | Dashboard login password | Use `openssl rand -hex 32` to generate. 32+ chars. |
 | `RATE_LIMIT_UNLOCK_CODE` | Clears login lockout when entered | Set a unique code. Required for unlock; no default in source. |
 | `DATABASE_URL` | Postgres connection | Never expose. Use connection pooling. |
-| `ANTHROPIC_API_KEY` | Claude API | Protects AI usage. Rotate if exposed. |
+| `ANTHROPIC_API_KEY` | Claude API (Content Writer) | Protects AI usage. Rotate if exposed. |
+| `OPENAI_API_KEY` | OpenAI (Content Writer brief/scoring) | Server-only. Rotate if exposed. |
+| `GEMINI_API_KEY` / `GOOGLE_AI_API_KEY` | Google AI / Gemini (Content Writer) | Server-only. Rotate if exposed. |
+| `SERPER_API_KEY` | Serper search (Content Writer) | Server-only. Optional. |
+| `JINA_API_KEY` | Jina Reader (Content Writer) | Optional; higher rate limit with key. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase (Recent history) | Server-only; never expose to client. |
 | `REVALIDATE_SECRET` | Cache revalidation webhook | Required for `POST /api/revalidate`. |
-| `JINA_API_KEY` | Optional, Jina Reader | Only if you use it. |
 
 ## Public Repository
 

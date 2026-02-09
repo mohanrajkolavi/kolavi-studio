@@ -54,6 +54,15 @@ function getClientIp(request: NextRequest): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    // Fail fast with a clear message if DB is not configured (e.g. local dev without .env)
+    if (!process.env.DATABASE_URL?.trim()) {
+      console.error("Contact API: DATABASE_URL is not set");
+      return NextResponse.json(
+        { error: "Server is not configured for form submissions. Please contact the site administrator." },
+        { status: 503 }
+      );
+    }
+
     const ip = getClientIp(request);
     if (!ip || ip === "unknown") {
       return NextResponse.json(
@@ -128,9 +137,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Contact form submission error:", error);
+
+    // In development, surface the real error so you can fix config/DB issues
+    const isDev = process.env.NODE_ENV === "development";
+    const userMessage =
+      isDev && message
+        ? `Failed to submit form: ${message}`
+        : "Failed to submit form. Please try again later.";
+
     return NextResponse.json(
-      { error: "Failed to submit form. Please try again later." },
+      { error: userMessage },
       { status: 500 }
     );
   }

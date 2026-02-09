@@ -12,6 +12,13 @@ Environment variables and third-party integrations used by the site.
 | `NEXT_PUBLIC_TYPEFORM_EMBED_URL` | Typeform embed URL. When set, the contact page shows the Typeform instead of the built-in form. Submissions are stored in your Typeform workspace. |
 | `NEXT_PUBLIC_TALLY_FORM_EMBED_URL` | Tally form embed URL. When set, the contact page shows the Tally form instead of the built-in form. Submissions are stored in your Tally dashboard. |
 | `NEXT_PUBLIC_GOOGLE_FORM_EMBED_URL` | Google Form embed URL (iframe `src`). When set, the contact page shows the Google Form instead of the built-in form. Submissions go to Google Forms. |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL. Optional; when set with `SUPABASE_SERVICE_ROLE_KEY`, enables Blog Maker “Recent” (last 5 generations) in the dashboard. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (server-only). Required for Recent; never expose to client. |
+| `REVALIDATE_SECRET` | Secret for `POST /api/revalidate` (on-demand ISR after WordPress changes). |
+| `SERPER_API_KEY` | Serper API (Google search) for Content Writer pipeline. Optional; get at serper.dev. |
+| `GEMINI_API_KEY` or `GOOGLE_AI_API_KEY` | Google AI / Gemini for Content Writer (data grounding, topic extraction). Optional. |
+| `OPENAI_API_KEY` | OpenAI for Content Writer (strategic brief, topic scoring). Optional. |
+| `JINA_API_KEY` | Jina Reader for fetching competitor content. Optional; higher rate limit with key. |
 
 ## Contact form (Typeform, Tally, or Google Forms)
 

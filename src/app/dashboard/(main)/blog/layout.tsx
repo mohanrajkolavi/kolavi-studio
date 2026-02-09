@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Blog Maker",
+  title: "Content Writer",
 };
 
 export default function BlogMakerLayout({

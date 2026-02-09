@@ -3,7 +3,9 @@ import { isAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin, type BlogHistoryRow } from "@/lib/supabase/server";
 
 const TABLE = "blog_generation_history";
-const MAX_HISTORY = 5;
+const MAX_HISTORY = 15;
+/** Fetch more rows so we can dedupe by keyword and still return up to MAX_HISTORY. */
+const FETCH_LIMIT = 80;
 
 type GeneratedContentBody = {
   title: string;
@@ -13,9 +15,32 @@ type GeneratedContentBody = {
   suggestedSlug?: string;
   suggestedCategories?: string[];
   suggestedTags?: string[];
+  focusKeyword?: string;
+  /** Total generation time in milliseconds. */
+  generationTimeMs?: number;
 };
 
-/** GET: last 5 entries (full payload for instant restore). */
+function normalizeKeyword(kw: string | null | undefined): string {
+  if (kw == null || typeof kw !== "string") return "";
+  return kw.trim().toLowerCase();
+}
+
+/** Dedupe by focus_keyword: for the same keyword keep only the latest (by created_at). */
+function dedupeByKeyword(rows: BlogHistoryRow[]): BlogHistoryRow[] {
+  const byKey = new Map<string, BlogHistoryRow>();
+  for (const row of rows) {
+    const key = normalizeKeyword(row.focus_keyword) || `__no_keyword_${row.id}`;
+    const existing = byKey.get(key);
+    if (!existing || new Date(row.created_at) > new Date(existing.created_at)) {
+      byKey.set(key, row);
+    }
+  }
+  return Array.from(byKey.values()).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}
+
+/** GET: last 15 entries, one per keyword (latest edited for that keyword). */
 export async function GET(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -31,15 +56,17 @@ export async function GET(request: NextRequest) {
     .from(TABLE)
     .select("*")
     .order("created_at", { ascending: false })
-    .limit(MAX_HISTORY);
+    .limit(FETCH_LIMIT);
   if (error) {
     console.error("[blog/history] GET error:", error);
     return NextResponse.json({ error: "Failed to load history" }, { status: 500 });
   }
-  return NextResponse.json((data ?? []) as BlogHistoryRow[]);
+  const rows = (data ?? []) as BlogHistoryRow[];
+  const deduped = dedupeByKeyword(rows);
+  return NextResponse.json(deduped.slice(0, MAX_HISTORY));
 }
 
-/** POST: insert one entry and trim to last 5. */
+/** POST: insert one entry and trim to last 15. */
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -65,6 +92,8 @@ export async function POST(request: NextRequest) {
     suggestedSlug,
     suggestedCategories,
     suggestedTags,
+    focusKeyword,
+    generationTimeMs,
   } = body;
   if (
     typeof title !== "string" ||
@@ -85,6 +114,14 @@ export async function POST(request: NextRequest) {
     suggested_slug: suggestedSlug != null ? String(suggestedSlug).trim() : null,
     suggested_categories: Array.isArray(suggestedCategories) ? suggestedCategories : null,
     suggested_tags: Array.isArray(suggestedTags) ? suggestedTags : null,
+    focus_keyword:
+      focusKeyword != null && typeof focusKeyword === "string" && focusKeyword.trim()
+        ? focusKeyword.trim()
+        : null,
+    generation_time_ms:
+      typeof generationTimeMs === "number" && Number.isFinite(generationTimeMs) && generationTimeMs >= 0
+        ? Math.round(generationTimeMs)
+        : null,
   };
   const { error: insertError } = await supabase.from(TABLE).insert(row);
   if (insertError) {

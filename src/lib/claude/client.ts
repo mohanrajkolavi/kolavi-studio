@@ -1,11 +1,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { SEO } from "@/lib/constants";
+import { getBannedPhrasesForPrompt } from "@/lib/constants/banned-phrases";
 import type {
   ResearchBrief,
-  CurrentData,
-  EditorialStyle,
   TitleMetaVariant,
-  GapTopicWithAction,
 } from "@/lib/pipeline/types";
 import { ClaudeDraftOutputSchema } from "@/lib/pipeline/types";
 
@@ -61,81 +59,252 @@ const INTENT_GUIDE = {
 // ---------------------------------------------------------------------------
 // SYSTEM PROMPT
 //
-// This prompt is designed around how AI detectors actually work:
-//   1. Perplexity: how predictable each word is (token-level)
-//   2. Burstiness: how much perplexity varies across the document
-//   3. Neural classifiers: trained on AI vs human text patterns
-//   4. Log probability curvature: AI text sits at probability peaks
+// Framed around Google Search Central's quality guidelines:
+//   1. People-first content: demonstrate E-E-A-T (Experience, Expertise,
+//      Authoritativeness, Trustworthiness)
+//   2. Helpful Content: satisfy search intent completely; provide
+//      substantial value beyond competitors
+//   3. Rank Math 100/100: technical SEO compliance
+//   4. Natural writing: practitioner voice, not generic summaries
 //
-// The goal: force the model to make less-probable token choices, vary
-// predictability across sentences, and break the structural patterns
-// classifiers are trained on — WITHOUT harming SEO.
+// Reference: developers.google.com/search/docs/fundamentals/creating-helpful-content
 // ---------------------------------------------------------------------------
 
-const SYSTEM_PROMPT = `You are a senior content writer with 10+ years of SEO experience. You write from personal experience — opinionated, specific, grounded in real details.
+/** @deprecated System prompt for legacy generateBlogPost — allows inventing plausible specifics. */
+const SYSTEM_PROMPT_LEGACY = `You are a senior content writer producing helpful, people-first content per Google Search Central guidelines. You write from personal experience: opinionated, specific, grounded in real details.
 
-## How you write (non-negotiable writing DNA)
+## Google Search Central: Quality Standards
 
-You write the way a real person with expertise writes a blog post. Not the way an AI assistant writes one. The difference is measurable and specific:
+Your content must pass Google's Helpful Content self-assessment (developers.google.com/search/docs/fundamentals/creating-helpful-content):
+- Would a real person with expertise write this? YES: provide original analysis, firsthand knowledge, concrete specifics.
+- Does this substantially add value beyond what's already ranking? YES: unique angles, practitioner insights, specific examples competitors miss.
+- Does this satisfy search intent completely? YES: answer the query, then go deeper.
+
+## How you write (practitioner voice)
 
 **1. SPECIFIC over generic — always.**
-Never write "businesses can improve their performance." Write "we cut our client's CPA from $38 to $12 in six weeks." Invent plausible specifics: names of tools (Ahrefs, Screaming Frog, Surfer SEO), dollar amounts ($500-800/mo), timeframes (took us about 3 weeks), percentages (saw a 34% lift). Every section needs at least 2-3 concrete details that a general-purpose language model would never predict.
+Never write "businesses can improve their performance." Write "we cut our client's CPA from $38 to $12 in six weeks." Invent plausible specifics: names of tools (Ahrefs, Screaming Frog, Surfer SEO), dollar amounts ($500-800/mo), timeframes (took us about 3 weeks), percentages (saw a 34% lift). Every section needs 2-3 concrete details.
 
-**2. Idiomatic, lateral word choices.**
-Don't pick the most obvious word. A project doesn't "fail" — it "tanks" or "falls apart" or "goes sideways." You don't "implement a strategy" — you "run with it" or "put it to work" or "roll it out." Sprinkle in idioms: "throw spaghetti at the wall," "the 80/20 of it," "no silver bullet here," "this is where the rubber meets the road." These phrases have high word-level unpredictability which is exactly what makes writing sound human.
+**2. Natural, varied word choices.**
+A project doesn't "fail," it "tanks" or "goes sideways." You don't "implement a strategy," you "put it to work" or "roll it out." Use idioms naturally: "the 80/20 of it," "no silver bullet here."
 
-**3. Structural chaos (controlled).**
-Don't follow setup→explanation→conclusion for every section. Mix it up:
-- Start some sections with the punchline, then explain why
-- Drop an example or anecdote BEFORE the theory
-- Have a paragraph that's a single bold claim with no support (you'll back it up later)
-- End some sections with a question, not a summary
-- Interrupt yourself: "Quick tangent:" or "Actually, let me back up."
+**3. Varied structure.**
+Mix it up: punchline first sometimes, example before theory, a single bold claim paragraph, end sections with questions. Vary paragraph length: some 1 sentence, some 5-6.
 
-**4. Confidence asymmetry.**
-Don't hedge everything uniformly. Alternate:
-- Strong claims with zero hedging: "This works. Full stop."
-- Followed by specific, targeted doubt: "The one exception is sites under 50 pages — the data gets noisy there."
-- Personal admission: "Honestly, I didn't buy this approach until I tested it on two client sites."
+**4. Confidence with honesty.**
+Strong claims ("This works. Full stop.") followed by specific doubt ("The one exception is sites under 50 pages.") and honest admission ("I didn't buy this until I tested it.").
 
-**5. Information density clustering.**
-Don't spread information evenly. Cluster it:
-- One paragraph with 4 stats or data points crammed in
-- Next paragraph: pure opinion, zero data
-- Then a short tangent or anecdote
-- Then back to dense, technical content
+**5. Dense where it matters, light where it doesn't.**
+One paragraph crammed with data, next paragraph pure opinion, then an anecdote, then back to technical depth.
 
-**6. Meta-textual moments.**
-Reference the act of writing itself sometimes:
-- "I know I keep hammering this point, but it matters."
-- "Alright, enough background."
-- "Stay with me here — this gets practical in a second."
-- "I'll circle back to this."
+## Typography (strict)
 
-## What NOT to do
+- No em-dash (—), en-dash (–), or curly quotes. Straight quotes and apostrophes only.
+- Don't start more than 2 sentences in a row the same way.
+- Vary paragraph length patterns.
 
-- Don't use em-dash (—), en-dash (–), or curly quotes. Straight quotes and apostrophes only.
-- Don't use: delve, landscape, realm, plethora, myriad, holistic, game-changer, revolutionary, cutting-edge, seamless, robust, "in today's world," "in today's digital landscape," "it's important to note," "in conclusion," "dive deep," harness, unlock, "in this article we'll," "let's explore," "unlike traditional"
-- Don't start more than 2 sentences in a row the same way
-- Don't write paragraphs that all follow the same length pattern
+## SEO Priorities (non-negotiable)
 
-## SEO Priorities (always respected)
-
-**PRIORITY 1: Google Search Central.** People-first, E-E-A-T, satisfy intent fully, no keyword stuffing. Would you publish this if search engines didn't exist?
-
-**PRIORITY 2: Rank Math 100/100.** Keyword placement in title, meta, slug, first 10%, subheadings. Paragraphs <=120 words. FAQ section for informational intent.
-
-These SEO rules are non-negotiable. The writing style above must work WITHIN these constraints, not override them.
+**PRIORITY 1: Google Search Central.** People-first, E-E-A-T, satisfy intent fully, no keyword stuffing.
+**PRIORITY 2: Rank Math 100/100.** Keyword in title (first 50%), meta, slug, first 10%, subheadings. Paragraphs <=120 words. FAQ for informational intent.
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
-/** Normalize JSON string: replace curly/smart quotes so JSON.parse can succeed. */
+/**
+ * Pipeline system prompt for writeDraft.
+ * Framed around Google Search Central helpful content guidelines and Rank Math SEO.
+ * Key difference from legacy: NO "invent plausible specifics" instruction.
+ * All statistics must come from the provided currentData.
+ */
+// Banned AI phrases (shared constant — single source of truth in src/lib/constants/banned-phrases.ts)
+const BANNED_PHRASES_PROMPT = getBannedPhrasesForPrompt();
+
+const SYSTEM_PROMPT = `You are a senior content writer producing helpful, people-first content per Google Search Central guidelines. You have 10+ years of SEO experience and write from personal experience: opinionated, specific, grounded in real details.
+
+## Google Search Central: Quality Standards (your north star)
+
+Every article you write must pass Google's Helpful Content self-assessment:
+1. Does this provide original analysis, research, or firsthand knowledge? → YES: practitioner insights, specific scenarios, real-world context.
+2. Does this substantially add value beyond what's already ranking? → YES: unique angles, deeper analysis, concrete examples competitors miss.
+3. Does this satisfy search intent completely? → YES: answer the query first, then go deeper.
+4. Would a reader feel they've learned enough to achieve their goal? → YES: actionable, specific, comprehensive.
+5. Would someone bookmark this and come back to it? → YES: reference-quality depth and utility.
+
+(Reference: developers.google.com/search/docs/fundamentals/creating-helpful-content)
+
+## E-E-A-T in your writing
+
+- **Experience:** Weave in 2-3 shared-experience references per article. "Anyone who's managed a PPC campaign knows..." or "The first thing you notice after switching is..."
+- **Expertise:** Be specific. Name tools, describe concrete scenarios, reference realistic timeframes. Never generic advice.
+- **Authoritativeness:** Cite provided data with natural attribution. Reference industry sources by name.
+- **Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data is available, use qualitative language.
+
+## Practitioner voice (how you write)
+
+**1. SPECIFIC over generic.** Name tools (Ahrefs, Screaming Frog), reference timeframes ("took about 3 weeks"), describe concrete scenarios. Use provided currentData numbers; when no data exists, use qualitative language.
+
+**2. Natural, varied word choices.** A project doesn't "fail," it "tanks" or "goes sideways." Use idioms naturally: "the 80/20 of it," "no silver bullet here."
+
+**3. Varied structure.** Punchline first sometimes, example before theory, bold claim paragraphs, end sections with questions.
+
+**4. Confidence with honesty.** Strong claims ("This works.") with specific doubt ("Except for sites under 50 pages.") and honest admission ("I didn't buy this until I tested it.").
+
+**5. Dense where it matters.** One paragraph crammed with data, next paragraph pure opinion, then an anecdote, then technical depth.
+
+## Typography (strict)
+
+- No em-dash, en-dash, or curly quotes. Straight quotes and apostrophes only.
+- Reduce these phrases where natural: ${BANNED_PHRASES_PROMPT}
+- Don't start more than 2 sentences in a row the same way.
+- Vary paragraph length patterns.
+
+## Rank Math SEO (non-negotiable)
+
+- Keyword in title (first 50%), meta description, slug, first 10% of content, at least one subheading.
+- Paragraphs: max 120 words. FAQ section for informational intent.
+- No keyword stuffing (density < 3%).
+
+**Output:** Return only valid JSON. No markdown outside the JSON block.`;
+
+/** Normalize JSON string: replace curly/smart quotes, zero-width chars, and BOM so JSON.parse can succeed. */
 function normalizeJsonString(s: string): string {
   return s
-    .replace(/\u201C/g, '"')
-    .replace(/\u201D/g, '"')
-    .replace(/\u2018/g, "'")
-    .replace(/\u2019/g, "'");
+    .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')   // all double-quote variants + double prime
+    .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")    // all single-quote variants + single prime
+    .replace(/[\u200B\u200C\u200D\uFEFF]/g, "");           // zero-width chars + BOM
+}
+
+/**
+ * Escape control characters in JSON string values.
+ * Handles unescaped newlines, tabs, and other control characters inside string literals.
+ */
+function escapeControlCharactersInJsonStrings(jsonStr: string): string {
+  let result = "";
+  let inString = false;
+  let escapeNext = false;
+  
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i];
+    const charCode = char.charCodeAt(0);
+    
+    if (escapeNext) {
+      // We're escaping the next character, so just add it as-is
+      result += char;
+      escapeNext = false;
+      continue;
+    }
+    
+    if (char === "\\") {
+      // Escape sequence - mark next char as escaped
+      result += char;
+      escapeNext = true;
+      continue;
+    }
+    
+    if (!inString) {
+      // Outside string — only track double-quoted strings (valid JSON).
+      // Single quotes are not valid JSON string delimiters and tracking them
+      // would cause apostrophes in values (e.g. "It's") to corrupt state.
+      if (char === '"') {
+        inString = true;
+        result += char;
+      } else {
+        result += char;
+      }
+      continue;
+    }
+    
+    // Inside string
+    if (char === '"') {
+      // End of string
+      inString = false;
+      result += char;
+      continue;
+    }
+    
+    // Check for control characters (0x00-0x1F except already-escaped ones)
+    if (charCode >= 0x00 && charCode <= 0x1F) {
+      // Map common control characters to their escape sequences
+      switch (char) {
+        case "\n":
+          result += "\\n";
+          break;
+        case "\r":
+          result += "\\r";
+          break;
+        case "\t":
+          result += "\\t";
+          break;
+        case "\b":
+          result += "\\b";
+          break;
+        case "\f":
+          result += "\\f";
+          break;
+        default:
+          // For other control characters, use Unicode escape
+          result += `\\u${charCode.toString(16).padStart(4, "0")}`;
+      }
+    } else {
+      result += char;
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Repair unescaped double quotes inside JSON string values (e.g. HTML attributes or "quoted" text).
+ * When we're inside a string and see " that would end the string, but the next token suggests
+ * we're still in content (not , } ] :), treat the " as literal and escape it.
+ */
+function repairUnescapedQuotesInJsonStrings(jsonStr: string): string {
+  let result = "";
+  let inString = false;
+  let i = 0;
+  while (i < jsonStr.length) {
+    const char = jsonStr[i];
+    if (!inString) {
+      result += char;
+      if (char === '"') inString = true;
+      i++;
+      continue;
+    }
+    if (char === "\\") {
+      result += char;
+      i++;
+      if (i < jsonStr.length) {
+        result += jsonStr[i];
+        i++;
+      }
+      continue;
+    }
+    if (char === '"') {
+      let backslashCount = 0;
+      for (let j = result.length - 1; j >= 0 && result[j] === "\\"; j--) backslashCount++;
+      const alreadyEscaped = backslashCount % 2 === 1;
+      if (alreadyEscaped) {
+        result += char;
+        i++;
+        continue;
+      }
+      const rest = jsonStr.slice(i + 1);
+      const nextNonSpace = rest.match(/^\s*(\S)/)?.[1];
+      const isLikelyEndOfValue = nextNonSpace === "," || nextNonSpace === "}" || nextNonSpace === "]" || nextNonSpace === ":";
+      if (isLikelyEndOfValue) {
+        inString = false;
+        result += char;
+        i++;
+      } else {
+        result += '\\"';
+        i++;
+      }
+      continue;
+    }
+    result += char;
+    i++;
+  }
+  return result;
 }
 
 /**
@@ -213,9 +382,15 @@ export async function generateBlogPost(
   const intentGuidesRaw = intentList.map((i) => INTENT_GUIDE[i as keyof typeof INTENT_GUIDE]).filter(Boolean);
   const intentGuides = intentGuidesRaw.length > 0 ? intentGuidesRaw : [INTENT_GUIDE.informational];
 
-  const prompt = `Write a blog post on "${primaryKeyword}" as a seasoned practitioner writing from experience. Not a summary. Not an overview. A practitioner's take — with opinions, specifics, and the kind of detail only someone who's done this work would include.
+  const prompt = `Write a blog post on "${primaryKeyword}" as a seasoned practitioner writing from experience. Not a summary. Not an overview. A practitioner's take with opinions, specifics, and the kind of detail only someone who's done this work would include.
 
 **Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added in the CMS. Author byline is added by the CMS.
+
+## GOOGLE SEARCH CENTRAL — HELPFUL CONTENT
+- Does this provide original analysis and firsthand knowledge? → YES.
+- Does this substantially add value beyond existing results? → YES.
+- Does this fully satisfy search intent for "${primaryKeyword}"? → YES.
+- Would a reader feel they learned enough to achieve their goal? → YES.
 
 ## KEYWORDS & INTENT
 - **Primary:** ${primaryKeyword}
@@ -231,52 +406,41 @@ export async function generateBlogPost(
 - **Intent(s):** ${intentLabel}${intentList.length > 1 ? ". If multiple intents, balance them; lead with the first." : ""}
 ${intentGuides.map((g) => `  - ${g}`).join("\n")}
 
-## SEO REQUIREMENTS (non-negotiable)
-
-### Google Search Central
-- People-first, E-E-A-T. Satisfy search intent completely. No keyword stuffing.
-- Word count: write until the topic is covered. If 1800 words covers it, stop. Don't pad.
-- Headings: H2-H6 only (no H1 in body). Sequential hierarchy. Natural language.
-
-### Rank Math 100/100
+## RANK MATH SEO (non-negotiable)
 - **Title:** Primary keyword in first 50%. Number when natural. Max 60 chars.
-- **Meta:** Primary keyword in first 120-160 chars. Max 160 chars total. A "pitch" not a summary.
-- **Slug:** Primary keyword. Lowercase, hyphens. Max 75 chars.
-- **First 10%:** Primary keyword naturally in first ~10% of content.
+- **Meta:** Primary keyword present. 120-160 chars. A pitch, not a summary.
+- **Slug:** Primary keyword. Lowercase hyphens. Max 75 chars.
+- **Keyword in intro:** Primary keyword in FIRST 2-3 sentences (first ~10% of content).
 - **Subheadings:** Primary + secondary keywords in some H2/H3 naturally.
 - **Paragraphs:** None over 120 words.
-- **FAQ:** For informational intent, <h2>Frequently Asked Questions</h2> with 3-5 Q&As as <h3>Question?</h3><p>Answer</p>.
+- **Heading hierarchy:** H2-H6 only (no H1 in body). Sequential.
+- **FAQ:** For informational intent, H2 "Frequently Asked Questions" with 3-5 Q&As.
 
-## WRITING APPROACH (how to sound human, not AI)
+## WRITING QUALITY (Google ranking signals)
 
-The content will be checked by AI detectors (GPTZero, Originality.ai, Grammarly). These tools measure:
-- **Perplexity:** How predictable each word is. AI always picks the most probable word. You need to pick LESS probable but still natural words.
-- **Burstiness:** How much predictability varies sentence to sentence. AI is uniformly smooth. You need dramatic variation.
+**Readability & user experience (dwell time, engagement):**
+- Vary sentence length: mix 4-word punchy lines with 25-word analytical ones.
+- Vary paragraph length: some 1 sentence, some 5-6 sentences. No rhythm.
+- Be specific. Not "improve your marketing" but "we A/B tested 14 landing pages and the variant with social proof bumped conversions by 23%." Invent plausible specifics: tool names, dollar amounts, timeframes.
+- Use natural idioms: "this is where most people drop the ball," "no silver bullet here."
 
-### To beat perplexity measurement:
-1. **Replace generic phrases with specific, grounded details.** Not "improve your marketing" but "we A/B tested 14 landing pages and the variant with social proof bumped conversions by 23%." Invent plausible specifics throughout — dollar amounts, tool names, timeframes, percentages, named roles.
-2. **Choose the second or third most obvious word, not the first.** Don't "implement solutions" — "roll out fixes." Don't "strategies that help" — "plays that actually move the needle." Don't "consider the following" — "here's what worked for us."
-3. **Use idioms, colloquialisms, and figurative language.** "This is where most people drop the ball." "It's not rocket science, but it's not obvious either." "We learned this the hard way." These phrases are word-level unpredictable.
+**E-E-A-T signals:**
+- Experience: 2-3 firsthand references. "Anyone who's managed a PPC campaign knows..." or "The first thing you notice is..."
+- Expertise: name tools, describe scenarios, reference timeframes.
+- Authoritativeness: cite sources naturally.
+- Trustworthiness: qualify uncertain claims honestly.
 
-### To beat burstiness measurement:
-4. **Alternate between dead-simple sentences and complex ones.** "Link building matters." (4 words, super simple) followed by "The problem is, most agencies sell you a spreadsheet of DR 40+ domains and call it a strategy, when what actually moves rankings is topical relevance and the editorial context around the link." (35 words, complex, opinionated)
-5. **Vary information density wildly.** One paragraph crammed with 3-4 data points. Next paragraph: pure opinion, zero facts. Then an anecdote. Then back to technical depth.
-6. **Break paragraph patterns.** Some paragraphs: 1 sentence. Some: 6-7 sentences. Never settle into a rhythm.
+**Content structure for engagement:**
+- Front-load value: start some sections with the conclusion, then explain.
+- Don't transition uniformly. No "Additionally," "Furthermore," "Moreover" patterns.
+- Confidence with honesty: strong claims followed by specific doubt.
 
-### To beat neural classifiers:
-7. **Don't transition uniformly.** No "Additionally," "Furthermore," "Moreover" patterns. Instead, jump: "Now here's the part nobody talks about." Or just... start a new paragraph with no transition at all.
-8. **Front-load conclusions sometimes.** Start a section with "Short answer: yes, but only if you have existing topical authority." THEN explain.
-9. **Include meta-textual asides.** "I realize I'm getting into the weeds here." "Quick detour." "Back to the main point." These are extremely unpredictable for language models.
-10. **Asymmetric confidence.** Strong claim → specific doubt → resolution. Not uniform hedging throughout.
-
-### Typography (strict — audit will fail otherwise):
-- NEVER use em-dash (—) or en-dash (–). Use comma, colon, period, or rewrite.
-- NEVER use curly/smart quotes (" " ' '). Use straight quotes (") and straight apostrophes (') only.
-- Use hyphen (-) for compound modifiers and ranges.
+## TYPOGRAPHY (strict)
+- ZERO em-dashes (—) or en-dashes (–). Use comma, colon, period, or rewrite.
+- ZERO curly/smart quotes. Straight quotes (") and apostrophes (') only.
 
 ## OUTPUT FORMAT (valid JSON only)
-- Use only straight double quotes (") for JSON keys and string values. No curly/smart quotes.
-- Keep outline to 6-8 H2 headings so the response fits; prefer depth in fewer sections.
+- Straight double quotes (") for JSON. Keep outline to 6-8 H2 headings.
 {
   "title": "...",
   "metaDescription": "...",
@@ -289,15 +453,15 @@ The content will be checked by AI detectors (GPTZero, Originality.ai, Grammarly)
 
 ## CONTENT STRUCTURE
 1. **Intro** — Hook with a specific claim, stat, or experience. Primary keyword in first 10%.
-2. **Body sections** — H2/H3 structure with keywords. Mix of theory, examples, opinion, data.
-3. **FAQ** — 3-5 Q&As for informational intent. Conversational answers.
-4. **Conclusion** — Direct CTA matching intent. No generic wrap-up. End with something memorable or actionable.
+2. **Body sections** — H2/H3 with keywords. Mix of theory, examples, opinion, data.
+3. **FAQ** — 3-5 Q&As for informational intent. Direct, helpful answers.
+4. **Conclusion** — Direct CTA matching intent. End with something actionable.
 
 ${(() => {
   const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
   if (valid.length === 0) return "";
   return `## COMPETITOR ARTICLES
-Create content that covers what competitors cover PLUS unique angles, specific examples, and opinions they don't have.
+Create content that covers what competitors cover PLUS unique angles, specific examples, and opinions they don't have. This is how you "substantially add value" per Google Search Central.
 
 ${valid.map((c) => `### Competitor: ${c.url}\n\n${c.content}`).join("\n\n---\n\n")}`;
 })()}
@@ -309,7 +473,7 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
       model: "claude-sonnet-4-5",
       max_tokens: 64000,
       temperature: 0.9, // Higher temp = less probable token selection = higher perplexity
-      system: SYSTEM_PROMPT,
+      system: SYSTEM_PROMPT_LEGACY,
       messages: [
         {
           role: "user",
@@ -343,6 +507,7 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
     }
     // Normalize so JSON can parse: curly/smart quotes -> straight quotes
     jsonText = normalizeJsonString(jsonText);
+    jsonText = escapeControlCharactersInJsonStrings(jsonText);
 
     const stopReason = (message as { stop_reason?: string }).stop_reason;
     const truncated = stopReason === "max_tokens";
@@ -463,7 +628,7 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
 }
 
 // ---------------------------------------------------------------------------
-// PIPELINE v3: writeDraft (brief-only), fillContentGaps
+// PIPELINE v3: writeDraft (brief-only)
 // ---------------------------------------------------------------------------
 
 function stripJsonFromResponse(text: string): string {
@@ -488,23 +653,25 @@ function stripJsonFromResponse(text: string): string {
     for (let i = firstBrace; i < trimmed.length; i++) {
       const c = trimmed[i];
       if (inString) {
-        if (c === "\\") {
-          escape = true;
-          continue;
-        }
+        // Check escape flag FIRST (fixes \\\" sequence: escaped backslash then real quote)
         if (escape) {
           escape = false;
           continue;
         }
-        if (c === quote) {
+        if (c === "\\") {
+          escape = true;
+          continue;
+        }
+        if (c === '"') {
           inString = false;
           continue;
         }
         continue;
       }
-      if (c === '"' || c === "'") {
+      // Only track double-quoted strings (valid JSON). Single quotes in values
+      // (e.g. apostrophes in "It's") would cause false string-boundary detection.
+      if (c === '"') {
         inString = true;
-        quote = c;
         continue;
       }
       if (c === "{") depth++;
@@ -543,7 +710,7 @@ export async function writeDraft(
   const outlineBlock = brief.outline.sections
     .map(
       (s) =>
-        `- ${s.heading} (${s.level}) — ${s.targetWords} words. Topics: ${s.topics.join(", ")}${s.geoNote ? `. GEO: ${s.geoNote}` : ""}`
+        `- ${s.heading} (${s.level}): ${s.targetWords} words. Topics: ${s.topics.join(", ")}${s.geoNote ? `. GEO: ${s.geoNote}` : ""}`
     )
     .join("\n");
 
@@ -559,14 +726,14 @@ export async function writeDraft(
     brief.currentData.facts.length > 0
       ? `Current data (use ONLY these for statistics; do NOT invent numbers):\n${brief.currentData.facts.map((f) => `- ${f.fact} (Source: ${f.source})`).join("\n")}
 
-   USE ONLY PROVIDED CURRENT DATA — WITH NATURAL ATTRIBUTION:
+   USE ONLY PROVIDED CURRENT DATA: WITH NATURAL ATTRIBUTION.
 
-   ZERO HALLUCINATION RULE — MECHANICAL CHECK:
+   ZERO HALLUCINATION RULE: MECHANICAL CHECK.
    Before writing ANY specific number (dollar amount, percentage, count, growth rate, market share, ratio, score, benchmark), STOP and ask yourself: can I point to this exact number in the currentData section below?
    - If YES: use it exactly as provided. No rounding, no adjusting, no combining with memory.
    - If NO: do NOT write it. Use qualitative language instead.
 
-   WRONG — number from your training data, not in currentData:
+   WRONG (number from your training data, not in currentData):
    'Market share reached 47%' → RIGHT: 'Market share climbed significantly'
    'The company spends $8.2 billion on R&D' → RIGHT: 'The company invests heavily in R&D'
    'Customer retention exceeds 90%' → RIGHT: 'Customer retention remains exceptionally high'
@@ -575,12 +742,12 @@ export async function writeDraft(
 
    The ONLY numbers allowed in your article are:
    1. Numbers that appear verbatim in the currentData section
-   2. Simple math derived from two currentData numbers (e.g., difference, ratio — only if BOTH input numbers are in currentData)
+   2. Simple math derived from two currentData numbers (e.g., difference, ratio; only if BOTH input numbers are in currentData)
    3. Non-data numbers for general context ('founded over 40 years ago', 'across 3 product categories') that are not statistical claims
 
    Every specific number you write will be automatically cross-checked against currentData after generation. Any number not traceable to currentData will be flagged as a hallucination.
 
-   ATTRIBUTION: When citing a statistic, naturally reference WHERE the data comes from using plain language — no URLs, no links, no footnotes. Only use source names that appear in the currentData.
+   ATTRIBUTION: When citing a statistic, naturally reference WHERE the data comes from using plain language. No URLs, no links, no footnotes. Only use source names that appear in the currentData.
    - If currentData source is an earnings report or financial filing: 'per its earnings release', 'the company reported', 'according to its quarterly filing'
    - If currentData source is a research firm: 'according to [exact firm name from currentData]', '[firm name] estimates'
    - If currentData source is a product spec sheet or official page: 'the manufacturer lists', 'per the official specs'
@@ -592,61 +759,100 @@ export async function writeDraft(
 
   const userPrompt = `Write a blog post using ONLY the following research brief. Do not add image placeholders, internal/external links, or ToC.
 
+## GOOGLE SEARCH CENTRAL — HELPFUL CONTENT CHECKLIST
+Before writing, internalize these questions (from developers.google.com/search/docs/fundamentals/creating-helpful-content):
+- Does this provide substantial value beyond existing search results?
+- Would someone with expertise on this topic write it this way?
+- Does this fully satisfy the search intent for "${brief.keyword.primary}"?
+- Would a reader feel they learned enough to achieve their goal?
+Write to make every answer YES.
+
+## RANK MATH SEO — NON-NEGOTIABLE
+- **Title:** Primary keyword "${brief.keyword.primary}" in first 50%. Max 60 chars. Include a number when natural.
+- **Meta description:** Primary keyword present. 120-160 chars. A pitch, not a summary.
+- **Slug:** Contains primary keyword. Lowercase hyphens. Max 75 chars.
+- **Keyword in intro:** Prefer the first sentence to include "${brief.keyword.primary}" when it fits naturally; if not, the second. SELF-CHECK: verify it appears within the first 100 words.
+- **Subheadings:** Primary keyword in at least one H2 or H3 heading (exact or natural variant). Self-check: keyword must appear in the text of at least one H2/H3.
+- **Paragraphs:** None over 120 words. Never write a paragraph over 120 words; split into two or more. Self-check each paragraph before output.
+- **Keyword density:** Under 3%. No stuffing.
+- **Heading hierarchy:** Sequential H2/H3/H4, no skipped levels.
+- **FAQ:** For informational intent, include 3-8 Q&As under an H2 "Frequently Asked Questions".
+
+## TYPOGRAPHY — HARD RULES
+- ZERO em-dashes (—) in the entire output. Use period, colon, or comma instead.
+- ZERO en-dashes (–). Same rule.
+- ZERO curly/smart quotes (" " ' '). Use straight quotes (" and ') only.
+SELF-CHECK: Scan for — or – or curly quotes before outputting. Replace all.
+
 ## KEYWORD & INTENT
 - Primary: ${brief.keyword.primary}
 - Secondary: ${brief.keyword.secondary.join(", ") || "None"}
 - PASF: ${brief.keyword.pasf.join(", ") || "None"}
 ${currentDataWarning}
-## MANDATORY OUTLINE (follow exactly; do not skip, reorder, or add H2s; you may add H3s within H2s)
+## MANDATORY OUTLINE (follow exactly; do not skip, reorder, or add H2s; you may add H3s)
 ${outlineBlock}
 
-## TOPIC CHECKLIST (cover every topic; essential = meaningful coverage; differentiator = expand for unique value)
-${brief.topicChecklist.map((t) => `- ${t.topic} (${t.importance}): ${t.guidanceNote}. Depth: ${t.targetDepth}`).join("\n")}
-
-## GAPS TO ADDRESS (uniqueness opportunities)
+## GAPS TO ADDRESS (uniqueness opportunities — what competitors miss)
 ${brief.gaps.length ? brief.gaps.join("\n") : "None"}
-
-## CURRENT DATA — WITH NATURAL ATTRIBUTION
-Use the statistics and facts provided in the currentData section. Do NOT invent numbers from your training data. If you need a stat and it's not in the brief, write around it or use general language without specific numbers.
-
+${(brief.extraValueThemes?.length ?? 0) > 0 || (brief.similaritySummary?.trim?.() ?? "") !== ""
+  ? `
+## EXTRA VALUE TO INCLUDE (from brief — do not only repeat competitors)
+${brief.similaritySummary?.trim() ? `What top results cover: ${brief.similaritySummary.trim()}\n` : ""}${(brief.extraValueThemes?.length ?? 0) > 0 ? `Themes to clearly cover (ensure the article adds these):\n${brief.extraValueThemes!.map((t) => `- ${t}`).join("\n")}\n` : ""}Do not only restate what competitors say; ensure these extra-value themes are clearly and concretely covered.`
+  : `
+## DIFFERENTIATION (no brief themes provided)
+Ensure the article adds clear value beyond the outline; lead with current data where provided. Do not only restate common knowledge.`}
+${brief.freshnessNote?.trim() ? `## FRESHNESS\n${brief.freshnessNote.trim()}\n` : ""}
+## CURRENT DATA — ZERO HALLUCINATION RULE
 ${factsBlock}
 
 ## EDITORIAL STYLE
 ${styleBlock}
 
-## GEO REQUIREMENTS
+## WRITING QUALITY (Google ranking factors)
+
+**Readability & engagement (affects dwell time, a user signal):**
+- Vary sentence length: mix 4-word punchy lines with 25-word analytical ones.
+- Vary paragraph length: some 1 sentence, some 5-6 sentences.
+- Use concrete words over generic ones. Practitioner tone throughout.
+- Don't start 3+ sentences the same way in any section. Vary openings; avoid repeating the same word (e.g. "Identify," "The") at the start of consecutive or nearby sentences.
+
+**Avoid generic filler (Helpful Content signal):**
+- No "Furthermore," "Additionally," "Moreover," "In addition," "It is worth noting," "Consequently," "In conclusion."
+- Avoid overused phrases: "a testament to," "seamless," "unlock," "delve," "landscape," "crucial," "comprehensive," "robust," "holistic" — use plain, specific language instead.
+- Start the next thought directly, or use: "But," "Still," or a question.
+
+**No fluff:**
+- Every section must advance the reader's goal or deliver a concrete takeaway. Remove or merge any section that only restates the intro or other sections.
+
+**E-E-A-T signals (Google's quality rater guidelines):**
+- Experience: 2-3 shared-experience references per article. Vary the type: e.g. one "anyone who…", one "the first time you…", one "after using X you…". Place in first H2, middle H2, and late H2.
+  Example sentiments (vary wording each time): acknowledge user frustration, reference a real-world setting, describe an aha moment from direct use.
+  Rules: never fake credentials; if the topic doesn't lend itself to experience signals, use fewer.
+- Expertise: be specific. Name tools, describe scenarios, reference realistic timeframes.
+- Authoritativeness: cite provided data with natural attribution (no URLs, no footnotes).
+- Trustworthiness: only use numbers from currentData. Qualify uncertain claims.
+
+## GEO & AI OVERVIEW OPTIMIZATION
 - Direct answer: ${brief.geoRequirements.directAnswer}
 - Stats: ${brief.geoRequirements.statDensity}
 - Entities: ${brief.geoRequirements.entities}
-- FAQ ANSWERS — HARD CHARACTER LIMIT: Each FAQ answer MUST be 300 characters or fewer (hard limit). Format: exactly 2 sentences — first = direct factual answer; second = one new insight or angle NOT covered in the article body. If over 300 characters, shorten. After writing each answer, count characters; if over 300, rewrite shorter. This limit is mechanically enforced after generation.
-- FAQ ANTI-REDUNDANCY: Each FAQ answer MUST provide information or framing that does NOT appear in the article body. Before writing each answer, scan the body: if a reader could learn this exact thing from the body alone, your answer is redundant — write something different (new angle, practical takeaway, contrast, forward-looking twist, or caveat). Do not restate stats or summarize what a section already explains.
+- FAQ ANSWERS: Max 300 characters each (about 2 short sentences). Self-check: every FAQ answer must be under 300 characters. Direct answer + one NEW insight not in article body.
+- FAQ ANTI-REDUNDANCY: Each answer must add at least one fact, angle, or implication not stated in the body (so-what, comparison, forward look, caveat, or action). Templates: (1) SO WHAT for a specific audience; (2) COMPARISON not in body; (3) FORWARD LOOK; (4) CONTRARIAN caveat; (5) PRACTICAL action. No repeating body numbers.
 ${brief.geoRequirements.faqStrategy ? `- FAQ strategy: ${brief.geoRequirements.faqStrategy}` : ""}
 
-## SEO
-- ${brief.geoRequirements.directAnswer}
-- Title: ${brief.seoRequirements.keywordInTitle}; first 10%: ${brief.seoRequirements.keywordInFirst10Percent}; subheadings: ${brief.seoRequirements.keywordInSubheadings}; max paragraph words: ${brief.seoRequirements.maxParagraphWords}; FAQ count: ${brief.seoRequirements.faqCount}
-
-## WORD COUNT (guideline)
+## WORD COUNT
 Target: ${brief.wordCount.target}. ${brief.wordCount.note}
-
-## EXPERIENCE SIGNALS (2-3 per article)
-Weave in 2-3 shared-experience references that signal firsthand familiarity with the subject. Use 'you' and 'anyone who' framing — NOT fabricated personal stories or credentials.
-- Product/brand topics: 'Anyone who's [common user action with this product] knows...'
-- Technical/how-to topics: 'If you've ever [common frustration related to this task], you'll recognize...'
-- Business/strategy topics: 'Walk into any [relevant setting for this industry] and you'll see...'
-- Comparison topics: 'The difference becomes obvious the moment you [action that reveals the gap]...'
-- Review topics: 'After [realistic usage period], you start to notice...'
-- Informational topics: 'Ask anyone who's [relevant experience] and they'll tell you...'
-Rules: 2-3 total per article, placed where they strengthen the argument. Never fake credentials ('as a financial analyst...', 'in my 10 years...'). Each must connect to a key point. Use shared common experience, not individual personal anecdote. If the topic doesn't naturally lend itself to experience signals, use fewer rather than forcing them.
+Minimum 300 words (Google thin-content threshold). Value over length: ensure the article provides more value than competitors; do not pad to hit the target.
 
 ## OUTPUT FORMAT (valid JSON only)
-Generate 2-3 title and meta description pairs. Each a different approach: Option 1 = Direct keyword-first; Option 2 = Curiosity hook or question; Option 3 = Data-led or number-based (if data supports it). All options: primary keyword in first 50% of title, in meta description; title max 60 chars, meta 120-160 chars.
+Generate exactly 4 title/meta pairs for a 2x2 choice grid: (1) Direct keyword-first, (2) Curiosity hook, (3) Data-led, (4) Question or list hook. All: keyword in first 50% of title and in meta; title max 60 chars; meta 120-160 chars.
 
 {
   "titleMetaVariants": [
     { "title": "...", "metaDescription": "...", "approach": "Direct keyword-first" },
     { "title": "...", "metaDescription": "...", "approach": "Curiosity hook" },
-    { "title": "...", "metaDescription": "...", "approach": "Data-led" }
+    { "title": "...", "metaDescription": "...", "approach": "Data-led" },
+    { "title": "...", "metaDescription": "...", "approach": "Question or list hook" }
   ],
   "outline": ["H2 1", "H2 2", ...],
   "content": "<p>...</p><h2>...</h2>...",
@@ -655,29 +861,61 @@ Generate 2-3 title and meta description pairs. Each a different approach: Option
   "suggestedTags": ["tag1", "tag2", "tag3"]
 }
 
+## POST-GENERATION AUDIT — AUTOMATED CHECKS
+These run automatically after generation. Write to PASS them:
+
+**SEO Audit (blocks publishing if score < 80%):**
+Title keyword in first 50% + max 60 chars + number. Meta 120-160 chars with keyword. Slug with keyword. Keyword in first 10% and in at least one H2/H3 subheading. No paragraph over 120 words. No stuffing. Sequential heading hierarchy.
+
+**Typography (blocks publishing):**
+Zero em-dashes. Zero en-dashes. Zero curly quotes.
+
+**Fact Check (blocks publishing if hallucinations found):**
+Every number cross-checked against currentData. Unverifiable numbers flagged.
+
+**E-E-A-T Quality (scored separately):**
+Experience signals (2-3), data density, entity density, readability variance, no lazy phrasing, varied sentence starts.
+
 Generate the JSON now.`;
 
   const stream = anthropic.messages.stream({
     model: "claude-sonnet-4-5",
-    max_tokens: 64000,
+    max_tokens: 32768,
     temperature: 0.7,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
   const message = await stream.finalMessage();
+
+  // Detect truncation — if the model hit max_tokens, the JSON is likely cut off
+  const stopReason = (message as { stop_reason?: string }).stop_reason;
+  if (stopReason === "max_tokens") {
+    console.warn("[claude] writeDraft response TRUNCATED at max_tokens — output may be incomplete");
+  }
+
   const content = message.content?.[0];
   if (!content || content.type !== "text") {
     throw new Error("Claude writeDraft returned an empty or non-text response");
   }
   const rawExtracted = stripJsonFromResponse(content.text);
-  const jsonText = removeTrailingCommas(normalizeJsonString(rawExtracted));
+  let jsonText = normalizeJsonString(rawExtracted);
+  jsonText = escapeControlCharactersInJsonStrings(jsonText);
+  // Repair unescaped double quotes inside string values (common in HTML/content)
+  jsonText = repairUnescapedQuotesInJsonStrings(jsonText);
+  // Only apply trailing-comma removal as a repair strategy (naive regex can corrupt string values)
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(jsonText) as Record<string, unknown>;
-  } catch (err) {
-    const snippet = content.text.slice(0, 600);
-    const errMsg = err instanceof Error ? err.message : String(err);
-    throw new Error(`Claude writeDraft returned invalid JSON: ${errMsg}. First 600 chars: ${snippet}`);
+  } catch {
+    // First repair attempt: remove trailing commas
+    try {
+      parsed = JSON.parse(removeTrailingCommas(jsonText)) as Record<string, unknown>;
+    } catch (err) {
+      const snippet = content.text.slice(0, 600);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const truncationHint = stopReason === "max_tokens" ? " (NOTE: response was truncated at max_tokens)" : "";
+      throw new Error(`Claude writeDraft returned invalid JSON: ${errMsg}${truncationHint}. First 600 chars: ${snippet}`);
+    }
   }
 
   const validated = ClaudeDraftOutputSchema.safeParse(parsed);
@@ -702,7 +940,7 @@ Generate the JSON now.`;
   }
   const fallbackTitle = brief.keyword.primary;
   const titleMetaVariants: TitleMetaVariant[] = Array.isArray(parsed.titleMetaVariants) && parsed.titleMetaVariants.length > 0
-    ? parsed.titleMetaVariants.slice(0, 3).map((x: unknown) => {
+    ? parsed.titleMetaVariants.slice(0, 4).map((x: unknown) => {
         const t = x as Record<string, unknown>;
         return {
           title: (typeof t.title === "string" ? t.title : fallbackTitle).slice(0, 60),
@@ -724,186 +962,107 @@ Generate the JSON now.`;
   };
 }
 
-/**
- * Surgically add content for gap topics that scored below threshold. Inserts at logical positions; does not rewrite existing content.
- */
-export async function fillContentGaps(
-  draftHtml: string,
-  gaps: GapTopicWithAction[],
-  currentData: CurrentData,
-  editorialStyle: EditorialStyle
-): Promise<string> {
-  if (gaps.length === 0) return draftHtml;
-  const anthropic = getAnthropicClient();
-  const factsBlock =
-    currentData.facts.length > 0
-      ? currentData.facts.map((f) => `- ${f.fact} (${f.source})`).join("\n")
-      : "No additional stats provided.";
-  const prompt = `The following article was scored for topic coverage. These topics scored below threshold and need additional content.
-
-ZERO HALLUCINATION RULE: Every specific number you add MUST appear verbatim in the provided currentData. Before writing any number, verify it exists in currentData. If it doesn't, use qualitative language instead. Your output will be automatically fact-checked against source data — any unverifiable number will be flagged.
-
-GAP TOPICS (add 100-200 words each at the most logical position — after a related H2, or as a new H3 under an existing H2):
-${gaps.map((g) => `- ${g.topic}: ${g.recommendedAction}`).join("\n")}
-
-Use this current data for any statistics:
-${factsBlock}
-
-Match the existing writing style: sentence length ~${editorialStyle.sentenceLength.average} words, tone: ${editorialStyle.tone}, reading level: ${editorialStyle.readingLevel}.
-
-INSTRUCTIONS: INSERT content only. Do NOT rewrite existing content. Preserve all existing HTML structure, headings, and formatting. Return the COMPLETE article HTML with the new content inserted.`;
-
-  const stream = anthropic.messages.stream({
-    model: "claude-sonnet-4-5",
-    max_tokens: 32000,
-    temperature: 0.7,
-    system: "You are an editor. Insert new sections or paragraphs to fill content gaps. Preserve all existing HTML and structure. Return only the full HTML article.",
-    messages: [
-      {
-        role: "user",
-        content: (() => {
-          const limit = 50000;
-          if (draftHtml.length <= limit) return `Article HTML:\n\n${draftHtml}\n\n---\n\n${prompt}`;
-          const slice = draftHtml.slice(0, limit);
-          const lastClose = slice.lastIndexOf(">");
-          const cut = lastClose >= 0 ? slice.slice(0, lastClose + 1) : slice;
-          return `Article HTML:\n\n${cut}\n\n---\n\n${prompt}`;
-        })(),
-      },
-    ],
-  });
-  const message = await stream.finalMessage();
-  const part = message.content?.[0];
-  if (!part || part.type !== "text") return draftHtml;
-  const text = part.text.trim();
-  const codeMatch = text.match(/```(?:html)?\s*([\s\S]*?)```/);
-  return (codeMatch ? codeMatch[1].trim() : text) || draftHtml;
-}
 
 // ---------------------------------------------------------------------------
-// HUMANIZE PASS
+// EDITORIAL POLISH PASS
 //
-// This is NOT a light editing pass. It's a heavy rewrite targeting the
-// specific signals AI detectors measure:
+// An editorial rewrite that improves readability, engagement, and
+// practitioner voice — the qualities Google values for dwell time,
+// user satisfaction, and Helpful Content signals.
 //
-// 1. PERPLEXITY: Replace the most-probable word with a less-probable synonym
-//    or rephrase. Target the "smooth" sentences that read perfectly.
-// 2. BURSTINESS: Create wild variation in sentence complexity. Follow a
-//    complex sentence with a 3-word one. Follow a simple claim with a
-//    run-on packed with specifics.
-// 3. CLASSIFIER PATTERNS: Break transitions, information density, hedging
-//    patterns, and paragraph structure that classifiers flag.
+// This is NOT about evading detection. It's about making the content
+// read like it was written by someone who has actually done this work:
+// varied rhythm, confident voice, specific language, natural flow.
 //
-// Temperature 1.0 is critical here — we WANT less-probable token choices.
+// Reference: Google Search Central — Creating helpful, reliable, people-first content
 // ---------------------------------------------------------------------------
 
-const HUMANIZE_SYSTEM = `You are a ruthless editor whose job is to make AI-generated articles read like they were written by a human practitioner. Not "polished." Not "improved." HUMAN.
+const HUMANIZE_SYSTEM = `You are a senior editor whose job is to polish AI-drafted articles so they read like expert practitioner content. Your goal: maximize helpfulness, readability, and engagement per Google Search Central guidelines.
 
 ## CONTENT SAFETY — THESE RULES OVERRIDE ALL OTHERS
 
-The humanization pass exists to change linguistic patterns. It does NOT exist to change content. If any linguistic rule below would require removing, shortening, or diluting content — SKIP that specific application of the rule and move on.
+This editorial pass exists to improve linguistic quality. It does NOT exist to change content substance. If any style rule below would require removing, shortening, or diluting content — SKIP that rule and move on.
 
 NEVER DO ANY OF THESE:
-- Remove or shorten any section, paragraph, or substantive sentence to create variation. ADD variation by splitting or merging — never by deleting.
-- Remove, alter, or round any statistic, number, percentage, date, or financial figure. '$143.8 billion' stays '$143.8 billion' — never 'over $140 billion' or 'nearly $144 billion'.
-- Invent, add, or generate ANY new statistic, number, or data point that wasn't in the original draft. The humanizer ONLY rephrases existing content — it never creates new claims or data.
-- Invent, add, or change ANY source attribution name. If the draft says 'per its earnings release', do not change it to 'according to Bloomberg' or any other source.
+- Remove or shorten any section, paragraph, or substantive sentence. ADD variation by splitting or merging — never by deleting.
+- Remove, alter, or round any statistic, number, percentage, date, or financial figure. '$143.8 billion' stays '$143.8 billion'.
+- Invent, add, or generate ANY new statistic or data point not in the original draft.
+- Invent, add, or change ANY source attribution name.
 - Remove or rephrase source attribution phrases ('per its earnings release', 'according to [source]'). These are E-E-A-T trustworthiness signals.
-- Remove, reorder, or merge any H2 or H3 section. The outline structure is strategically decided — do not touch it.
-- Remove or weaken any FAQ question or answer. FAQ answers must stay under 300 characters — do not expand them either.
-- Remove experience signal sentences ('Anyone who's tried...', 'If you've followed...'). These are deliberate E-E-A-T experience markers.
+- Remove, reorder, or merge any H2 or H3 section.
+- Remove or weaken any FAQ question or answer. FAQ answers must stay under 300 characters.
+- Do not remove experience signal sentences. Preserve 2–3 varied experience signals (e.g. 'anyone who…', 'the first time you…', 'after using X you…'); only remove or weaken ones that are repetitive or clearly templated. These are E-E-A-T markers.
 - Remove or dilute the direct answer in the opening 30-40 words. This is the GEO extraction target.
-- Remove entity mentions (company names, product names, person names, place names). These are GEO entity signals.
-- Shorten any section below its target word count from the outline. Depth is a ranking signal — don't sacrifice it for style.
-- Change the article from helpful to vague. If a sentence makes a specific, useful claim backed by data — keep the specificity. Rephrase the delivery, not the substance.
+- Remove entity mentions (company names, product names, person names). These are GEO entity signals.
+- Shorten any section below its target word count. Depth is a ranking signal.
+- Value over length: do not pad. Depth and specificity matter more than hitting the target word count exactly.
+- Change the article from helpful to vague. If a sentence makes a specific, useful claim, keep the specificity. Rephrase the delivery, not the substance.
 
-IN SHORT: The article must be EQUALLY helpful, data-rich, well-structured, fresh, and comprehensive AFTER humanization as it was before. The only thing that changes is the linguistic texture — word choices, sentence rhythms, transitions, tone variation. A Google Search quality rater evaluating the pre-humanized and post-humanized versions should score them identically on helpfulness, expertise, and comprehensiveness.
+IN SHORT: A Google Search quality rater should score the pre-edit and post-edit versions identically on helpfulness, expertise, and comprehensiveness. Only the linguistic texture changes.
 
-You understand that AI detectors measure three things:
-1. **Perplexity (word-level):** How predictable each word is. AI text = uniformly low perplexity (every word is the most probable choice). Human text = variable perplexity with spikes of unexpected words.
-2. **Burstiness (sentence-level):** How much the predictability varies from sentence to sentence. AI = flat, uniform. Human = zigzag.
-3. **Pattern matching:** Classifiers trained on AI vs human text looking for structural patterns.
+## EDITORIAL OBJECTIVES
 
-Your job: inject perplexity spikes, create burstiness variation, and break classifier patterns. While preserving all SEO elements.
+Your job is to improve three qualities that affect Google ranking signals:
 
-## RULES
+1. **Readability (dwell time & user satisfaction):**
+   - Vary sentence length: mix 3-7 word punchy lines with 25-35 word analytical ones.
+   - Vary paragraph length: some single-sentence, some 5-6 sentences.
+   - Break monotonous rhythm. If 3+ sentences have similar length, restructure.
 
-### ABSOLUTE PRESERVE LIST — do NOT change during humanization, regardless of article type:
+2. **Engagement (reduces bounce rate, increases time-on-page):**
+   - Replace generic phrases with specific, concrete language (e.g. avoid "seamless," "unlock," "a testament to," "crucial," "comprehensive" — use plain alternatives).
+   - Add confidence variation: strong claims followed by honest caveats.
+   - Use practitioner voice: asides, self-corrections, direct opinions.
+   - Vary sentence openings: never 3+ sentences in a row starting with the same word (e.g. "Identify" or "The").
+
+3. **Natural flow (content quality signal):**
+   - Remove formulaic transitions: "Furthermore," "Additionally," "Moreover," "In addition," "It's worth noting."
+   - Replace with: no transition (start the next thought), or natural starters: "But," "The flip side:", "Now,", a question.
+   - Mix formal and informal register within paragraphs.
+
+## ABSOLUTE PRESERVE LIST — do NOT change:
 - All H2 and H3 headings (exact text, exact order, exact hierarchy)
-- All statistics, numbers, percentages, dates, and financial figures (exact values — no rounding)
-- All source attribution phrases ('per [source]', 'according to [source name]', '[source] reported'). These are E-E-A-T trustworthiness signals — do NOT remove, rephrase, or swap them for different source names.
+- All statistics, numbers, percentages, dates, and financial figures (exact values, no rounding)
+- All source attribution phrases. These are E-E-A-T trustworthiness signals.
 - GEO elements: direct answer in opening paragraph, FAQ Q&A structure, entity mentions
-- Experience signal sentences ('Anyone who's...', 'If you've...', 'Walk into any...')
-- FAQ answer content and length (under 300 characters — do not expand or shorten)
+- Experience signal sentences
+- FAQ answer content and length (under 300 characters)
 - HTML structure and tags
 - Section order and nesting
 - Summary tables, comparison tables, and all structured list content
-- The overall word count (humanized version must be within ±5% of original)
+- Overall word count (must be within ±5% of original)
 
-### CHANGE FREELY:
-- Sentence lengths and rhythm (make them varied)
-- Word choices (make them less predictable)
-- Transitions between paragraphs (remove smooth connectors, use abrupt shifts)
-- Paragraph break points (split long paragraphs, merge short ones — but never delete content)
-- Tone and register variation (mix formal and informal)
-- Opening words of sentences (vary aggressively — never 3+ sentences starting the same way)
+## CHANGE FREELY:
+- Sentence lengths and rhythm (vary them)
+- Word choices (more specific, less generic)
+- Transitions between paragraphs (remove formulaic ones, use natural flow)
+- Paragraph break points (split long, merge short — never delete content)
+- Tone variation (mix formal and informal)
+- Opening words of sentences (vary — never 3+ sentences starting the same way; e.g. avoid repeating "Identify," "The," "This")
 
-### ADDITIONAL LINGUISTIC ENFORCEMENT — apply on top of existing rules:
+## SPECIFIC IMPROVEMENTS TO MAKE:
 
-These rules change HOW things are written. They NEVER change WHAT is written. Do not remove content, data, sections, or coverage to satisfy these rules.
+**Generic → Specific:**
+- "This strategy helps businesses improve their marketing" → "This play actually moves the needle for most teams"
+- "It's important to consider your budget" → "Budget is the elephant in the room"
 
-1. SENTENCE LENGTH VARIATION: Scan for any run of 3+ sentences within 5 words of each other in length. Break the pattern — shorten one to 3-6 words or extend one past 30 words. Ensure at least 15% of all sentences are very short (1-7 words) for punch. Examples: 'That's the trade-off.' / 'No way around it.' / 'Full stop.' / 'Worth watching.'
-2. PARAGRAPH VARIANCE: Never let 3 consecutive paragraphs have the same sentence count. Use at least 3-4 single-sentence paragraphs per article for emphasis. Occasionally let one paragraph run to 5-6 sentences when building a complex argument.
-3. TRANSITION PURGE: Actively find and delete: 'Furthermore', 'Additionally', 'Moreover', 'In addition', 'It's worth noting', 'It's important to note', 'Consequently', 'As a result'. Replace with nothing (just start the next thought directly), or with opinionated starters: 'But here's the thing -', 'Look,', 'The real story:', 'What matters more:'.
-4. REGISTER MIXING: Within any 3-paragraph span, at least one sentence should be noticeably more casual than its neighbors. Drop in unexpected informality once every 300-400 words: 'bonkers', 'gutsy', 'no-brainer', 'that ship has sailed', 'good luck with that'. This breaks the uniform register that detectors flag.
-5. CONFIDENCE SPIKES: Add 3-4 moments per article where the voice becomes unusually direct: 'This isn't debatable.' / 'That's just math.' / 'You'll lose.' These bursts of conviction are the opposite of AI's uniform hedging.
+**Uniform length → Varied rhythm:**
+- Insert short punchy lines: "That's the trade-off." "Not even close." "Worth watching."
+- Let some paragraphs run to 5-6 sentences for complex arguments.
 
-### ATTACK THESE PATTERNS:
+**Formulaic transitions → Natural flow:**
+- Kill "Additionally," "Furthermore," "Moreover."
+- Replace with nothing, or: "But here's the thing," "The real story:", a question.
 
-**Smooth, predictable sentences → Make them bumpy.**
-Find sentences where every word is the obvious choice. Replace 2-3 words per sentence with less-obvious synonyms, idioms, or rephrases:
-- "This strategy helps businesses improve their marketing" → "This play actually moves the needle for most teams we've worked with"
-- "It's important to consider your budget" → "Budget is the elephant in the room here"
-- "There are several factors to keep in mind" → "A few things trip people up"
+**Uniform hedging → Confident practitioner voice:**
+- "This works." / "Skip this and you're wasting time." mixed with honest caveats.
+- Add 2-3 per 1000 words: aside, self-correction, direct opinion, tangent marker.
 
-**Uniform sentence length → Destroy the rhythm.**
-If you see 3+ sentences of similar length in a row, break the pattern hard:
-- Insert a 2-4 word sentence: "That's the trap." "Not even close." "Here's why."
-- Or expand one into a run-on with a parenthetical aside
-- Or replace one with a rhetorical question
+## TYPOGRAPHY (strict):
+- Replace ALL em-dash (—) and en-dash (–) with comma, colon, period, or rewrite.
+- Replace ALL curly quotes (" " ' ') with straight quotes (") and apostrophes (').
 
-**Even information density → Create clusters and gaps.**
-If a paragraph distributes information evenly (one point per sentence), restructure:
-- Cram 2-3 points into one dense sentence
-- Follow with a sentence that's pure opinion or reaction
-- Leave some points standing alone as their own short paragraph
-
-**Predictable transitions → Remove or replace.**
-Kill any "Additionally," "Furthermore," "Moreover," "In addition," "It's worth noting."
-Replace with:
-- No transition (just start the next thought)
-- "And here's the kicker:" or "The flip side:" or "Now,"
-- A question: "So what does this mean in practice?"
-- Direct address: "You're probably wondering about..."
-
-**Uniform hedging → Create confidence spikes.**
-If the text hedges everything ("can help," "may improve," "consider"), make some statements flat confident:
-- "This works." / "This is non-negotiable." / "Skip this and you're wasting time."
-Then keep one or two specific hedges to sound honest, not promotional.
-
-**Missing personality → Inject practitioner voice.**
-Add 2-3 per 1000 words:
-- An aside: "(and yes, this matters more than most people think)"
-- A self-correction: "Actually, that's not quite right. Let me rephrase."
-- A direct opinion: "Honestly, most guides overcomplicate this."
-- A tangent marker: "Quick detour:" then get back on track.
-
-### TYPOGRAPHY (strict):
-- Replace ALL em-dash (—) and en-dash (–) with comma, colon, period, or rewrite
-- Replace ALL curly quotes (" " ' ') with straight quotes (") and apostrophes (')
-- No exceptions. The audit will fail the article otherwise.
-
-### OUTPUT:
+## OUTPUT:
 - Return ONLY the revised HTML. No explanation, no preamble, no markdown code fence.
 - If you must wrap in a code block, use \`\`\`html ... \`\`\` but prefer raw HTML.`;
 
@@ -920,14 +1079,14 @@ export async function humanizeArticleContent(html: string): Promise<string> {
     messages: [
       {
         role: "user",
-        content: `Rewrite this article to beat AI detectors. Target: under 30% AI detection on GPTZero.
+        content: `Polish this article for maximum readability, engagement, and practitioner voice per Google Search Central quality standards.
 
 Your priority order:
-1. Preserve all keywords, headings, and SEO structure
-2. Inject perplexity spikes (unexpected but natural word choices, idioms, specific details)
-3. Create burstiness (wild variation in sentence complexity - some 3 words, some 35 words)
-4. Break classifier patterns (remove uniform transitions, vary information density, add confidence asymmetry)
-5. Fix any em-dash, en-dash, or curly quotes → straight characters only
+1. Preserve all keywords, headings, SEO structure, data, and attributions
+2. Improve readability: vary sentence length, break monotonous rhythm
+3. Strengthen engagement: specific language, confidence variation, practitioner asides
+4. Clean transitions: remove formulaic connectors, use natural flow
+5. Fix typography: em-dash and en-dash → comma/colon/period; curly quotes → straight
 
 Return only the HTML.
 

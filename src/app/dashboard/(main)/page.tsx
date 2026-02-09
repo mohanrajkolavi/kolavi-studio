@@ -55,7 +55,7 @@ export default function DashboardOverviewPage() {
 
   const quickActions = [
     { href: "/dashboard/leads", label: "Leads", description: "Manage contact form submissions and track pipeline", icon: Users },
-    { href: "/dashboard/blog", label: "Blog Maker", description: "Generate and publish posts with Claude AI", icon: FileEdit },
+    { href: "/dashboard/blog", label: "Content Writer", description: "Generate and publish posts with Claude AI", icon: FileEdit },
     { href: "/dashboard/content-maintenance", label: "Content Maintenance", description: "Track and update blog post status", icon: FileSearch },
   ];
 
@@ -116,12 +116,12 @@ export default function DashboardOverviewPage() {
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
                 <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Quick action</p>
                 <p className="mt-2 text-base font-medium text-foreground">Create a post</p>
-                <p className="mt-1 text-sm text-muted-foreground">Generate a draft with Blog Maker.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Generate a draft with Content Writer.</p>
                 <Link
                   href="/dashboard/blog"
                   className="mt-4 inline-flex items-center rounded-2xl bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
                 >
-                  Open Blog Maker
+                  Open Content Writer
                 </Link>
               </div>
               <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">

@@ -39,6 +39,7 @@ export async function GET(request: NextRequest) {
     const posts = await getPosts();
 
     let maintenanceRecords: MaintenanceRecordRow[] = [];
+    let databaseConnected = false;
     try {
       await ensureContentMaintenanceTable();
       // Get maintenance records from database
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
         SELECT post_slug, status, note, last_reviewed_at, updated_at
         FROM content_maintenance
       `) as unknown as MaintenanceRecordRow[];
+      databaseConnected = true;
     } catch (e) {
       // If DB isn't configured or table can't be created, degrade gracefully.
       console.error("Content maintenance DB unavailable:", e);
@@ -107,7 +109,7 @@ export async function GET(request: NextRequest) {
     // Sort by age (oldest first)
     combined.sort((a, b) => b.ageDays - a.ageDays);
 
-    return NextResponse.json({ posts: combined });
+    return NextResponse.json({ posts: combined, databaseConnected });
   } catch (error) {
     console.error("Error fetching content maintenance data:", error);
     return NextResponse.json(

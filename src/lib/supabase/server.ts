@@ -15,6 +15,7 @@ export function getSupabaseAdmin(): SupabaseClient | null {
 export type BlogHistoryRow = {
   id: string;
   created_at: string;
+  focus_keyword: string | null;
   title: string;
   meta_description: string;
   outline: string[];
@@ -22,4 +23,6 @@ export type BlogHistoryRow = {
   suggested_slug: string | null;
   suggested_categories: string[] | null;
   suggested_tags: string[] | null;
+  /** Total pipeline execution time in milliseconds (null/undefined for entries saved before this column existed). */
+  generation_time_ms?: number | null;
 };

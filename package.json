@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "check:secrets": "sh scripts/check-secrets.sh",
-    "prepush": "npm run check:secrets && npm run lint"
+    "prepush": "npm run check:secrets && npm run lint",
+    "open:browser": "node scripts/open-app-in-browser.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.61.0",
@@ -40,6 +41,7 @@
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.1.6",
     "eslint-plugin-jsx-a11y": "^6.10.2",
+    "playwright": "^1.58.2",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3"

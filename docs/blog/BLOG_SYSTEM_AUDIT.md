@@ -159,4 +159,69 @@ The flow is designed so every output embodies:
 
 ---
 
+## 7. Alignment Run: Content Writer ↔ Audit (High-Quality Checklist)
+
+This section maps **every audit check** to the **Content Writer pipeline** (Brief → Draft → Humanize → FAQ enforcement → SEO audit → Fact check) so output is aligned for high-quality, publishable content.
+
+### Pipeline order (orchestrator)
+
+1. **Input** → Serper/Jina/Gemini → Topic extraction (OpenAI) → **Brief** (OpenAI)
+2. **Draft** (Claude) → **FAQ enforcement** (300-char truncation) → **SEO audit** → **Fact check**
+3. (Optional) **Humanize** (dashboard) → audit can be re-run on humanized content
+4. **Publishable** = `auditResult.score >= 75` and `level1Fails === 0`; fact-check hallucinations are non-blocking (warning only).
+
+### Audit check ↔ Writer/Brief alignment
+
+| Audit check (id) | Level | Writer/Brief instruction | Aligned |
+|------------------|-------|---------------------------|--------|
+| **Title** (present, length) | 1/2 | Draft: "Max 60 chars", "keyword in first 50%", "number when natural" | ✓ |
+| **Meta description** (present, length, keyword) | 1/2/3 | Draft: "120-160 chars", "keyword present", "pitch" | ✓ |
+| **Content thinness** (<300 words = L1 fail) | 1 | Draft: word count target (always >300 in practice); explicit "min 300 words" in draft | ✓ (reinforced) |
+| **Keyword stuffing** | 1/2 | Draft: "Under 3%. No stuffing"; Brief: "No keyword stuffing (< 3% density)" | ✓ |
+| **Heading structure** (H2–H6, no skip, single H1) | 1/2 | Draft: "Sequential H2/H3/H4"; Brief: outline defines headings | ✓ |
+| **Paragraph length** (>120 words = L2 warn) | 2 | Draft: "None over 120 words"; Brief: "maxParagraphWords: 120" | ✓ |
+| **Slug** (present, keyword, max 75) | 2 | Draft: "slug with keyword", "max 75 chars" | ✓ |
+| **AI typography** (em-dash, en-dash, curly quotes) | 2 | Draft + Humanize: "ZERO em-dash, en-dash, curly quotes" | ✓ |
+| **AI phrases** (generic phrases) | 2 | Draft + Humanize: banned list ("seamless", "unlock", "a testament to", etc.) | ✓ |
+| **Rank Math: keyword in meta** | 3 | Draft: "keyword in meta" | ✓ |
+| **Rank Math: first 10%** | 3 | Draft: "Primary keyword in first 10%" / "first 100 words" | ✓ |
+| **Rank Math: slug keyword** | 3 | Draft: "slug with keyword" | ✓ |
+| **Rank Math: subheading keyword** | 3 | Draft: "Primary keyword in at least one H2 or H3"; Brief: outline must include keyword in ≥1 heading | ✓ (reinforced in brief) |
+| **Rank Math: content length** | 3 | Excluded from score; value-over-length in draft | ✓ |
+| **Rank Math: title keyword position** | 3 | Draft: "first 50% of title" | ✓ |
+| **Rank Math: number in title** | 3 | Draft: "Include a number when natural" | ✓ |
+| **Extra value coverage** (brief themes in content) | 3 | Brief: extraValueThemes; Draft: "EXTRA VALUE TO INCLUDE" block | ✓ |
+
+### Post-pipeline checks (not in article-audit.ts)
+
+| Check | Where | Writer alignment |
+|-------|--------|------------------|
+| **FAQ 300 chars** | enforceFaqCharacterLimit (orchestrator step 5) | Draft: "Max 300 characters each"; truncation applied if over | ✓ |
+| **Fact check** (hallucinations) | verifyFactsAgainstSource (orchestrator step 7) | Brief: "Every specific number must trace to currentData"; Draft: "only use numbers from currentData" | ✓ |
+| **E-E-A-T / skimmability / temporal** | Python content_audit (dashboard, optional) | Draft: experience signals, sentence variety; Python: step-heading exemption, 3-year temporal threshold | ✓ |
+
+### Constants (single source of truth)
+
+- **SEO** (`src/lib/constants.ts`): TITLE_MAX_CHARS 60, META 160, URL_SLUG 75, PARAGRAPH_MAX_WORDS 120, CONTENT_MIN_WORDS_PILLAR 2500.
+- **Audit** uses `SEO.PARAGRAPH_MAX_WORDS` (120); **Brief** uses maxParagraphWords: 120; **Draft** says "120 words". Aligned.
+- **FAQ max chars:** 300 in enforceFaqCharacterLimit, GEO_FAQ_ANSWER_MAX_CHARS, and draft prompt. Aligned.
+
+### Gaps closed in alignment run
+
+1. **Keyword in subheadings:** Brief builder now instructs GPT to ensure at least one outline section heading includes the primary keyword (or natural variant) so the generated outline satisfies Rank Math subheading check.
+2. **Content thinness:** Draft prompt explicitly states article must be at least 300 words (Google thin-content threshold) as a self-check alongside word count target.
+3. **Scoring note:** Editorial checks (generic phrases) are excluded from score except ai-typography; rm-content-length is excluded. So score reflects technical SEO + typography + structure + Rank Math placement.
+
+### High-quality content summary
+
+- **Level 1 (blockers):** Title, meta, thin content, stuffing, headings, typography — all covered in draft + brief; FAQ length enforced in pipeline.
+- **Level 2 (ranking):** Paragraph length, slug, typography, phrases — draft + humanize.
+- **Level 3 (competitive):** Rank Math placement + extra value coverage — draft + brief outline.
+- **Fact check:** currentData-only numbers — brief + draft.
+- **E-E-A-T (Python):** Experience, skimmability, temporal, sentence variety — draft + humanize + Python exemptions.
+
+*Alignment run: Content Writer pipeline and Audit system are aligned to produce high-quality, publishable content when the writer follows the brief and draft instructions.*
+
+---
+
 *Generated as final audit of blog generator, humanize pass, article audit, Google Search Central, and Rank Math alignment.*

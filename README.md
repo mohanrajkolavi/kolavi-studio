@@ -43,10 +43,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Project Structure
 
-- `/src/app` - Next.js App Router pages
-- `/src/components` - Reusable React components
-- `/src/lib` - Utilities (GraphQL client, SEO helpers)
-- `/src/types` - TypeScript type definitions
+- **`/src/app`** – Next.js App Router: pages, layouts, API routes (`/api/auth`, `/api/blog`, `/api/contact`, `/api/content-audit`, `/api/content-maintenance`, `/api/leads`, `/api/revalidate`), sitemap, RSS
+- **`/src/components`** – Reusable UI: `blog/`, `contact/`, `dashboard/`, `layout/`, `legal/`, `sections/`, `ui/` (shadcn)
+- **`/src/lib`** – Shared logic: `auth/`, `blog/`, `claude/`, `gemini/`, `openai/`, `pipeline/`, `seo/`, `graphql/`, `jina/`, `serper/`, `supabase/`, `db/`, `constants/`
+- **`/src/types`** – TypeScript type definitions
+- **`/scripts`** – Dev/ops scripts (check-secrets, run-audit, open-app-in-browser)
+- **`/content_audit`** – Optional Python E-E-A-T/content-audit tool (see [content_audit/README.md](content_audit/README.md))
+- **`/docs`** – Documentation (architecture, dashboard, integrations, blog)
 
 ## Sitemap
 
@@ -68,13 +71,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 - **[SETUP.md](SETUP.md)** – Full setup, env vars, GSC, sitemap
 - **[SECURITY.md](SECURITY.md)** – Never commit API keys or secrets; what’s gitignored
-- **[docs/README.md](docs/README.md)** – Architecture, dashboard, integrations
+- **[docs/README.md](docs/README.md)** – Doc index: architecture, dashboard, integrations, blog, content audit
 
 ## Features
 
-- Mobile-first responsive design
-- SEO optimized (metadata, JSON-LD, sitemap, FAQ schema, keywords)
-- Headless WordPress blog with ISR and paginated slugs
-- Security headers (CSP, X-Frame-Options, etc.) and HTML sanitization for post content
-- Core Web Vitals optimized; skip-to-main link and jsx-a11y
-- Scalable architecture for multiple verticals
+- **Site:** Mobile-first responsive design; SEO (metadata, JSON-LD, sitemap, FAQ schema); headless WordPress blog with ISR and paginated slugs
+- **Security:** Security headers (CSP, X-Frame-Options, etc.), HTML sanitization for post content; Core Web Vitals; skip-to-main link and jsx-a11y
+- **Dashboard:** Owner dashboard (Overview, Leads, Content Writer, Recent, Content Maintenance); login with rate limiting; optional Supabase for Blog Maker “Recent” history
+- **Content Writer (Blog Maker):** AI pipeline (Serper/Jina/Gemini, OpenAI brief, Claude draft, humanize, SEO audit, fact check); publishable = 75%+ score and no Level 1 fails
+- **Content audit:** In-app SEO article audit (`src/lib/seo/article-audit.ts`); optional Python E-E-A-T tool in `content_audit/`; API route `/api/content-audit/quality`
+- **Scalable:** Multiple verticals (e.g. medical-spas, industries); legal pages (privacy, terms, disclaimer, cookies)

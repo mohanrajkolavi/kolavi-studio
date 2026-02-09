@@ -1,8 +1,9 @@
 /**
- * One-off run: audit pasted article (Google Search Central + Rank Math + Editorial).
+ * One-off run: audit pasted article (Google Search Central + Rank Math).
  * Usage: node scripts/run-audit.mjs
  * Reads article.json from project root: { title?, metaDescription?, content, slug?, focusKeyword? }
  *
+ * AI/editorial phrasing and typography are handled by the E-E-A-T panel (lazy phrasing, sentence starts) in the app.
  * Note: Author byline and bio are handled by the CMS at publish time and are not audited here.
  */
 
@@ -28,109 +29,12 @@ function getParagraphs(html) {
 
 const MIN_PUBLISH_SCORE = 75;
 
-// --- Editorial: AI content quality checks ---
-// These are editorial standards to reduce detectable AI patterns in generated content.
-// They are NOT based on Google or Rank Math documentation.
-// Keep in sync with src/lib/audit/article.ts AI phrase lists and src/lib/claude/client.ts.
-
-/** High-confidence AI markers — rarely used by human writers in normal prose. */
-const AI_PHRASES_HIGH = [
-  "delve", "delve into", "landscape", "realm", "plethora", "myriad", "holistic",
-  "game-changer", "revolutionary", "cutting-edge", "seamless", "robust",
-  "in today's world", "in today's digital landscape",
-  "it's important to note", "it's important to note that", "it's worth noting",
-  "in conclusion", "dive deep", "harness", "unlock",
-  "in this article we'll", "let's explore",
-  "unlike traditional", "over time, this builds",
-];
-
-/** Common phrases that CAN signal AI but also appear in normal instructional writing. */
-const AI_PHRASES_COMMON = [
-  "crucial", "comprehensive", "leverage", "utilize", "navigate",
-  "when it comes to", "certainly,", "indeed,",
-  "furthermore,", "moreover,", "in terms of", "ultimately,", "essentially,", "basically,",
-  "a solid ", "this guide covers", "practical steps", "helps you reach", "aligns your",
-  "builds trust over time", "round out", "when it fits", "where it sounds natural",
-  "ensure your", "ensure that", "consider a ", "supports the decision", "worth optimizing for",
-  "combined with", "match content to intent",
-  "focus on ", "start with ",
-];
-
-const AI_PHRASE_SUGGESTIONS = {
-  crucial: "key, needed, or be specific",
-  comprehensive: "full, complete, or describe what's covered",
-  "game-changer": "concrete claim or cut",
-  utilize: "use",
-  "ensure your": "make sure",
-  "ensure that": "make sure",
-  leverage: "use or take advantage of",
-  delve: "look at or explore",
-  "delve into": "look at or explore",
-  myriad: "many or list examples",
-  plethora: "many or list examples",
-  holistic: "full or whole",
-  "in conclusion": "cut or end with a concrete takeaway",
-  "it's important to note": "here's what matters or keep in mind",
-  "it's important to note that": "here's what matters or keep in mind",
-  "in today's digital landscape": "cut or use specific context",
-  "in today's world": "cut or use specific context",
-  revolutionary: "concrete claim or cut",
-  "cutting-edge": "concrete claim or cut",
-  "combined with": "plus or along with",
-  "unlike traditional": "say the contrast in plain language",
-};
-
-/** AI typography: em-dash, curly/smart quotes. Editorial standard. */
-const AI_TYPOGRAPHY = [
-  { char: "\u2014", label: "em-dash (—)" },
-  { char: "\u2013", label: "en-dash (–)" },
-  { char: "\u201C", label: "curly left double quote (\")" },
-  { char: "\u201D", label: "curly right double quote (\")" },
-  { char: "\u2018", label: "curly left single quote (')" },
-  { char: "\u2019", label: "curly apostrophe/quote (')" },
-];
-
 function stripHtml(html) {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function wordCount(text) {
   return text.split(/\s+/).filter(Boolean).length;
-}
-
-function countPhrasesInList(text, phrases) {
-  const lower = text.toLowerCase();
-  const found = [];
-  // Sort phrases by length descending so longest matches are counted first
-  const sorted = [...phrases].sort((a, b) => b.trim().length - a.trim().length);
-  // Track [start, end) ranges already counted to avoid overlap
-  const recordedRanges = [];
-
-  function overlapsRange(start, end) {
-    return recordedRanges.some(([s, e]) => start < e && end > s);
-  }
-
-  function addRange(start, end) {
-    recordedRanges.push([start, end]);
-  }
-
-  for (const phrase of sorted) {
-    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const regex = new RegExp(escaped, "gi");
-    let count = 0;
-    let m;
-    while ((m = regex.exec(lower)) !== null) {
-      const start = m.index;
-      const end = m.index + m[0].length;
-      if (!overlapsRange(start, end)) {
-        count++;
-        addRange(start, end);
-      }
-    }
-    if (count > 0) found.push({ phrase: phrase.trim(), count });
-  }
-
-  return found;
 }
 
 // --- Load article ---
@@ -190,94 +94,6 @@ if (!/<h[2-6]/.test(article.content)) {
 }
 if (/<h1[\s>]/.test(article.content)) {
   results.push({ icon: "⚠", label: "H1 in body", msg: "Remove H1 from body; title is H1.", level: 2, source: "google" });
-}
-
-// --- Level 1/2: Editorial — AI content quality (not Google policy) ---
-
-// AI phrases: two-tier system
-const highFound = countPhrasesInList(plainContent, AI_PHRASES_HIGH);
-const commonFound = countPhrasesInList(plainContent, AI_PHRASES_COMMON);
-const highTotal = highFound.reduce((s, f) => s + f.count, 0);
-const commonTotal = commonFound.reduce((s, f) => s + f.count, 0);
-const combinedTotal = highTotal + commonTotal;
-
-// High-confidence AI phrases
-if (highFound.length > 0) {
-  const maxShow = 8;
-  const shown = highFound.slice(0, maxShow);
-  const parts = shown.map((f) => {
-    const suggestion = AI_PHRASE_SUGGESTIONS[f.phrase.toLowerCase()];
-    const countStr = `"${f.phrase}" (${f.count})`;
-    return suggestion ? `${countStr} → ${suggestion}` : countStr;
-  });
-  const tail = highFound.length > maxShow ? `; +${highFound.length - maxShow} more` : "";
-  results.push({
-    icon: highTotal > 2 ? "✗" : "⚠",
-    label: "AI language: strong markers [Editorial]",
-    msg: `Replace: ${parts.join("; ")}${tail}.`,
-    level: highTotal > 2 ? 1 : 2,
-    source: "editorial",
-  });
-} else {
-  results.push({ icon: "✓", label: "AI language: strong markers [Editorial]", msg: "No high-confidence AI phrases.", level: 2, source: "editorial" });
-}
-
-// Common AI-adjacent phrases (only flagged in bulk)
-if (commonTotal > 5) {
-  const maxShow = 6;
-  const shown = commonFound.slice(0, maxShow);
-  const parts = shown.map((f) => {
-    const suggestion = AI_PHRASE_SUGGESTIONS[f.phrase.toLowerCase()];
-    const countStr = `"${f.phrase}" (${f.count})`;
-    return suggestion ? `${countStr} → ${suggestion}` : countStr;
-  });
-  const tail = commonFound.length > maxShow ? `; +${commonFound.length - maxShow} more` : "";
-  results.push({
-    icon: "⚠",
-    label: "AI language: common phrases [Editorial]",
-    msg: `${commonTotal} common AI-adjacent phrases. Consider varying: ${parts.join("; ")}${tail}.`,
-    level: 2,
-    source: "editorial",
-  });
-} else {
-  results.push({
-    icon: "✓",
-    label: "AI language: common phrases [Editorial]",
-    msg: commonTotal > 0 ? `${commonTotal} common phrase(s) — within acceptable range.` : "No common AI-adjacent phrases.",
-    level: 2,
-    source: "editorial",
-  });
-}
-
-// Combined escalation
-if (combinedTotal > 5 && highTotal > 0 && commonTotal > 3) {
-  results.push({
-    icon: "✗",
-    label: "AI language: overall density [Editorial]",
-    msg: `${combinedTotal} AI-flagged phrases total (${highTotal} strong + ${commonTotal} common). Rewrite affected sections.`,
-    level: 1,
-    source: "editorial",
-  });
-}
-
-// AI typography
-const typoFound = [];
-for (const { char, label } of AI_TYPOGRAPHY) {
-  const count = (plainContent.match(new RegExp(char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
-  if (count > 0) typoFound.push({ label, count });
-}
-if (typoFound.length > 0) {
-  const total = typoFound.reduce((s, f) => s + f.count, 0);
-  const examples = typoFound.map((f) => `${f.label} (${f.count})`).join("; ");
-  results.push({
-    icon: total >= 2 ? "✗" : "⚠",
-    label: "AI typography [Editorial]",
-    msg: `Replace: ${examples}. Use straight quotes and commas/colons.`,
-    level: total >= 2 ? 1 : 2,
-    source: "editorial",
-  });
-} else {
-  results.push({ icon: "✓", label: "AI typography [Editorial]", msg: "No em-dash or curly quotes.", level: 2, source: "editorial" });
 }
 
 // --- Level 2: Ranking Killers (Google) ---

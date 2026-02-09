@@ -12,11 +12,18 @@ import type { ArticleAuditResult } from "@/lib/seo/article-audit";
 
 export type SearchIntent = "informational" | "commercial" | "transactional" | "navigational";
 
+/** Word count guideline preset. "auto" = use competitor-derived target; custom uses wordCountCustom. */
+export type WordCountPreset = "auto" | "concise" | "standard" | "in_depth" | "custom";
+
 export type PipelineInput = {
   primaryKeyword: string;
   secondaryKeywords?: string[];
   peopleAlsoSearchFor?: string[];
   intent?: SearchIntent | SearchIntent[];
+  /** When set and not "auto", overrides competitor-derived word count. */
+  wordCountPreset?: WordCountPreset;
+  /** Used only when wordCountPreset is "custom". */
+  wordCountCustom?: number;
 };
 
 // =============================================================================
@@ -240,13 +247,6 @@ export const ResearchBriefOutlineSchema = z.object({
   estimatedWordCount: z.number(),
 });
 
-export const TopicChecklistItemSchema = z.object({
-  topic: z.string(),
-  importance: z.string(),
-  guidanceNote: z.string(),
-  targetDepth: z.string(),
-});
-
 export const GeoRequirementsSchema = z.object({
   directAnswer: z.string(),
   statDensity: z.string(),
@@ -275,7 +275,6 @@ export const ResearchBriefSchema = z.object({
     pasf: z.array(z.string()),
   }),
   currentData: CurrentDataSchema,
-  topicChecklist: z.array(TopicChecklistItemSchema),
   outline: ResearchBriefOutlineSchema,
   gaps: z.array(z.string()),
   editorialStyle: EditorialStyleSchema,
@@ -283,6 +282,10 @@ export const ResearchBriefSchema = z.object({
   geoRequirements: GeoRequirementsSchema,
   seoRequirements: SeoRequirementsSchema,
   wordCount: ResearchBriefWordCountSchema,
+  // Optional "best version" fields for step 6 → step 7 handoff
+  similaritySummary: z.string().optional(),
+  extraValueThemes: z.array(z.string()).optional(),
+  freshnessNote: z.string().optional(),
 });
 
 /** Used when GPT returns brief without currentData (merged server-side). */
@@ -301,14 +304,17 @@ export type TitleMetaVariant = {
 };
 
 export const TitleMetaVariantSchema = z.object({
-  title: z.string().max(60),
-  metaDescription: z.string().max(160),
+  // Don't enforce max length in Zod — a 61-char title would fail the entire
+  // safeParse and drop all structural validation. Truncation is handled
+  // post-validation in the Claude client, and the SEO audit enforces limits.
+  title: z.string().min(1),
+  metaDescription: z.string().min(1),
   approach: z.string(),
 });
 
 // Claude draft output (writeDraft response) — Zod validated
 export const ClaudeDraftOutputSchema = z.object({
-  titleMetaVariants: z.array(TitleMetaVariantSchema).min(2).max(3),
+  titleMetaVariants: z.array(TitleMetaVariantSchema).min(2).max(4),
   outline: z.array(z.string()),
   content: z.string().min(1),
   suggestedSlug: z.string(),
@@ -319,38 +325,7 @@ export const ClaudeDraftOutputSchema = z.object({
 export type ClaudeDraftOutput = z.infer<typeof ClaudeDraftOutputSchema>;
 
 // =============================================================================
-// 10. TopicScore & TopicScoreResult (from o3-mini) — Zod validated
-// =============================================================================
-
-export const TopicScoreSchema = z.object({
-  topic: z.string(),
-  score: z.number().min(0).max(100),
-  status: z.enum(["pass", "gap"]),
-  notes: z.string(),
-});
-
-export const GapTopicWithActionSchema = z.object({
-  topic: z.string(),
-  score: z.number(),
-  recommendedAction: z.string(),
-});
-
-export const TopicScoreResultSchema = z.object({
-  topicScores: z.array(TopicScoreSchema),
-  overallScore: z.number(),
-  gapTopics: z.array(GapTopicWithActionSchema),
-  decision: z.enum(["SKIP_TO_HUMANIZE", "FILL_GAPS"]),
-  faqRedundancyFlags: z
-    .array(z.object({ question: z.string(), overlapPercent: z.number(), suggestion: z.string() }))
-    .optional(),
-});
-
-export type TopicScore = z.infer<typeof TopicScoreSchema>;
-export type TopicScoreResult = z.infer<typeof TopicScoreResultSchema>;
-export type GapTopicWithAction = z.infer<typeof GapTopicWithActionSchema>;
-
-// =============================================================================
-// 11. SchemaMarkup
+// 10. SchemaMarkup
 // =============================================================================
 
 export type SchemaMarkup = {
@@ -361,8 +336,24 @@ export type SchemaMarkup = {
 };
 
 // =============================================================================
-// 12. PipelineOutput
+// 11. PipelineOutput
 // =============================================================================
+
+/** Best-version brief summary for UI and debugging (no full brief in output). */
+export type BriefSummary = {
+  similaritySummary?: string;
+  extraValueThemes?: string[];
+  freshnessNote?: string;
+};
+
+/** Outline drift: draft H2s vs brief outline (non-blocking). */
+export type OutlineDrift = {
+  passed: boolean;
+  expected: string[];
+  actual: string[];
+  missing: string[];
+  extra: string[];
+};
 
 export type PipelineOutput = {
   article: {
@@ -374,16 +365,9 @@ export type PipelineOutput = {
   };
   titleMetaVariants: TitleMetaVariant[];
   selectedTitleMeta: TitleMetaVariant | null;
-  topicScoreReport: TopicScoreResult;
   sourceUrls: string[];
   auditResult: ArticleAuditResult;
   schemaMarkup: SchemaMarkup;
-  contentIntegrity: {
-    passed: boolean;
-    issues: string[];
-    restorations: string[];
-    postRestorationIssues: string[];
-  };
   faqEnforcement: {
     passed: boolean;
     violations: { question: string; answer?: string; charCount: number }[];
@@ -399,10 +383,16 @@ export type PipelineOutput = {
     publishedUrl?: string;
     publishDate?: string;
   };
+  /** Total pipeline execution time in milliseconds. */
+  generationTimeMs?: number;
+  /** Strategy/differentiation from brief (for dashboard). */
+  briefSummary?: BriefSummary;
+  /** Non-blocking: draft outline vs brief outline. */
+  outlineDrift?: OutlineDrift;
 };
 
 // =============================================================================
-// 13. Utility types (v3)
+// 12. Utility types (v3)
 // =============================================================================
 
 export type StepResult<T> = {
@@ -449,7 +439,7 @@ export const RETRY_STANDARD: RetryConfig = {
 
 export const RETRY_EXPENSIVE: RetryConfig = {
   maxRetries: 1,
-  retryDelayMs: 2000,
+  retryDelayMs: 3000,
   timeoutMs: 60000,
-  retryOn: ["timeout"],
+  retryOn: ["timeout", "rate_limit"],
 };

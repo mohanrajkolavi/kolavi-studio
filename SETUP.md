@@ -119,6 +119,7 @@ If you use **Supabase** and want the Blog Maker "Recent" (last 5 posts) feature,
 CREATE TABLE IF NOT EXISTS blog_generation_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  focus_keyword TEXT,
   title TEXT NOT NULL,
   meta_description TEXT NOT NULL,
   outline JSONB NOT NULL DEFAULT '[]',
@@ -128,58 +129,65 @@ CREATE TABLE IF NOT EXISTS blog_generation_history (
   suggested_tags JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_generation_history(created_at DESC);
+
+-- If the table already exists, add the column (run once):
+-- ALTER TABLE blog_generation_history ADD COLUMN IF NOT EXISTS focus_keyword TEXT;
+
+-- Add generation time column for the Recent page (run once):
+-- ALTER TABLE blog_generation_history ADD COLUMN IF NOT EXISTS generation_time_ms INTEGER;
 ```
+
+### Content Audit (optional)
+
+- **In-app:** SEO article audit runs in the dashboard (Content Writer) and is implemented in `src/lib/seo/article-audit.ts`. The API route `POST /api/content-audit/quality` can audit HTML/metadata for quality and E-E-A-T–related signals.
+- **Python tool:** The `content_audit/` folder contains an optional Python-based E-E-A-T and “Helpful Content” auditor. See [content_audit/README.md](content_audit/README.md) for setup and usage. It can be run standalone or integrated via scripts.
 
 ## Project Structure
 
 ```
 src/
-├── app/                          # Next.js App Router pages
-│   ├── layout.tsx               # Root layout with header/footer
-│   ├── page.tsx                 # Home page
-│   ├── medical-spas/            # Medical spa vertical landing
-│   ├── services/                # Services page
-│   ├── portfolio/               # Portfolio page
-│   ├── about/                   # About page
-│   ├── contact/                 # Contact page
-│   ├── blog/                    # Blog pages
-│   │   ├── page.tsx            # Blog index
-│   │   ├── [slug]/             # Individual blog posts
-│   │   ├── category/[slug]/    # Category pages
-│   │   └── tag/[slug]/         # Tag pages
-│   ├── sitemap/                 # Sitemap index + child sitemaps (static, posts, categories, tags)
-│   └── robots.ts                # Robots.txt
+├── app/                              # Next.js App Router
+│   ├── layout.tsx, page.tsx          # Root layout, home
+│   ├── about/, contact/, services/, portfolio/, industries/
+│   ├── medical-spas/                 # Vertical landing
+│   ├── privacy/, terms/, disclaimer/, cookies/   # Legal
+│   ├── blog/                         # Blog: index, [slug], category/[slug], tag/[slug], rss
+│   ├── dashboard/                    # Owner dashboard
+│   │   ├── layout.tsx, login/
+│   │   └── (main)/                   # Overview, leads, blog (Content Writer), recent, content-maintenance
+│   ├── api/                          # API routes
+│   │   ├── auth/login, auth/logout
+│   │   ├── blog/generate, blog/history, blog/humanize, blog/publish-record
+│   │   ├── contact/, leads/, revalidate/
+│   │   ├── content-audit/quality/    # Content quality audit API
+│   │   └── content-maintenance/
+│   ├── sitemap/                      # Sitemap index + static, posts, categories, tags
+│   └── robots.ts
 ├── components/
-│   ├── layout/                  # Layout components
-│   │   ├── Header.tsx          # Mobile-first header
-│   │   ├── MobileNav.tsx       # Mobile navigation
-│   │   ├── Footer.tsx          # Footer
-│   │   └── CTAStrip.tsx        # CTA banner
-│   ├── sections/                # Reusable page sections
-│   │   ├── Hero.tsx
-│   │   ├── Benefits.tsx
-│   │   ├── Process.tsx
-│   │   ├── Testimonials.tsx
-│   │   ├── FAQ.tsx
-│   │   └── CTA.tsx
-│   └── ui/                      # shadcn/ui components
+│   ├── layout/       # Header, Footer, MobileNav, CTAStrip, LayoutShell, Logo
+│   ├── sections/     # Hero, Benefits, Process, Testimonials, FAQ, CTA
+│   ├── blog/         # BlogContent, BlogPostTOC, BlogSubscribe, ShareButtons
+│   ├── contact/      # ContactForm, TypeformEmbed
+│   ├── dashboard/    # BlogGenerationProvider, DashboardNavStrip, LoginForm, etc.
+│   ├── legal/        # LegalPageLayout
+│   └── ui/           # shadcn/ui (button, card, input, sheet, textarea)
 ├── lib/
-│   ├── graphql/                 # WordPress GraphQL integration
-│   │   ├── client.ts           # GraphQL client
-│   │   ├── queries.ts          # All GraphQL queries
-│   │   └── types.ts            # TypeScript types
-│   ├── seo/                     # SEO utilities
-│   │   ├── metadata.ts         # Metadata helpers
-│   │   ├── canonical.ts        # Canonical URL helper
-│   │   └── jsonld/             # JSON-LD schemas
-│   │       ├── organization.ts
-│   │       ├── breadcrumb.ts
-│   │       ├── article.ts
-│   │       └── faq.ts
-│   ├── constants.ts             # Site constants
-│   └── utils.ts                 # Utility functions
+│   ├── auth/         # login-rate-limit, auth
+│   ├── blog/         # data, generation-types, sample-posts, utils
+│   ├── graphql/      # client, queries, types (WordPress)
+│   ├── seo/          # metadata, canonical, article-audit, jsonld/*, rank-math-parser
+│   ├── pipeline/     # orchestrator, types (Content Writer pipeline)
+│   ├── claude/, gemini/, openai/   # AI clients
+│   ├── jina/, serper/              # Reader, search
+│   ├── supabase/, db/              # Supabase, Postgres (schema in db/schema.sql)
+│   ├── constants/                   # Site constants + banned-phrases
+│   └── utils.ts, sitemap-index.ts
 └── types/
-    └── global.d.ts              # Global TypeScript types
+    └── global.d.ts
+
+content_audit/        # Optional Python E-E-A-T audit (see content_audit/README.md)
+scripts/              # check-secrets.sh, run-audit.mjs, open-app-in-browser.mjs
+docs/                 # architecture, dashboard, integrations, blog
 ```
 
 ## Key Features

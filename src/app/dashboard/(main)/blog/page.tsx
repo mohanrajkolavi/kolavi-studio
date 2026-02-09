@@ -6,48 +6,36 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { TagInput } from "@/components/dashboard/TagInput";
 import { useBlogGeneration } from "@/components/dashboard/BlogGenerationProvider";
-import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, History, ChevronDown } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown } from "lucide-react";
 import { SEO } from "@/lib/constants";
 import { auditArticle, MIN_PUBLISH_SCORE } from "@/lib/seo/article-audit";
-import type { GeneratedContent, PipelineResult } from "@/lib/blog/generation-types";
+import type { AuditItem } from "@/lib/seo/article-audit";
+import type { GeneratedContent, GenerationInput, PipelineResult } from "@/lib/blog/generation-types";
 import { pipelineToGenerated } from "@/lib/blog/generation-types";
 
-/** API history entry (snake_case). */
-type HistoryEntry = {
-  id: string;
-  created_at: string;
-  title: string;
-  meta_description: string;
-  outline: string[];
-  content: string;
-  suggested_slug?: string | null;
-  suggested_categories?: string[] | null;
-  suggested_tags?: string[] | null;
+/** Result state shape (matches BlogGenerationProvider). */
+type ResultState = {
+  pipelineResult: PipelineResult | null;
+  fallbackGenerated: GeneratedContent | null;
+  selectedTitleIndex: number;
+  input: GenerationInput;
 };
 
-function historyEntryToContent(entry: HistoryEntry): GeneratedContent {
-  return {
-    title: entry.title,
-    metaDescription: entry.meta_description,
-    outline: entry.outline ?? [],
-    content: entry.content,
-    suggestedSlug: entry.suggested_slug ?? undefined,
-    suggestedCategories: entry.suggested_categories ?? undefined,
-    suggestedTags: entry.suggested_tags ?? undefined,
+/** E-E-A-T & Content Quality API response (Python content_audit — Google quality rater signals). */
+type ContentAuditQualityResult = {
+  results: {
+    experience_signals?: { score: number; experience_sentences: string[] } | { error: string };
+    title_hyperbole?: { is_clickbait: boolean; trigger_word?: string; sentiment_polarity?: number; sentiment_trigger?: string } | { error: string };
+    data_density?: { density_score: number; data_point_count: number; word_count: number } | { error: string };
+    skimmability?: { pass_fail: string; problematic_sections: { section_label: string; word_count: number; issue: string }[] } | { error: string };
+    temporal_consistency?: { consistency_score: string; title_year?: number; stale_year_references: string[] } | { error: string };
+    answer_first_structure?: { direct_answer_ratio: number; buried_answers: { heading_text: string; first_sentence: string; word_count: number }[]; total_questions: number } | { error: string };
+    entity_density?: { density_percent: number; top_entities: [string, string][]; unique_entity_count: number; skipped_reason?: string } | { error: string };
+    readability_variance?: { variance_score: string; fatigue_sentences: string[]; monotony_detected: boolean } | { error: string };
+    lazy_phrasing?: { score: number; found_transitions: string[]; found_hype: string[]; found_tells: string[] } | { error: string };
+    sentence_starts?: { is_repetitive: boolean; repeating_word: string | null } | { error: string };
   };
-}
-
-function relativeTime(iso: string): string {
-  const d = new Date(iso);
-  const now = Date.now();
-  const diff = now - d.getTime();
-  const min = 60 * 1000, h = 60 * min, day = 24 * h;
-  if (diff < min) return "Just now";
-  if (diff < h) return `${Math.floor(diff / min)} min ago`;
-  if (diff < day) return `${Math.floor(diff / h)} hours ago`;
-  if (diff < 7 * day) return `${Math.floor(diff / day)} days ago`;
-  return d.toLocaleDateString();
-}
+};
 
 /** Convert HTML to plain text for display and copy. */
 function htmlToPlainText(html: string): string {
@@ -66,6 +54,241 @@ function htmlToPlainText(html: string): string {
   return t.replace(/\n{3,}/g, "\n\n").replace(/\n\s*\n/g, "\n\n").trim();
 }
 
+function isEeatError(r: unknown): r is { error: string } {
+  return typeof r === "object" && r !== null && "error" in r && typeof (r as { error: unknown }).error === "string";
+}
+
+function EeatResultsDisplay({
+  results,
+  open: openDetails,
+  filter = "all",
+}: {
+  results: ContentAuditQualityResult["results"];
+  open: boolean;
+  filter?: "all" | "correct" | "issues";
+}) {
+  const items: Array<{
+    key: string;
+    label: string;
+    summary: (r: unknown) => string;
+    detail: (r: unknown) => string | null;
+    isProblematic?: (r: unknown) => boolean;
+    isSkipped?: (r: unknown) => boolean;
+  }> = [
+    {
+      key: "experience_signals",
+      label: "Experience signals",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : `${(r as { score: number }).score}/100`,
+      detail: (r: unknown) =>
+        isEeatError(r) ? null : (r as { experience_sentences: string[] }).experience_sentences?.length
+          ? `Sentences: ${(r as { experience_sentences: string[] }).experience_sentences.length}`
+          : "No experience signal sentences detected",
+      isProblematic: (r) => !isEeatError(r) && (r as { score: number }).score < 1,
+    },
+    {
+      key: "title_hyperbole",
+      label: "Title hyperbole",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : (r as { is_clickbait: boolean }).is_clickbait ? "Clickbait" : "OK",
+      detail: (r: unknown) =>
+        isEeatError(r) ? null : (r as { trigger_word?: string }).trigger_word
+          ? `Trigger: ${(r as { trigger_word: string }).trigger_word}`
+          : null,
+      isProblematic: (r) => !isEeatError(r) && (r as { is_clickbait: boolean }).is_clickbait,
+    },
+    {
+      key: "data_density",
+      label: "Data density",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : `${(r as { density_score: number }).density_score} per 100 words`,
+      detail: (r: unknown) =>
+        isEeatError(r) ? null : `${(r as { data_point_count: number }).data_point_count} data points`,
+      isProblematic: (r) => !isEeatError(r) && (r as { density_score: number }).density_score < 1,
+    },
+    {
+      key: "skimmability",
+      label: "Skimmability",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : (r as { pass_fail: string }).pass_fail === "pass" ? "Pass" : "Issues",
+      detail: (r: unknown) =>
+        isEeatError(r) ? null : (r as { problematic_sections: { section_label: string; issue: string }[] }).problematic_sections?.length
+          ? (r as { problematic_sections: { section_label: string; issue: string }[] }).problematic_sections.map((s) => `${s.section_label}: ${s.issue}`).join("; ")
+          : null,
+      isProblematic: (r) => !isEeatError(r) && (r as { pass_fail: string }).pass_fail !== "pass",
+    },
+    {
+      key: "temporal_consistency",
+      label: "Temporal consistency",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : (r as { consistency_score: string }).consistency_score === "pass" ? "Pass" : "Stale refs",
+      detail: (r: unknown) =>
+        isEeatError(r) ? null : (r as { stale_year_references: string[] }).stale_year_references?.length
+          ? (r as { stale_year_references: string[] }).stale_year_references.join(", ")
+          : null,
+      isProblematic: (r) => !isEeatError(r) && (r as { consistency_score: string }).consistency_score !== "pass",
+    },
+    {
+      key: "answer_first_structure",
+      label: "Answer-first",
+      summary: (r: unknown) => {
+        if (isEeatError(r)) return (r as { error: string }).error;
+        const d = r as { direct_answer_ratio: number; total_questions: number };
+        if ((d.total_questions ?? 0) === 0) return "No question headings";
+        return `${d.direct_answer_ratio}% direct`;
+      },
+      detail: (r: unknown) => {
+        if (isEeatError(r)) return null;
+        const d = r as { buried_answers: unknown[]; total_questions: number };
+        if ((d.total_questions ?? 0) === 0)
+          return "No H2/H3 starting with What/How/Who/Why/Where found";
+        return d.buried_answers?.length
+          ? `${d.buried_answers.length} buried answer(s)`
+          : null;
+      },
+      isProblematic: (r) => {
+        if (isEeatError(r)) return false;
+        const d = r as { direct_answer_ratio: number; total_questions: number; buried_answers: unknown[] };
+        // Flag when there are question headings but most answers are buried
+        return (d.total_questions ?? 0) > 0 && d.direct_answer_ratio < 50;
+      },
+      isSkipped: (r) => !isEeatError(r) && ((r as { total_questions: number }).total_questions ?? 0) === 0,
+    },
+    {
+      key: "entity_density",
+      label: "Entity density",
+      summary: (r: unknown) =>
+        isEeatError(r)
+          ? (r as { error: string }).error
+          : (r as { skipped_reason?: string }).skipped_reason
+            ? "Skipped (spacy not installed)"
+            : `${(r as { density_percent: number }).density_percent}%`,
+      detail: (r: unknown) =>
+        isEeatError(r)
+          ? null
+          : (r as { skipped_reason?: string }).skipped_reason
+            ? (r as { skipped_reason: string }).skipped_reason
+            : (r as { top_entities: [string, string][] }).top_entities?.length
+              ? (r as { top_entities: [string, string][] }).top_entities.map((e) => e[0]).slice(0, 5).join(", ")
+              : null,
+      isSkipped: (r) => !isEeatError(r) && !!(r as { skipped_reason?: string }).skipped_reason,
+    },
+    {
+      key: "readability_variance",
+      label: "Readability variance",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : (r as { variance_score: string }).variance_score === "pass" ? "Pass" : "Issues",
+      detail: (r: unknown) =>
+        isEeatError(r) ? null : (r as { monotony_detected: boolean; fatigue_sentences: string[] }).monotony_detected
+          ? "Monotony"
+          : (r as { fatigue_sentences: string[] }).fatigue_sentences?.length
+            ? `${(r as { fatigue_sentences: string[] }).fatigue_sentences.length} long sentences`
+            : null,
+      isProblematic: (r) => !isEeatError(r) && (r as { variance_score: string }).variance_score !== "pass",
+    },
+    {
+      key: "lazy_phrasing",
+      label: "Generic phrasing",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : `${(r as { score: number }).score}% filler`,
+      detail: (r: unknown) => {
+        if (isEeatError(r)) return null;
+        const x = r as { found_transitions: string[]; found_hype: string[]; found_tells: string[] };
+        const parts: string[] = [];
+        if (x.found_transitions?.length) parts.push(`Transitions: ${[...new Set(x.found_transitions)].join(", ")}`);
+        if (x.found_hype?.length) parts.push(`Hype: ${[...new Set(x.found_hype)].join(", ")}`);
+        if (x.found_tells?.length) parts.push(`Generic: ${[...new Set(x.found_tells)].join(", ")}`);
+        return parts.length ? parts.join(" · ") : null;
+      },
+      isProblematic: (r) => !isEeatError(r) && (r as { score: number }).score >= 1,
+    },
+    {
+      key: "sentence_starts",
+      label: "Sentence variety",
+      summary: (r: unknown) =>
+        isEeatError(r) ? (r as { error: string }).error : (r as { is_repetitive: boolean }).is_repetitive ? "Repetitive" : "Pass",
+      detail: (r: unknown) =>
+        isEeatError(r) ? null : (r as { repeating_word: string | null }).repeating_word
+          ? `Repeating: "${(r as { repeating_word: string }).repeating_word}"`
+          : null,
+      isProblematic: (r) => !isEeatError(r) && (r as { is_repetitive: boolean }).is_repetitive,
+    },
+  ];
+
+  const qualityKeys = ["experience_signals", "title_hyperbole", "data_density", "skimmability"];
+  const structureKeys = ["temporal_consistency", "answer_first_structure", "entity_density", "readability_variance"];
+  const writingKeys = ["lazy_phrasing", "sentence_starts"];
+  const groups: { label: string; keys: string[] }[] = [
+    { label: "E-E-A-T Signals", keys: qualityKeys },
+    { label: "Content Structure", keys: structureKeys },
+    { label: "Writing Quality", keys: writingKeys },
+  ];
+
+  const itemMap = new Map(items.map((i) => [i.key, i]));
+
+  return (
+    <div className="space-y-3">
+      {groups.map(({ label, keys: groupKeys }) => {
+        let groupItems = groupKeys
+          .map((key) => {
+            const item = itemMap.get(key);
+            const r = results[key as keyof typeof results];
+            if (!item || r == null) return null;
+            return { key, item, r };
+          })
+          .filter((x): x is NonNullable<typeof x> => x != null);
+        if (filter !== "all") {
+          groupItems = groupItems.filter(({ item, r }) => {
+            const ok = !isEeatError(r) && !(item.isProblematic?.(r) ?? false);
+            const skipped = item.isSkipped?.(r) ?? false;
+            const isIssue = !ok && !skipped;
+            if (filter === "correct") return ok;
+            if (filter === "issues") return isIssue || skipped;
+            return true;
+          });
+        }
+        if (groupItems.length === 0) return null;
+        return (
+          <div key={label} className="space-y-3">
+            <p className="sticky top-0 z-10 bg-card/95 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+              {label}
+            </p>
+            {groupItems.map(({ key, item, r }) => {
+              const { label: itemLabel, summary, detail, isProblematic, isSkipped } = item;
+              const ok = !isEeatError(r) && !(isProblematic?.(r) ?? false);
+              const skipped = isSkipped?.(r) ?? false;
+              const isIssue = !ok && !skipped;
+              return (
+                <div
+                  key={key}
+                  className={`flex gap-3 rounded-xl px-3 py-2.5 ${
+                    isIssue ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
+                  }`}
+                >
+                  {ok ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  ) : skipped ? (
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : (
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-foreground">{itemLabel}</p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{summary(r)}</p>
+                    {openDetails && detail(r) && (
+                      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">{detail(r)}</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 type IntentType = "informational" | "navigational" | "commercial" | "transactional";
 
 const INTENT_OPTIONS: { value: IntentType; label: string }[] = [
@@ -75,9 +298,14 @@ const INTENT_OPTIONS: { value: IntentType; label: string }[] = [
   { value: "transactional", label: "Transactional" },
 ];
 
-/** Sample data to preview the output window layout on localhost without generating. ~1800+ words. */
+/**
+ * Sample data for the Blog Maker output UI. Use "View sample output" to load this
+ * (and SAMPLE_PIPELINE_RESULT) so you can edit the UI or fix issues without running
+ * real generation — avoids wasting API tokens.
+ * Pairs with sample keywords (e.g. "medical spa SEO").
+ */
 const SAMPLE_OUTPUT: GeneratedContent = {
-  title: "7 Proven SEO Tips for Medical Spas in 2025",
+  title: "7 Proven SEO Tips for Medical Spas in 2026",
   metaDescription:
     "Learn how to rank higher and attract more clients with these SEO strategies tailored for medical spas and aesthetic practices.",
   outline: [
@@ -90,7 +318,7 @@ const SAMPLE_OUTPUT: GeneratedContent = {
     "Measuring and Improving Over Time",
   ],
   content: `
-<p>Medical spas compete for visibility in a crowded market. A solid SEO strategy helps you reach clients who are already searching for your services. This guide covers practical steps you can take in 2025 to improve your search rankings and fill your calendar with the right patients.</p>
+<p>Medical spas compete for visibility in a crowded market. A solid SEO strategy helps you reach clients who are already searching for your services. This guide covers practical steps you can take in 2026 to improve your search rankings and fill your calendar with the right patients.</p>
 
 <h2>Why SEO Matters for Medical Spas</h2>
 <p>Potential clients search for treatments like Botox, fillers, and laser services before they book. If your practice doesn't show up on the first page, you're missing appointments. SEO aligns your site with what people are actually typing into Google.</p>
@@ -142,9 +370,104 @@ const SAMPLE_OUTPUT: GeneratedContent = {
 <h3>Can I do medical spa SEO myself?</h3>
 <p>You can handle basics like updating your GBP, writing simple service pages, and publishing blog posts. For technical SEO, link building, and ongoing strategy, many practices hire an agency or consultant.</p>
 `.trim(),
-  suggestedSlug: "seo-tips-medical-spas-2025",
+  suggestedSlug: "seo-tips-medical-spas-2026",
   suggestedCategories: ["SEO", "Medical Spa"],
-  suggestedTags: ["SEO", "medical spa", "digital marketing", "2025"],
+  suggestedTags: ["SEO", "medical spa", "digital marketing", "2026"],
+};
+
+/** Full pipeline sample for UI work without tokens: 4 titles/meta (source-based), audit, schema, quality checks. */
+const SAMPLE_PIPELINE_RESULT: PipelineResult = {
+  article: {
+    content: SAMPLE_OUTPUT.content,
+    outline: SAMPLE_OUTPUT.outline,
+    suggestedSlug: SAMPLE_OUTPUT.suggestedSlug ?? "seo-tips-medical-spas-2026",
+    suggestedCategories: SAMPLE_OUTPUT.suggestedCategories ?? [],
+    suggestedTags: SAMPLE_OUTPUT.suggestedTags ?? [],
+  },
+  titleMetaVariants: [
+    {
+      approach: "Google Search Central — Accurate, descriptive title; meta as snippet; clean URL",
+      title: "Medical Spa SEO: A Guide to Search Best Practices (2026)",
+      metaDescription:
+        "How to create helpful, reliable content for medical spas that meets Google's guidelines. Covers titles, snippets, and user intent.",
+    },
+    {
+      approach: "Rank Math — Focus keyword in title; 50–60 char title; 120–160 char meta; keyword in slug",
+      title: "Medical Spa SEO Tips 2026: 7 Ways to Rank Higher",
+      metaDescription:
+        "Medical spa SEO guide: keyword research, local SEO, on-page optimization, and technical tips to rank and get more clients in 2026.",
+    },
+    {
+      approach: "Ahrefs — CTR-focused title; benefit-led meta; short, readable slug",
+      title: "7 Medical Spa SEO Tips That Actually Get You Clients",
+      metaDescription:
+        "Stop guessing. Use these 7 SEO tactics to get more bookings—Google Business Profile, content, and technical fixes that move the needle.",
+    },
+    {
+      approach: "Semrush / Backlinko — Power words, number, specificity; CTA in meta; keyword-rich slug",
+      title: "7 Proven Medical Spa SEO Tips to Dominate Local Search in 2026",
+      metaDescription:
+        "Discover the exact SEO strategies top medical spas use. Step-by-step: GBP, keywords, content, and technical SEO. Start ranking today.",
+    },
+  ],
+  selectedTitleMeta: null,
+  sourceUrls: [
+    "https://developers.google.com/search/docs",
+    "https://support.google.com/business",
+    "https://blog.google/products/search",
+  ],
+  auditResult: {
+    score: 88,
+    publishable: true,
+    summary: { pass: 19, warn: 0, fail: 0 },
+    items: [
+      { id: "title-length", severity: "pass", label: "Title length", message: "Title is 52 chars.", level: 2 },
+      { id: "title-keyword", severity: "pass", label: "Title keyword", message: "Title contains target keyword.", level: 2 },
+      { id: "meta-description", severity: "pass", label: "Meta description length", message: "Meta description is 128 chars.", level: 2 },
+      { id: "content-thin", severity: "pass", label: "Content depth", message: "Content is 1847 words.", level: 1 },
+      { id: "keyword-stuffing", severity: "pass", label: "Keyword use", message: "Focus keyword used naturally (12 times).", level: 2 },
+      { id: "headings-hierarchy", severity: "pass", label: "Heading hierarchy", message: "Found 14 heading(s) with valid structure.", level: 2 },
+      { id: "paragraph-length", severity: "pass", label: "Paragraph length", message: "Paragraphs within 75 words.", level: 2 },
+      { id: "slug-length", severity: "pass", label: "URL slug length", message: "Slug is 24 chars.", level: 2 },
+      { id: "rm-meta-keyword", severity: "pass", label: "Rank Math: Keyword in meta", message: "Primary keyword in meta description.", level: 3, source: "rankmath" },
+      { id: "rm-first10", severity: "pass", label: "Rank Math: Keyword in intro", message: "Primary keyword appears in first 10% of content.", level: 3, source: "rankmath" },
+      { id: "rm-slug-keyword", severity: "pass", label: "Rank Math: Keyword in URL", message: "Primary keyword in slug.", level: 3, source: "rankmath" },
+      { id: "rm-subheading-keyword", severity: "pass", label: "Rank Math: Keyword in subheadings", message: "Primary keyword in subheadings.", level: 3, source: "rankmath" },
+      { id: "rm-content-length", severity: "pass", label: "Rank Math: Content length", message: "1847 words. 2500+ = Rank Math 100%. Google: quality over quantity—no need to pad.", level: 3, source: "rankmath" },
+      { id: "rm-title-position", severity: "pass", label: "Rank Math: Keyword position in title", message: "Primary keyword in first 50% of title.", level: 3, source: "rankmath" },
+      { id: "rm-number-in-title", severity: "pass", label: "Rank Math: Number in title", message: "Title contains a number.", level: 3, source: "rankmath" },
+    ],
+  },
+  schemaMarkup: {
+    article: { "@context": "https://schema.org", "@type": "Article", headline: SAMPLE_OUTPUT.title },
+    faq: { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: [] },
+    breadcrumb: { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [] },
+  },
+  faqEnforcement: {
+    passed: true,
+    violations: [],
+  },
+  factCheck: {
+    verified: true,
+    hallucinations: [],
+    issues: [],
+    skippedRhetorical: [],
+  },
+  publishTracking: { keyword: "medical spa SEO" },
+};
+
+const SAMPLE_INPUT: GenerationInput = {
+  keywords: ["medical spa SEO", "aesthetic practice marketing"],
+  peopleAlsoSearchFor: ["how long for SEO results", "medical spa blog"],
+  intent: ["informational"],
+  competitorUrls: [],
+};
+
+const SAMPLE_RESULT: ResultState = {
+  pipelineResult: SAMPLE_PIPELINE_RESULT,
+  fallbackGenerated: null,
+  selectedTitleIndex: 0,
+  input: SAMPLE_INPUT,
 };
 
 export default function BlogMakerPage() {
@@ -153,6 +476,7 @@ export default function BlogMakerPage() {
     generated: contextGenerated,
     result: contextResult,
     error: generationError,
+    progress: generationProgress,
     startGeneration,
     clearResult,
     clearError,
@@ -163,76 +487,173 @@ export default function BlogMakerPage() {
   const [peopleAlsoSearchFor, setPeopleAlsoSearchFor] = useState<string[]>([]);
   const [intent, setIntent] = useState<IntentType[]>([]);
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [wordCountPreset, setWordCountPreset] = useState<"auto" | "concise" | "standard" | "in_depth" | "custom">("auto");
+  const [wordCountCustom, setWordCountCustom] = useState<number | "">("");
   const [sampleOutput, setSampleOutput] = useState<GeneratedContent | null>(null);
+  const [sampleResult, setSampleResult] = useState<ResultState | null>(null);
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
-  const [contentView, setContentView] = useState<"preview" | "text">("preview");
+  const [contentView, setContentView] = useState<"preview" | "outline">("preview");
 
+  const result = contextResult ?? sampleResult;
   const generated = contextGenerated ?? sampleOutput;
-  const pipelineResult = contextResult?.pipelineResult ?? null;
-  const selectedTitleIndex = contextResult?.selectedTitleIndex ?? 0;
-  const generationInput = contextResult?.input ?? { keywords: [], peopleAlsoSearchFor: [], intent: [], competitorUrls: [] };
+  const pipelineResult = result?.pipelineResult ?? null;
+  const selectedTitleIndex = result?.selectedTitleIndex ?? 0;
+  const generationInput = result?.input ?? {
+    keywords: [],
+    peopleAlsoSearchFor: [],
+    intent: [],
+    competitorUrls: [],
+    wordCountPreset: "auto",
+  };
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [metaCopyField, setMetaCopyField] = useState<"title" | "metaDescription" | "slug" | null>(null);
   const [schemaOpen, setSchemaOpen] = useState(false);
-  const [qualityChecksOpen, setQualityChecksOpen] = useState(false);
+  const [strategyOpen, setStrategyOpen] = useState(true);
+  const [eeatLoading, setEeatLoading] = useState(false);
+  const [eeatError, setEeatError] = useState<string | null>(null);
+  const [eeatResult, setEeatResult] = useState<ContentAuditQualityResult | null>(null);
+  const [auditListFilter, setAuditListFilter] = useState<"all" | "correct" | "issues">("all");
+  const [qualityListFilter, setQualityListFilter] = useState<"all" | "correct" | "issues">("all");
+  const [eeatListFilter, setEeatListFilter] = useState<"all" | "correct" | "issues">("all");
   const [status, setStatus] = useState<{
     type: "success" | "error" | null;
     message: string;
     link?: string;
   }>({ type: null, message: "" });
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyError, setHistoryError] = useState<"auth" | "config" | "error" | null>(null);
-  const [recentOpen, setRecentOpen] = useState(false);
-  const recentRef = useRef<HTMLDivElement>(null);
+  const autoRunEeatDoneRef = useRef(false);
+  /** Track auto-retry count for E-E-A-T (max 1 retry). */
+  const eeatAutoRetryRef = useRef(0);
+  /** Last (title, content) we sent to E-E-A-T successfully; used to debounce re-run on meta/content edits */
+  const lastEeatInputRef = useRef<{ title: string; content: string } | null>(null);
+  const editingSnapshotRef = useRef<{ title: string; content: string }>({ title: "", content: "" });
 
   useEffect(() => {
     if (generated) setEditing({ ...generated });
   }, [generated]);
 
+  // Reset E-E-A-T auto-run flag and retry counter when pipeline result changes (e.g. new generation)
   useEffect(() => {
-    if (!recentOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (recentRef.current && !recentRef.current.contains(e.target as Node)) setRecentOpen(false);
-    }
-    document.addEventListener("click", handleClick);
-    return () => document.removeEventListener("click", handleClick);
-  }, [recentOpen]);
+    if (!contextResult?.pipelineResult) return;
+    autoRunEeatDoneRef.current = false;
+    eeatAutoRetryRef.current = 0;
+  }, [contextResult?.pipelineResult]);
 
+  // Auto-run E-E-A-T once when generation completes (real API result only, not sample)
   useEffect(() => {
-    if (generated !== null) return;
-    setHistoryLoading(true);
-    setHistoryError(null);
-    fetch("/api/blog/history", { credentials: "include" })
-      .then((res) => {
-        if (res.status === 401) {
-          setHistoryError("auth");
-          return [];
+    if (
+      !contextResult?.pipelineResult ||
+      !editing?.content ||
+      eeatLoading ||
+      autoRunEeatDoneRef.current
+    )
+      return;
+    autoRunEeatDoneRef.current = true;
+    setEeatLoading(true);
+    setEeatError(null);
+    const title = editing.title;
+    const content = editing.content;
+    const doFetch = () =>
+      fetch("/api/content-audit/quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ title, content, html: content }),
+      });
+    doFetch()
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.ok && data.results) {
+          setEeatResult({ results: data.results });
+          lastEeatInputRef.current = { title, content };
+        } else {
+          throw new Error(data.error || "No results");
         }
-        if (res.status === 503) {
-          setHistoryError("config");
-          return [];
-        }
-        if (!res.ok) {
-          setHistoryError("error");
-          return [];
-        }
-        return res.json();
       })
-      .then((data) => setHistory(Array.isArray(data) ? data : []))
-      .catch(() => {
-        setHistoryError("error");
-        setHistory([]);
+      .catch((firstErr) => {
+        // Auto-retry once on failure; do not mutate state until we give up
+        if (eeatAutoRetryRef.current < 1) {
+          eeatAutoRetryRef.current += 1;
+          return new Promise<void>((resolve) => setTimeout(resolve, 2000))
+            .then(() => doFetch())
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.ok && data.results) {
+                setEeatResult({ results: data.results });
+                lastEeatInputRef.current = { title, content };
+              } else {
+                setEeatError(data.error || "No results (after retry)");
+              }
+            })
+            .catch((retryErr) => {
+              setEeatError(retryErr instanceof Error ? retryErr.message : "Request failed (after retry)");
+            });
+        } else {
+          setEeatError(firstErr instanceof Error ? firstErr.message : "Request failed");
+        }
       })
-      .finally(() => setHistoryLoading(false));
-  }, [generated]);
+      .finally(() => setEeatLoading(false));
+  }, [contextResult?.pipelineResult, editing?.content, editing?.title, eeatLoading]);
+
+  // Keep a snapshot of current editing for use in debounced E-E-A-T re-run
+  useEffect(() => {
+    if (editing) {
+      editingSnapshotRef.current = { title: editing.title, content: editing.content };
+    }
+  }, [editing?.title, editing?.content]);
+
+  // Re-run E-E-A-T when user edits title or content (debounced); no LLM tokens, Python only
+  useEffect(() => {
+    if (!editing?.content || eeatLoading) return;
+    const last = lastEeatInputRef.current;
+    if (last == null) return; // only re-run after we've had a successful run
+    if (editing.title === last.title && editing.content === last.content) return;
+    const t = setTimeout(() => {
+      const current = editingSnapshotRef.current;
+      if (!current.content) return;
+      if (lastEeatInputRef.current?.title === current.title && lastEeatInputRef.current?.content === current.content) return;
+      setEeatLoading(true);
+      setEeatError(null);
+      fetch("/api/content-audit/quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: current.title,
+          content: current.content,
+          html: current.content,
+        }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.ok && data.results) {
+            setEeatResult({ results: data.results });
+            lastEeatInputRef.current = current;
+          } else {
+            setEeatError(data.error || "No results");
+          }
+        })
+        .catch((e) => {
+          setEeatError(e instanceof Error ? e.message : "Request failed");
+        })
+        .finally(() => setEeatLoading(false));
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [editing?.title, editing?.content, eeatLoading]);
+
+  // Clear E-E-A-T result when user changes title variant so they can re-run with new title
+  const prevTitleIndexRef = useRef(selectedTitleIndex);
+  useEffect(() => {
+    if (prevTitleIndexRef.current !== selectedTitleIndex && pipelineResult) {
+      setEeatResult(null);
+      lastEeatInputRef.current = null;
+      prevTitleIndexRef.current = selectedTitleIndex;
+    } else {
+      prevTitleIndexRef.current = selectedTitleIndex;
+    }
+  }, [selectedTitleIndex, pipelineResult]);
 
   const seoAudit = useMemo(() => {
     if (!editing) return null;
-    if (pipelineResult?.auditResult) {
-      return pipelineResult.auditResult as ReturnType<typeof auditArticle>;
-    }
     try {
       return auditArticle({
         title: editing.title,
@@ -256,7 +677,30 @@ export default function BlogMakerPage() {
         publishable: false,
       };
     }
-  }, [editing, keywords, generationInput.keywords, pipelineResult?.auditResult]);
+  }, [editing, keywords, generationInput.keywords]);
+
+  /** Check if E-E-A-T has critical failures that should warn on the publishable badge. */
+  const eeatHasCriticalIssues = useMemo(() => {
+    if (!eeatResult?.results) return false;
+    const r = eeatResult.results;
+    // Critical: experience score 0, very low data density, or repetitive sentence starts
+    const expFail = !isEeatError(r.experience_signals) && r.experience_signals && r.experience_signals.score === 0;
+    const lazyFail = !isEeatError(r.lazy_phrasing) && r.lazy_phrasing && r.lazy_phrasing.score >= 8;
+    const sentenceFail = !isEeatError(r.sentence_starts) && r.sentence_starts && r.sentence_starts.is_repetitive;
+    const dataDensityFail = !isEeatError(r.data_density) && r.data_density && r.data_density.density_score < 0.3;
+    return Boolean(expFail || lazyFail || sentenceFail || dataDensityFail);
+  }, [eeatResult]);
+
+  /** Combined health: green/amber/red considering SEO + Quality + E-E-A-T. */
+  const combinedHealth = useMemo<{ color: "green" | "amber" | "red"; label: string }>(() => {
+    if (!seoAudit) return { color: "amber", label: "Waiting for audit" };
+    const seoOk = seoAudit.publishable;
+    const hasHallucinations = (pipelineResult?.factCheck?.hallucinations?.length ?? 0) > 0;
+    const eeatOk = eeatResult?.results ? !eeatHasCriticalIssues : true; // no E-E-A-T data = neutral
+    if (seoOk && !hasHallucinations && eeatOk) return { color: "green", label: "All checks pass" };
+    if (!seoOk || hasHallucinations) return { color: "red", label: "Fix issues before publishing" };
+    return { color: "amber", label: "E-E-A-T needs attention" };
+  }, [seoAudit, pipelineResult?.factCheck?.hallucinations, eeatResult, eeatHasCriticalIssues]);
 
   async function handleCopyForWordPress() {
     if (!editing?.content) return;
@@ -286,6 +730,42 @@ export default function BlogMakerPage() {
     }
   }
 
+  async function handleRunEeatAudit() {
+    if (!editing?.content) return;
+    setEeatLoading(true);
+    setEeatError(null);
+    try {
+      const res = await fetch("/api/content-audit/quality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          title: editing.title,
+          content: editing.content,
+          html: editing.content,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setEeatError(data.error || data.detail || "Audit failed");
+        setEeatResult(null);
+        return;
+      }
+      if (data.ok && data.results) {
+        setEeatResult({ results: data.results });
+        if (editing) lastEeatInputRef.current = { title: editing.title, content: editing.content };
+      } else {
+        setEeatError(data.error || "No results");
+        setEeatResult(null);
+      }
+    } catch (e) {
+      setEeatError(e instanceof Error ? e.message : "Request failed");
+      setEeatResult(null);
+    } finally {
+      setEeatLoading(false);
+    }
+  }
+
   function handleGenerate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus({ type: null, message: "" });
@@ -294,6 +774,8 @@ export default function BlogMakerPage() {
       peopleAlsoSearchFor,
       intent: intent.length > 0 ? intent : ["informational"],
       competitorUrls,
+      wordCountPreset,
+      ...(wordCountPreset === "custom" && typeof wordCountCustom === "number" && wordCountCustom >= 500 && wordCountCustom <= 6000 && { wordCountCustom }),
     });
     setContentView("preview");
   }
@@ -304,10 +786,10 @@ export default function BlogMakerPage() {
       <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
-            Blog Maker
+            Content Writer
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Enter a keyword to generate an SEO-optimized post. Competitor URLs are found automatically.
+            Google Search Central + Rank Math optimized content. Enter a keyword to generate.
           </p>
         </div>
         {generated ? (
@@ -319,12 +801,19 @@ export default function BlogMakerPage() {
               const current = editing;
               clearResult();
               setSampleOutput(null);
+              setSampleResult(null);
               setEditing(null);
               if (current && current.title !== SAMPLE_OUTPUT.title) {
+                const focusKeyword = generationInput.keywords[0] ?? keywords[0] ?? undefined;
+                const generationTimeMs = pipelineResult?.generationTimeMs;
                 fetch("/api/blog/history", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(current),
+                  body: JSON.stringify({
+                    ...current,
+                    focusKeyword,
+                    ...(typeof generationTimeMs === "number" && { generationTimeMs }),
+                  }),
                   credentials: "include",
                 }).catch(() => {});
               }
@@ -334,24 +823,7 @@ export default function BlogMakerPage() {
             <ArrowLeft className="mr-1.5 h-4 w-4" />
             Start over
           </Button>
-        ) : (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              setKeywords(["medical spa SEO", "aesthetic practice marketing"]);
-              setPeopleAlsoSearchFor(["how long for SEO results", "medical spa blog"]);
-              setIntent(["informational"]);
-              setSampleOutput(SAMPLE_OUTPUT);
-              setEditing({ ...SAMPLE_OUTPUT });
-              setContentView("preview");
-            }}
-            className="shrink-0 border-border text-muted-foreground hover:text-foreground"
-          >
-            View sample output
-          </Button>
-        )}
+        ) : null}
       </header>
 
       {(status.type || generationError) && (
@@ -396,173 +868,164 @@ export default function BlogMakerPage() {
           className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
         >
           {generating && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/95 animate-in fade-in duration-200 backdrop-blur-sm">
-              <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-              <p className="mt-5 text-sm font-medium text-muted-foreground">
-                Generating your post…
-              </p>
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5 bg-background/95 animate-in fade-in duration-200 backdrop-blur-sm">
+              <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+              <div className="w-full max-w-sm space-y-3 px-6">
+                <p className="text-center text-sm font-medium text-foreground">
+                  {generationProgress?.message || "Starting pipeline..."}
+                </p>
+                {/* Progress bar */}
+                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-orange-500 transition-all duration-500 ease-out"
+                    style={{ width: `${generationProgress?.progress ?? 2}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>
+                    {generationProgress
+                      ? `${Math.round((generationProgress.elapsedMs || 0) / 1000)}s elapsed`
+                      : "Initializing..."}
+                  </span>
+                  <span>{generationProgress?.progress ?? 0}%</span>
+                </div>
+              </div>
             </div>
           )}
 
           <div className="space-y-0">
-            {/* Keywords & PASF */}
-            <section className="grid gap-8 p-8 sm:grid-cols-2 sm:p-10">
+            {/* Keywords, People also search for, Search intent, Word count — single flat section, no nested boxes */}
+            <section className="p-8 sm:p-10 space-y-10">
               <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-medium text-foreground">
-                    Keywords
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Primary focus. First keyword is most important. Max 6.
-                  </p>
-                </div>
+                <h3 className="text-sm font-medium text-foreground">Keywords</h3>
+                <p className="text-sm text-muted-foreground">Primary focus. First keyword is most important. Max 6.</p>
                 <TagInput
                   tags={keywords}
                   onTagsChange={setKeywords}
                   placeholder="Add a keyword, press Enter"
                   maxTags={6}
                   disabled={generating}
-                  className="min-h-12 rounded-2xl bg-background px-4 py-3"
+                  className="min-h-11 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
                 />
               </div>
+
               <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-medium text-foreground">
-                    People also search for
-                  </h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Related phrases for FAQs. Max 3.
-                  </p>
-                </div>
+                <h3 className="text-sm font-medium text-foreground">People also search for</h3>
+                <p className="text-sm text-muted-foreground">Related phrases for FAQs. Max 3.</p>
                 <TagInput
                   tags={peopleAlsoSearchFor}
                   onTagsChange={setPeopleAlsoSearchFor}
                   placeholder="Add a phrase, press Enter"
                   maxTags={3}
                   disabled={generating}
-                  className="min-h-12 rounded-2xl bg-background px-4 py-3"
+                  className="min-h-11 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
                 />
               </div>
-            </section>
 
-            {/* Search intent */}
-            <section className="space-y-6 border-t border-border/50 p-8 sm:p-10">
-              <div>
-                <h3 className="text-sm font-medium text-foreground">
-                  Search intent
-                </h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Select one or more to shape tone and structure
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {INTENT_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className={`inline-flex cursor-pointer items-center rounded-full px-5 py-2.5 text-sm font-medium transition-all duration-200 ${
-                      intent.includes(opt.value)
-                        ? "bg-orange-600 text-white shadow-md shadow-orange-500/20 dark:bg-orange-500 dark:shadow-orange-400/20"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    } ${generating ? "pointer-events-none opacity-60" : ""}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={intent.includes(opt.value)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setIntent([...intent, opt.value]);
-                        } else {
-                          setIntent(intent.filter((i) => i !== opt.value));
-                        }
-                      }}
-                      className="sr-only"
-                    />
-                    {opt.label}
-                  </label>
-                ))}
-              </div>
-            </section>
-
-            {/* Advanced: optional competitor URLs override */}
-            <section className="border-t border-border/50 p-8 sm:p-10">
-              <button
-                type="button"
-                onClick={() => setAdvancedOpen((o) => !o)}
-                className="flex w-full items-center justify-between text-left text-sm font-medium text-foreground"
-              >
-                Advanced
-                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${advancedOpen ? "rotate-180" : ""}`} />
-              </button>
-              {advancedOpen && (
-                <div className="mt-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Optional: paste competitor URLs to use instead of auto-found results. Leave empty to use automatic search.
-                  </p>
-                  <TagInput
-                    tags={competitorUrls}
-                    onTagsChange={setCompetitorUrls}
-                    placeholder="Paste URL, press Enter"
-                    maxTags={5}
-                    disabled={generating}
-                    className="min-h-12 rounded-2xl bg-background px-4 py-3"
-                  />
+              <div className="space-y-3 pt-2">
+                <h3 className="text-sm font-medium text-foreground">Search intent</h3>
+                <p className="text-sm text-muted-foreground">Select one or more to shape tone and structure.</p>
+                <div className="flex flex-wrap gap-2">
+                  {INTENT_OPTIONS.map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`inline-flex cursor-pointer items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        intent.includes(opt.value)
+                          ? "bg-orange-600 text-white dark:bg-orange-500"
+                          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      } ${generating ? "pointer-events-none opacity-60" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={intent.includes(opt.value)}
+                        onChange={(e) => {
+                          if (e.target.checked) setIntent([...intent, opt.value]);
+                          else setIntent(intent.filter((i) => i !== opt.value));
+                        }}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
                 </div>
-              )}
+              </div>
+
+              <div className="space-y-3 border-t border-border/50 pt-8">
+                <h3 className="text-sm font-medium text-foreground">Word count</h3>
+                <p className="text-sm text-muted-foreground">Guideline only — value and answering the query over length. Aim to provide more value than competitors.</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(
+                    [
+                      { value: "auto", label: "Auto", sub: "From competitors" },
+                      { value: "concise", label: "Concise", sub: "≈1k–1.5k" },
+                      { value: "standard", label: "Standard", sub: "≈1.5k–2.5k" },
+                      { value: "in_depth", label: "In-depth", sub: "≈2.5k–4k" },
+                      { value: "custom", label: "Custom", sub: "" },
+                    ] as const
+                  ).map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                        wordCountPreset === opt.value
+                          ? "bg-orange-600 text-white dark:bg-orange-500"
+                          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      } ${generating ? "pointer-events-none opacity-60" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name="wordCountPreset"
+                        value={opt.value}
+                        checked={wordCountPreset === opt.value}
+                        onChange={() => setWordCountPreset(opt.value)}
+                        disabled={generating}
+                        className="sr-only"
+                      />
+                      <span>{opt.label}</span>
+                      {opt.sub && <span className="opacity-90 text-xs">({opt.sub})</span>}
+                    </label>
+                  ))}
+                  {wordCountPreset === "custom" && (
+                    <>
+                      <Input
+                        type="number"
+                        min={500}
+                        max={6000}
+                        placeholder="e.g. 2000"
+                        value={wordCountCustom === "" ? "" : wordCountCustom}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setWordCountCustom(v === "" ? "" : Math.min(6000, Math.max(500, Number(v) || 500)));
+                        }}
+                        disabled={generating}
+                        className="h-10 w-28 rounded-xl border border-border bg-background text-sm"
+                      />
+                      <span className="text-sm text-muted-foreground">words</span>
+                    </>
+                  )}
+                </div>
+              </div>
             </section>
 
-            {/* Submit: Recent button (same size as Generate post) opposite Generate post */}
+            {/* Submit: View sample output (same size as Generate post) opposite Generate post */}
             <section className="flex flex-wrap items-center justify-between gap-6 border-t border-border/50 p-8 sm:p-10">
-              <div className="relative shrink-0" ref={recentRef}>
-                <Button
-                  type="button"
-                  onClick={() => setRecentOpen((o) => !o)}
-                  variant="outline"
-                  className="h-12 rounded-full border-2 border-border px-8 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
-                >
-                  <History className="mr-2 h-4 w-4" />
-                  Recent
-                  <ChevronDown className={`ml-2 h-4 w-4 transition-transform ${recentOpen ? "rotate-180" : ""}`} />
-                </Button>
-                {recentOpen && (
-                  <div className="absolute left-full top-1/2 z-50 ml-2 w-80 -translate-y-1/2 rounded-xl border border-border bg-card py-2 shadow-lg">
-                    {historyLoading ? (
-                      <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>
-                    ) : historyError === "auth" ? (
-                      <p className="px-4 py-3 text-sm text-muted-foreground">Sign in to see recent posts.</p>
-                    ) : historyError === "config" ? (
-                      <p className="px-4 py-3 text-sm text-muted-foreground">History not available. Check .env.local and SETUP.md.</p>
-                    ) : historyError === "error" ? (
-                      <p className="px-4 py-3 text-sm text-muted-foreground">Could not load history.</p>
-                    ) : history.length === 0 ? (
-                      <p className="px-4 py-3 text-sm text-muted-foreground leading-snug">No recent posts. Generate a post and click Start over to save it here.</p>
-                    ) : (
-                      <ul className="max-h-64 overflow-y-auto">
-                        {history.map((entry) => (
-                          <li key={entry.id}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const content = historyEntryToContent(entry);
-                                clearResult();
-                                setSampleOutput(content);
-                                setEditing(content);
-                                setContentView("preview");
-                                setRecentOpen(false);
-                              }}
-                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted/50"
-                            >
-                              <span className="font-medium text-foreground line-clamp-1">
-                                {entry.title.length > 55 ? `${entry.title.slice(0, 55)}…` : entry.title}
-                              </span>
-                              <span className="block text-xs text-muted-foreground">{relativeTime(entry.created_at)}</span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  clearResult();
+                  setKeywords(SAMPLE_INPUT.keywords);
+                  setPeopleAlsoSearchFor(SAMPLE_INPUT.peopleAlsoSearchFor);
+                  setIntent(SAMPLE_INPUT.intent as IntentType[]);
+                  setSampleResult(SAMPLE_RESULT);
+                  const initial = pipelineToGenerated(SAMPLE_PIPELINE_RESULT, 0);
+                  setSampleOutput(initial);
+                  setEditing({ ...initial });
+                  setContentView("preview");
+                }}
+                className="h-12 shrink-0 rounded-full border-2 border-border px-8 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
+              >
+                View sample output
+              </Button>
               <Button
                 type="submit"
                 disabled={generating || keywords.length === 0}
@@ -579,25 +1042,51 @@ export default function BlogMakerPage() {
           <div className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr] lg:items-stretch">
             {/* Left: outline column. Right: content column. Both columns match height; content box ends where outline ends. */}
             <aside className="order-1 flex min-w-0 flex-col gap-4 lg:order-none">
-              {/* SEO Audit – Google Search Central (developers.google.com/search/docs) – show first */}
+              {/* Combined health indicator */}
               {editing && seoAudit && (
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      SEO Audit
-                    </p>
-                    <a
-                      href="https://developers.google.com/search/docs"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground"
-                    >
-                      Google Search Central
-                      <ExternalLink className="h-3 w-3" />
-                    </a>
-                  </div>
-                  <div className="p-4">
-                    <div className="mb-4 flex flex-wrap items-baseline gap-2">
+                <div
+                  className={`flex items-center gap-2.5 rounded-xl px-4 py-2.5 text-[12px] font-medium ${
+                    combinedHealth.color === "green"
+                      ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+                      : combinedHealth.color === "red"
+                        ? "bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200"
+                        : "bg-amber-50 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                      combinedHealth.color === "green"
+                        ? "bg-emerald-500"
+                        : combinedHealth.color === "red"
+                          ? "bg-red-500"
+                          : "bg-amber-500"
+                    }`}
+                  />
+                  <span>{combinedHealth.label}</span>
+                  <span className="ml-auto text-[10px] font-normal opacity-70">
+                    SEO {seoAudit.score}%
+                    {pipelineResult?.factCheck ? ` · ${pipelineResult.factCheck.hallucinations.length} halluc.` : ""}
+                    {eeatResult?.results ? ` · E-E-A-T ${eeatHasCriticalIssues ? "warn" : "ok"}` : ""}
+                  </span>
+                </div>
+              )}
+              {/* SEO Audit — Google Search Central + Rank Math compliance */}
+              {editing && seoAudit && (
+                <div className="flex h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-foreground">Google &amp; Rank Math Audit</h3>
+                      <a
+                        href="https://developers.google.com/search/docs/fundamentals/creating-helpful-content"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted-foreground hover:text-foreground"
+                        title="Google Search Central — Helpful Content"
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                       <span
                         className={`text-2xl font-bold tabular-nums ${
                           seoAudit.publishable
@@ -609,234 +1098,348 @@ export default function BlogMakerPage() {
                       >
                         {seoAudit.score}%
                       </span>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground">
                         {seoAudit.summary.pass} pass · {seoAudit.summary.warn} warn · {seoAudit.summary.fail} fail
                       </span>
-                      {seoAudit.publishable ? (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                      {seoAudit.publishable && !eeatHasCriticalIssues ? (
+                        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
                           Publishable
                         </span>
+                      ) : seoAudit.publishable && eeatHasCriticalIssues ? (
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                          E-E-A-T review needed
+                        </span>
                       ) : (
-                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                          {seoAudit.score < MIN_PUBLISH_SCORE
-                            ? `Below ${MIN_PUBLISH_SCORE}% — fix before publishing`
-                            : "Fix critical issues before publishing"}
+                        <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                          Below {MIN_PUBLISH_SCORE}% — fix before publishing
                         </span>
                       )}
                     </div>
-                    {(seoAudit.items.some((i) => i.id === "ai-phrases" && (i.severity === "warn" || i.severity === "fail")) ||
-                      seoAudit.items.some((i) => i.id === "ai-typography" && (i.severity === "warn" || i.severity === "fail"))) && (
-                      <p className="mb-3 text-[11px] text-muted-foreground">
-                        Replace flagged phrases and em-dashes/curly quotes. Target under 30% AI detection.
-                      </p>
-                    )}
-                    <ul className="space-y-2">
-                      {[...seoAudit.items]
-                        .sort((a, b) => {
-                          const aiItems = ["ai-phrases", "ai-typography"];
-                          const aAi = aiItems.includes(a.id ?? "") && (a.severity === "warn" || a.severity === "fail");
-                          const bAi = aiItems.includes(b.id ?? "") && (b.severity === "warn" || b.severity === "fail");
-                          if (aAi && !bAi) return -1;
-                          if (!aAi && bAi) return 1;
-                          return 0;
-                        })
-                        .map((item) => {
-                        const Icon =
-                          item.severity === "pass"
-                            ? CheckCircle2
-                            : item.severity === "warn"
-                              ? AlertTriangle
-                              : XCircle;
-                        const iconClass =
-                          item.severity === "pass"
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : item.severity === "warn"
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-red-600 dark:text-red-400";
-                        return (
-                          <li
-                            key={item.id}
-                            className="flex gap-2 rounded-lg bg-muted/30 px-2.5 py-2"
-                          >
-                            <Icon className={`h-4 w-4 shrink-0 ${iconClass}`} />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-medium text-foreground">
-                                {item.label}
+                    <div className="flex rounded-lg bg-muted/60 p-0.5">
+                      {(["all", "correct", "issues"] as const).map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setAuditListFilter(f)}
+                          className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                            auditListFilter === f
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {f === "all" ? "All" : f === "correct" ? "Correct" : "Issues"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {(() => {
+                      const SEO_CATEGORY_ORDER = ["google", "rankmath", "editorial", "other"] as const;
+                      const SEO_CATEGORY_LABELS: Record<string, string> = {
+                        google: "Google",
+                        rankmath: "Rank Math",
+                        editorial: "Writing Quality",
+                        other: "Others",
+                      };
+                      const getCategory = (item: AuditItem): string =>
+                        item.source === "google" || item.source === "rankmath" || item.source === "editorial"
+                          ? item.source
+                          : "other";
+                      const filtered = [...seoAudit.items].filter((item) => {
+                        if (auditListFilter === "correct") return item.severity === "pass";
+                        if (auditListFilter === "issues") return item.severity === "warn" || item.severity === "fail";
+                        return true;
+                      });
+                      const byCategory = new Map<string, AuditItem[]>();
+                      for (const item of filtered) {
+                        const cat = getCategory(item);
+                        if (!byCategory.has(cat)) byCategory.set(cat, []);
+                        byCategory.get(cat)!.push(item);
+                      }
+                      return (
+                        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-5">
+                          {SEO_CATEGORY_ORDER.filter((cat) => (byCategory.get(cat)?.length ?? 0) > 0).map((cat) => (
+                            <div key={cat} className="space-y-1.5">
+                              <p className="sticky top-0 z-10 bg-card/95 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground backdrop-blur-sm">
+                                {SEO_CATEGORY_LABELS[cat]}
                               </p>
-                              <p className="mt-0.5 text-[11px] text-muted-foreground">
-                                {item.message}
-                              </p>
-                              {item.guideline && (
-                                <p className="mt-1 text-[10px] text-muted-foreground/80">
-                                  {item.guideline}
-                                </p>
-                              )}
+                              <ul className="space-y-3">
+                                {byCategory.get(cat)!.map((item, idx) => {
+                                  const Icon =
+                                    item.severity === "pass"
+                                      ? CheckCircle2
+                                      : item.severity === "warn"
+                                        ? AlertTriangle
+                                        : XCircle;
+                                  const iconClass =
+                                    item.severity === "pass"
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : item.severity === "warn"
+                                        ? "text-amber-600 dark:text-amber-400"
+                                        : "text-red-600 dark:text-red-400";
+                                  const isIssue = item.severity === "warn" || item.severity === "fail";
+                                  const isAllView = auditListFilter === "all";
+                                  const showCorrective = auditListFilter === "issues" && isIssue;
+                                  const allViewIssueOnly = isAllView && isIssue;
+                                  return (
+                                    <li
+                                      key={`${cat}-${item.id}-${idx}`}
+                                      className={`flex gap-3 rounded-xl px-3 py-2.5 ${
+                                        isIssue
+                                          ? "bg-amber-50/60 dark:bg-amber-950/20"
+                                          : "bg-muted/30 dark:bg-muted/20"
+                                      }`}
+                                    >
+                                      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconClass}`} />
+                                      <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                                        {!allViewIssueOnly && (
+                                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{item.message}</p>
+                                        )}
+                                        {showCorrective && (item.guideline || item.message) && (
+                                          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                                            <span className="font-medium text-amber-900 dark:text-amber-100">What to correct: </span>
+                                            {item.guideline ?? item.message}
+                                          </p>
+                                        )}
+                                        {!showCorrective && !isAllView && item.guideline && (
+                                          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{item.guideline}</p>
+                                        )}
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
                             </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                </div>
+              )}
+
+
+              {/* Quality checks — fact verification + FAQ compliance */}
+              {(pipelineResult?.faqEnforcement || pipelineResult?.factCheck) && (
+                <div className="flex h-[280px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
+                    <h3 className="text-sm font-semibold text-foreground">Content Integrity</h3>
+                    <p className="text-[11px] text-muted-foreground">FAQ compliance and fact verification against source data.</p>
+                    <div className="flex rounded-lg bg-muted/60 p-0.5">
+                      {(["all", "correct", "issues"] as const).map((f) => (
+                        <button
+                          key={f}
+                          type="button"
+                          onClick={() => setQualityListFilter(f)}
+                          className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                            qualityListFilter === f
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {f === "all" ? "All" : f === "correct" ? "Correct" : "Issues"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-5">
+                    {pipelineResult.faqEnforcement && (qualityListFilter === "all" ||
+                      (qualityListFilter === "correct" && pipelineResult.faqEnforcement.passed) ||
+                      (qualityListFilter === "issues" && !pipelineResult.faqEnforcement.passed)) && (
+                      <div
+                        className={`flex gap-3 rounded-xl px-3 py-2.5 ${
+                          !pipelineResult.faqEnforcement.passed ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
+                        }`}
+                      >
+                        {pipelineResult.faqEnforcement.passed ? (
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-foreground">FAQ character limit (300)</p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                            {pipelineResult.faqEnforcement.passed ? "All answers within limit." : `${pipelineResult.faqEnforcement.violations.length} answer(s) truncated.`}
+                          </p>
+                          {qualityListFilter === "issues" && pipelineResult.faqEnforcement.violations.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
+                              {pipelineResult.faqEnforcement.violations.map((v, i) => (
+                                <li key={i}>{v.question?.slice(0, 50)}… ({v.charCount} chars)</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {pipelineResult.factCheck && (qualityListFilter === "all" ||
+                      (qualityListFilter === "correct" && pipelineResult.factCheck.verified) ||
+                      (qualityListFilter === "issues" && !pipelineResult.factCheck.verified)) && (
+                      <div
+                        className={`flex gap-3 rounded-xl px-3 py-2.5 ${
+                          !pipelineResult.factCheck.verified ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
+                        }`}
+                      >
+                        {pipelineResult.factCheck.verified ? (
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        ) : (
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-foreground">Fact check vs sources</p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                            {pipelineResult.factCheck.verified ? "Verified against sources." : `${pipelineResult.factCheck.hallucinations.length} potential hallucination(s).`}
+                          </p>
+                          {qualityListFilter === "issues" && pipelineResult.factCheck.hallucinations.length > 0 && (
+                            <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
+                              {pipelineResult.factCheck.hallucinations.map((h, i) => (
+                                <li key={i}>{h}</li>
+                              ))}
+                            </ul>
+                          )}
+                          {qualityListFilter === "issues" && (pipelineResult.factCheck.skippedRhetorical?.length ?? 0) > 0 && (
+                            <p className="mt-1 text-[10px] text-muted-foreground">Skipped (rhetorical): {pipelineResult.factCheck.skippedRhetorical!.slice(0, 3).join(", ")}{pipelineResult.factCheck.skippedRhetorical!.length > 3 ? "…" : ""}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Topic coverage (pipeline v3) */}
-              {pipelineResult?.topicScoreReport && (
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Topic coverage
-                    </p>
-                    <span
-                      className={`text-sm font-bold tabular-nums ${
-                        pipelineResult.topicScoreReport.overallScore >= 75
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : pipelineResult.topicScoreReport.overallScore >= 50
-                            ? "text-amber-600 dark:text-amber-400"
-                            : "text-red-600 dark:text-red-400"
-                      }`}
-                    >
-                      {pipelineResult.topicScoreReport.overallScore}/100
-                    </span>
+              {/* E-E-A-T & Content Quality — Google quality rater guidelines */}
+              {editing?.content && (
+                <div
+                  className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${
+                    eeatResult?.results || eeatError || eeatLoading ? "h-[440px]" : "h-[200px]"
+                  }`}
+                >
+                  <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
+                    <h3 className="text-sm font-semibold text-foreground">E-E-A-T &amp; Content Quality</h3>
+                    <p className="text-[11px] text-muted-foreground">Google quality rater signals: experience, expertise, readability, structure.</p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-1 rounded-lg bg-muted/60 p-0.5">
+                        {(["all", "correct", "issues"] as const).map((f) => (
+                          <button
+                            key={f}
+                            type="button"
+                            onClick={() => setEeatListFilter(f)}
+                            className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
+                              eeatListFilter === f
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            {f === "all" ? "All" : f === "correct" ? "Correct" : "Issues"}
+                          </button>
+                        ))}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={eeatLoading}
+                        onClick={handleRunEeatAudit}
+                        className="h-8 shrink-0 rounded-lg px-3 text-[11px] font-medium"
+                      >
+                        {eeatLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Run audit"}
+                      </Button>
+                    </div>
                   </div>
-                  <ul className="space-y-1.5 p-4">
-                    {pipelineResult.topicScoreReport.topicScores.map((t, i) => (
-                      <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-muted/30 px-2.5 py-2">
-                        <span className="min-w-0 truncate text-xs text-foreground">{t.topic}</span>
-                        <span
-                          className={`shrink-0 text-xs font-medium ${
-                            t.score >= 75 ? "text-emerald-600" : t.score >= 50 ? "text-amber-600" : "text-red-600"
-                          }`}
-                        >
-                          {t.score}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                  {pipelineResult.topicScoreReport.gapTopics.length > 0 && (
-                    <div className="border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
-                      Gaps auto-filled where possible. Review recommended actions in the report.
+                  <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-5">
+                    {eeatError && (
+                      <p className="rounded-xl bg-red-50 px-3 py-2 text-[11px] text-red-700 dark:bg-red-950/50 dark:text-red-200">
+                        {eeatError}
+                      </p>
+                    )}
+                    {eeatResult?.results && (
+                      <EeatResultsDisplay results={eeatResult.results} open={eeatListFilter === "issues"} filter={eeatListFilter} />
+                    )}
+                    {!eeatResult && !eeatError && !eeatLoading && (
+                      <p className="text-[11px] text-muted-foreground">Click &quot;Run audit&quot; to analyze this article against Google quality rater guidelines.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Strategy (from brief) + Outline drift */}
+              {(pipelineResult?.briefSummary || pipelineResult?.outlineDrift) && (
+                <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <button
+                    type="button"
+                    onClick={() => setStrategyOpen((o) => !o)}
+                    className="flex items-center justify-between border-b border-border px-4 py-3 text-left hover:bg-muted/30"
+                  >
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Strategy & outline</h3>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {pipelineResult.outlineDrift?.passed ? "Outline matches brief." : pipelineResult.outlineDrift?.missing?.length
+                          ? `${pipelineResult.outlineDrift.missing.length} expected H2(s) missing.`
+                          : "Differentiation and outline check."}
+                      </p>
+                    </div>
+                    <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${strategyOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {strategyOpen && (
+                    <div className="min-h-0 space-y-3 overflow-y-auto p-4 pr-5">
+                      {pipelineResult.briefSummary && (
+                        <>
+                          {pipelineResult.briefSummary.similaritySummary && (
+                            <div>
+                              <p className="text-[11px] font-medium text-foreground">What top results cover</p>
+                              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{pipelineResult.briefSummary.similaritySummary}</p>
+                            </div>
+                          )}
+                          {(pipelineResult.briefSummary.extraValueThemes?.length ?? 0) > 0 && (
+                            <div>
+                              <p className="text-[11px] font-medium text-foreground">Extra value to include</p>
+                              <ul className="mt-1 list-inside list-disc space-y-0.5 text-[11px] text-muted-foreground">
+                                {pipelineResult.briefSummary.extraValueThemes!.map((t, i) => (
+                                  <li key={i}>{t}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                          {pipelineResult.briefSummary.freshnessNote && (
+                            <div>
+                              <p className="text-[11px] font-medium text-foreground">Freshness</p>
+                              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{pipelineResult.briefSummary.freshnessNote}</p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      {pipelineResult.outlineDrift && !pipelineResult.outlineDrift.passed && pipelineResult.outlineDrift.missing.length > 0 && (
+                        <div className="rounded-lg bg-amber-50/60 px-3 py-2 dark:bg-amber-950/20">
+                          <p className="text-[11px] font-medium text-amber-800 dark:text-amber-200">Outline drift (non-blocking)</p>
+                          <p className="mt-0.5 text-[11px] text-muted-foreground">Expected H2(s) not in draft: {pipelineResult.outlineDrift.missing.join(", ")}</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {(generationInput.keywords.length > 0 || generationInput.peopleAlsoSearchFor.length > 0) && (
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="border-b border-border px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Generated from
-                    </p>
-                  </div>
-                  <div className="space-y-4 p-4">
-                    {generationInput.keywords.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Keywords
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {generationInput.keywords.map((k, i) => (
-                            <span
-                              key={i}
-                              className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
-                            >
-                              {k}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {generationInput.peopleAlsoSearchFor.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          People also search for
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {generationInput.peopleAlsoSearchFor.map((p, i) => (
-                            <span
-                              key={i}
-                              className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
-                            >
-                              {p}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {generationInput.intent.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Intent
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {generationInput.intent.map((i) => (
-                            <span
-                              key={i}
-                              className="inline-flex items-center rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground"
-                            >
-                              {INTENT_OPTIONS.find((o) => o.value === i)?.label ?? i}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                <div className="border-b border-border px-4 py-3">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Outline
-                  </p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">
-                    Section headings; edit as needed.
-                  </p>
-                </div>
-                <div className="space-y-3 p-4">
-                  {editing.outline.map((item, index) => (
-                    <div key={index} className="flex gap-3">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted/60 text-xs font-semibold tabular-nums text-foreground">
-                        {index + 1}
-                      </span>
-                      <Textarea
-                        value={item}
-                        onChange={(e) => {
-                          const newOutline = [...editing.outline];
-                          newOutline[index] = e.target.value;
-                          setEditing({ ...editing, outline: newOutline });
-                        }}
-                        rows={2}
-                        className="min-h-[2.5rem] flex-1 resize-y rounded-xl border-border bg-background text-xs leading-snug"
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
-
               {/* Source URLs (pipeline v3) */}
               {pipelineResult?.sourceUrls && pipelineResult.sourceUrls.length > 0 && (
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                <div className="flex h-[180px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                   <div className="border-b border-border px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Sources used in this article
-                    </p>
+                    <h3 className="text-sm font-semibold text-foreground">Sources used in this article</h3>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">URLs referenced during research and fact-check.</p>
                   </div>
-                  <ul className="max-h-40 space-y-1 overflow-y-auto p-4">
-                    {pipelineResult.sourceUrls.slice(0, 15).map((url, i) => (
-                      <li key={i}>
+                  <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4 pr-5">
+                    {pipelineResult.sourceUrls.slice(0, 20).map((url, i) => (
+                      <li key={i} className="flex items-center gap-2 rounded-lg bg-muted/20 px-2.5 py-1.5">
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                         <a
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="truncate text-xs text-orange-600 underline hover:no-underline dark:text-orange-400"
+                          className="min-w-0 truncate text-[11px] text-orange-600 underline decoration-orange-300 hover:decoration-orange-500 dark:text-orange-400 dark:decoration-orange-600 dark:hover:decoration-orange-400"
                         >
                           {url}
                         </a>
                       </li>
                     ))}
-                    {pipelineResult.sourceUrls.length > 15 && (
-                      <li className="text-[11px] text-muted-foreground">+{pipelineResult.sourceUrls.length - 15} more</li>
+                    {pipelineResult.sourceUrls.length > 20 && (
+                      <li className="py-1 text-[11px] text-muted-foreground">+{pipelineResult.sourceUrls.length - 20} more</li>
                     )}
                   </ul>
                 </div>
@@ -846,29 +1449,39 @@ export default function BlogMakerPage() {
               {pipelineResult?.schemaMarkup && (
                 <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
                   <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Schema markup
-                    </p>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Schema markup</h3>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">JSON-LD for search results. Injected by CMS on publish.</p>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setSchemaOpen((o) => !o)}
-                      className="text-xs font-medium text-muted-foreground hover:text-foreground"
+                      className="rounded-lg border border-border bg-muted/50 px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted"
                     >
-                      {schemaOpen ? "Hide" : "Show"}
+                      {schemaOpen ? "Hide" : "Show"} JSON
                     </button>
                   </div>
                   <div className="p-4">
-                    <p className="mb-2 text-[11px] text-muted-foreground">
-                      Article ✓ · FAQ {pipelineResult.schemaMarkup.faq ? "✓" : "✗"} · Breadcrumb ✓
-                      {pipelineResult.schemaMarkup.faqSchemaNote ? (
-                        <span className="ml-1" title={pipelineResult.schemaMarkup.faqSchemaNote}>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                        <Check className="h-3.5 w-3.5" /> Article
+                      </span>
+                      <span className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium ${pipelineResult.schemaMarkup.faq ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200" : "bg-muted/70 text-muted-foreground"}`}>
+                        {pipelineResult.schemaMarkup.faq ? <Check className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
+                        FAQ
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-medium text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200">
+                        <Check className="h-3.5 w-3.5" /> Breadcrumb
+                      </span>
+                      {pipelineResult.schemaMarkup.faqSchemaNote && (
+                        <span className="text-[10px] text-muted-foreground" title={pipelineResult.schemaMarkup.faqSchemaNote}>
                           (i)
                         </span>
-                      ) : null}
-                    </p>
+                      )}
+                    </div>
                     {schemaOpen && (
-                      <div className="mt-2 rounded-lg bg-muted/50 p-3">
-                        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all text-[10px] text-foreground">
+                      <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
+                        <pre className="max-h-52 overflow-auto whitespace-pre-wrap break-all rounded-lg bg-background p-3 text-[10px] leading-relaxed text-foreground">
                           {JSON.stringify(
                             {
                               article: pipelineResult.schemaMarkup.article,
@@ -884,7 +1497,7 @@ export default function BlogMakerPage() {
                           type="button"
                           variant="outline"
                           size="sm"
-                          className="mt-2 h-8 text-xs"
+                          className="mt-2 h-8 gap-1.5 rounded-lg text-xs"
                           onClick={() => {
                             const sm = pipelineResult.schemaMarkup;
                             if (!sm) return;
@@ -901,365 +1514,294 @@ export default function BlogMakerPage() {
                             navigator.clipboard.writeText(json).then(() => setStatus({ type: "success", message: "Schema copied" }));
                           }}
                         >
-                          <Copy className="mr-1.5 h-3.5 w-3.5" />
+                          <Copy className="h-3.5 w-3.5" />
                           Copy schema
                         </Button>
                       </div>
                     )}
-                    <p className="mt-2 text-[10px] text-muted-foreground">
-                      Injected by CMS on publish.
-                    </p>
                   </div>
                 </div>
               )}
 
-              {/* Quality checks (v4.1: content integrity, FAQ enforcement, fact check) */}
-              {(pipelineResult?.contentIntegrity || pipelineResult?.faqEnforcement || pipelineResult?.factCheck) && (
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="flex items-center justify-between border-b border-border px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Quality checks
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setQualityChecksOpen((o) => !o)}
-                      className="text-xs font-medium text-muted-foreground hover:text-foreground"
-                    >
-                      {qualityChecksOpen ? "Hide" : "Show"}
-                    </button>
-                  </div>
-                  <div className="p-4 space-y-3">
-                    {pipelineResult.contentIntegrity && (
-                      <div className="rounded-lg bg-muted/30 px-3 py-2">
-                        <p className="text-[11px] font-medium text-muted-foreground">Content integrity (post-humanize)</p>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-xs">
-                          {pipelineResult.contentIntegrity.passed ? (
-                            <span className="text-emerald-600 dark:text-emerald-400">✓ Passed</span>
-                          ) : (
-                            <span className="text-amber-600 dark:text-amber-400">
-                              ⚠ {pipelineResult.contentIntegrity.issues.length} issue{pipelineResult.contentIntegrity.issues.length !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                          {pipelineResult.contentIntegrity.restorations?.length > 0 && (
-                            <span className="text-[10px] text-muted-foreground">({pipelineResult.contentIntegrity.restorations.length} restored)</span>
-                          )}
-                        </p>
-                        {qualityChecksOpen && pipelineResult.contentIntegrity.issues.length > 0 && (
-                          <ul className="mt-2 max-h-32 overflow-y-auto space-y-1 text-[11px] text-muted-foreground list-disc list-inside">
-                            {pipelineResult.contentIntegrity.issues.map((issue, i) => (
-                              <li key={i}>{issue}</li>
-                            ))}
-                          </ul>
-                        )}
-                        {qualityChecksOpen && ((pipelineResult.contentIntegrity.restorations?.length ?? 0) > 0) && (
-                          <>
-                            <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">Restorations:</p>
-                            <ul className="mt-0.5 max-h-24 overflow-y-auto space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
-                              {pipelineResult.contentIntegrity.restorations!.map((r, i) => (
-                                <li key={i}>{r}</li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
-                        {qualityChecksOpen && ((pipelineResult.contentIntegrity.postRestorationIssues?.length ?? 0) > 0) && (
-                          <>
-                            <p className="mt-1.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">Post-restoration issues:</p>
-                            <ul className="mt-0.5 max-h-24 overflow-y-auto space-y-0.5 text-[11px] list-disc list-inside">
-                              {pipelineResult.contentIntegrity.postRestorationIssues!.map((issue, i) => (
-                                <li key={i}>{issue}</li>
-                              ))}
-                            </ul>
-                          </>
-                        )}
-                      </div>
-                    )}
-                    {pipelineResult.faqEnforcement && (
-                      <div className="rounded-lg bg-muted/30 px-3 py-2">
-                        <p className="text-[11px] font-medium text-muted-foreground" title="FAQ answers over 300 characters are auto-truncated to stay within limit">
-                          FAQ character limit (300)
-                        </p>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-xs">
-                          {pipelineResult.faqEnforcement.passed ? (
-                            <span className="text-emerald-600 dark:text-emerald-400">✓ Passed</span>
-                          ) : (
-                            <span className="text-amber-600 dark:text-amber-400" title="Answers were shortened to 300 chars in the final content">
-                              ⚠ {pipelineResult.faqEnforcement.violations.length} answer(s) truncated
-                            </span>
-                          )}
-                        </p>
-                        {qualityChecksOpen && pipelineResult.faqEnforcement.violations.length > 0 && (
-                          <ul className="mt-2 max-h-24 overflow-y-auto space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
-                            {pipelineResult.faqEnforcement.violations.map((v, i) => (
-                              <li key={i}>{v.question?.slice(0, 50)}… ({v.charCount} chars)</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    )}
-                    {pipelineResult.factCheck && (
-                      <div className="rounded-lg bg-muted/30 px-3 py-2">
-                        <p className="text-[11px] font-medium text-muted-foreground">Fact check vs sources</p>
-                        <p className="mt-0.5 flex items-center gap-1.5 text-xs">
-                          {pipelineResult.factCheck.verified ? (
-                            <span className="text-emerald-600 dark:text-emerald-400">✓ Verified</span>
-                          ) : (
-                            <span className="text-amber-600 dark:text-amber-400">
-                              ⚠ {pipelineResult.factCheck.hallucinations.length} potential hallucination{pipelineResult.factCheck.hallucinations.length !== 1 ? "s" : ""}
-                            </span>
-                          )}
-                        </p>
-                        {qualityChecksOpen && pipelineResult.factCheck.hallucinations.length > 0 && (
-                          <ul className="mt-2 max-h-32 overflow-y-auto space-y-1 text-[11px] text-muted-foreground list-disc list-inside">
-                            {pipelineResult.factCheck.hallucinations.map((h, i) => (
-                              <li key={i}>{h}</li>
-                            ))}
-                          </ul>
-                        )}
-                        {qualityChecksOpen && ((pipelineResult.factCheck.skippedRhetorical?.length ?? 0) > 0) && (
-                          <>
-                            <p className="mt-1.5 text-[11px] font-medium text-muted-foreground" title="Numbers in comparative or approximate phrasing (e.g. “nearly X”, “top 5”) — not flagged as hallucinations">
-                              Skipped (rhetorical):
-                            </p>
-                            <ul className="mt-0.5 max-h-20 overflow-y-auto space-y-0.5 text-[10px] text-muted-foreground list-disc list-inside">
-                              {pipelineResult.factCheck.skippedRhetorical!.slice(0, 5).map((s, i) => (
-                                <li key={i}>{s}</li>
-                              ))}
-                              {pipelineResult.factCheck.skippedRhetorical!.length > 5 && (
-                                <li>+{pipelineResult.factCheck.skippedRhetorical!.length - 5} more</li>
-                              )}
-                            </ul>
-                          </>
-                        )}
-                      </div>
-                    )}
-                    <p className="text-[10px] text-muted-foreground">
-                      Pipeline runs these after humanize and audit. Review issues before publish.
-                    </p>
-                  </div>
-                </div>
-              )}
+              <p className="shrink-0 rounded-xl border border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+                Images, image alts, and external/internal links are added in your CMS when you publish.
+              </p>
             </aside>
 
             {/* Right: Content panel – absolute wrapper so row height = outline only; content box ends exactly where outline ends */}
             <div className="order-2 relative min-h-0 min-w-0 lg:order-none">
               <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              {/* Title / Meta variant selector (pipeline v3) */}
+              {/* Choose title & meta – compact list with accent selection */}
               {pipelineResult && pipelineResult.titleMetaVariants.length > 1 && (
-                <div className="shrink-0 border-b border-border p-4">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Choose title & meta (pick one)
-                  </p>
-                  <div className="flex flex-wrap gap-3">
-                    {pipelineResult.titleMetaVariants.map((v, i) => (
-                      <button
-                        key={i}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTitleIndex(i);
-                          const content = pipelineToGenerated(pipelineResult, i);
-                          setEditing((prev) => (prev ? { ...prev, title: content.title, metaDescription: content.metaDescription } : null));
-                        }}
-                        className={`max-w-[280px] rounded-xl border-2 p-3 text-left transition-all ${
-                          selectedTitleIndex === i
-                            ? "border-orange-500 bg-orange-50/50 dark:bg-orange-950/30 dark:border-orange-400"
-                            : "border-border bg-muted/30 hover:border-muted-foreground/30"
-                        }`}
-                      >
-                        <p className="text-xs font-medium text-muted-foreground">{v.approach}</p>
-                        <p className="mt-1 line-clamp-2 text-sm font-medium text-foreground">{v.title}</p>
-                        <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{v.metaDescription}</p>
-                      </button>
-                    ))}
+                <div className="shrink-0 px-4 pt-4">
+                  <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                    <div className="px-4 pt-4 pb-2">
+                      <h3 className="text-sm font-semibold text-foreground">Choose title & meta</h3>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        Select one of {pipelineResult.titleMetaVariants.length} options (2×2 grid) for your article title and meta description.
+                      </p>
+                    </div>
+                    <div className="px-4 pb-4">
+                      <ul className="grid grid-cols-2 gap-3" role="listbox" aria-label="Title and meta options (2×2 grid)">
+                        {pipelineResult.titleMetaVariants.map((v, i) => {
+                          const source = v.approach.includes(" — ") ? v.approach.split(" — ")[0] : v.approach;
+                          const guideline = v.approach.includes(" — ") ? v.approach.slice(source.length + 3) : undefined;
+                          const isSelected = selectedTitleIndex === i;
+                          return (
+                            <li key={i}>
+                              <button
+                                type="button"
+                                role="option"
+                                aria-selected={isSelected}
+                                onClick={() => {
+                                  if (sampleResult) {
+                                    setSampleResult((prev) => (prev ? { ...prev, selectedTitleIndex: i } : null));
+                                  } else {
+                                    setSelectedTitleIndex(i);
+                                  }
+                                  const content = pipelineToGenerated(pipelineResult, i);
+                                  setEditing((prev) => (prev ? { ...prev, title: content.title, metaDescription: content.metaDescription } : null));
+                                }}
+                                className={`w-full rounded-xl border-2 text-left transition-all duration-200 ${
+                                  isSelected
+                                    ? "border-orange-500 bg-orange-50/80 shadow-sm dark:border-orange-400 dark:bg-orange-950/40"
+                                    : "border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/30 dark:bg-muted/10 dark:hover:bg-muted/20"
+                                }`}
+                              >
+                                <div className="relative p-3.5">
+                                  {isSelected && (
+                                    <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white dark:bg-orange-400" aria-hidden>
+                                      <Check className="h-3 w-3" />
+                                    </span>
+                                  )}
+                                  <p className={`text-[10px] font-semibold uppercase tracking-wider ${isSelected ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"}`}>
+                                    {source}
+                                  </p>
+                                  <p className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-foreground pr-7" title={v.title}>
+                                    {v.title}
+                                  </p>
+                                  {guideline && (
+                                    <p className="mt-1 line-clamp-1 text-[10px] text-muted-foreground" title={guideline}>
+                                      {guideline}
+                                    </p>
+                                  )}
+                                </div>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* Meta – header bar + fields with inline copy */}
-              <div className="shrink-0 flex flex-col border-b border-border">
-                <div className="flex items-center px-4 py-3 bg-muted/30">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Meta</span>
-                </div>
-                <div className="space-y-5 p-4">
-                  {/* Title */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <label htmlFor="edit-title" className="text-sm font-medium text-foreground">Title</label>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ${
-                          editing.title.length > SEO.TITLE_MAX_CHARS
-                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {editing.title.length}/{SEO.TITLE_MAX_CHARS}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="edit-title"
-                        value={editing.title}
-                        onChange={(e) => setEditing({ ...editing, title: e.target.value })}
-                        className="h-10 rounded-lg border-border bg-background pr-10 text-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopyMetaField("title")}
-                        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-md p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        title="Copy title"
-                      >
-                        {metaCopyField === "title" ? (
-                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
+              {/* Meta – editable title, meta description, slug in a single card */}
+              <div className="shrink-0 px-4 py-4">
+                <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                  <div className="px-4 pt-4 pb-2">
+                    <h3 className="text-sm font-semibold text-foreground">Meta</h3>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">Edit and copy title, meta description, and URL slug.</p>
                   </div>
+                  <div className="p-4 space-y-4">
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
+                      {/* Title */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label htmlFor="edit-title" className="text-xs font-medium text-foreground">Title</label>
+                          <span
+                            className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums ${
+                              editing.title.length > SEO.TITLE_MAX_CHARS
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {editing.title.length}/{SEO.TITLE_MAX_CHARS}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <Input
+                            id="edit-title"
+                            value={editing.title}
+                            onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                            className="h-10 rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyMetaField("title")}
+                            className="absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                            title="Copy title"
+                          >
+                            {metaCopyField === "title" ? (
+                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
 
-                  {/* Meta description */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <label htmlFor="edit-meta" className="text-sm font-medium text-foreground">Meta description</label>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums ${
-                          editing.metaDescription.length > SEO.META_DESCRIPTION_MAX_CHARS
-                            ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {editing.metaDescription.length}/{SEO.META_DESCRIPTION_MAX_CHARS}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <Textarea
-                        id="edit-meta"
-                        value={editing.metaDescription}
-                        onChange={(e) => setEditing({ ...editing, metaDescription: e.target.value })}
-                        rows={2}
-                        className="min-h-[3.5rem] resize-y rounded-lg border-border bg-background pr-10 text-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopyMetaField("metaDescription")}
-                        className="absolute right-2 top-2 h-8 w-8 rounded-md p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        title="Copy meta description"
-                      >
-                        {metaCopyField === "metaDescription" ? (
-                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
+                      {/* URL slug – same row as Title on md */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <label htmlFor="edit-slug" className="text-xs font-medium text-foreground">URL slug</label>
+                          <span className="shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                            {(editing.suggestedSlug ?? "").length}/75
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <Input
+                            id="edit-slug"
+                            value={editing.suggestedSlug ?? ""}
+                            onChange={(e) => setEditing({ ...editing, suggestedSlug: e.target.value })}
+                            className="h-10 rounded-xl border-border bg-muted/20 font-mono text-sm pr-10 focus:bg-background"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyMetaField("slug")}
+                            className="absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                            title="Copy URL slug"
+                          >
+                            {metaCopyField === "slug" ? (
+                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
 
-                  {/* URL slug */}
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <label htmlFor="edit-slug" className="text-sm font-medium text-foreground">URL slug</label>
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-                        {(editing.suggestedSlug ?? "").length}/75
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <Input
-                        id="edit-slug"
-                        value={editing.suggestedSlug ?? ""}
-                        onChange={(e) => setEditing({ ...editing, suggestedSlug: e.target.value })}
-                        className="h-10 rounded-lg border-border bg-background font-mono pr-10 text-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleCopyMetaField("slug")}
-                        className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 rounded-md p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        title="Copy URL slug"
-                      >
-                        {metaCopyField === "slug" ? (
-                          <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
+                      {/* Meta description – full width */}
+                      <div className="space-y-1.5 md:col-span-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <label htmlFor="edit-meta" className="text-xs font-medium text-foreground">Meta description</label>
+                          <span
+                            className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums ${
+                              editing.metaDescription.length > SEO.META_DESCRIPTION_MAX_CHARS
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {editing.metaDescription.length}/{SEO.META_DESCRIPTION_MAX_CHARS}
+                          </span>
+                        </div>
+                        <div className="relative">
+                          <Textarea
+                            id="edit-meta"
+                            value={editing.metaDescription}
+                            onChange={(e) => setEditing({ ...editing, metaDescription: e.target.value })}
+                            rows={2}
+                            className="min-h-[3.25rem] resize-y rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopyMetaField("metaDescription")}
+                            className="absolute right-2 top-2.5 h-8 w-8 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                            title="Copy meta description"
+                          >
+                            {metaCopyField === "metaDescription" ? (
+                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                            ) : (
+                              <Copy className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Content – view switcher + actions; redesigned toolbar */}
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="shrink-0 flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border bg-muted/30 px-4 py-3">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Content</span>
-                  <div className="flex items-center gap-3">
-                    <div className="flex rounded-lg bg-background shadow-sm ring-1 ring-border/60" role="group" aria-label="View mode">
-                      {[
-                        { id: "preview" as const, label: "Preview", icon: Eye },
-                        { id: "text" as const, label: "Text", icon: FileText },
-                      ].map(({ id, label, icon: Icon }) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => setContentView(id)}
-                          className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md ${
-                            contentView === id
-                              ? "bg-muted text-foreground shadow-sm"
-                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                          }`}
+              {/* Content – card with tabs + preview/outline box */}
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="shrink-0 flex flex-col gap-3 border-b border-border px-4 py-3">
+                    <h3 className="text-sm font-semibold text-foreground">Content</h3>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex rounded-lg bg-muted/60 p-0.5" role="group" aria-label="View mode">
+                        {[
+                          { id: "preview" as const, label: "Preview", icon: Eye },
+                          { id: "outline" as const, label: "Outline", icon: FileText },
+                        ].map(({ id, label, icon: Icon }) => (
+                          <button
+                            key={id}
+                            type="button"
+                            onClick={() => setContentView(id)}
+                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors ${
+                              contentView === id
+                                ? "bg-background text-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <Icon className="h-3.5 w-3.5" />
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            if (pipelineResult) {
+                              setEditing(pipelineToGenerated(pipelineResult, selectedTitleIndex));
+                            } else {
+                              setEditing({ ...generated! });
+                            }
+                          }}
+                          className="h-8 rounded-lg border-border bg-background px-3 text-[11px] font-medium"
                         >
-                          <Icon className="h-3.5 w-3.5" />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                    <span className="h-5 w-px bg-border" aria-hidden />
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          if (pipelineResult) {
-                            setEditing(pipelineToGenerated(pipelineResult, selectedTitleIndex));
-                          } else {
-                            setEditing({ ...generated! });
-                          }
-                        }}
-                        className="h-8 rounded-lg border-border bg-background px-3 text-xs font-medium"
-                      >
-                        Reset edits
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleCopyForWordPress}
-                        className="h-8 rounded-lg bg-orange-600 px-3 text-xs font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
-                      >
-                        <Copy className="mr-1.5 h-3.5 w-3.5" />
-                        {copyFeedback ? "Copied!" : "Copy for WordPress"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-                {/* Content box: fills remaining height so it ends where outline ends; scroll inside. Consistent gap around nested card. */}
-                <div className="min-h-[320px] flex-1 overflow-y-auto p-4">
-                  {contentView === "preview" && (
-                    <div className="rounded-2xl border border-border bg-background shadow-sm">
-                      <div
-                        className="prose prose-sm dark:prose-invert max-w-none px-5 py-4 text-foreground"
-                        dangerouslySetInnerHTML={{ __html: editing.content || "<p>(No content)</p>" }}
-                      />
-                    </div>
-                  )}
-                  {contentView === "text" && (
-                    <div className="rounded-2xl border border-border bg-background px-5 py-4 shadow-sm">
-                      <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-                        {htmlToPlainText(editing.content) || "(No content)"}
+                          Reset edits
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleCopyForWordPress}
+                          className="h-8 rounded-lg bg-orange-600 px-3 text-[11px] font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                        >
+                          <Copy className="mr-1.5 h-3.5 w-3.5" />
+                          {copyFeedback ? "Copied!" : "Copy for WordPress"}
+                        </Button>
                       </div>
                     </div>
-                  )}
+                  </div>
+                  <div className="min-h-[280px] flex-1 overflow-y-auto p-4">
+                    {contentView === "preview" && (
+                      <div className="rounded-xl border border-border bg-background">
+                        <div
+                          className="prose prose-sm dark:prose-invert max-w-none px-5 py-4 text-foreground"
+                          dangerouslySetInnerHTML={{ __html: editing.content || "<p>(No content)</p>" }}
+                        />
+                      </div>
+                    )}
+                    {contentView === "outline" && (
+                      <div className="space-y-3">
+                        <p className="text-[11px] text-muted-foreground">Section headings; edit as needed.</p>
+                        {editing.outline.map((item, index) => (
+                          <div key={index} className="flex gap-3 rounded-xl border border-border bg-muted/10 p-3">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-xs font-semibold tabular-nums text-orange-800 dark:bg-orange-900/50 dark:text-orange-200">
+                              {index + 1}
+                            </span>
+                            <Textarea
+                              value={item}
+                              onChange={(e) => {
+                                const newOutline = [...editing.outline];
+                                newOutline[index] = e.target.value;
+                                setEditing({ ...editing, outline: newOutline });
+                              }}
+                              rows={2}
+                              className="min-h-[2.25rem] flex-1 resize-y rounded-lg border-border bg-background text-sm leading-snug"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               </div>

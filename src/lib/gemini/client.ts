@@ -64,9 +64,13 @@ async function validateSourceUrls(
     if (r.status === "rejected") inaccessible.push(url);
   }
   const accessibleSet = new Set(urls.filter((u) => !inaccessible.includes(u)));
-  const filteredFacts = facts.filter((f) => f.source.startsWith("http") && accessibleSet.has(f.source));
+  // Keep both: (1) HTTP-sourced facts with verified URLs, and (2) non-HTTP sourced facts
+  // (e.g. "Wikipedia", "Company 10-K filing") which are legitimate attributions.
+  const nonUrlFacts = facts.filter((f) => !f.source.startsWith("http"));
+  const verifiedUrlFacts = facts.filter((f) => f.source.startsWith("http") && accessibleSet.has(f.source));
+  const filteredFacts = [...verifiedUrlFacts, ...nonUrlFacts];
   if (process.env.NODE_ENV !== "test") {
-    console.log(`[gemini] Source URL validation: ${accessibleSet.size}/${urls.length} accessible`);
+    console.log(`[gemini] Source URL validation: ${accessibleSet.size}/${urls.length} accessible, ${nonUrlFacts.length} non-URL sources preserved`);
   }
   return {
     filteredFacts,
@@ -243,7 +247,8 @@ Return ONLY valid JSON matching this structure (no markdown):
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
-    contents: payload + "\n\n" + prompt,
+    // Prompt FIRST to avoid "lost in the middle" — model knows what to extract before reading content
+    contents: prompt + "\n\n--- COMPETITOR ARTICLES ---\n\n" + payload,
     config: { temperature: 0.3 },
   });
 

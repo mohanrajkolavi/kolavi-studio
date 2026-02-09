@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileEdit, FileSearch, Loader2 } from "lucide-react";
+import { LayoutDashboard, Users, FileEdit, FileSearch, History, Loader2 } from "lucide-react";
 import { useBlogGenerationOptional } from "@/components/dashboard/BlogGenerationProvider";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/leads", label: "Leads", icon: Users },
-  { href: "/dashboard/blog", label: "Blog Maker", icon: FileEdit },
+  { href: "/dashboard/blog", label: "Content Writer", icon: FileEdit },
+  { href: "/dashboard/recent", label: "Recent", icon: History },
   { href: "/dashboard/content-maintenance", label: "Content", icon: FileSearch },
 ];
 
@@ -28,8 +29,8 @@ export function DashboardNavStrip() {
           safePath === item.href ||
           (item.href !== "/dashboard" && safePath.startsWith(item.href));
         const Icon = item.icon;
-        const isBlogMaker = item.href === "/dashboard/blog";
-        const showGenerating = isBlogMaker && isGenerating;
+        const isContentWriter = item.href === "/dashboard/blog";
+        const showGenerating = isContentWriter && isGenerating;
         return (
           <Link
             key={item.href}
@@ -41,14 +42,10 @@ export function DashboardNavStrip() {
             }`}
             aria-current={isActive ? "page" : undefined}
           >
-            {showGenerating ? (
-              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
-            ) : (
-              <Icon className="h-4 w-4 shrink-0" aria-hidden />
-            )}
+            <Icon className="h-4 w-4 shrink-0" aria-hidden />
             {item.label}
             {showGenerating && (
-              <span className="ml-1 text-xs opacity-90">Generating…</span>
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
             )}
           </Link>
         );
