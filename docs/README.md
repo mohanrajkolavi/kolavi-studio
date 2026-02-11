@@ -33,6 +33,7 @@ Index for project documentation and guides.
 
 | Doc | Description |
 |-----|-------------|
+| [WORKFLOW.md](WORKFLOW.md) | Pipeline workflow, steps, providers, error handling, retries |
 | [blog/BLOG_SYSTEM_AUDIT.md](blog/BLOG_SYSTEM_AUDIT.md) | Blog generator, humanize, article audit vs Google/Rank Math; pipeline alignment |
 | [blog/blog-maker-guidelines-comparison.md](blog/blog-maker-guidelines-comparison.md) | Google vs Rank Math guidelines; priority and resolution |
 

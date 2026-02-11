@@ -194,13 +194,30 @@ export default function RecentPage() {
               : "Generate a post in Content Writer and it will automatically appear here."
           }
           action={
-            <Link
-              href="/dashboard/blog"
-              className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
-            >
-              <Sparkles className="h-4 w-4" />
-              Go to Content Writer
-            </Link>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              {error === "error" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setError(null);
+                    loadEntries();
+                  }}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Try again
+                </Button>
+              )}
+              <Link
+                href="/dashboard/blog"
+                className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+              >
+                <Sparkles className="h-4 w-4" />
+                Go to Content Writer
+              </Link>
+            </div>
           }
         />
       </div>
@@ -356,9 +373,12 @@ export default function RecentPage() {
                   className="border-b border-border/30 transition-colors last:border-0 hover:bg-muted/30"
                 >
                   <td className="px-6 py-5">
-                    <span className="text-[15px] font-medium leading-relaxed text-foreground line-clamp-2">
+                    <Link
+                      href={`/dashboard/blog?historyId=${entry.id}`}
+                      className="text-[15px] font-medium leading-relaxed text-foreground line-clamp-2 hover:underline underline-offset-2"
+                    >
                       {entry.title}
-                    </span>
+                    </Link>
                   </td>
                   <td className="px-6 py-5">
                     {entry.focus_keyword ? (

@@ -92,6 +92,18 @@ function extractHeadings(html: string): { level: number; text: string }[] {
   return out;
 }
 
+/** Extract H2 headings from article HTML in order (for outline drift check; no need for Claude to generate outline). */
+export function extractH2sFromHtml(html: string): string[] {
+  const re = /<h2[^>]*>([\s\S]*?)<\/h2>/gi;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const text = stripHtml(m[1]).trim();
+    if (text) out.push(text);
+  }
+  return out;
+}
+
 function getParagraphs(html: string): string[] {
   const fragment = html.replace(/<p[^>]*>/gi, "\n<p>").replace(/<\/p>/gi, "</p>\n");
   const raw = fragment.split(/\n/).filter((s) => s.trim().length > 0);
@@ -157,13 +169,13 @@ function auditAiTypography(plainText: string): AuditItem[] {
     return [
       {
         id: "ai-typography",
-        severity: total >= 2 ? "fail" : "warn",
-        level: total >= 2 ? 1 : 2,
+        severity: "fail",
+        level: 1,
         source: "editorial",
         label: "Typography (editorial)",
-        message: `Replace: ${examples}. Use straight quotes (" ') and commas/colons instead of em-dash.`,
+        message: `Replace: ${examples}. Use straight quotes (" ') and commas/colons instead of em-dash. Even one instance fails.`,
         value: total,
-        guideline: "Editorial standard: use straight quotes and standard punctuation for clean, web-ready content.",
+        guideline: "No em-dash, en-dash, or curly quotes. Straight quotes and standard punctuation only.",
       },
     ];
   }
@@ -175,6 +187,43 @@ function auditAiTypography(plainText: string): AuditItem[] {
       source: "editorial",
       label: "Typography (editorial)",
       message: "No em-dash or curly quotes detected.",
+    },
+  ];
+}
+
+/** Excessive symbols often used by AI: multiple !!, ellipses (...), decorative runs. Level 1 fail. */
+function auditExcessiveSymbols(plainText: string): AuditItem[] {
+  const issues: string[] = [];
+  const doubleExcl = (plainText.match(/!!+/g) || []).length;
+  if (doubleExcl > 0) {
+    issues.push(`Multiple exclamation marks (!! or !!!): ${doubleExcl} occurrence(s)`);
+  }
+  const ellipsis = (plainText.match(/\.{3,}/g) || []).length;
+  if (ellipsis > 2) {
+    issues.push(`Excessive ellipses (...): ${ellipsis} (max 2 allowed)`);
+  }
+  if (issues.length > 0) {
+    return [
+      {
+        id: "excessive-symbols",
+        severity: "fail",
+        level: 1,
+        source: "editorial",
+        label: "Excessive symbols",
+        message: issues.join(". "),
+        value: issues.length,
+        guideline: "Use single punctuation. No !! or !!!; avoid repeated ellipses (...).",
+      },
+    ];
+  }
+  return [
+    {
+      id: "excessive-symbols",
+      severity: "pass",
+      level: 2,
+      source: "editorial",
+      label: "Excessive symbols",
+      message: "No excessive punctuation detected.",
     },
   ];
 }
@@ -858,43 +907,6 @@ function auditRankMathSubheadingKeyword(html: string, focusKeyword: string | und
   return items;
 }
 
-/**
- * Content length — informational only, excluded from score.
- * Google cares about satisfying intent, not word count. Rank Math prefers 2500+ for 100%
- * but we don't penalize shorter articles that fully cover their topic.
- */
-function auditRankMathContentLength(plainText: string): AuditItem[] {
-  const items: AuditItem[] = [];
-  const wc = wordCount(plainText);
-  if (wc >= SEO.CONTENT_MIN_WORDS_PILLAR) {
-    items.push({
-      id: "rm-content-length",
-      severity: "pass",
-      level: 3,
-      source: "rankmath",
-      label: "Rank Math: Content length",
-      message: `${wc} words (2500+ = Rank Math 100%).`,
-      value: wc,
-      threshold: SEO.CONTENT_MIN_WORDS_PILLAR,
-    });
-  } else {
-    // Informational only — any length is fine if intent is satisfied.
-    // Shown as "pass" so it doesn't flag as an issue; excluded from score regardless.
-    items.push({
-      id: "rm-content-length",
-      severity: "pass",
-      level: 3,
-      source: "rankmath",
-      label: "Rank Math: Content length",
-      message: `${wc} words. Rank Math: 2500+ for 100%. Google: content length varies by topic — satisfy intent fully.`,
-      value: wc,
-      threshold: SEO.CONTENT_MIN_WORDS_PILLAR,
-      guideline: "Informational: Google does not penalize shorter content. Only add length if it serves the reader. Value over length; aim to provide more value than competitors.",
-    });
-  }
-  return items;
-}
-
 function auditRankMathTitleKeywordPosition(title: string, focusKeyword: string | undefined): AuditItem[] {
   const items: AuditItem[] = [];
   if (!focusKeyword?.trim() || !title.trim()) return items;
@@ -1038,169 +1050,6 @@ function extractFaqBlock(html: string): { questions: string[]; answers: string[]
     answers.push(text);
   }
   return { questions, answers };
-}
-
-/**
- * Post-humanization content integrity check. Compares pre vs post HTML for heading,
- * statistic, attribution, section count, word count, FAQ, and entity preservation.
- */
-export function verifyContentIntegrity(
-  preHumanizeHtml: string,
-  postHumanizeHtml: string
-): { passed: boolean; issues: string[] } {
-  const issues: string[] = [];
-  const preText = stripHtml(preHumanizeHtml);
-  const postText = stripHtml(postHumanizeHtml);
-
-  // 1. Heading integrity
-  const preHeadings = extractH2H3Text(preHumanizeHtml);
-  const postHeadings = extractH2H3Text(postHumanizeHtml);
-  if (preHeadings.length !== postHeadings.length) {
-    issues.push(
-      `HEADING COUNT: Original has ${preHeadings.length} H2/H3 sections, humanized has ${postHeadings.length}`
-    );
-  }
-  for (let i = 0; i < Math.min(preHeadings.length, postHeadings.length); i++) {
-    if (preHeadings[i] !== postHeadings[i]) {
-      issues.push(`HEADING ALTERED: "${preHeadings[i]}" changed to "${postHeadings[i]}"`);
-    }
-  }
-  if (postHeadings.length < preHeadings.length) {
-    for (let i = postHeadings.length; i < preHeadings.length; i++) {
-      issues.push(`HEADING MISSING: "${preHeadings[i]}" not found in humanized version`);
-    }
-  }
-
-  // 2. Statistic preservation
-  const preNums = extractNumbersFromText(preText);
-  const postNums = extractNumbersFromText(postText);
-  for (const n of preNums) {
-    if (!postNums.some((p) => p === n || p.includes(n) || n.includes(p))) {
-      issues.push(`STAT MISSING: "${n}" found in original but not in humanized version`);
-    }
-  }
-
-  // 3. Source attribution preservation
-  const preAttrib = extractAttributionPhrases(preText);
-  const postAttrib = extractAttributionPhrases(postText);
-  for (const a of preAttrib) {
-    const found = postAttrib.some((p) => p.toLowerCase().includes(a.toLowerCase().slice(0, 15)));
-    if (!found) {
-      issues.push(`ATTRIBUTION DROPPED: "${a}" not found in humanized version`);
-    }
-  }
-
-  // 4. Section count
-  const preH2 = (preHumanizeHtml.match(/<h2[^>]*>/gi) ?? []).length;
-  const postH2 = (postHumanizeHtml.match(/<h2[^>]*>/gi) ?? []).length;
-  const preH3 = (preHumanizeHtml.match(/<h3[^>]*>/gi) ?? []).length;
-  const postH3 = (postHumanizeHtml.match(/<h3[^>]*>/gi) ?? []).length;
-  if (preH2 !== postH2) issues.push(`SECTION LOST: Original has ${preH2} H2 sections, humanized has ${postH2}`);
-  if (preH3 !== postH3) issues.push(`SECTION LOST: Original has ${preH3} H3 sections, humanized has ${postH3}`);
-
-  // 5. Word count drift
-  const preWords = wordCount(preText);
-  const postWords = wordCount(postText);
-  const drift = preWords > 0 ? (postWords - preWords) / preWords : 0;
-  if (Math.abs(drift) > 0.05) {
-    const pct = (drift * 100).toFixed(1);
-    issues.push(
-      `WORD COUNT DRIFT: Original ${preWords} words, humanized ${postWords} words (${Number(pct) >= 0 ? "+" : ""}${pct}%) — exceeds ±5% tolerance`
-    );
-  }
-
-  // 6. FAQ preservation
-  const preFaq = extractFaqBlock(preHumanizeHtml);
-  const postFaq = extractFaqBlock(postHumanizeHtml);
-  if (preFaq.questions.length !== postFaq.questions.length) {
-    issues.push(
-      `FAQ QUESTION COUNT: Original has ${preFaq.questions.length}, humanized has ${postFaq.questions.length}`
-    );
-  }
-  for (let i = 0; i < Math.min(preFaq.questions.length, postFaq.questions.length); i++) {
-    if (preFaq.questions[i].trim() !== postFaq.questions[i].trim()) {
-      issues.push(`FAQ QUESTION CHANGED: "${preFaq.questions[i]}" became "${postFaq.questions[i]}"`);
-    }
-  }
-  for (let i = 0; i < postFaq.answers.length; i++) {
-    if (postFaq.answers[i].length > 300) {
-      issues.push(`FAQ ANSWER EXPANDED: Answer to question ${i + 1} is ${postFaq.answers[i].length} characters (limit: 300)`);
-    }
-  }
-
-  // 7. Entity preservation (simple: key numbers and attributions already checked; optional entity-name extraction)
-  // 8. Direct answer opening — soft check: first 60 words contain at least one key number or attribution from pre
-  const postFirst60 = postText.split(/\s+/).slice(0, 60).join(" ");
-  const preFirst60 = preText.split(/\s+/).slice(0, 60).join(" ");
-  const preNumsInOpening = preNums.filter((n) => preFirst60.includes(n));
-  if (preNumsInOpening.length > 0 && !preNumsInOpening.some((n) => postFirst60.includes(n))) {
-    issues.push("GEO OPENING WEAKENED: Key number(s) from original opening not found in first 60 words of humanized version");
-  }
-
-  return { passed: issues.length === 0, issues };
-}
-
-/**
- * Surgically restore damaged content from pre-humanized HTML. Does not retry humanization.
- */
-export function restoreContentIntegrity(
-  preHumanizeHtml: string,
-  postHumanizeHtml: string,
-  issues: string[]
-): { restoredHtml: string; restorations: string[] } {
-  const restorations: string[] = [];
-  let restored = postHumanizeHtml;
-
-  // Restore missing/altered headings
-  const preHeadings = extractH2H3Text(preHumanizeHtml);
-  const postHeadings = extractH2H3Text(postHumanizeHtml);
-  if (preHeadings.length !== postHeadings.length || preHeadings.some((h, i) => postHeadings[i] !== h)) {
-    const preH2Matches = [...preHumanizeHtml.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
-    const postH2Matches = [...restored.matchAll(/<h2[^>]*>([\s\S]*?)<\/h2>/gi)];
-    for (let i = 0; i < Math.min(preH2Matches.length, postH2Matches.length); i++) {
-      const preText = stripHtml(preH2Matches[i][1]).trim();
-      const postText = stripHtml(postH2Matches[i][1]).trim();
-      if (preText !== postText) {
-        restored = restored.replace(postH2Matches[i][0], preH2Matches[i][0]);
-        restorations.push(`Restored H2 heading: "${preText}"`);
-      }
-    }
-    const preH3Matches = [...preHumanizeHtml.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi)];
-    const postH3Matches = [...restored.matchAll(/<h3[^>]*>([\s\S]*?)<\/h3>/gi)];
-    for (let i = 0; i < Math.min(preH3Matches.length, postH3Matches.length); i++) {
-      const preText = stripHtml(preH3Matches[i][1]).trim();
-      const postText = stripHtml(postH3Matches[i][1]).trim();
-      if (preText !== postText) {
-        restored = restored.replace(postH3Matches[i][0], preH3Matches[i][0]);
-        restorations.push(`Restored H3 heading: "${preText}"`);
-      }
-    }
-  }
-
-  // Restore FAQ block if any answer was expanded or changed
-  const preFaq = extractFaqBlock(preHumanizeHtml);
-  const postFaq = extractFaqBlock(restored);
-  const faqNeedsRestore = issues.some((x) => x.includes("FAQ")) &&
-    (postFaq.answers.some((a, j) => a.length > 300 || (preFaq.answers[j] && preFaq.answers[j] !== a)));
-  if (faqNeedsRestore) {
-    const preFaqH2 = preHumanizeHtml.match(/<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i);
-    const postFaqH2 = restored.match(/<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i);
-    if (preFaqH2 && postFaqH2) {
-      const preStart = preHumanizeHtml.indexOf(preFaqH2[0]);
-      const afterPreFaq = preHumanizeHtml.slice(preStart + 1);
-      const preNextH2Match = afterPreFaq.match(/<h2[^>]*>/i);
-      const preEnd = preNextH2Match ? preStart + 1 + afterPreFaq.indexOf(preNextH2Match[0]) : preHumanizeHtml.length;
-      const preBlock = preHumanizeHtml.slice(preStart, preEnd);
-      const postStart = restored.indexOf(postFaqH2[0]);
-      const afterPostFaq = restored.slice(postStart + 1);
-      const postNextH2Match = afterPostFaq.match(/<h2[^>]*>/i);
-      const postEnd = postNextH2Match ? postStart + 1 + afterPostFaq.indexOf(postNextH2Match[0]) : restored.length;
-      restored = restored.slice(0, postStart) + preBlock + restored.slice(postEnd);
-      restorations.push("Restored full FAQ block from pre-humanized version");
-    }
-  }
-
-  return { restoredHtml: restored, restorations };
 }
 
 /**
@@ -1548,15 +1397,15 @@ export function auditArticle(
     // Level 2 — Ranking Killers (Google) — images/links skipped (added in WordPress)
     ...auditParagraphLength(input.content),
     ...auditSlug(input.slug),
-    // Level 2 — Editorial quality (typography + generic phrases)
+    // Level 1/2 — Editorial quality (typography + excessive symbols = L1 fail; generic phrases)
     ...auditAiTypography(plainContent),
+    ...auditExcessiveSymbols(plainContent),
     ...auditAiPhrases(plainContent),
     // Level 3 — Rank Math 100/100 (competitive; Google priority)
     ...auditRankMathMetaKeyword(input.metaDescription, input.focusKeyword),
     ...auditRankMathFirst10Percent(plainContent, input.focusKeyword),
     ...auditRankMathSlugKeyword(input.slug, input.focusKeyword),
     ...auditRankMathSubheadingKeyword(input.content, input.focusKeyword),
-    ...auditRankMathContentLength(plainContent),
     ...auditRankMathTitleKeywordPosition(input.title, input.focusKeyword),
     ...auditRankMathNumberInTitle(input.title),
     // Level 3 — Differentiation (optional; from brief extra-value themes)
@@ -1566,10 +1415,9 @@ export function auditArticle(
   const sorted = [...all].sort(byLevelThenSeverity);
 
   // Informational items excluded from score:
-  // - AI phrase checks (editorial source, except ai-typography which is a hard ban)
-  // - Content length (rm-content-length) — Google doesn't penalize shorter content
+  // - AI phrase checks (editorial source, except ai-typography and excessive-symbols which are hard bans)
   const scoreable = all.filter(
-    (i) => (i.source !== "editorial" || i.id === "ai-typography") && i.id !== "rm-content-length"
+    (i) => i.source !== "editorial" || i.id === "ai-typography" || i.id === "excessive-symbols"
   );
   const pass = scoreable.filter((i) => i.severity === "pass").length;
   const warn = scoreable.filter((i) => i.severity === "warn").length;
@@ -1598,6 +1446,39 @@ export function auditArticle(
     publishable,
     schemaMarkup,
   };
+}
+
+/**
+ * Audit rules for use in LLM prompts (generate meta). Ensures generated meta
+ * satisfies Google Search Central + Rank Math checks.
+ *
+ * References:
+ * - Google: developers.google.com/search/docs/appearance/title-link
+ * - Rank Math: rankmath.com/kb/score-100-in-tests, rankmath.com/blog/power-words
+ */
+export function getAuditRulesForPrompt(): string {
+  return `TITLE (Google + Rank Math):
+• Max 60 chars (Google truncates ~50–60; put important words first)
+• Primary keyword in FIRST 50% of title (Rank Math + Google)
+• Include a number when natural (e.g. "7 Tips", "5 Ways") — Rank Math: numbers improve CTR
+• One sentiment word: positive (amazing, proven, best, ultimate) OR negative (avoid, warning, mistake) — Rank Math: evokes emotion
+• One power word: guide, tips, how to, discover, ultimate, proven, essential, step-by-step — Rank Math: compels clicks
+• Descriptive, unique — avoid vague labels; match search intent
+• NO: em-dash (—), curly quotes (" "), keyword stuffing, all-caps
+
+META DESCRIPTION (Google + Rank Math):
+• 70–160 chars (Google typically displays ~155–160)
+• Primary keyword in first 120–160 chars (Rank Math 100/100)
+• Pitch-style: concise summary that convinces users to click; match page content
+• Soft CTA when natural: "Discover…", "Learn…", "Get…", "Find out…"
+• Unique per page; avoid boilerplate or duplicate descriptions
+• NO: misleading claims; generic filler; excessive punctuation
+
+SLUG (Google + Rank Math):
+• Max 75 chars; keep short for readability
+• Lowercase, hyphens only; alphanumeric + hyphens
+• Primary keyword present (core term or key phrase)
+• Omit stop words: a, the, of, and, in, to, for, with`;
 }
 
 /**

@@ -51,3 +51,33 @@ CREATE TABLE IF NOT EXISTS contact_rate_limit (
 );
 
 CREATE INDEX IF NOT EXISTS idx_contact_rate_limit_reset_at ON contact_rate_limit(reset_at);
+
+-- Pipeline jobs: persist content-writer jobs so retries work across restarts and serverless instances
+CREATE TABLE IF NOT EXISTS pipeline_jobs (
+  id TEXT PRIMARY KEY,
+  phase TEXT NOT NULL,
+  input JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  error_message TEXT,
+  pipeline_version TEXT NOT NULL,
+  chunk_records JSONB NOT NULL DEFAULT '{}'
+);
+
+CREATE INDEX IF NOT EXISTS idx_pipeline_jobs_created_at ON pipeline_jobs(created_at DESC);
+
+-- Blog generation history: last 10 generations for Recent page (Content Writer)
+CREATE TABLE IF NOT EXISTS blog_generation_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  focus_keyword TEXT,
+  title TEXT NOT NULL,
+  meta_description TEXT NOT NULL,
+  outline JSONB NOT NULL DEFAULT '[]',
+  content TEXT NOT NULL,
+  suggested_slug TEXT,
+  suggested_categories JSONB,
+  suggested_tags JSONB,
+  generation_time_ms INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_generation_history(created_at DESC);

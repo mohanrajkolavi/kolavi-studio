@@ -1,11 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { SEO } from "@/lib/constants";
 import { getBannedPhrasesForPrompt } from "@/lib/constants/banned-phrases";
+import { extractH2sFromHtml } from "@/lib/seo/article-audit";
 import type {
+  CurrentData,
+  HallucinationFix,
   ResearchBrief,
-  TitleMetaVariant,
+  TokenUsageRecord,
 } from "@/lib/pipeline/types";
 import { ClaudeDraftOutputSchema } from "@/lib/pipeline/types";
+import type { TitleMetaSlugOption } from "@/lib/openai/client";
 
 let _client: Anthropic | null = null;
 
@@ -151,18 +155,22 @@ Every article you write must pass Google's Helpful Content self-assessment:
 
 **5. Dense where it matters.** One paragraph crammed with data, next paragraph pure opinion, then an anecdote, then technical depth.
 
-## Typography (strict)
+## Typography (strict — enforced at audit; any violation fails)
 
-- No em-dash, en-dash, or curly quotes. Straight quotes and apostrophes only.
+- **ZERO em-dashes (—) or en-dashes (–).** At any cost do not use them. Use comma, colon, or period instead. Even one instance fails the publishability audit.
+- **ZERO curly/smart quotes.** Straight quotes (") and apostrophes (') only. Scan output and replace before returning.
+- **No excessive symbols.** AI often overuses: ellipses (...), multiple exclamation marks (!! or !!!), or decorative symbol runs. Use a single period or exclamation; avoid "..." — use a period or rephrase. Keep punctuation minimal and professional.
 - Reduce these phrases where natural: ${BANNED_PHRASES_PROMPT}
-- Don't start more than 2 sentences in a row the same way.
-- Vary paragraph length patterns.
+- Don't start more than 2 sentences in a row the same way. Vary paragraph length patterns.
+- No generic transitions: "Furthermore," "Additionally," "Moreover," "In addition," "It is worth noting," "Consequently," "In conclusion." Start the next thought directly or use "But," "Still," or a question.
 
 ## Rank Math SEO (non-negotiable)
 
-- Keyword in title (first 50%), meta description, slug, first 10% of content, at least one subheading.
-- Paragraphs: max 120 words. FAQ section for informational intent.
-- No keyword stuffing (density < 3%).
+- Keyword in first 10% of content and in at least one H2/H3. Paragraphs: max 120 words. FAQ section for informational intent.
+- No keyword stuffing (density < 3%). (Title, meta, slug are handled separately by another model.)
+
+## Structure (strict)
+- **Never output HTML table tags.** Do not use \`<table>\`, \`<tr>\`, \`<td>\`, or \`<th>\`. For any tabular or list-style content use \`<ul>\` or \`<ol>\` only. The frontend does not format tables.
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
@@ -384,7 +392,7 @@ export async function generateBlogPost(
 
   const prompt = `Write a blog post on "${primaryKeyword}" as a seasoned practitioner writing from experience. Not a summary. Not an overview. A practitioner's take with opinions, specifics, and the kind of detail only someone who's done this work would include.
 
-**Do NOT include:** image placeholders, internal links, external links, or Table of Contents. Those are added in the CMS. Author byline is added by the CMS.
+**Do NOT include:** image placeholders, internal links, external links, Table of Contents, or HTML table tags (frontend does not format tables — use bulleted or numbered lists instead). Those are added in the CMS. Author byline is added by the CMS.
 
 ## GOOGLE SEARCH CENTRAL — HELPFUL CONTENT
 - Does this provide original analysis and firsthand knowledge? → YES.
@@ -435,9 +443,10 @@ ${intentGuides.map((g) => `  - ${g}`).join("\n")}
 - Don't transition uniformly. No "Additionally," "Furthermore," "Moreover" patterns.
 - Confidence with honesty: strong claims followed by specific doubt.
 
-## TYPOGRAPHY (strict)
-- ZERO em-dashes (—) or en-dashes (–). Use comma, colon, period, or rewrite.
+## TYPOGRAPHY (strict — any violation fails audit)
+- ZERO em-dashes (—) or en-dashes (–). At any cost use comma, colon, period, or rewrite. No exceptions.
 - ZERO curly/smart quotes. Straight quotes (") and apostrophes (') only.
+- No excessive symbols: no repeated ellipses (...), no !! or !!!, no decorative symbol runs. Single punctuation only.
 
 ## OUTPUT FORMAT (valid JSON only)
 - Straight double quotes (") for JSON. Keep outline to 6-8 H2 headings.
@@ -472,7 +481,7 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
     const stream = anthropic.messages.stream({
       model: "claude-sonnet-4-5",
       max_tokens: 64000,
-      temperature: 0.9, // Higher temp = less probable token selection = higher perplexity
+      temperature: 0.5,
       system: SYSTEM_PROMPT_LEGACY,
       messages: [
         {
@@ -691,17 +700,26 @@ function removeTrailingCommas(jsonStr: string): string {
     .replace(/,(\s*})/g, "$1");
 }
 
+/** Read prompt/completion tokens from Claude message (stream or non-stream). */
+function getClaudeUsage(
+  message: { usage?: { input_tokens?: number | null; output_tokens?: number } }
+): { promptTokens: number; completionTokens: number } {
+  const u = message.usage;
+  const input = u?.input_tokens ?? 0;
+  const output = u?.output_tokens ?? 0;
+  return { promptTokens: typeof input === "number" ? input : 0, completionTokens: output };
+}
+
 /**
- * Write article draft from the strategic research brief only. Follows mandatory outline,
- * dynamic editorial style, uses ONLY provided current data. Returns 2-3 title/meta variants.
+ * Write article draft from the strategic research brief only. Title, meta, slug are provided
+ * (from OpenAI) — Claude outputs only content, categories, and tags.
  */
 export async function writeDraft(
-  brief: ResearchBrief
+  brief: ResearchBrief,
+  titleMetaSlug: TitleMetaSlugOption,
+  tokenUsage?: TokenUsageRecord[]
 ): Promise<{
-  titleMetaVariants: TitleMetaVariant[];
-  outline: string[];
   content: string;
-  suggestedSlug: string;
   suggestedCategories: string[];
   suggestedTags: string[];
 }> {
@@ -719,8 +737,8 @@ export async function writeDraft(
     : "\nWARNING: Current data may not be verified (no grounding sources). Use with caution and avoid stating these as confirmed facts.\n";
 
   const styleBlock = brief.editorialStyleFallback
-    ? `Use standard human-like style: avg sentence ~15 words, mix short/medium/long; avg paragraph ~3 sentences; semi-formal, direct address; 70% prose, 20% lists, 10% tables.`
-    : `Match this editorial style: Sentence length avg ${brief.editorialStyle.sentenceLength.average} words, distribution ${brief.editorialStyle.sentenceLength.distribution.short}% short / ${brief.editorialStyle.sentenceLength.distribution.medium}% medium / ${brief.editorialStyle.sentenceLength.distribution.long}% long / ${brief.editorialStyle.sentenceLength.distribution.veryLong}% very long. Paragraph avg ${brief.editorialStyle.paragraphLength.averageSentences} sentences. Tone: ${brief.editorialStyle.tone}. Reading level: ${brief.editorialStyle.readingLevel}. Content mix: ${brief.editorialStyle.contentMix.prose}% prose, ${brief.editorialStyle.contentMix.lists}% lists, ${brief.editorialStyle.contentMix.tables}% tables. Data density: ${brief.editorialStyle.dataDensity}. Intro: ${brief.editorialStyle.introStyle}. CTA: ${brief.editorialStyle.ctaStyle}.`;
+    ? `Use standard human-like style: avg sentence ~15 words, mix short/medium/long; avg paragraph ~3 sentences; semi-formal, direct address; ~75% prose, ~25% lists. Do not use HTML table tags — use bulleted or numbered lists only.`
+    : `Match this editorial style: Sentence length avg ${brief.editorialStyle.sentenceLength.average} words, distribution ${brief.editorialStyle.sentenceLength.distribution.short}% short / ${brief.editorialStyle.sentenceLength.distribution.medium}% medium / ${brief.editorialStyle.sentenceLength.distribution.long}% long / ${brief.editorialStyle.sentenceLength.distribution.veryLong}% very long. Paragraph avg ${brief.editorialStyle.paragraphLength.averageSentences} sentences. Tone: ${brief.editorialStyle.tone}. Reading level: ${brief.editorialStyle.readingLevel}. Content mix: ${brief.editorialStyle.contentMix.prose}% prose, ${brief.editorialStyle.contentMix.lists}% lists. Do not use table tags — use lists (ul/ol) only. Data density: ${brief.editorialStyle.dataDensity}. Intro: ${brief.editorialStyle.introStyle}. CTA: ${brief.editorialStyle.ctaStyle}.`;
 
   const factsBlock =
     brief.currentData.facts.length > 0
@@ -757,32 +775,12 @@ export async function writeDraft(
    Not every number needs attribution — but every MAJOR claim (revenue, market share, growth rate, benchmark result, key specification) should reference its source at least once. If multiple nearby facts come from the same source, attribute once and let proximity carry. Keep attributions conversational, not academic. Do NOT add URLs or a Sources section — linking is handled separately in the CMS.`
       : "No current data provided. Do not invent specific statistics; use general language where needed.";
 
-  const userPrompt = `Write a blog post using ONLY the following research brief. Do not add image placeholders, internal/external links, or ToC.
+  const userPrompt = `Write a blog post using ONLY the following research brief. No image placeholders, internal/external links, or ToC.
 
-## GOOGLE SEARCH CENTRAL — HELPFUL CONTENT CHECKLIST
-Before writing, internalize these questions (from developers.google.com/search/docs/fundamentals/creating-helpful-content):
-- Does this provide substantial value beyond existing search results?
-- Would someone with expertise on this topic write it this way?
-- Does this fully satisfy the search intent for "${brief.keyword.primary}"?
-- Would a reader feel they learned enough to achieve their goal?
-Write to make every answer YES.
-
-## RANK MATH SEO — NON-NEGOTIABLE
-- **Title:** Primary keyword "${brief.keyword.primary}" in first 50%. Max 60 chars. Include a number when natural.
-- **Meta description:** Primary keyword present. 120-160 chars. A pitch, not a summary.
-- **Slug:** Contains primary keyword. Lowercase hyphens. Max 75 chars.
-- **Keyword in intro:** Prefer the first sentence to include "${brief.keyword.primary}" when it fits naturally; if not, the second. SELF-CHECK: verify it appears within the first 100 words.
-- **Subheadings:** Primary keyword in at least one H2 or H3 heading (exact or natural variant). Self-check: keyword must appear in the text of at least one H2/H3.
-- **Paragraphs:** None over 120 words. Never write a paragraph over 120 words; split into two or more. Self-check each paragraph before output.
-- **Keyword density:** Under 3%. No stuffing.
-- **Heading hierarchy:** Sequential H2/H3/H4, no skipped levels.
-- **FAQ:** For informational intent, include 3-8 Q&As under an H2 "Frequently Asked Questions".
-
-## TYPOGRAPHY — HARD RULES
-- ZERO em-dashes (—) in the entire output. Use period, colon, or comma instead.
-- ZERO en-dashes (–). Same rule.
-- ZERO curly/smart quotes (" " ' '). Use straight quotes (" and ') only.
-SELF-CHECK: Scan for — or – or curly quotes before outputting. Replace all.
+## GOOGLE & RANK MATH (article-specific)
+- Search intent / primary keyword: "${brief.keyword.primary}". Write so a reader achieves their goal and gets substantial value beyond existing results.
+- Title, meta, and slug are provided — do NOT generate them. Output only content, suggestedCategories, suggestedTags.
+- Keyword in first 100 words and in at least one H2/H3; prefer primary keyword or close variant in at least one H2 (e.g. "Best ${brief.keyword.primary} Tools"). Paragraphs ≤120 words; sequential H2/H3/H4; 3-8 Q&As under H2 "Frequently Asked Questions".
 
 ## KEYWORD & INTENT
 - Primary: ${brief.keyword.primary}
@@ -791,105 +789,71 @@ SELF-CHECK: Scan for — or – or curly quotes before outputting. Replace all.
 ${currentDataWarning}
 ## MANDATORY OUTLINE (follow exactly; do not skip, reorder, or add H2s; you may add H3s)
 ${outlineBlock}
+Section word targets above are guidance; roughly proportion your content across sections accordingly.
 
-## GAPS TO ADDRESS (uniqueness opportunities — what competitors miss)
+## GAPS TO ADDRESS
 ${brief.gaps.length ? brief.gaps.join("\n") : "None"}
 ${(brief.extraValueThemes?.length ?? 0) > 0 || (brief.similaritySummary?.trim?.() ?? "") !== ""
   ? `
-## EXTRA VALUE TO INCLUDE (from brief — do not only repeat competitors)
-${brief.similaritySummary?.trim() ? `What top results cover: ${brief.similaritySummary.trim()}\n` : ""}${(brief.extraValueThemes?.length ?? 0) > 0 ? `Themes to clearly cover (ensure the article adds these):\n${brief.extraValueThemes!.map((t) => `- ${t}`).join("\n")}\n` : ""}Do not only restate what competitors say; ensure these extra-value themes are clearly and concretely covered.`
+## EXTRA VALUE (do not only repeat competitors)
+${brief.similaritySummary?.trim() ? `Top results cover: ${brief.similaritySummary.trim()}\n` : ""}${(brief.extraValueThemes?.length ?? 0) > 0 ? `Themes to cover:\n${brief.extraValueThemes!.map((t) => `- ${t}`).join("\n")}\n` : ""}`
   : `
-## DIFFERENTIATION (no brief themes provided)
-Ensure the article adds clear value beyond the outline; lead with current data where provided. Do not only restate common knowledge.`}
+## DIFFERENTIATION
+Add clear value beyond the outline; lead with current data where provided.`}
 ${brief.freshnessNote?.trim() ? `## FRESHNESS\n${brief.freshnessNote.trim()}\n` : ""}
-## CURRENT DATA — ZERO HALLUCINATION RULE
+## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
 
 ## EDITORIAL STYLE
 ${styleBlock}
 
-## WRITING QUALITY (Google ranking factors)
+## WRITING QUALITY
+Vary sentence and paragraph length and openings. E-E-A-T: 2-3 experience signals (e.g. "anyone who…", "the first time you…"), cite data with natural attribution, only numbers from currentData. Every section must advance the reader's goal; no fluff.
 
-**Readability & engagement (affects dwell time, a user signal):**
-- Vary sentence length: mix 4-word punchy lines with 25-word analytical ones.
-- Vary paragraph length: some 1 sentence, some 5-6 sentences.
-- Use concrete words over generic ones. Practitioner tone throughout.
-- Don't start 3+ sentences the same way in any section. Vary openings; avoid repeating the same word (e.g. "Identify," "The") at the start of consecutive or nearby sentences.
-
-**Avoid generic filler (Helpful Content signal):**
-- No "Furthermore," "Additionally," "Moreover," "In addition," "It is worth noting," "Consequently," "In conclusion."
-- Avoid overused phrases: "a testament to," "seamless," "unlock," "delve," "landscape," "crucial," "comprehensive," "robust," "holistic" — use plain, specific language instead.
-- Start the next thought directly, or use: "But," "Still," or a question.
-
-**No fluff:**
-- Every section must advance the reader's goal or deliver a concrete takeaway. Remove or merge any section that only restates the intro or other sections.
-
-**E-E-A-T signals (Google's quality rater guidelines):**
-- Experience: 2-3 shared-experience references per article. Vary the type: e.g. one "anyone who…", one "the first time you…", one "after using X you…". Place in first H2, middle H2, and late H2.
-  Example sentiments (vary wording each time): acknowledge user frustration, reference a real-world setting, describe an aha moment from direct use.
-  Rules: never fake credentials; if the topic doesn't lend itself to experience signals, use fewer.
-- Expertise: be specific. Name tools, describe scenarios, reference realistic timeframes.
-- Authoritativeness: cite provided data with natural attribution (no URLs, no footnotes).
-- Trustworthiness: only use numbers from currentData. Qualify uncertain claims.
-
-## GEO & AI OVERVIEW OPTIMIZATION
+## GEO & FAQ
 - Direct answer: ${brief.geoRequirements.directAnswer}
 - Stats: ${brief.geoRequirements.statDensity}
 - Entities: ${brief.geoRequirements.entities}
-- FAQ ANSWERS: Max 300 characters each (about 2 short sentences). Self-check: every FAQ answer must be under 300 characters. Direct answer + one NEW insight not in article body.
-- FAQ ANTI-REDUNDANCY: Each answer must add at least one fact, angle, or implication not stated in the body (so-what, comparison, forward look, caveat, or action). Templates: (1) SO WHAT for a specific audience; (2) COMPARISON not in body; (3) FORWARD LOOK; (4) CONTRARIAN caveat; (5) PRACTICAL action. No repeating body numbers.
+- FAQ answers: max 300 characters each. Each answer must add at least one of: a so-what, a comparison, a forward look, a caveat, or a concrete next step — not a condensed repeat of the body. No repeating body numbers; every FAQ answer must teach something new to someone who read the full article.
 ${brief.geoRequirements.faqStrategy ? `- FAQ strategy: ${brief.geoRequirements.faqStrategy}` : ""}
 
-## WORD COUNT
-Target: ${brief.wordCount.target}. ${brief.wordCount.note}
-Minimum 300 words (Google thin-content threshold). Value over length: ensure the article provides more value than competitors; do not pad to hit the target.
+## WORD COUNT (STRICT)
+Section word targets sum to approximately ${brief.outline.estimatedWordCount}. Article total must be ${brief.wordCount.target} words (±5%). Distribute content accordingly.
+Target: ${brief.wordCount.target} words. ${brief.wordCount.note}
+Minimum 300 words. Article MUST be within ±5% of target. Meet the target — add or trim as needed.
 
-## OUTPUT FORMAT (valid JSON only)
-Generate exactly 4 title/meta pairs for a 2x2 choice grid: (1) Direct keyword-first, (2) Curiosity hook, (3) Data-led, (4) Question or list hook. All: keyword in first 50% of title and in meta; title max 60 chars; meta 120-160 chars.
-
-**Rank Math Title Readability (required for each title):**
-- **Sentiment:** Each title MUST contain at least one positive or negative sentiment word that evokes emotion (e.g. amazing, proven, secret, essential, avoid, warning, ultimate, powerful, discover, shocking).
-- **Power word:** Each title MUST contain at least one power word that compels clicks (e.g. how to, guide, proven, secret, discover, essential, ultimate, best, easy, free, new, guaranteed, step-by-step). See rankmath.com/blog/power-words/
+## OUTPUT (valid JSON only)
+Output only the JSON object below. No text before or after the JSON. Do NOT include title, metaDescription, or suggestedSlug — they are provided separately.
 
 {
-  "titleMetaVariants": [
-    { "title": "...", "metaDescription": "...", "approach": "Direct keyword-first" },
-    { "title": "...", "metaDescription": "...", "approach": "Curiosity hook" },
-    { "title": "...", "metaDescription": "...", "approach": "Data-led" },
-    { "title": "...", "metaDescription": "...", "approach": "Question or list hook" }
-  ],
-  "outline": ["H2 1", "H2 2", ...],
   "content": "<p>...</p><h2>...</h2>...",
-  "suggestedSlug": "lowercase-hyphenated",
   "suggestedCategories": ["cat1", "cat2"],
   "suggestedTags": ["tag1", "tag2", "tag3"]
 }
 
-## POST-GENERATION AUDIT — AUTOMATED CHECKS
-These run automatically after generation. Write to PASS them:
+If you approach the response limit, prioritize completing the final H2 and FAQ; you may shorten middle sections. Write to pass the automated SEO, typography, and fact-check audits. No em-dashes, en-dashes, or curly quotes; no excessive symbols (..., !!, !!!). Never use HTML table tags — use ul/ol only.`;
 
-**SEO Audit (blocks publishing if score < 80%):**
-Title keyword in first 50% + max 60 chars + number. Meta 120-160 chars with keyword. Slug with keyword. Keyword in first 10% and in at least one H2/H3 subheading. No paragraph over 120 words. No stuffing. Sequential heading hierarchy. **Title must include at least one sentiment word and one power word** (Rank Math: sentiment + power word in title).
-
-**Typography (blocks publishing):**
-Zero em-dashes. Zero en-dashes. Zero curly quotes.
-
-**Fact Check (blocks publishing if hallucinations found):**
-Every number cross-checked against currentData. Unverifiable numbers flagged.
-
-**E-E-A-T Quality (scored separately):**
-Experience signals (2-3), data density, entity density, readability variance, no lazy phrasing, varied sentence starts.
-
-Generate the JSON now.`;
-
+  const writeDraftStartMs = Date.now();
   const stream = anthropic.messages.stream({
     model: "claude-sonnet-4-5",
-    max_tokens: 32768,
-    temperature: 0.7,
+    max_tokens: 32000,
+    temperature: 0.5,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
   const message = await stream.finalMessage();
+  const writeDraftDurationMs = Date.now() - writeDraftStartMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) {
+    tokenUsage.push({
+      callName: "writeDraft",
+      model: "claude-sonnet-4-5",
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.promptTokens + usage.completionTokens,
+      durationMs: writeDraftDurationMs,
+    });
+  }
 
   // Detect truncation — if the model hit max_tokens, the JSON is likely cut off
   const stopReason = (message as { stop_reason?: string }).stop_reason;
@@ -925,13 +889,8 @@ Generate the JSON now.`;
   const validated = ClaudeDraftOutputSchema.safeParse(parsed);
   if (validated.success) {
     const v = validated.data;
-    const slugRaw = v.suggestedSlug?.trim() || brief.keyword.primary.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
-    const slug = slugRaw.length > SEO.URL_SLUG_MAX_CHARS ? slugRaw.slice(0, SEO.URL_SLUG_MAX_CHARS).replace(/-+$/, "") : slugRaw;
     return {
-      titleMetaVariants: v.titleMetaVariants,
-      outline: v.outline,
       content: v.content,
-      suggestedSlug: slug,
       suggestedCategories: v.suggestedCategories ?? [],
       suggestedTags: v.suggestedTags ?? [],
     };
@@ -942,25 +901,8 @@ Generate the JSON now.`;
     console.error("[claude] writeDraft Zod errors:", validated.error.flatten());
     throw new Error("Claude writeDraft response missing or empty content");
   }
-  const fallbackTitle = brief.keyword.primary;
-  const titleMetaVariants: TitleMetaVariant[] = Array.isArray(parsed.titleMetaVariants) && parsed.titleMetaVariants.length > 0
-    ? parsed.titleMetaVariants.slice(0, 4).map((x: unknown) => {
-        const t = x as Record<string, unknown>;
-        return {
-          title: (typeof t.title === "string" ? t.title : fallbackTitle).slice(0, 60),
-          metaDescription: (typeof t.metaDescription === "string" ? t.metaDescription : "").slice(0, 160),
-          approach: typeof t.approach === "string" ? t.approach : "Direct",
-        };
-      })
-    : [{ title: fallbackTitle.slice(0, 60), metaDescription: "", approach: "Direct keyword-first" }];
-  const outline = Array.isArray(parsed.outline) ? parsed.outline.filter((h): h is string => typeof h === "string") : [];
-  const slugRaw = (typeof parsed.suggestedSlug === "string" ? parsed.suggestedSlug : "").trim() || brief.keyword.primary.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-+|-+$/g, "");
-  const slug = slugRaw.length > SEO.URL_SLUG_MAX_CHARS ? slugRaw.slice(0, SEO.URL_SLUG_MAX_CHARS).replace(/-+$/, "") : slugRaw;
   return {
-    titleMetaVariants,
-    outline,
-    content: parsed.content as string,
-    suggestedSlug: slug,
+    content: (parsed.content as string) ?? "",
     suggestedCategories: Array.isArray(parsed.suggestedCategories) ? parsed.suggestedCategories.filter((c): c is string => typeof c === "string") : [],
     suggestedTags: Array.isArray(parsed.suggestedTags) ? parsed.suggestedTags.filter((t): t is string => typeof t === "string") : [],
   };
@@ -968,148 +910,141 @@ Generate the JSON now.`;
 
 
 // ---------------------------------------------------------------------------
-// EDITORIAL POLISH PASS
-//
-// An editorial rewrite that improves readability, engagement, and
-// practitioner voice — the qualities Google values for dwell time,
-// user satisfaction, and Helpful Content signals.
-//
-// This is NOT about evading detection. It's about making the content
-// read like it was written by someone who has actually done this work:
-// varied rhythm, confident voice, specific language, natural flow.
-//
-// Reference: Google Search Central — Creating helpful, reliable, people-first content
+// Auto-fix fact-check hallucinations (surgical rewrite, preserve flow)
 // ---------------------------------------------------------------------------
 
-const HUMANIZE_SYSTEM = `You are a senior editor whose job is to polish AI-drafted articles so they read like expert practitioner content. Your goal: maximize helpfulness, readability, and engagement per Google Search Central guidelines.
+const HALLUCINATION_FIX_SYSTEM = `You are an editor fixing only specific flagged issues in an article. You will receive:
+1. The article HTML
+2. A list of hallucination flags from a fact-checker (unverified statistics or fabricated source attributions)
+3. Verified facts from currentData that you MAY use to replace bad data when it fits naturally
 
-## CONTENT SAFETY — THESE RULES OVERRIDE ALL OTHERS
+RULES:
+- For EACH flagged hallucination, REWRITE the surrounding sentence or two so the text flows naturally WITHOUT the problematic statistic or attribution. Do NOT simply delete a sentence — that would leave an awkward gap. Rewrite to preserve readability and flow.
+- If a verified fact from currentData can naturally replace the hallucinated claim in context, use it and set replacedWithVerifiedFact to true.
+- If not, rewrite the sentence to make the same point without the specific statistic or attribution; set replacedWithVerifiedFact to false.
+- Do NOT change any content outside the immediate vicinity of each hallucination.
+- Preserve ALL HTML structure, tags, headings, and formatting exactly. Only change the text content where hallucinations appear.
+- Target ONLY the items in the hallucinations list. Do not second-guess or "fix" other numbers or attributions.
 
-This editorial pass exists to improve linguistic quality. It does NOT exist to change content substance. If any style rule below would require removing, shortening, or diluting content — SKIP that rule and move on.
+OUTPUT FORMAT:
+1. Output the complete fixed HTML first (the full article with your edits).
+2. Then on a new line write exactly: HALLUCINATION_FIXES:
+3. Then a JSON array of objects, one per fix: [{ "originalText": "exact phrase or sentence you replaced", "replacement": "the new text", "reason": "brief reason", "replacedWithVerifiedFact": true or false }]
+Use double quotes in JSON. No markdown code fence around the JSON.`;
 
-NEVER DO ANY OF THESE:
-- Remove or shorten any section, paragraph, or substantive sentence. ADD variation by splitting or merging — never by deleting.
-- Remove, alter, or round any statistic, number, percentage, date, or financial figure. '$143.8 billion' stays '$143.8 billion'.
-- Invent, add, or generate ANY new statistic or data point not in the original draft.
-- Invent, add, or change ANY source attribution name.
-- Remove or rephrase source attribution phrases ('per its earnings release', 'according to [source]'). These are E-E-A-T trustworthiness signals.
-- Remove, reorder, or merge any H2 or H3 section.
-- Remove or weaken any FAQ question or answer. FAQ answers must stay under 300 characters.
-- Do not remove experience signal sentences. Preserve 2–3 varied experience signals (e.g. 'anyone who…', 'the first time you…', 'after using X you…'); only remove or weaken ones that are repetitive or clearly templated. These are E-E-A-T markers.
-- Remove or dilute the direct answer in the opening 30-40 words. This is the GEO extraction target.
-- Remove entity mentions (company names, product names, person names). These are GEO entity signals.
-- Shorten any section below its target word count. Depth is a ranking signal.
-- Value over length: do not pad. Depth and specificity matter more than hitting the target word count exactly.
-- Change the article from helpful to vague. If a sentence makes a specific, useful claim, keep the specificity. Rephrase the delivery, not the substance.
+const HALLUCINATION_FIX_TIMEOUT_MS = 45_000;
 
-IN SHORT: A Google Search quality rater should score the pre-edit and post-edit versions identically on helpfulness, expertise, and comprehensiveness. Only the linguistic texture changes.
+export type FixHallucinationsResult = {
+  fixedHtml: string;
+  fixes: HallucinationFix[];
+};
 
-## EDITORIAL OBJECTIVES
-
-Your job is to improve three qualities that affect Google ranking signals:
-
-1. **Readability (dwell time & user satisfaction):**
-   - Vary sentence length: mix 3-7 word punchy lines with 25-35 word analytical ones.
-   - Vary paragraph length: some single-sentence, some 5-6 sentences.
-   - Break monotonous rhythm. If 3+ sentences have similar length, restructure.
-
-2. **Engagement (reduces bounce rate, increases time-on-page):**
-   - Replace generic phrases with specific, concrete language (e.g. avoid "seamless," "unlock," "a testament to," "crucial," "comprehensive" — use plain alternatives).
-   - Add confidence variation: strong claims followed by honest caveats.
-   - Use practitioner voice: asides, self-corrections, direct opinions.
-   - Vary sentence openings: never 3+ sentences in a row starting with the same word (e.g. "Identify" or "The").
-
-3. **Natural flow (content quality signal):**
-   - Remove formulaic transitions: "Furthermore," "Additionally," "Moreover," "In addition," "It's worth noting."
-   - Replace with: no transition (start the next thought), or natural starters: "But," "The flip side:", "Now,", a question.
-   - Mix formal and informal register within paragraphs.
-
-## ABSOLUTE PRESERVE LIST — do NOT change:
-- All H2 and H3 headings (exact text, exact order, exact hierarchy)
-- All statistics, numbers, percentages, dates, and financial figures (exact values, no rounding)
-- All source attribution phrases. These are E-E-A-T trustworthiness signals.
-- GEO elements: direct answer in opening paragraph, FAQ Q&A structure, entity mentions
-- Experience signal sentences
-- FAQ answer content and length (under 300 characters)
-- HTML structure and tags
-- Section order and nesting
-- Summary tables, comparison tables, and all structured list content
-- Overall word count (must be within ±5% of original)
-
-## CHANGE FREELY:
-- Sentence lengths and rhythm (vary them)
-- Word choices (more specific, less generic)
-- Transitions between paragraphs (remove formulaic ones, use natural flow)
-- Paragraph break points (split long, merge short — never delete content)
-- Tone variation (mix formal and informal)
-- Opening words of sentences (vary — never 3+ sentences starting the same way; e.g. avoid repeating "Identify," "The," "This")
-
-## SPECIFIC IMPROVEMENTS TO MAKE:
-
-**Generic → Specific:**
-- "This strategy helps businesses improve their marketing" → "This play actually moves the needle for most teams"
-- "It's important to consider your budget" → "Budget is the elephant in the room"
-
-**Uniform length → Varied rhythm:**
-- Insert short punchy lines: "That's the trade-off." "Not even close." "Worth watching."
-- Let some paragraphs run to 5-6 sentences for complex arguments.
-
-**Formulaic transitions → Natural flow:**
-- Kill "Additionally," "Furthermore," "Moreover."
-- Replace with nothing, or: "But here's the thing," "The real story:", a question.
-
-**Uniform hedging → Confident practitioner voice:**
-- "This works." / "Skip this and you're wasting time." mixed with honest caveats.
-- Add 2-3 per 1000 words: aside, self-correction, direct opinion, tangent marker.
-
-## TYPOGRAPHY (strict):
-- Replace ALL em-dash (—) and en-dash (–) with comma, colon, period, or rewrite.
-- Replace ALL curly quotes (" " ' ') with straight quotes (") and apostrophes (').
-
-## OUTPUT:
-- Return ONLY the revised HTML. No explanation, no preamble, no markdown code fence.
-- If you must wrap in a code block, use \`\`\`html ... \`\`\` but prefer raw HTML.`;
-
-export async function humanizeArticleContent(html: string): Promise<string> {
-  const anthropic = getAnthropicClient();
-  const trimmed = html?.trim() ?? "";
-  if (trimmed.length === 0) throw new Error("Content is required for humanization");
-
-  const stream = anthropic.messages.stream({
-    model: "claude-sonnet-4-5",
-    max_tokens: 16384,
-    temperature: 0.8,
-    system: HUMANIZE_SYSTEM,
-    messages: [
-      {
-        role: "user",
-        content: `Polish this article for maximum readability, engagement, and practitioner voice per Google Search Central quality standards.
-
-Your priority order:
-1. Preserve all keywords, headings, SEO structure, data, and attributions
-2. Improve readability: vary sentence length, break monotonous rhythm
-3. Strengthen engagement: specific language, confidence variation, practitioner asides
-4. Clean transitions: remove formulaic connectors, use natural flow
-5. Fix typography: em-dash and en-dash → comma/colon/period; curly quotes → straight
-
-Return only the HTML.
-
-${trimmed}`,
-      },
-    ],
-  });
-  const message = await stream.finalMessage();
-
-  const content = message.content[0];
-  if (content.type !== "text") throw new Error("Unexpected response format from Claude");
-
-  const stopReason = (message as { stop_reason?: string }).stop_reason;
-  if (stopReason === "max_tokens") {
-    console.warn("Humanize response was truncated (max_tokens). Returning original content.");
-    return trimmed;
+/**
+ * Surgically fix fact-check hallucinations in draft HTML using Claude.
+ * Rewrites only the immediate context of each hallucination to preserve flow; does not second-guess the fact-checker's skip logic.
+ */
+export async function fixHallucinationsInContent(
+  draftHtml: string,
+  hallucinations: string[],
+  currentData: CurrentData,
+  tokenUsage?: TokenUsageRecord[]
+): Promise<FixHallucinationsResult> {
+  if (hallucinations.length === 0) {
+    return { fixedHtml: draftHtml, fixes: [] };
   }
+  const anthropic = getAnthropicClient();
+  const fixStartMs = Date.now();
+  const verifiedFactsBlock = currentData.facts
+    .slice(0, 50)
+    .map((f) => `- "${f.fact}" (source: ${f.source})`)
+    .join("\n");
+  const userContent = `Fix the following hallucinations in this article. Preserve HTML and flow.
 
-  const text = content.text.trim();
-  const codeMatch = text.match(/```(?:html)?\s*([\s\S]*?)```/);
-  return (codeMatch ? codeMatch[1].trim() : text) || trimmed;
+VERIFIED FACTS (you may use these to replace hallucinated stats when they fit):
+${verifiedFactsBlock || "(none)"}
+
+HALLUCINATIONS TO FIX (each is a flag from the fact-checker; fix only these):
+${hallucinations.map((h) => `- ${h}`).join("\n")}
+
+ARTICLE HTML:
+${draftHtml}`;
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), HALLUCINATION_FIX_TIMEOUT_MS);
+  try {
+    const stream = anthropic.messages.stream(
+      {
+        model: "claude-sonnet-4-5",
+        max_tokens: 16384,
+        temperature: 0.1,
+        system: HALLUCINATION_FIX_SYSTEM,
+        messages: [{ role: "user", content: userContent }],
+      },
+      { signal: controller.signal }
+    );
+    const message = await stream.finalMessage();
+    const fixDurationMs = Date.now() - fixStartMs;
+    const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+    if (tokenUsage) {
+      tokenUsage.push({
+        callName: "fixHallucinationsInContent",
+        model: "claude-sonnet-4-5",
+        promptTokens: usage.promptTokens,
+        completionTokens: usage.completionTokens,
+        totalTokens: usage.promptTokens + usage.completionTokens,
+        durationMs: fixDurationMs,
+      });
+    }
+    const content = message.content[0];
+    if (content.type !== "text") {
+      return { fixedHtml: draftHtml, fixes: [] };
+    }
+    const text = content.text.trim();
+    const fixesMarker = "HALLUCINATION_FIXES:";
+    const idx = text.indexOf(fixesMarker);
+    let fixedHtml = draftHtml;
+    let fixes: HallucinationFix[] = [];
+    if (idx >= 0) {
+      const htmlPart = text.slice(0, idx).trim();
+      const jsonPart = text.slice(idx + fixesMarker.length).trim();
+      const codeMatch = htmlPart.match(/```(?:html)?\s*([\s\S]*?)```/);
+      fixedHtml = (codeMatch ? codeMatch[1].trim() : htmlPart) || draftHtml;
+      try {
+        const parsed = JSON.parse(jsonPart) as unknown;
+        if (Array.isArray(parsed)) {
+          fixes = parsed
+            .filter(
+              (p): p is HallucinationFix =>
+                p != null &&
+                typeof p === "object" &&
+                typeof (p as HallucinationFix).originalText === "string" &&
+                typeof (p as HallucinationFix).replacement === "string" &&
+                typeof (p as HallucinationFix).reason === "string" &&
+                typeof (p as HallucinationFix).replacedWithVerifiedFact === "boolean"
+            )
+            .map((p) => ({
+              originalText: String((p as HallucinationFix).originalText),
+              replacement: String((p as HallucinationFix).replacement),
+              reason: String((p as HallucinationFix).reason),
+              replacedWithVerifiedFact: Boolean((p as HallucinationFix).replacedWithVerifiedFact),
+            }));
+        }
+      } catch {
+        // Keep fixes [] if JSON parse fails
+      }
+    } else {
+      const codeMatch = text.match(/```(?:html)?\s*([\s\S]*?)```/);
+      fixedHtml = (codeMatch ? codeMatch[1].trim() : text) || draftHtml;
+    }
+    return { fixedHtml, fixes };
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.warn("[fixHallucinations] Timeout or abort — returning original content");
+    } else {
+      console.error("[fixHallucinations]", err);
+    }
+    return { fixedHtml: draftHtml, fixes: [] };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

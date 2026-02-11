@@ -1,24 +1,34 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { TagInput } from "@/components/dashboard/TagInput";
 import { useBlogGeneration } from "@/components/dashboard/BlogGenerationProvider";
-import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown, ChevronUp, GripVertical, Trash2, Plus, Save, Search, PenLine } from "lucide-react";
+import { GenerationLoadingOverlay } from "@/components/dashboard/GenerationLoadingOverlay";
 import { SEO } from "@/lib/constants";
 import { auditArticle, MIN_PUBLISH_SCORE } from "@/lib/seo/article-audit";
 import type { AuditItem } from "@/lib/seo/article-audit";
-import type { GeneratedContent, GenerationInput, PipelineResult } from "@/lib/blog/generation-types";
+import type {
+  BriefChunkResult,
+  BriefOverridesForDraft,
+  GeneratedContent,
+  GenerationInput,
+  OutlineSectionForEditor,
+  PipelineResult,
+  ResearchChunkResult,
+  ResearchSerpItem,
+  ResearchSerpResult,
+} from "@/lib/blog/generation-types";
 import { pipelineToGenerated } from "@/lib/blog/generation-types";
 
 /** Result state shape (matches BlogGenerationProvider). */
 type ResultState = {
   pipelineResult: PipelineResult | null;
   fallbackGenerated: GeneratedContent | null;
-  selectedTitleIndex: number;
   input: GenerationInput;
 };
 
@@ -57,6 +67,21 @@ function htmlToPlainText(html: string): string {
 
 function isEeatError(r: unknown): r is { error: string } {
   return typeof r === "object" && r !== null && "error" in r && typeof (r as { error: unknown }).error === "string";
+}
+
+/** Show a readable error message; if the value is JSON like {"error":"..."}, extract the message. */
+function displayError(msg: string | null | undefined): string {
+  if (msg == null || msg === "") return "";
+  const trimmed = msg.trim();
+  if (trimmed.startsWith("{") && trimmed.includes('"error"')) {
+    try {
+      const o = JSON.parse(trimmed) as { error?: string };
+      if (typeof o?.error === "string") return o.error;
+    } catch {
+      // not valid JSON, fall through
+    }
+  }
+  return msg;
 }
 
 function EeatResultsDisplay({
@@ -300,10 +325,9 @@ const INTENT_OPTIONS: { value: IntentType; label: string }[] = [
 ];
 
 /**
- * Sample data for the Blog Maker output UI. Use "View sample output" to load this
- * (and SAMPLE_PIPELINE_RESULT) so you can edit the UI or fix issues without running
- * real generation — avoids wasting API tokens.
+ * Sample data for the Blog Maker output UI. Run real generation for live results.
  * Pairs with sample keywords (e.g. "medical spa SEO").
+ * Updated for Output Quality Plan: targetWords sum to 2000 (standard preset), per-section guidance.
  */
 const SAMPLE_OUTPUT: GeneratedContent = {
   title: "7 Proven SEO Tips for Medical Spas in 2026",
@@ -376,42 +400,88 @@ const SAMPLE_OUTPUT: GeneratedContent = {
   suggestedTags: ["SEO", "medical spa", "digital marketing", "2026"],
 };
 
-/** Full pipeline sample for UI work without tokens: 4 titles/meta (source-based), audit, schema, quality checks. */
+/** Sample SERP (9 results, 3x3 grid) for Select competitors demo. Matches production. */
+const SAMPLE_RESEARCH_SERP: ResearchSerpResult = {
+  results: [
+    { position: 1, title: "7 Proven SEO Tips for Medical Spas in 2026", url: "https://example.com/medical-spa-seo-guide" },
+    { position: 2, title: "Medical Spa Marketing: Aesthetic Practice SEO", url: "https://example.com/aesthetic-practice-marketing" },
+    { position: 3, title: "Local SEO for Medical Spas and Med Spas", url: "https://example.com/local-seo-medical-spa" },
+    { position: 4, title: "How to Rank Your Med Spa on Google", url: "https://example.com/rank-med-spa-google" },
+    { position: 5, title: "Medical Spa Website SEO Checklist 2026", url: "https://example.com/med-spa-seo-checklist" },
+    { position: 6, title: "Aesthetic Practice Digital Marketing Guide", url: "https://example.com/aesthetic-digital-marketing" },
+    { position: 7, title: "Google Business Profile for Medical Spas", url: "https://example.com/gbp-medical-spa" },
+    { position: 8, title: "Content Strategy for Med Spa SEO", url: "https://example.com/med-spa-content-strategy" },
+    { position: 9, title: "Medical Spa Keywords and Search Intent", url: "https://example.com/med-spa-keywords" },
+  ],
+};
+
+/** Sample research chunk for demo — matches production Research summary UI. */
+const SAMPLE_RESEARCH: ResearchChunkResult = {
+  urlCount: 3,
+  articleCount: 3,
+  currentDataFacts: 24,
+  competitorUrls: [
+    "https://example.com/medical-spa-seo-guide",
+    "https://example.com/aesthetic-practice-marketing",
+    "https://example.com/local-seo-medical-spa",
+  ],
+  competitorTitles: [
+    "7 Proven SEO Tips for Medical Spas in 2026",
+    "Medical Spa Marketing: Aesthetic Practice SEO",
+    "Local SEO for Medical Spas and Med Spas",
+  ],
+};
+
+/** Sample brief chunk for demo — outline editable before draft (matches SAMPLE_OUTPUT outline). Target words sum to 2000. */
+const SAMPLE_BRIEF: BriefChunkResult = {
+  outline: [
+    "Why SEO Matters for Medical Spas",
+    "Keyword Research for Aesthetic Services",
+    "Local SEO and Google Business Profile",
+    "On-Page Optimization Basics",
+    "Content That Converts",
+    "Technical SEO Checklist",
+    "Measuring and Improving Over Time",
+  ].map((heading, i) => {
+    const targets = [220, 280, 280, 290, 310, 310, 310];
+    const topicMap: Record<number, string[]> = {
+      0: ["why medical spa SEO", "search intent", "competitive visibility"],
+      1: ["keyword research", "aesthetic services", "local modifiers"],
+      2: ["local SEO", "Google Business Profile", "reviews", "citations"],
+      3: ["on-page optimization", "title tags", "headings", "meta description"],
+      4: ["content strategy", "intent matching", "conversion", "CTAs"],
+      5: ["technical SEO", "sitemap", "mobile", "page speed", "HTTPS"],
+      6: ["analytics", "Search Console", "improvement", "tracking"],
+    };
+    return {
+      heading,
+      level: "h2" as const,
+      reason: i === 0 ? "Establish relevance and intent" : "Cover key subtopics for medical spa SEO",
+      topics: topicMap[i as keyof typeof topicMap] ?? [heading.toLowerCase(), "medical spa", "SEO"],
+      targetWords: targets[i] ?? 280,
+    };
+  }),
+  briefSummary: {
+    similaritySummary: "Top results focus on local SEO, Google Business Profile, and on-page basics.",
+    extraValueThemes: [
+      "Emphasize 2026-specific guidance (Core Web Vitals, SGE considerations).",
+      "Include a short FAQ section to capture featured snippets.",
+    ],
+    freshnessNote: "Content references 2026 best practices; consider annual refresh.",
+  },
+};
+
+/** Full pipeline sample for UI work without tokens. Draft has placeholder meta; user clicks "Generate meta" to get SEO-optimized title/meta/slug. */
 const SAMPLE_PIPELINE_RESULT: PipelineResult = {
   article: {
     content: SAMPLE_OUTPUT.content,
     outline: SAMPLE_OUTPUT.outline,
-    suggestedSlug: SAMPLE_OUTPUT.suggestedSlug ?? "seo-tips-medical-spas-2026",
+    suggestedSlug: "medical-spa-seo",
     suggestedCategories: SAMPLE_OUTPUT.suggestedCategories ?? [],
     suggestedTags: SAMPLE_OUTPUT.suggestedTags ?? [],
   },
-  titleMetaVariants: [
-    {
-      approach: "Google Search Central — Accurate, descriptive title; meta as snippet; clean URL",
-      title: "Medical Spa SEO: A Guide to Search Best Practices (2026)",
-      metaDescription:
-        "How to create helpful, reliable content for medical spas that meets Google's guidelines. Covers titles, snippets, and user intent.",
-    },
-    {
-      approach: "Rank Math — Focus keyword in title; 50–60 char title; 120–160 char meta; keyword in slug",
-      title: "Medical Spa SEO Tips 2026: 7 Ways to Rank Higher",
-      metaDescription:
-        "Medical spa SEO guide: keyword research, local SEO, on-page optimization, and technical tips to rank and get more clients in 2026.",
-    },
-    {
-      approach: "Ahrefs — CTR-focused title; benefit-led meta; short, readable slug",
-      title: "7 Medical Spa SEO Tips That Actually Get You Clients",
-      metaDescription:
-        "Stop guessing. Use these 7 SEO tactics to get more bookings—Google Business Profile, content, and technical fixes that move the needle.",
-    },
-    {
-      approach: "Semrush / Backlinko — Power words, number, specificity; CTA in meta; keyword-rich slug",
-      title: "7 Proven Medical Spa SEO Tips to Dominate Local Search in 2026",
-      metaDescription:
-        "Discover the exact SEO strategies top medical spas use. Step-by-step: GBP, keywords, content, and technical SEO. Start ranking today.",
-    },
-  ],
-  selectedTitleMeta: null,
+  title: "Draft",
+  metaDescription: "",
   sourceUrls: [
     "https://developers.google.com/search/docs",
     "https://support.google.com/business",
@@ -434,15 +504,22 @@ const SAMPLE_PIPELINE_RESULT: PipelineResult = {
       { id: "rm-first10", severity: "pass", label: "Rank Math: Keyword in intro", message: "Primary keyword appears in first 10% of content.", level: 3, source: "rankmath" },
       { id: "rm-slug-keyword", severity: "pass", label: "Rank Math: Keyword in URL", message: "Primary keyword in slug.", level: 3, source: "rankmath" },
       { id: "rm-subheading-keyword", severity: "pass", label: "Rank Math: Keyword in subheadings", message: "Primary keyword in subheadings.", level: 3, source: "rankmath" },
-      { id: "rm-content-length", severity: "pass", label: "Rank Math: Content length", message: "1847 words. 2500+ = Rank Math 100%. Google: quality over quantity—no need to pad.", level: 3, source: "rankmath" },
       { id: "rm-title-position", severity: "pass", label: "Rank Math: Keyword position in title", message: "Primary keyword in first 50% of title.", level: 3, source: "rankmath" },
       { id: "rm-number-in-title", severity: "pass", label: "Rank Math: Number in title", message: "Title contains a number.", level: 3, source: "rankmath" },
     ],
   },
   schemaMarkup: {
-    article: { "@context": "https://schema.org", "@type": "Article", headline: SAMPLE_OUTPUT.title },
-    faq: { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: [] },
+    article: { "@context": "https://schema.org", "@type": "Article", headline: "Draft" },
+    faq: {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: [
+        { "@type": "Question", name: "How long does it take to see SEO results?", acceptedAnswer: { "@type": "Answer", text: "Typically 3–6 months for meaningful traction. Local SEO can show improvements sooner." } },
+        { "@type": "Question", name: "Do I need a blog for medical spa SEO?", acceptedAnswer: { "@type": "Answer", text: "Yes. Articles that answer common questions help you rank and build trust with potential clients." } },
+      ],
+    },
     breadcrumb: { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [] },
+    faqSchemaNote: "FAQ block added from article H2/H3 pairs; inject on publish.",
   },
   faqEnforcement: {
     passed: true,
@@ -455,6 +532,23 @@ const SAMPLE_PIPELINE_RESULT: PipelineResult = {
     skippedRhetorical: [],
   },
   publishTracking: { keyword: "medical spa SEO" },
+  generationTimeMs: 42_500,
+  briefSummary: {
+    similaritySummary:
+      "Top results focus on local SEO, Google Business Profile, and on-page basics. Many include checklist-style tips and 2024–2025 updates.",
+    extraValueThemes: [
+      "Emphasize 2026-specific guidance (Core Web Vitals, SGE considerations).",
+      "Include a short FAQ section to capture featured snippets.",
+    ],
+    freshnessNote: "Content references 2026 best practices; consider annual refresh.",
+  },
+  outlineDrift: {
+    passed: true,
+    expected: SAMPLE_OUTPUT.outline.slice(0, 7),
+    actual: [...SAMPLE_OUTPUT.outline.slice(0, 7), "Frequently Asked Questions"],
+    missing: [],
+    extra: ["Frequently Asked Questions"],
+  },
 };
 
 const SAMPLE_INPUT: GenerationInput = {
@@ -462,12 +556,12 @@ const SAMPLE_INPUT: GenerationInput = {
   peopleAlsoSearchFor: ["how long for SEO results", "medical spa blog"],
   intent: ["informational"],
   competitorUrls: [],
+  wordCountPreset: "standard",
 };
 
 const SAMPLE_RESULT: ResultState = {
   pipelineResult: SAMPLE_PIPELINE_RESULT,
   fallbackGenerated: null,
-  selectedTitleIndex: 0,
   input: SAMPLE_INPUT,
 };
 
@@ -480,10 +574,20 @@ export default function BlogMakerPage() {
     result: contextResult,
     error: generationError,
     progress: generationProgress,
+    generationStartedAt,
     startGeneration,
     clearResult,
     clearError,
-    setSelectedTitleIndex,
+    phase,
+    jobId,
+    chunkOutputs,
+    errorChunk,
+    startResearchFetch,
+    startBrief,
+    startReviseBrief,
+    startDraft,
+    startValidate,
+    retryFromChunk,
   } = useBlogGeneration();
 
   const [keywords, setKeywords] = useState<string[]>([]);
@@ -497,11 +601,91 @@ export default function BlogMakerPage() {
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
   const [contentView, setContentView] = useState<"preview" | "outline">("preview");
   const [loadingHistory, setLoadingHistory] = useState(false);
+  /** Demo workflow: same as production (research → brief → draft → validate) with sample data, ~10s per stage. */
+  const [demoRunning, setDemoRunning] = useState(false);
+  type DemoStep = "research" | "select_done" | "fetch" | "research_done" | "brief" | "brief_done" | "draft" | "validate" | "complete";
+  const [demoStep, setDemoStep] = useState<DemoStep>("research");
+  const [demoProgress, setDemoProgress] = useState(0);
+  const [demoStartedAt, setDemoStartedAt] = useState<number | null>(null);
+  const [demoElapsedTick, setDemoElapsedTick] = useState(0);
+  const [demoChunkOutputs, setDemoChunkOutputs] = useState<{
+    research: ResearchChunkResult | null;
+    researchSerp: ResearchSerpResult | null;
+    brief: BriefChunkResult | null;
+  }>({ research: null, researchSerp: null, brief: null });
+  /** Selected competitor URLs (max 3) for Select competitors step. */
+  const [selectedSerpUrls, setSelectedSerpUrls] = useState<string[]>([]);
+  /** Custom competitor URL (max 1) — user can add one custom URL instead of picking from SERP. */
+  const [customCompetitorUrl, setCustomCompetitorUrl] = useState("");
+  /** Jump-to stage for refining one screen without running full demo (no tokens). */
+  const [jumpToStage, setJumpToStage] = useState<string>("");
+  /** Step mode: editable outline (with originalIndex for briefOverrides). */
+  const [editedOutline, setEditedOutline] = useState<Array<OutlineSectionForEditor & { originalIndex: number }>>([]);
+  /** Target total words for outline; used by Redistribute and Revise Brief. */
+  const [targetTotal, setTargetTotal] = useState<number>(0);
+  /** Which step to show when in step mode (1=Select competitors, 2=Research summary, 3=Outline). null = show latest. */
+  const [stepView, setStepView] = useState<number | null>(null);
+  /** Cache SERP so "Back to previous section" from research summary can still show competitors (provider may clear researchSerp). */
+  const lastResearchSerpRef = useRef<ResearchSerpResult | null>(null);
+
+  /** Jump demo to a specific stage for refining that screen without running the full flow. */
+  const jumpDemoTo = useCallback((stage: "select" | "outline" | "result") => {
+    setStatus({ type: null, message: "" });
+    clearResult();
+    setSampleResult(null);
+    setSampleOutput(null);
+    setEditing(null);
+    setSelectedSerpUrls([]);
+    setCustomCompetitorUrl("");
+    setKeywords(SAMPLE_INPUT.keywords);
+    setPeopleAlsoSearchFor(SAMPLE_INPUT.peopleAlsoSearchFor);
+    setIntent(SAMPLE_INPUT.intent as IntentType[]);
+    setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
+    setWordCountPreset((SAMPLE_INPUT.wordCountPreset as "auto" | "concise" | "standard" | "in_depth" | "custom") ?? "auto");
+    setWordCountCustom(SAMPLE_INPUT.wordCountCustom ?? "");
+    lastResearchSerpRef.current = SAMPLE_RESEARCH_SERP;
+
+    if (stage === "select") {
+      setDemoRunning(false);
+      setDemoStep("select_done");
+      setDemoChunkOutputs({ research: null, researchSerp: SAMPLE_RESEARCH_SERP, brief: null });
+      setDemoProgress(25);
+      setDemoStartedAt(null);
+      setSelectedSerpUrls(SAMPLE_RESEARCH_SERP.results.slice(0, 3).map((r) => r.url));
+      setStepView(1);
+    } else if (stage === "outline") {
+      setDemoRunning(false);
+      setDemoStep("brief_done");
+      setDemoChunkOutputs({ research: SAMPLE_RESEARCH, researchSerp: SAMPLE_RESEARCH_SERP, brief: SAMPLE_BRIEF });
+      const demoOutline = SAMPLE_BRIEF.outline.map((s, i) => ({ ...s, originalIndex: i }));
+      setEditedOutline(demoOutline);
+      setTargetTotal(demoOutline.reduce((acc, s) => acc + (s.targetWords || 150), 0));
+      setDemoProgress(50);
+      setDemoStartedAt(null);
+      setStepView(2);
+    } else {
+      setDemoRunning(false);
+      setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
+      setStepView(null);
+      setSampleResult(SAMPLE_RESULT);
+      const initial = pipelineToGenerated(SAMPLE_PIPELINE_RESULT);
+      setSampleOutput(initial);
+      setEditing({ ...initial });
+      setContentView("preview");
+      setStrategyOpen(true);
+      setSchemaOpen(false);
+      setAuditListFilter("all");
+      setQualityListFilter("all");
+      setEeatListFilter("all");
+      setEeatResult(null);
+      setEeatError(null);
+    }
+    setJumpToStage("");
+  }, [clearResult]);
 
   const result = contextResult ?? sampleResult;
   const generated = contextGenerated ?? sampleOutput;
   const pipelineResult = result?.pipelineResult ?? null;
-  const selectedTitleIndex = result?.selectedTitleIndex ?? 0;
   const generationInput = result?.input ?? {
     keywords: [],
     peopleAlsoSearchFor: [],
@@ -532,61 +716,276 @@ export default function BlogMakerPage() {
   const editingSnapshotRef = useRef<{ title: string; content: string }>({ title: "", content: "" });
   /** Track if we've auto-saved this generation to avoid duplicate saves */
   const autoSavedRef = useRef<string | null>(null);
-
+  /** When we load from history or save, we get an id; use it for PATCH on subsequent saves */
+  const [currentHistoryId, setCurrentHistoryId] = useState<string | null>(null);
+  const currentHistoryIdRef = useRef<string | null>(null);
+  const [saveInProgress, setSaveInProgress] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+  const [generateMetaLoading, setGenerateMetaLoading] = useState(false);
+  /** Meta options from "Generate meta" — user picks one to apply */
+  const [metaOptions, setMetaOptions] = useState<
+    { title: string; metaDescription: string; suggestedSlug: string; audit: { score: number; publishable: boolean } }[] | null
+  >(null);
+  useEffect(() => {
+    currentHistoryIdRef.current = currentHistoryId;
+  }, [currentHistoryId]);
   useEffect(() => {
     if (generated) setEditing({ ...generated });
   }, [generated]);
 
-  // Reset auto-save flag when starting new generation
+  // Step mode: sync editable outline when brief is ready (stable deps so effect runs when outline content changes)
+  const outlineKey = JSON.stringify(chunkOutputs.brief?.outline);
+  useEffect(() => {
+    const outline = chunkOutputs.brief?.outline;
+    if (outline?.length) {
+      const sections = outline.map((s, i) => ({ ...s, originalIndex: i }));
+      setEditedOutline(sections);
+      const sum = sections.reduce((acc, s) => acc + (s.targetWords || 150), 0);
+      setTargetTotal(sum);
+    }
+  }, [chunkOutputs.brief, outlineKey]);
+
+  // Pre-select first 3 SERP results in production when SERP first arrives (do not overwrite user's later changes)
+  const serpPreSelectDoneRef = useRef(false);
+  useEffect(() => {
+    const serp = chunkOutputs.researchSerp;
+    if (!serp?.results?.length || demoRunning) {
+      if (!serp) serpPreSelectDoneRef.current = false;
+      return;
+    }
+    if (serpPreSelectDoneRef.current) return;
+    serpPreSelectDoneRef.current = true;
+    setSelectedSerpUrls(serp.results.slice(0, 3).map((r) => r.url));
+  }, [chunkOutputs.researchSerp, demoRunning]);
+
+  // Pre-select first 3 in demo when Select competitors step is shown (same as production)
+  const demoSerpPreSelectDoneRef = useRef(false);
+  useEffect(() => {
+    if (!demoRunning) {
+      demoSerpPreSelectDoneRef.current = false;
+      return;
+    }
+    const serp = demoChunkOutputs.researchSerp;
+    if (!serp?.results?.length) {
+      demoSerpPreSelectDoneRef.current = false;
+      return;
+    }
+    if (demoSerpPreSelectDoneRef.current) return;
+    demoSerpPreSelectDoneRef.current = true;
+    setSelectedSerpUrls(serp.results.slice(0, 3).map((r) => r.url));
+  }, [demoRunning, demoChunkOutputs.researchSerp]);
+
+  // Tick every second while generating so total elapsed time updates
+  const [elapsedTick, setElapsedTick] = useState(0);
+  useEffect(() => {
+    if (!generating) return;
+    const id = setInterval(() => setElapsedTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [generating]);
+
+  // Demo: tick every second for elapsed display
+  useEffect(() => {
+    if (!demoRunning) return;
+    const id = setInterval(() => setDemoElapsedTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [demoRunning]);
+
+  // Demo workflow: run each stage ~10s like production; select_done/research_done/brief_done show real UI with sample data
+  const demoStepDurationMs = 5_000;
+  useEffect(() => {
+    if (!demoRunning || demoStartedAt == null) return;
+    const elapsed = Date.now() - demoStartedAt;
+    if (demoStep === "research" && elapsed >= demoStepDurationMs) {
+      setDemoChunkOutputs({ research: null, researchSerp: SAMPLE_RESEARCH_SERP, brief: null });
+      setDemoStep("select_done");
+      setDemoStartedAt(null);
+      setDemoProgress(25);
+      setSelectedSerpUrls(SAMPLE_RESEARCH_SERP.results.slice(0, 3).map((r) => r.url));
+      return;
+    }
+    if (demoStep === "fetch" && elapsed >= demoStepDurationMs) {
+      setDemoChunkOutputs((prev) => ({ research: SAMPLE_RESEARCH, researchSerp: prev.researchSerp ?? SAMPLE_RESEARCH_SERP, brief: null }));
+      setDemoStep("brief");
+      setDemoStartedAt(Date.now());
+      setDemoProgress(25);
+      return;
+    }
+    if (demoStep === "brief" && elapsed >= demoStepDurationMs) {
+      setDemoChunkOutputs((prev) => ({ ...prev, brief: SAMPLE_BRIEF, research: prev.research ?? SAMPLE_RESEARCH, researchSerp: prev.researchSerp ?? SAMPLE_RESEARCH_SERP }));
+      const demoOutline = SAMPLE_BRIEF.outline.map((s, i) => ({ ...s, originalIndex: i }));
+      setEditedOutline(demoOutline);
+      setTargetTotal(demoOutline.reduce((acc, s) => acc + (s.targetWords || 150), 0));
+      setDemoStep("brief_done");
+      setDemoStartedAt(null);
+      setDemoProgress(50);
+      return;
+    }
+    if (demoStep === "draft" && elapsed >= demoStepDurationMs) {
+      setDemoStep("validate");
+      setDemoStartedAt(Date.now());
+      setDemoProgress(75);
+      return;
+    }
+    if (demoStep === "validate" && elapsed >= demoStepDurationMs) {
+      setDemoRunning(false);
+      setDemoStartedAt(null);
+      setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
+      setDemoStep("complete");
+      setSampleResult(SAMPLE_RESULT);
+      const initial = pipelineToGenerated(SAMPLE_PIPELINE_RESULT);
+      setSampleOutput(initial);
+      setEditing({ ...initial });
+      setContentView("preview");
+      setStrategyOpen(true);
+      setSchemaOpen(false);
+      setAuditListFilter("all");
+      setQualityListFilter("all");
+      setEeatListFilter("all");
+      setEeatResult(null);
+      setEeatError(null);
+      return;
+    }
+    // Progress bar during running steps
+    if (demoStep === "research") setDemoProgress(Math.min(25, (elapsed / demoStepDurationMs) * 25));
+    if (demoStep === "fetch") setDemoProgress(25);
+    if (demoStep === "brief") setDemoProgress(25 + (elapsed / demoStepDurationMs) * 25);
+    if (demoStep === "draft") setDemoProgress(50 + (elapsed / demoStepDurationMs) * 25);
+    if (demoStep === "validate") setDemoProgress(75 + (elapsed / demoStepDurationMs) * 25);
+  }, [demoRunning, demoStartedAt, demoStep, demoElapsedTick]);
+
+  // Reset auto-save flag, history id, and SERP cache when starting new generation
   useEffect(() => {
     if (generating) {
       autoSavedRef.current = null;
+      setCurrentHistoryId(null);
+      currentHistoryIdRef.current = null;
+      lastResearchSerpRef.current = null;
     }
   }, [generating]);
 
-  // Auto-save to history when generation completes
+  /** Save current or partial content to history (appears on Recent). Returns id if created. */
+  const saveToHistory = useCallback(
+    async (payload: {
+      title: string;
+      metaDescription: string;
+      outline: string[];
+      content: string;
+      suggestedSlug?: string;
+      suggestedCategories?: string[];
+      suggestedTags?: string[];
+      focusKeyword?: string;
+      generationTimeMs?: number;
+    }) => {
+      setSaveInProgress(true);
+      setSaveStatus("idle");
+      setSaveErrorMessage(null);
+      const id = currentHistoryIdRef.current ?? null;
+      const url = id ? `/api/blog/history?id=${encodeURIComponent(id)}` : "/api/blog/history";
+      const method = id ? "PATCH" : "POST";
+      const body = {
+        title: payload.title,
+        metaDescription: payload.metaDescription,
+        outline: payload.outline,
+        content: payload.content,
+        suggestedSlug: payload.suggestedSlug ?? null,
+        suggestedCategories: payload.suggestedCategories ?? null,
+        suggestedTags: payload.suggestedTags ?? null,
+        focusKeyword: payload.focusKeyword ?? null,
+        ...(typeof payload.generationTimeMs === "number" && { generationTimeMs: payload.generationTimeMs }),
+      };
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          credentials: "include",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          const errMsg = (data as { error?: string }).error ?? `Save failed (${res.status})`;
+          setSaveErrorMessage(errMsg);
+          setSaveStatus("error");
+          return null;
+        }
+        const newId = (data as { id?: string }).id ?? id;
+        if (newId && !currentHistoryIdRef.current) {
+          setCurrentHistoryId(newId);
+          currentHistoryIdRef.current = newId;
+        }
+        setSaveStatus("saved");
+        return newId;
+      } catch (err) {
+        setSaveErrorMessage(err instanceof Error ? err.message : "Network error");
+        setSaveStatus("error");
+        return null;
+      } finally {
+        setSaveInProgress(false);
+      }
+    },
+    []
+  );
+
+  // Auto-save to history when generation completes (once per content)
   useEffect(() => {
     if (!generated || !result || generating) return;
-    // Skip sample output
-    if (generated.title === SAMPLE_OUTPUT.title) return;
-    // Skip if already saved (check by title + content hash to avoid duplicates)
+    if (sampleResult != null) return;
     const contentHash = `${generated.title}-${generated.content.slice(0, 100)}`;
     if (autoSavedRef.current === contentHash) return;
-    
-    // Get primary keyword
     const currentKw = keywords[0]?.trim();
     const genKw = generationInput.keywords[0]?.trim();
     const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
-    
-    // Get generation time
     const generationTimeMs = pipelineResult?.generationTimeMs;
-    
-    // Save to history
-    fetch("/api/blog/history", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: generated.title,
-        metaDescription: generated.metaDescription,
-        outline: generated.outline,
-        content: generated.content,
-        suggestedSlug: generated.suggestedSlug,
-        suggestedCategories: generated.suggestedCategories,
-        suggestedTags: generated.suggestedTags,
+    saveToHistory({
+      title: generated.title,
+      metaDescription: generated.metaDescription,
+      outline: generated.outline,
+      content: generated.content,
+      suggestedSlug: generated.suggestedSlug,
+      suggestedCategories: generated.suggestedCategories,
+      suggestedTags: generated.suggestedTags,
+      focusKeyword,
+      ...(typeof generationTimeMs === "number" && { generationTimeMs }),
+    }).then((id) => {
+      if (id) autoSavedRef.current = contentHash;
+    });
+  }, [generated, result, keywords, generationInput.keywords, pipelineResult?.generationTimeMs, generating, sampleResult, saveToHistory]);
+
+  // Clear "Saved to Recent" message after a short delay
+  useEffect(() => {
+    if (saveStatus !== "saved") return;
+    const t = setTimeout(() => setSaveStatus("idle"), 3000);
+    return () => clearTimeout(t);
+  }, [saveStatus]);
+
+  // Keep ref updated so debounced save always uses latest editing state
+  const editingRef = useRef(editing);
+  useEffect(() => {
+    editingRef.current = editing;
+  }, [editing]);
+
+  // Debounced auto-save when user edits (result stage): updates history so saved article stays on Recent
+  const keywordsFirst = keywords[0];
+  const genKwFirst = generationInput.keywords?.[0];
+  const genTimeMs = pipelineResult?.generationTimeMs;
+  useEffect(() => {
+    if (!editing) return;
+    // Skip for demo sample; allow when loaded from Recent (currentHistoryId set)
+    if (sampleResult != null && !currentHistoryIdRef.current) return;
+    const t = setTimeout(() => {
+      const current = editingRef.current;
+      if (!current) return;
+      const currentKw = keywordsFirst?.trim();
+      const genKw = genKwFirst?.trim();
+      const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
+      saveToHistory({
+        ...current,
         focusKeyword,
-        ...(typeof generationTimeMs === "number" && { generationTimeMs }),
-      }),
-      credentials: "include",
-    })
-      .then(() => {
-        // Mark as saved
-        autoSavedRef.current = contentHash;
-      })
-      .catch((err) => {
-        console.error("Failed to auto-save to history:", err);
-        // Don't mark as saved on error so we can retry
+        ...(typeof genTimeMs === "number" && { generationTimeMs: genTimeMs }),
       });
-  }, [generated, result, keywords, generationInput.keywords, pipelineResult?.generationTimeMs, generating]);
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [editing, editing?.title, editing?.metaDescription, editing?.content, editing?.outline, editing?.suggestedSlug, editing?.suggestedCategories, editing?.suggestedTags, keywords, keywordsFirst, generationInput.keywords, genKwFirst, genTimeMs, sampleResult, saveToHistory]);
 
   // Load history entry if historyId query param is present
   useEffect(() => {
@@ -612,6 +1011,10 @@ export default function BlogMakerPage() {
         };
         setEditing(historyContent);
         setSampleOutput(historyContent);
+        if (data.id) {
+          setCurrentHistoryId(data.id);
+          currentHistoryIdRef.current = data.id;
+        }
         // Set keywords state so primary keyword is available when saving
         if (data.focus_keyword) {
           setKeywords([data.focus_keyword]);
@@ -619,7 +1022,6 @@ export default function BlogMakerPage() {
         setSampleResult({
           pipelineResult: null,
           fallbackGenerated: historyContent,
-          selectedTitleIndex: 0,
           input: {
             keywords: data.focus_keyword ? [data.focus_keyword] : [],
             peopleAlsoSearchFor: [],
@@ -753,18 +1155,6 @@ export default function BlogMakerPage() {
     return () => clearTimeout(t);
   }, [editing?.title, editing?.content, eeatLoading]);
 
-  // Clear E-E-A-T result when user changes title variant so they can re-run with new title
-  const prevTitleIndexRef = useRef(selectedTitleIndex);
-  useEffect(() => {
-    if (prevTitleIndexRef.current !== selectedTitleIndex && pipelineResult) {
-      setEeatResult(null);
-      lastEeatInputRef.current = null;
-      prevTitleIndexRef.current = selectedTitleIndex;
-    } else {
-      prevTitleIndexRef.current = selectedTitleIndex;
-    }
-  }, [selectedTitleIndex, pipelineResult]);
-
   const seoAudit = useMemo(() => {
     if (!editing) return null;
     try {
@@ -832,6 +1222,76 @@ export default function BlogMakerPage() {
     }
   }
 
+  async function handleGenerateMeta() {
+    if (!editing?.content) return;
+    const primaryKeyword = generationInput.keywords[0]?.trim() || keywords[0]?.trim();
+    if (!primaryKeyword) {
+      setStatus({ type: "error", message: "Primary keyword needed. Add a keyword in the input and try again." });
+      return;
+    }
+    setGenerateMetaLoading(true);
+    setStatus({ type: null, message: "" });
+    setMetaOptions(null);
+    try {
+      if (sampleResult && !currentHistoryId) {
+        setEditing((prev) =>
+          prev
+            ? {
+                ...prev,
+                title: SAMPLE_OUTPUT.title,
+                metaDescription: SAMPLE_OUTPUT.metaDescription,
+                suggestedSlug: SAMPLE_OUTPUT.suggestedSlug ?? prev.suggestedSlug,
+              }
+            : prev
+        );
+        setStatus({ type: "success", message: "Meta generated from draft" });
+      } else {
+        const content = editing.content;
+        const res = await fetch("/api/blog/meta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            content,
+            primaryKeyword,
+            intent: generationInput.intent?.[0] || intent[0] || "informational",
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setStatus({ type: "error", message: data.error ?? "Meta generation failed" });
+          return;
+        }
+        const opts = data.options;
+        if (Array.isArray(opts) && opts.length >= 2) {
+          setMetaOptions(opts);
+          setStatus({ type: "success", message: "2 meta options generated. Pick one below." });
+        } else {
+          setStatus({ type: "error", message: "Unexpected response: expected 2 options" });
+        }
+      }
+    } catch (e) {
+      setStatus({ type: "error", message: e instanceof Error ? e.message : "Meta generation failed" });
+    } finally {
+      setGenerateMetaLoading(false);
+    }
+  }
+
+  function handleUseMetaOption(opt: { title: string; metaDescription: string; suggestedSlug: string }) {
+    setEditing((prev) =>
+      prev
+        ? {
+            ...prev,
+            title: opt.title,
+            metaDescription: opt.metaDescription,
+            suggestedSlug: opt.suggestedSlug ?? prev.suggestedSlug,
+          }
+        : prev
+    );
+    setMetaOptions(null);
+    setStatus({ type: "success", message: "Meta applied" });
+  }
+
   async function handleRunEeatAudit() {
     if (!editing?.content) return;
     setEeatLoading(true);
@@ -882,11 +1342,33 @@ export default function BlogMakerPage() {
     setContentView("preview");
   }
 
+  // Cache SERP when we have it so "Back to previous section" from step 2 still has data for step 1
+  const serpForStep1 = chunkOutputs.researchSerp ?? lastResearchSerpRef.current;
+  if (chunkOutputs.researchSerp) lastResearchSerpRef.current = chunkOutputs.researchSerp;
+
+  const inStepMode =
+    (phase === "reviewing" && (chunkOutputs.researchSerp || chunkOutputs.research || chunkOutputs.brief)) ||
+    (demoRunning && (demoChunkOutputs.researchSerp || demoChunkOutputs.research || demoChunkOutputs.brief)) ||
+    // Allow jump-to-stage for redesign: demo chunks present without running
+    (demoChunkOutputs.researchSerp || demoChunkOutputs.research || demoChunkOutputs.brief);
+  const maxStep =
+    chunkOutputs.brief || demoChunkOutputs.brief
+      ? 2
+      : chunkOutputs.researchSerp || demoChunkOutputs.researchSerp
+        ? 1
+        : 0;
+  const displayStep =
+    stepView !== null ? (stepView <= 0 ? 0 : Math.min(stepView, maxStep)) : maxStep;
+  const hasDemoChunks = !!(demoChunkOutputs.brief || demoChunkOutputs.researchSerp);
+  const showInputSections = !inStepMode || displayStep === 0 || hasDemoChunks;
+  // When going back to step 1, use cached SERP if provider cleared it
+  const showStep1Content = inStepMode && (serpForStep1 || demoChunkOutputs.researchSerp) && displayStep === 1;
+
   return (
     <div className="space-y-12">
-      {/* Header – Apple/Google style: generous space, refined typography */}
-      <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+      {/* Header – title + subtitle left; Back or Start over right, vertically centred */}
+      <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             Content Writer
           </h1>
@@ -894,42 +1376,89 @@ export default function BlogMakerPage() {
             Google Search Central + Rank Math optimized content. Enter a keyword to generate.
           </p>
         </div>
-        {generated ? (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              const current = editing;
-              clearResult();
-              setSampleOutput(null);
-              setSampleResult(null);
-              setEditing(null);
-              if (current && current.title !== SAMPLE_OUTPUT.title) {
-                // Primary keyword is always the first keyword entered by the user
-                // Use current keywords state if available and non-empty, otherwise fall back to generation input
+        <div className="shrink-0 flex items-center gap-2">
+          {generated ? (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={saveInProgress}
+              onClick={async () => {
+                if (!editing) return;
                 const currentKw = keywords[0]?.trim();
                 const genKw = generationInput.keywords[0]?.trim();
                 const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
-                const generationTimeMs = pipelineResult?.generationTimeMs;
-                fetch("/api/blog/history", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    ...current,
-                    focusKeyword,
-                    ...(typeof generationTimeMs === "number" && { generationTimeMs }),
-                  }),
-                  credentials: "include",
-                }).catch(() => {});
-              }
-            }}
-            className="shrink-0 border-border text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="mr-1.5 h-4 w-4" />
-            Start over
-          </Button>
-        ) : null}
+                await saveToHistory({
+                  ...editing,
+                  focusKeyword,
+                  ...(typeof pipelineResult?.generationTimeMs === "number" && { generationTimeMs: pipelineResult.generationTimeMs }),
+                });
+              }}
+              className="shrink-0 border-border text-muted-foreground hover:text-foreground"
+            >
+              {saveInProgress ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+              Save
+            </Button>
+            {saveStatus === "saved" && (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <Check className="h-3.5 w-3.5" /> Saved to Recent
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <span className="text-xs text-destructive" title={saveErrorMessage ?? undefined}>
+                {saveErrorMessage ?? "Save failed"}
+              </span>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const current = editing;
+                const wasSample = sampleResult != null;
+                clearResult();
+                setSampleOutput(null);
+                setSampleResult(null);
+                setEditing(null);
+                setCurrentHistoryId(null);
+                currentHistoryIdRef.current = null;
+                if (current && !wasSample && current.title !== SAMPLE_OUTPUT.title) {
+                  const currentKw = keywords[0]?.trim();
+                  const genKw = generationInput.keywords[0]?.trim();
+                  const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
+                  const generationTimeMs = pipelineResult?.generationTimeMs;
+                  fetch("/api/blog/history", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      ...current,
+                      focusKeyword,
+                      ...(typeof generationTimeMs === "number" && { generationTimeMs }),
+                    }),
+                    credentials: "include",
+                  }).catch(() => {});
+                }
+              }}
+              className="shrink-0 border-border text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              Start over
+            </Button>
+          </>
+          ) : inStepMode && displayStep >= 1 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-[13px] text-muted-foreground hover:text-foreground"
+              onClick={() => setStepView(displayStep === 2 ? 1 : 0)}
+            >
+              <ArrowLeft className="mr-1.5 h-4 w-4" />
+              {displayStep === 2 ? "Back to Select competitors" : "Back to input"}
+            </Button>
+          ) : null}
+        </div>
       </header>
 
       {(status.type || generationError) && (
@@ -942,7 +1471,11 @@ export default function BlogMakerPage() {
           }`}
         >
           <div className="min-w-0 flex-1">
-            <p>{status.message || generationError}</p>
+            <p>
+              {generationError?.includes("Job not found")
+                ? "This job is no longer available. Start a new run with the same settings below."
+                : displayError((status.message || generationError) ?? null) || "Something went wrong."}
+            </p>
             {status.type === "success" && status.link && (
               <a
                 href={status.link}
@@ -952,6 +1485,57 @@ export default function BlogMakerPage() {
               >
                 View post →
               </a>
+            )}
+            {!status.type && generationError && errorChunk && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {generationError.includes("Job not found") ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      clearError();
+                      retryFromChunk(errorChunk);
+                    }}
+                    className="rounded-full"
+                  >
+                    Start new run
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        clearError();
+                        retryFromChunk(errorChunk);
+                      }}
+                      className="rounded-full border-red-300 text-red-800 hover:bg-red-100 dark:border-red-700 dark:text-red-200 dark:hover:bg-red-900/40"
+                    >
+                      Retry from {errorChunk === "research" ? "Research" : errorChunk === "brief" ? "Analysis" : errorChunk === "draft" ? "Draft" : "Validation"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        clearError();
+                        startGeneration({
+                          keywords,
+                          peopleAlsoSearchFor,
+                          intent: intent.length > 0 ? intent : ["informational"],
+                          competitorUrls,
+                          wordCountPreset,
+                          ...(wordCountPreset === "custom" && typeof wordCountCustom === "number" && wordCountCustom >= 500 && wordCountCustom <= 6000 && { wordCountCustom }),
+                        });
+                      }}
+                      className="rounded-full"
+                    >
+                      Retry from start
+                    </Button>
+                  </>
+                )}
+              </div>
             )}
           </div>
           <button
@@ -971,36 +1555,673 @@ export default function BlogMakerPage() {
       {!generated ? (
         <form
           onSubmit={handleGenerate}
-          className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm"
+          className={`relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${
+            (generating && phase !== "reviewing") || (demoRunning && ["research", "fetch", "brief", "draft", "validate"].includes(demoStep))
+              ? "h-[420px]"
+              : ""
+          }`}
         >
-          {generating && (
-            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-5 bg-background/95 animate-in fade-in duration-200 backdrop-blur-sm">
-              <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
-              <div className="w-full max-w-sm space-y-3 px-6">
-                <p className="text-center text-sm font-medium text-foreground">
-                  {generationProgress?.message || "Starting pipeline..."}
-                </p>
-                {/* Progress bar */}
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-orange-500 transition-all duration-500 ease-out"
-                    style={{ width: `${generationProgress?.progress ?? 2}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
-                  <span>
-                    {generationProgress
-                      ? `${Math.round((generationProgress.elapsedMs || 0) / 1000)}s elapsed`
-                      : "Initializing..."}
-                  </span>
-                  <span>{generationProgress?.progress ?? 0}%</span>
-                </div>
-              </div>
-            </div>
-          )}
+          <GenerationLoadingOverlay
+            visible={(generating && phase !== "reviewing") || (demoRunning && ["research", "fetch", "brief", "draft", "validate"].includes(demoStep))}
+            progress={generationProgress}
+            generationStartedAt={generationStartedAt}
+            chunkOutputs={chunkOutputs}
+            demoRunning={demoRunning}
+            demoStep={demoStep}
+            demoProgress={demoProgress}
+            demoStartedAt={demoStartedAt}
+            demoElapsedTick={demoElapsedTick}
+            demoChunkOutputs={demoChunkOutputs}
+          />
 
           <div className="space-y-0">
-            {/* Keywords, People also search for, Search intent, Word count — single flat section, no nested boxes */}
+            {/* Step mode: select competitors — 3x3 grid, improved card layout and UX */}
+            {showStep1Content && (
+              <section className="flex min-h-0 max-h-[100dvh] flex-col px-5 py-6 sm:px-8 sm:py-10">
+                <div className="mx-auto flex w-full max-w-5xl flex-1 min-h-0 flex-col">
+                  {/* Header */}
+                  <header className="shrink-0 mb-8">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="inline-flex h-6 items-center rounded-full bg-muted/50 px-2.5 text-[11px] font-medium tabular-nums text-muted-foreground">
+                          Step 1
+                        </span>
+                        <h2 className="text-xl font-medium tracking-tight text-foreground sm:text-2xl">
+                          Select competitors
+                        </h2>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearResult();
+                          setSelectedSerpUrls([]);
+                          setCustomCompetitorUrl("");
+                          if (demoRunning) {
+                            setDemoRunning(false);
+                            setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
+                          }
+                        }}
+                        className="text-[13px] text-muted-foreground hover:text-foreground transition-colors py-1.5 px-2 rounded-md hover:bg-muted/40 -mr-1"
+                      >
+                        Change keywords
+                      </button>
+                    </div>
+                    <p className="mt-2.5 text-[15px] text-muted-foreground leading-relaxed whitespace-nowrap overflow-x-auto">
+                      Pick up to 3 sources. We&apos;ll use them to build your outline and draft. Up to 1 can be a custom URL.
+                    </p>
+                  </header>
+
+                  {/* Custom URL — 1 slot for user-provided URL (single line) */}
+                  <div className="shrink-0 mb-5">
+                    <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
+                          <Plus className="h-4 w-4" />
+                        </span>
+                        <label htmlFor="custom-competitor-url" className="shrink-0 text-[13px] font-medium text-foreground whitespace-nowrap">
+                          Custom URL (optional)
+                        </label>
+                        <Input
+                          id="custom-competitor-url"
+                          type="url"
+                          value={customCompetitorUrl}
+                          onChange={(e) => setCustomCompetitorUrl(e.target.value)}
+                          placeholder="https://example.com/article"
+                          className="h-10 flex-1 min-w-[200px] rounded-lg border-0 bg-muted/30 text-[14px] placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 transition-colors"
+                        />
+                        {customCompetitorUrl.trim() && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-10 w-10 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/50 shrink-0"
+                            onClick={() => setCustomCompetitorUrl("")}
+                            aria-label="Clear custom URL"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Grid: 3x3, equal-height cards; pt avoids first row being clipped by scroll */}
+                  <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pt-3 pb-4 content-start">
+                    {((demoChunkOutputs.researchSerp ?? serpForStep1)!.results).slice(0, 9).map((item: ResearchSerpItem) => {
+                        const selected = selectedSerpUrls.includes(item.url);
+                        const hasValidCustom = (() => {
+                          const t = customCompetitorUrl.trim();
+                          if (!t) return false;
+                          try {
+                            const u = new URL(t);
+                            return u.protocol === "http:" || u.protocol === "https:";
+                          } catch {
+                            return false;
+                          }
+                        })();
+                        const serpMax = hasValidCustom ? 2 : 3;
+                        const atMax = selectedSerpUrls.length >= serpMax && !selected;
+                        const selectionIndex = selected ? selectedSerpUrls.indexOf(item.url) + 1 : 0;
+                        let domain = "";
+                        try {
+                          domain = new URL(item.url).hostname;
+                        } catch {
+                          domain = item.url;
+                        }
+                        const toggleSelection = () => {
+                          if (atMax) return;
+                          setSelectedSerpUrls((prev) =>
+                            selected ? prev.filter((u) => u !== item.url) : prev.length >= serpMax ? prev : [...prev, item.url]
+                          );
+                        };
+                        return (
+                          <li
+                            key={item.url}
+                            className={`group relative flex h-full min-h-[140px] flex-col rounded-xl border-2 text-left select-none ${
+                              atMax ? "cursor-not-allowed border-border/30 bg-muted/10 opacity-60" : "cursor-pointer border-border/40 bg-card"
+                            } ${selected ? "border-orange-500 bg-orange-500/5 shadow-md ring-2 ring-orange-500/20" : ""}`}
+                          >
+                            <button
+                              type="button"
+                              tabIndex={atMax ? -1 : 0}
+                              aria-pressed={selected}
+                              disabled={atMax}
+                              title={atMax ? "Maximum 3 selected. Deselect one to change." : selected ? "Click to deselect" : "Click to select"}
+                              onClick={toggleSelection}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  e.preventDefault();
+                                  toggleSelection();
+                                }
+                              }}
+                              className="flex min-h-0 flex-1 flex-col rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            >
+                            {/* Top row: position + selection check */}
+                            <div className="flex items-start justify-between gap-2 p-3 pb-1 sm:p-4 sm:pb-2">
+                              <span
+                                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums transition-colors ${
+                                  selected ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"
+                                }`}
+                              >
+                                {selected ? selectionIndex : item.position}
+                              </span>
+                              {selected && (
+                                <span className="rounded-full bg-orange-500 p-0.5 text-white" aria-hidden>
+                                  <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Title: fills space, clamps to 2 lines */}
+                            <div className="min-h-0 flex-1 px-3 pb-1 sm:px-4 sm:pb-2">
+                              <p className="text-[13px] sm:text-[14px] font-medium text-foreground leading-snug line-clamp-2">
+                                {item.title || "Untitled"}
+                              </p>
+                            </div>
+                            </button>
+
+                            {/* Bottom: domain + open link as badges (click opens URL only, does not toggle card) */}
+                            <div className="flex flex-wrap items-center gap-2 px-3 pb-3 sm:px-4 sm:pb-4">
+                              {domain && (
+                                <a
+                                  href={item.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={item.url}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] sm:text-xs font-medium text-emerald-700 dark:text-emerald-400/90 truncate max-w-full"
+                                >
+                                  {domain}
+                                </a>
+                              )}
+                              <a
+                                href={item.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={`Open: ${item.url}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1 text-[11px] sm:text-xs font-medium text-muted-foreground shrink-0"
+                              >
+                                Open
+                                <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                              </a>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              disabled={atMax}
+                              onChange={() => {
+                                setSelectedSerpUrls((prev) =>
+                                  selected ? prev.filter((u) => u !== item.url) : prev.length >= serpMax ? prev : [...prev, item.url]
+                                );
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="sr-only"
+                              aria-label={selected ? `Deselect ${item.title || item.url}` : `Select ${item.title || item.url}`}
+                            />
+                          </li>
+                        );
+                    })}
+                  </ul>
+
+                  {/* Footer: sticky feel with clear CTA */}
+                  <div className="shrink-0 flex flex-col gap-3 pt-6 mt-2">
+                    {(() => {
+                      const isValidCustom = (() => {
+                        const t = customCompetitorUrl.trim();
+                        if (!t) return false;
+                        try {
+                          const u = new URL(t);
+                          return u.protocol === "http:" || u.protocol === "https:";
+                        } catch {
+                          return false;
+                        }
+                      })();
+                      const totalSelected = selectedSerpUrls.length + (isValidCustom ? 1 : 0);
+                      const urlsToFetch = isValidCustom ? [...selectedSerpUrls, customCompetitorUrl.trim()] : selectedSerpUrls;
+                      return (
+                        <>
+                          {totalSelected === 0 && (
+                            <p className="text-[13px] text-muted-foreground">
+                              Select at least one source to continue.
+                            </p>
+                          )}
+                          {totalSelected >= 3 && (
+                            <p className="text-[13px] text-muted-foreground">
+                              Maximum reached. Deselect a card or clear the custom URL to change.
+                            </p>
+                          )}
+                          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4">
+                            <span className="text-[13px] text-muted-foreground">
+                              <span className="font-semibold text-foreground tabular-nums">{totalSelected}</span>
+                              <span> / 3 selected</span>
+                              {isValidCustom && <span className="ml-1 text-muted-foreground/70">(1 custom)</span>}
+                            </span>
+                            <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={saveInProgress}
+                          onClick={async () => {
+                            const title = keywords.length ? `${keywords.join(", ")} (in progress)` : "Draft (in progress)";
+                            await saveToHistory({
+                              title,
+                              metaDescription: "",
+                              outline: [],
+                              content: "",
+                              focusKeyword: keywords[0]?.trim() || undefined,
+                            });
+                          }}
+                          className="h-11 rounded-full px-8 text-[15px] font-medium border-border"
+                        >
+                          {saveInProgress ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+                          Save
+                        </Button>
+                        {saveStatus === "error" && (
+                          <span className="text-xs text-destructive" title={saveErrorMessage ?? undefined}>
+                            {saveErrorMessage ?? "Save failed"}
+                          </span>
+                        )}
+                        <Button
+                          type="button"
+                          disabled={totalSelected === 0}
+                          onClick={() => {
+                            if (demoRunning && demoChunkOutputs.researchSerp) {
+                              setDemoStep("fetch");
+                              setDemoStartedAt(Date.now());
+                              setDemoElapsedTick(0);
+                              return;
+                            }
+                            setStepView(null);
+                            if (jobId && urlsToFetch.length >= 1 && urlsToFetch.length <= 3) {
+                              startResearchFetch(jobId, urlsToFetch);
+                            }
+                          }}
+                          className="w-full sm:w-auto h-11 rounded-full bg-foreground px-8 text-[15px] font-medium text-background shadow-sm hover:bg-foreground/90 hover:shadow transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100"
+                        >
+                          {totalSelected === 0 ? "Select at least one" : "Continue"}
+                        </Button>
+                      </div>
+                    </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Step mode: outline editor (research & brief run in sequence; no separate research summary) */}
+            {inStepMode && (chunkOutputs.brief || demoChunkOutputs.brief) && displayStep === 2 && (
+              <section className="flex min-h-0 max-h-[100dvh] flex-col w-full bg-background">
+                <div className="flex w-full flex-1 min-h-0 flex-col px-8 sm:px-12 lg:px-20 xl:px-24">
+                  {/* Header — spacious, minimal, excellent */}
+                  <header className="shrink-0 pt-14 pb-10">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-[26px] font-semibold text-foreground tracking-tight leading-tight">
+                          Article outline
+                        </h2>
+                        <p className="mt-3 text-[15px] text-muted-foreground leading-[1.6]">
+                          Define your article structure. Edit headings, set word targets, use Redistribute or Revise Brief to adjust word count, then continue to draft.
+                        </p>
+                      </div>
+                    </div>
+                    {editedOutline.length > 0 && (
+                      <div className="mt-10 flex flex-wrap items-center gap-6 w-full">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-baseline gap-2 rounded-full bg-muted/40 px-4 py-2">
+                            <span className="tabular-nums text-[15px] font-semibold text-foreground">{editedOutline.length}</span>
+                            <span className="text-[14px] text-muted-foreground">sections</span>
+                          </div>
+                          <div className="flex items-baseline gap-2 rounded-full bg-muted/40 px-4 py-2">
+                            <span className="tabular-nums text-[15px] font-semibold text-foreground">
+                              {editedOutline.reduce((sum, s) => sum + (s.targetWords || 0), 0)}
+                            </span>
+                            <span className="text-[14px] text-muted-foreground">words</span>
+                          </div>
+                        </div>
+                        <div className="h-5 w-px bg-border/70" aria-hidden />
+                        <div className="flex flex-wrap items-center gap-3">
+                          <label htmlFor="target-total" className="text-[13px] text-muted-foreground sr-only sm:not-sr-only">Target words</label>
+                          <Input
+                            id="target-total"
+                            type="number"
+                            min={500}
+                            max={6000}
+                            step={100}
+                            value={targetTotal}
+                            onChange={(e) => setTargetTotal(Math.max(0, Number(e.target.value) || 0))}
+                            className="h-10 w-28 rounded-xl border-0 bg-muted/30 px-4 text-[15px] font-medium placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 transition-colors duration-200"
+                            aria-label="Target word count"
+                            placeholder="Target"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sum = editedOutline.reduce((s, x) => s + (x.targetWords || 150), 0);
+                              if (sum <= 0 || targetTotal <= 0) return;
+                              setEditedOutline((prev) =>
+                                prev.map((s) => ({
+                                  ...s,
+                                  targetWords: Math.max(50, Math.round((s.targetWords || 150) * (targetTotal / sum))),
+                                }))
+                              );
+                            }}
+                            className="h-10 rounded-full px-5 text-[14px] font-medium bg-muted/50 text-foreground hover:bg-muted border border-transparent hover:border-border/60 transition-all duration-200"
+                          >
+                            Redistribute
+                          </button>
+                          {(jobId || demoChunkOutputs.brief) && (
+                            <button
+                              type="button"
+                              disabled={generating}
+                              onClick={() => {
+                                const sum = editedOutline.reduce((s, x) => s + (x.targetWords || 150), 0);
+                                const effectiveTarget = Math.max(
+                                  500,
+                                  Math.min(6000, (targetTotal >= 500 && targetTotal <= 6000 ? targetTotal : sum) || sum || 1500)
+                                );
+                                if (jobId) startReviseBrief(jobId, Math.round(effectiveTarget));
+                                else if (demoChunkOutputs.brief && sum > 0) {
+                                  setEditedOutline((prev) =>
+                                    prev.map((s) => ({
+                                      ...s,
+                                      targetWords: Math.max(50, Math.round((s.targetWords || 150) * (effectiveTarget / sum))),
+                                    }))
+                                  );
+                                }
+                              }}
+                              className="h-10 rounded-full px-5 text-[14px] font-medium bg-orange-500/15 text-orange-600 border border-orange-500/30 hover:bg-orange-500/25 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/25 transition-all duration-200 disabled:opacity-50"
+                            >
+                              Revise Brief
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const outline = (demoChunkOutputs.brief ?? chunkOutputs.brief)?.outline ?? [];
+                            const sections = outline.map((s, i) => ({ ...s, originalIndex: i }));
+                            setEditedOutline(sections);
+                            setTargetTotal(sections.reduce((acc, s) => acc + (s.targetWords || 150), 0));
+                          }}
+                          className="ml-auto h-10 rounded-full px-5 text-[14px] font-medium bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent hover:border-border/50 transition-all duration-200"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    )}
+                  </header>
+
+                  {/* Section list */}
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-4 pb-12">
+                    {editedOutline.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-28 text-center">
+                        <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-muted/25 mb-8 ring-1 ring-border/30">
+                          <FileText className="h-10 w-10 text-muted-foreground/80" />
+                        </div>
+                        <h3 className="text-[19px] font-semibold text-foreground tracking-tight">No sections yet</h3>
+                        <p className="mt-4 text-[15px] text-muted-foreground leading-[1.65]">
+                          Add sections to build your article structure. Each section needs a heading and optional word target.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const nextId = -1 - editedOutline.filter((e) => e.originalIndex < 0).length;
+                            setEditedOutline((prev) => [...prev, { heading: "New section", level: "h2" as const, targetWords: 150, topics: [], reason: "", originalIndex: nextId }]);
+                          }}
+                          className="outline-empty-btn mt-10 h-12 px-10 rounded-full bg-foreground text-background text-[15px] font-semibold"
+                        >
+                          Add first section
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-border/50">
+                          {editedOutline.map((section, idx) => (
+                            <article
+                              key={`${section.originalIndex}-${idx}`}
+                              className={`group outline-section-row flex items-start gap-5 py-5 px-5 -mx-4 rounded-xl first:pt-5 border border-border/30
+                                ${section.level === "h3" ? "ml-4 pl-5 border-l-2 border-l-orange-500/50" : ""}`}
+                            >
+                              <div className="flex shrink-0 items-center gap-2 pt-1">
+                                <span
+                                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums transition-colors duration-200
+                                    ${section.level === "h2"
+                                      ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                                      : "bg-muted/50 text-muted-foreground"
+                                    }`}
+                                  aria-hidden
+                                >
+                                  {idx + 1}
+                                </span>
+                                <span className="cursor-grab active:cursor-grabbing p-2 rounded-lg text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/40 transition-colors duration-200 -ml-1" aria-hidden title="Drag to reorder">
+                                  <GripVertical className="h-4 w-4" />
+                                </span>
+                              </div>
+
+                              <div className="flex-1 min-w-0 flex flex-col gap-3.5">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <Input
+                                    value={section.heading}
+                                    onChange={(e) =>
+                                      setEditedOutline((prev) =>
+                                        prev.map((s, i) => (i === idx ? { ...s, heading: e.target.value } : s))
+                                      )
+                                    }
+                                    className={`flex-1 min-w-[200px] h-10 rounded-lg border-0 bg-muted/30 px-4 text-[15px] font-medium placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 hover:bg-muted/35 transition-all duration-200 ${
+                                      section.level === "h3" ? "text-[14px] font-normal" : ""
+                                    }`}
+                                    placeholder="Section heading"
+                                  />
+                                  <select
+                                    value={section.level}
+                                    onChange={(e) =>
+                                      setEditedOutline((prev) =>
+                                        prev.map((s, i) => (i === idx ? { ...s, level: e.target.value as "h2" | "h3" } : s))
+                                      )
+                                    }
+                                    className="h-10 w-[68px] rounded-lg border-0 bg-muted/30 px-3 text-[13px] font-medium text-muted-foreground focus:ring-2 focus:ring-orange-500/25 focus:outline-none hover:bg-muted/35 transition-all duration-200"
+                                    aria-label="Heading level"
+                                  >
+                                    <option value="h2">H2</option>
+                                    <option value="h3">H3</option>
+                                  </select>
+                                  <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 min-w-[88px] hover:bg-muted/35 transition-colors duration-200">
+                                    <Input
+                                      type="number"
+                                      min={0}
+                                      max={2000}
+                                      value={section.targetWords}
+                                      onChange={(e) =>
+                                        setEditedOutline((prev) =>
+                                          prev.map((s, i) => (i === idx ? { ...s, targetWords: Number(e.target.value) || 0 } : s))
+                                        )
+                                      }
+                                      className="h-7 w-14 border-0 bg-transparent p-0 text-center text-[13px] font-medium tabular-nums text-foreground focus-visible:ring-0"
+                                    />
+                                    <span className="text-[12px] text-muted-foreground">words</span>
+                                  </div>
+                                </div>
+                                {section.topics?.length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                    {section.topics.map((topic, ti) => (
+                                      <span key={ti} className="inline-flex rounded-full bg-muted/35 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                                        {topic}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex shrink-0 items-center gap-1 pt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" disabled={idx === 0} aria-label="Move up"
+                                  onClick={() => setEditedOutline((prev) => {
+                                    if (idx <= 0) return prev;
+                                    const next = [...prev];
+                                    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                    return next;
+                                  })}
+                                >
+                                  <ChevronUp className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" disabled={idx === editedOutline.length - 1} aria-label="Move down"
+                                  onClick={() => setEditedOutline((prev) => {
+                                    if (idx >= prev.length - 1) return prev;
+                                    const next = [...prev];
+                                    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                                    return next;
+                                  })}
+                                >
+                                  <ChevronDown className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-500/10" aria-label="Remove section"
+                                  onClick={() => setEditedOutline((prev) => prev.filter((_, i) => i !== idx))}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </article>
+                          ))}
+                          <div className="pt-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextId = -1 - editedOutline.filter((e) => e.originalIndex < 0).length;
+                                setEditedOutline((prev) => [...prev, { heading: "New section", level: "h2" as const, targetWords: 150, topics: [], reason: "", originalIndex: nextId }]);
+                              }}
+                              className="outline-add-btn flex w-full min-h-[80px] items-center justify-center gap-2.5 py-5 px-5 -mx-4 rounded-xl border border-dashed border-border/50 bg-muted/20 text-[15px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-orange-500/40 transition-all duration-200"
+                            >
+                              <Plus className="h-5 w-5" />
+                              Add section
+                            </button>
+                          </div>
+                        </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <footer className="shrink-0 flex flex-col gap-6 py-10 border-t border-border/40 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3 min-w-0 sm:justify-start">
+                      {editedOutline.length > 0 ? (
+                        <span className="inline-flex items-center gap-2.5 text-[15px]">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                            <Check className="h-3.5 w-3.5" />
+                          </span>
+                          <span className="font-medium text-foreground">{editedOutline.length} section{editedOutline.length === 1 ? "" : "s"} ready</span>
+                        </span>
+                      ) : (
+                        <p className="text-[15px] text-muted-foreground">
+                          Add at least one section to generate a draft.
+                        </p>
+                      )}
+                      {saveStatus === "error" && (
+                        <span className="text-xs text-destructive truncate" title={saveErrorMessage ?? undefined}>
+                          {saveErrorMessage ?? "Save failed"}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={saveInProgress}
+                        className="h-10 rounded-full px-6 text-[15px] font-medium border border-border bg-background hover:bg-muted/50 transition-all duration-200"
+                        onClick={async () => {
+                          const title = editedOutline.length > 0 ? editedOutline[0].heading : (keywords.length ? keywords.join(", ") : "Outline (in progress)");
+                          await saveToHistory({
+                            title,
+                            metaDescription: "",
+                            outline: editedOutline.map((s) => s.heading),
+                            content: "",
+                            focusKeyword: keywords[0]?.trim() || undefined,
+                          });
+                        }}
+                      >
+                        {saveInProgress ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-1.5 h-3.5 w-3.5" />}
+                        Save
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditedOutline(
+                            ((demoChunkOutputs.brief ?? chunkOutputs.brief)?.outline ?? []).map((s, i) => ({
+                              ...s,
+                              originalIndex: i,
+                            }))
+                          )
+                        }
+                        className="h-10 rounded-full px-6 text-[15px] font-medium bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted/70 border border-transparent hover:border-border/50 transition-all duration-200"
+                      >
+                        Reset to original
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-center sm:justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={editedOutline.length === 0}
+                        className="h-12 rounded-full px-8 font-semibold text-[15px] bg-orange-600 text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
+                        onClick={() => {
+                          if (demoRunning && demoChunkOutputs.brief) {
+                            setDemoStep("draft");
+                            setDemoStartedAt(Date.now());
+                            setDemoElapsedTick(0);
+                            return;
+                          }
+                          if (!jobId) return;
+                          const N = chunkOutputs.brief?.outline?.length ?? 0;
+                          const existing = editedOutline.filter((e) => e.originalIndex >= 0);
+                          const added = editedOutline.filter((e) => e.originalIndex < 0);
+                          const removedSectionIndexes = Array.from({ length: N }, (_, i) => i).filter(
+                            (i) => !existing.some((e) => e.originalIndex === i)
+                          );
+                          // Full order including added: use negative indices -1,-2,... for added so backend can merge and reorder
+                          const reorderedSectionIndexes = editedOutline.map((e) =>
+                            e.originalIndex >= 0 ? e.originalIndex : -1 - added.indexOf(e)
+                          );
+                          const sections: BriefOverridesForDraft["sections"] = new Array(N);
+                          existing.forEach((e) => {
+                            if (e.originalIndex >= 0 && e.originalIndex < N) {
+                              sections[e.originalIndex] = {
+                                heading: e.heading,
+                                level: e.level,
+                                targetWords: e.targetWords,
+                                topics: e.topics,
+                                geoNote: e.geoNote,
+                              };
+                            }
+                          });
+                          const addedSections: BriefOverridesForDraft["addedSections"] = added.length
+                            ? added.map((e) => ({
+                                heading: e.heading,
+                                level: e.level,
+                                targetWords: e.targetWords,
+                                topics: e.topics,
+                                geoNote: e.geoNote,
+                              }))
+                            : undefined;
+                          startDraft(jobId, {
+                            sections,
+                            reorderedSectionIndexes,
+                            removedSectionIndexes,
+                            ...(addedSections?.length ? { addedSections } : {}),
+                          });
+                        }}
+                      >
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                        Generate Draft
+                      </Button>
+                    </div>
+                  </footer>
+                </div>
+              </section>
+            )}
+
+            {/* Keywords, People also search for, Search intent, Word count — single flat section (hidden when reviewing or demo review) */}
+            {showInputSections && (
             <section className="p-8 sm:p-10 space-y-10">
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-foreground">Keywords</h3>
@@ -1010,7 +2231,7 @@ export default function BlogMakerPage() {
                   onTagsChange={setKeywords}
                   placeholder="Add a keyword, press Enter"
                   maxTags={6}
-                  disabled={generating}
+                  disabled={generating || demoRunning}
                   className="min-h-11 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
                 />
               </div>
@@ -1023,7 +2244,7 @@ export default function BlogMakerPage() {
                   onTagsChange={setPeopleAlsoSearchFor}
                   placeholder="Add a phrase, press Enter"
                   maxTags={3}
-                  disabled={generating}
+                  disabled={generating || demoRunning}
                   className="min-h-11 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
                 />
               </div>
@@ -1056,95 +2277,99 @@ export default function BlogMakerPage() {
                 </div>
               </div>
 
-              <div className="space-y-3 border-t border-border/50 pt-8">
-                <h3 className="text-sm font-medium text-foreground">Word count</h3>
-                <p className="text-sm text-muted-foreground">Guideline only — value and answering the query over length. Aim to provide more value than competitors.</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  {(
-                    [
-                      { value: "auto", label: "Auto", sub: "From competitors" },
-                      { value: "concise", label: "Concise", sub: "≈1k–1.5k" },
-                      { value: "standard", label: "Standard", sub: "≈1.5k–2.5k" },
-                      { value: "in_depth", label: "In-depth", sub: "≈2.5k–4k" },
-                      { value: "custom", label: "Custom", sub: "" },
-                    ] as const
-                  ).map((opt) => (
-                    <label
-                      key={opt.value}
-                      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                        wordCountPreset === opt.value
-                          ? "bg-orange-600 text-white dark:bg-orange-500"
-                          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      } ${generating ? "pointer-events-none opacity-60" : ""}`}
-                    >
-                      <input
-                        type="radio"
-                        name="wordCountPreset"
-                        value={opt.value}
-                        checked={wordCountPreset === opt.value}
-                        onChange={() => setWordCountPreset(opt.value)}
-                        disabled={generating}
-                        className="sr-only"
-                      />
-                      <span>{opt.label}</span>
-                      {opt.sub && <span className="opacity-90 text-xs">({opt.sub})</span>}
-                    </label>
-                  ))}
-                  {wordCountPreset === "custom" && (
-                    <>
-                      <Input
-                        type="number"
-                        min={500}
-                        max={6000}
-                        placeholder="e.g. 2000"
-                        value={wordCountCustom === "" ? "" : wordCountCustom}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          setWordCountCustom(v === "" ? "" : Math.min(6000, Math.max(500, Number(v) || 500)));
-                        }}
-                        disabled={generating}
-                        className="h-10 w-28 rounded-xl border border-border bg-background text-sm"
-                      />
-                      <span className="text-sm text-muted-foreground">words</span>
-                    </>
-                  )}
-                </div>
-              </div>
             </section>
+            )}
 
-            {/* Submit: View sample output (same size as Generate post) opposite Generate post */}
-            <section className="flex flex-wrap items-center justify-between gap-6 border-t border-border/50 p-8 sm:p-10">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  clearResult();
-                  setKeywords(SAMPLE_INPUT.keywords);
-                  setPeopleAlsoSearchFor(SAMPLE_INPUT.peopleAlsoSearchFor);
-                  setIntent(SAMPLE_INPUT.intent as IntentType[]);
-                  setSampleResult(SAMPLE_RESULT);
-                  const initial = pipelineToGenerated(SAMPLE_PIPELINE_RESULT, 0);
-                  setSampleOutput(initial);
-                  setEditing({ ...initial });
-                  setContentView("preview");
-                }}
-                className="h-12 shrink-0 rounded-full border-2 border-border px-8 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
-              >
-                View sample output
-              </Button>
+            {/* Submit: Run demo, Generate. Sticky when refining demo so Refine dropdown stays visible. */}
+            {showInputSections && (
+            <section className={`flex flex-wrap items-center justify-between gap-6 border-t border-border/50 p-6 sm:p-8 ${hasDemoChunks ? "sticky bottom-0 z-10 bg-card" : ""}`}>
+              {inStepMode && displayStep === 0 && (
+                <div className="w-full mb-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-[13px] text-muted-foreground hover:text-foreground"
+                    onClick={() => setStepView(1)}
+                  >
+                    Continue to Select competitors →
+                  </Button>
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={generating || demoRunning}
+                  onClick={() => {
+                    setStatus({ type: null, message: "" });
+                    clearResult();
+                    setSampleResult(null);
+                    setSampleOutput(null);
+                    setEditing(null);
+                    setKeywords(SAMPLE_INPUT.keywords);
+                    setPeopleAlsoSearchFor(SAMPLE_INPUT.peopleAlsoSearchFor);
+                    setIntent(SAMPLE_INPUT.intent as IntentType[]);
+                    setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
+                    setWordCountPreset((SAMPLE_INPUT.wordCountPreset as "auto" | "concise" | "standard" | "in_depth" | "custom") ?? "auto");
+                    setWordCountCustom(SAMPLE_INPUT.wordCountCustom ?? "");
+                    setDemoRunning(true);
+                    setDemoStep("research");
+                    setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
+                    setDemoProgress(0);
+                    setDemoStartedAt(Date.now());
+                    setDemoElapsedTick(0);
+                    setStepView(null);
+                  }}
+                  className="h-12 shrink-0 rounded-full border-2 border-border px-8 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
+                >
+                  {demoRunning ? "Running demo…" : "Run demo (25s)"}
+                </Button>
+                <span className="text-sm text-muted-foreground">Refine:</span>
+                <select
+                  value={jumpToStage}
+                  onChange={(e) => {
+                    const v = e.target.value as "" | "select" | "outline" | "result";
+                    if (v) {
+                      jumpDemoTo(v);
+                      setJumpToStage("");
+                    }
+                  }}
+                  disabled={generating || demoRunning}
+                  className="h-10 min-w-[160px] cursor-pointer rounded-lg border border-border bg-background px-4 pr-10 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Jump to stage"
+                >
+                  <option value="">Jump to stage…</option>
+                  <option value="select">Select competitors</option>
+                  <option value="outline">Outline</option>
+                  <option value="result">Result</option>
+                </select>
+              </div>
               <Button
                 type="submit"
-                disabled={generating || keywords.length === 0}
+                disabled={generating || demoRunning || keywords.length === 0}
                 className="h-12 shrink-0 rounded-full bg-orange-600 px-8 text-base font-medium text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/25 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600 disabled:shadow-none"
               >
                 <Sparkles className="mr-2 h-4 w-4" />
                 Generate post
               </Button>
             </section>
+            )}
           </div>
         </form>
       ) : editing ? (
         <div className="space-y-6">
+          {sampleResult != null && !currentHistoryId && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50/80 px-5 py-4 dark:border-orange-900/50 dark:bg-orange-950/30">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white">
+                <Sparkles className="h-3.5 w-3.5" />
+                Demo
+              </span>
+              <p className="text-sm text-orange-900/90 dark:text-orange-100/90">
+                This is sample output. Use <strong>Generate post</strong> with your keywords to create real content. Try the outline editor with Target total, Redistribute, and Revise Brief for word count control.
+              </p>
+            </div>
+          )}
           <div className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr] lg:items-stretch">
             {/* Left: outline column. Right: content column. Both columns match height; content box ends where outline ends. */}
             <aside className="order-1 flex min-w-0 flex-col gap-4 lg:order-none">
@@ -1376,6 +2601,28 @@ export default function BlogMakerPage() {
                           {qualityListFilter === "issues" && (pipelineResult.factCheck.skippedRhetorical?.length ?? 0) > 0 && (
                             <p className="mt-1 text-[10px] text-muted-foreground">Skipped (rhetorical): {pipelineResult.factCheck.skippedRhetorical!.slice(0, 3).join(", ")}{pipelineResult.factCheck.skippedRhetorical!.length > 3 ? "…" : ""}</p>
                           )}
+                        </div>
+                      </div>
+                    )}
+                    {pipelineResult.hallucinationFixes && pipelineResult.hallucinationFixes.length > 0 && (
+                      <div className="flex gap-3 rounded-xl px-3 py-2.5 bg-emerald-50/60 dark:bg-emerald-950/20">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-foreground">Auto-fixes applied</p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                            {pipelineResult.hallucinationFixes.length} hallucination(s) were rewritten or replaced with verified facts.
+                          </p>
+                          <ul className="mt-1.5 space-y-1.5 text-[11px] text-muted-foreground">
+                            {pipelineResult.hallucinationFixes.map((fix, i) => (
+                              <li key={i} className="rounded-lg bg-background/60 p-2">
+                                <span className="font-medium text-foreground">{fix.reason}</span>
+                                {fix.replacedWithVerifiedFact && (
+                                  <span className="ml-1 text-emerald-600 dark:text-emerald-400">(used verified fact)</span>
+                                )}
+                                <p className="mt-0.5 line-clamp-2">“{fix.originalText}” → “{fix.replacement}”</p>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       </div>
                     )}
@@ -1616,79 +2863,77 @@ export default function BlogMakerPage() {
             {/* Right: Content panel – absolute wrapper so row height = outline only; content box ends exactly where outline ends */}
             <div className="order-2 relative min-h-0 min-w-0 lg:order-none">
               <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              {/* Choose title & meta – compact list with accent selection */}
-              {pipelineResult && pipelineResult.titleMetaVariants.length > 1 && (
-                <div className="shrink-0 px-4 pt-4">
-                  <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                    <div className="px-4 pt-4 pb-2">
-                      <h3 className="text-sm font-semibold text-foreground">Choose title & meta</h3>
-                      <p className="mt-0.5 text-[11px] text-muted-foreground">
-                        Select one of {pipelineResult.titleMetaVariants.length} options (2×2 grid) for your article title and meta description.
-                      </p>
-                    </div>
-                    <div className="px-4 pb-4">
-                      <ul className="grid grid-cols-2 gap-3" role="listbox" aria-label="Title and meta options (2×2 grid)">
-                        {pipelineResult.titleMetaVariants.map((v, i) => {
-                          const source = v.approach.includes(" — ") ? v.approach.split(" — ")[0] : v.approach;
-                          const guideline = v.approach.includes(" — ") ? v.approach.slice(source.length + 3) : undefined;
-                          const isSelected = selectedTitleIndex === i;
-                          return (
-                            <li key={i}>
-                              <button
-                                type="button"
-                                role="option"
-                                aria-selected={isSelected}
-                                onClick={() => {
-                                  if (sampleResult) {
-                                    setSampleResult((prev) => (prev ? { ...prev, selectedTitleIndex: i } : null));
-                                  } else {
-                                    setSelectedTitleIndex(i);
-                                  }
-                                  const content = pipelineToGenerated(pipelineResult, i);
-                                  setEditing((prev) => (prev ? { ...prev, title: content.title, metaDescription: content.metaDescription } : null));
-                                }}
-                                className={`w-full rounded-xl border-2 text-left transition-all duration-200 ${
-                                  isSelected
-                                    ? "border-orange-500 bg-orange-50/80 shadow-sm dark:border-orange-400 dark:bg-orange-950/40"
-                                    : "border-border bg-card hover:border-muted-foreground/30 hover:bg-muted/30 dark:bg-muted/10 dark:hover:bg-muted/20"
-                                }`}
-                              >
-                                <div className="relative p-3.5">
-                                  {isSelected && (
-                                    <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white dark:bg-orange-400" aria-hidden>
-                                      <Check className="h-3 w-3" />
-                                    </span>
-                                  )}
-                                  <p className={`text-[10px] font-semibold uppercase tracking-wider ${isSelected ? "text-orange-600 dark:text-orange-400" : "text-muted-foreground"}`}>
-                                    {source}
-                                  </p>
-                                  <p className="mt-1.5 line-clamp-2 text-sm font-semibold leading-snug text-foreground pr-7" title={v.title}>
-                                    {v.title}
-                                  </p>
-                                  {guideline && (
-                                    <p className="mt-1 line-clamp-1 text-[10px] text-muted-foreground" title={guideline}>
-                                      {guideline}
-                                    </p>
-                                  )}
-                                </div>
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Meta – editable title, meta description, slug in a single card */}
-              <div className="shrink-0 px-4 py-4">
-                <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                  <div className="px-4 pt-4 pb-2">
+              {/* Meta – editable title, meta description, slug */}
+              <div className="shrink-0 border-t border-border/60 px-4 pt-4 pb-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
                     <h3 className="text-sm font-semibold text-foreground">Meta</h3>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">Edit and copy title, meta description, and URL slug.</p>
                   </div>
-                  <div className="p-4 space-y-4">
+                  {!currentHistoryId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={generateMetaLoading || !editing?.content}
+                    onClick={handleGenerateMeta}
+                    className="h-8 shrink-0 rounded-lg border-orange-300 bg-orange-50 px-3 text-[11px] font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:hover:bg-orange-950/50"
+                  >
+                    {generateMetaLoading ? (
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    )}
+                    Generate meta
+                  </Button>
+                  )}
+                </div>
+                {metaOptions && metaOptions.length >= 2 ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {metaOptions.map((opt, idx) => (
+                        <div
+                          key={idx}
+                          className="flex flex-col gap-2 rounded-xl border border-orange-200 px-3 py-2.5 dark:border-orange-800/50"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-muted-foreground">Option {idx + 1}</span>
+                            <span
+                              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                opt.audit.publishable
+                                  ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"
+                                  : opt.audit.score >= 60
+                                    ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
+                                    : "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200"
+                              }`}
+                            >
+                              {opt.audit.score}%
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium leading-tight line-clamp-1">{opt.title}</p>
+                          <p className="text-[11px] text-muted-foreground leading-tight line-clamp-1">{opt.metaDescription}</p>
+                          <p className="text-[10px] font-mono text-muted-foreground/80 truncate">{opt.suggestedSlug}</p>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => handleUseMetaOption(opt)}
+                            className="h-8 w-full rounded-lg bg-orange-600 px-2 text-xs hover:bg-orange-700"
+                          >
+                            Use this option
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMetaOptions(null)}
+                      className="text-[11px] text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                <div className="mt-4 space-y-4">
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
                       {/* Title */}
                       <div className="space-y-1.5">
@@ -1708,7 +2953,7 @@ export default function BlogMakerPage() {
                           <Input
                             id="edit-title"
                             value={editing.title}
-                            onChange={(e) => setEditing({ ...editing, title: e.target.value })}
+                            onChange={(e) => setEditing((prev) => (prev ? { ...prev, title: e.target.value } : null))}
                             className="h-10 rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
                           />
                           <Button
@@ -1740,7 +2985,7 @@ export default function BlogMakerPage() {
                           <Input
                             id="edit-slug"
                             value={editing.suggestedSlug ?? ""}
-                            onChange={(e) => setEditing({ ...editing, suggestedSlug: e.target.value })}
+                            onChange={(e) => setEditing((prev) => (prev ? { ...prev, suggestedSlug: e.target.value } : null))}
                             className="h-10 rounded-xl border-border bg-muted/20 font-mono text-sm pr-10 focus:bg-background"
                           />
                           <Button
@@ -1778,7 +3023,7 @@ export default function BlogMakerPage() {
                           <Textarea
                             id="edit-meta"
                             value={editing.metaDescription}
-                            onChange={(e) => setEditing({ ...editing, metaDescription: e.target.value })}
+                            onChange={(e) => setEditing((prev) => (prev ? { ...prev, metaDescription: e.target.value } : null))}
                             rows={2}
                             className="min-h-[3.25rem] resize-y rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
                           />
@@ -1799,14 +3044,13 @@ export default function BlogMakerPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
                 </div>
+                )}
               </div>
 
-              {/* Content – card with tabs + preview/outline box */}
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden px-4 pb-4">
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="shrink-0 flex flex-col gap-3 border-b border-border px-4 py-3">
+              {/* Content – tabs + preview/outline box */}
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border/60 px-4 py-4">
+                  <div className="shrink-0 flex flex-col gap-3 pb-3">
                     <h3 className="text-sm font-semibold text-foreground">Content</h3>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="flex rounded-lg bg-muted/60 p-0.5" role="group" aria-label="View mode">
@@ -1829,13 +3073,13 @@ export default function BlogMakerPage() {
                           </button>
                         ))}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => {
                             if (pipelineResult) {
-                              setEditing(pipelineToGenerated(pipelineResult, selectedTitleIndex));
+                              setEditing(pipelineToGenerated(pipelineResult));
                             } else {
                               setEditing({ ...generated! });
                             }
@@ -1844,6 +3088,17 @@ export default function BlogMakerPage() {
                         >
                           Reset edits
                         </Button>
+                        {jobId && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={generating || demoRunning}
+                            onClick={() => startValidate(jobId)}
+                            className="h-8 rounded-lg px-3 text-[11px] font-medium"
+                          >
+                            Re-run validation
+                          </Button>
+                        )}
                         <Button
                           size="sm"
                           onClick={handleCopyForWordPress}
@@ -1865,34 +3120,37 @@ export default function BlogMakerPage() {
                       </div>
                     )}
                     {contentView === "outline" && (
-                      <div className="space-y-3">
-                        <p className="text-[11px] text-muted-foreground">Section headings; edit as needed.</p>
+                      <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground mb-3">Edit section headings as needed.</p>
                         {editing.outline.map((item, index) => (
-                          <div key={index} className="flex gap-3 rounded-xl border border-border bg-muted/10 p-3">
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-xs font-semibold tabular-nums text-orange-800 dark:bg-orange-900/50 dark:text-orange-200">
+                          <div key={index} className="flex gap-3 rounded-xl border border-border bg-card p-3.5 shadow-sm hover:border-border/80 transition-colors">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/15 text-xs font-bold tabular-nums text-orange-600 dark:text-orange-400">
                               {index + 1}
                             </span>
                             <Textarea
                               value={item}
                               onChange={(e) => {
-                                const newOutline = [...editing.outline];
-                                newOutline[index] = e.target.value;
-                                setEditing({ ...editing, outline: newOutline });
+                                const value = e.target.value;
+                                setEditing((prev) => {
+                                  if (!prev?.outline) return prev;
+                                  const newOutline = [...prev.outline];
+                                  newOutline[index] = value;
+                                  return { ...prev, outline: newOutline };
+                                });
                               }}
                               rows={2}
-                              className="min-h-[2.25rem] flex-1 resize-y rounded-lg border-border bg-background text-sm leading-snug"
+                              className="min-h-[2.25rem] flex-1 resize-y rounded-lg border-border bg-background text-sm leading-snug focus:ring-2 focus:ring-orange-500/20"
                             />
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-                </div>
-              </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
       ) : null}
     </div>
   );

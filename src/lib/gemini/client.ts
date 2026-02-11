@@ -106,10 +106,13 @@ Return as structured JSON with this exact format (no other text):
   "lastUpdated": "string e.g. January 2026"
 }
 
-Only include facts you can verify with sources. If no current data is available for a topic, say so — do NOT invent data.`;
+Rules:
+- Only include facts you can verify with sources from this search. Do NOT use numbers or stats from training data.
+- If you cannot find a current statistic for a topic, omit it or set the fact text to "No current data found" for that item. Never invent numbers.
+- If no facts are found at all, return: {"facts": [], "recentDevelopments": [], "lastUpdated": "No recent data found"}.`;
 
   const config = {
-    temperature: 0.3,
+    temperature: 0.1,
     tools: [{ googleSearch: {} }],
   };
 
@@ -226,30 +229,30 @@ C) EDITORIAL STYLE ANALYSIS
 - Sentence length distribution: % short (1-8), medium (9-17), long (18-30), veryLong (30+).
 - Average paragraph length (sentences).
 - Paragraph distribution: % single, standard (2-4), long (5-7), veryLong (8+).
-- Tone, reading level (e.g. "Grade 8-9"), contentMix (prose/lists/tables %), dataDensity, introStyle, ctaStyle.
+- Tone, reading level (e.g. "Grade 8-9"), contentMix (prose/lists % only — no tables; frontend does not format tables), dataDensity, introStyle, ctaStyle.
 
 D) COMPETITOR ANALYSIS
 - Per competitor: url, strengths, weaknesses.
 - For EACH competitor assess AI-generated likelihood: "likely_human", "uncertain", or "likely_ai" based on: uniform sentence length, repetitive structure, AI-typical phrases (delve, landscape, crucial, comprehensive, leverage, seamless, robust), lack of personal voice.
 
 E) WORD COUNT
-- competitorAverage, recommended (avg + 15%), note.
+- competitorAverage, recommended (avg + 15%), note. The note must state: STRICT — the target word count MUST be met (within ±5%). Do not pad; do not fall short. This flows to the writer; missing it breaks the pipeline.
 
-Return ONLY valid JSON matching this structure (no markdown):
+Return ONLY valid JSON matching this EXACT top-level structure (no wrapper keys, no nesting under "extraction" or "data" or "result"). The JSON root must have exactly these 6 keys: topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount. No markdown fences.
 {
   "topics": [{"name","importance","coverageCount","keyTerms","exampleContent","recommendedDepth"}],
   "competitorHeadings": [{"url","h2s":[],"h3s":[]}],
   "gaps": [{"topic","opportunity","recommendedApproach"}],
   "competitorStrengths": [{"url","strengths","weaknesses","aiLikelihood":"likely_human"|"uncertain"|"likely_ai"}],
-  "editorialStyle": {"sentenceLength":{"average", "distribution":{"short","medium","long","veryLong"}}, "paragraphLength":{"averageSentences", "distribution":{"single","standard","long","veryLong"}}, "tone","readingLevel","contentMix":{"prose","lists","tables"},"dataDensity","introStyle","ctaStyle"},
-  "wordCount": {"competitorAverage","recommended","note"}
+  "editorialStyle": {"sentenceLength":{"average", "distribution":{"short","medium","long","veryLong"}}, "paragraphLength":{"averageSentences", "distribution":{"single","standard","long","veryLong"}}, "tone","readingLevel","contentMix":{"prose","lists"},"dataDensity","introStyle","ctaStyle"},
+  "wordCount": {"competitorAverage","recommended","note":"STRICT — the target MUST be met within ±5%. Do not pad; do not fall short."}
 }`;
 
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash",
     // Prompt FIRST to avoid "lost in the middle" — model knows what to extract before reading content
     contents: prompt + "\n\n--- COMPETITOR ARTICLES ---\n\n" + payload,
-    config: { temperature: 0.3 },
+    config: { temperature: 0.1 },
   });
 
   const text = response.text ?? "";

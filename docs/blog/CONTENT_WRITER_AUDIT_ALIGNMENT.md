@@ -137,6 +137,7 @@ The Content Writer module (Claude-based draft generation) and Audit System (Type
 - `auditRankMathSlugKeyword`: Checks slug presence
 - `auditRankMathFirst10Percent`: Checks first 10%
 - `auditRankMathSubheadingKeyword`: Checks H2/H3 presence
+- ~~`auditRankMathContentLength`~~: Removed (Rank Math 2500 no longer used)
 
 **Status:** ✅ **FULLY ALIGNED**
 
@@ -169,18 +170,18 @@ The Content Writer module (Claude-based draft generation) and Audit System (Type
 
 **Status:** ✅ **FULLY ALIGNED**
 
-### Content Length (Informational) ✅
+### Content Length (Strict) ✅
 
 **Writer Instruction:**
-- "Value over length"
-- "2500+ = Rank Math 100%"
-- "Google: Quality over quantity"
+- STRICT: Target word count MUST be met within ±5%
+- "Meet the target — add or trim content as needed"
+- Minimum 300 words (Google thin-content threshold)
 
 **Audit Validation:**
-- `auditRankMathContentLength`: Excluded from score (informational only)
 - Content thinness: Min 300 words (Level 1 blocker)
+- Rank Math 2500 content length check removed (no longer used)
 
-**Status:** ✅ **ALIGNED** (Google priority maintained)
+**Status:** ✅ **ALIGNED** (User-selected word count presets enforced strictly)
 
 ---
 
@@ -240,7 +241,7 @@ The Content Writer module (Claude-based draft generation) and Audit System (Type
 | `META_DESCRIPTION_MAX_CHARS` | 160 | Writer prompt, Audit |
 | `URL_SLUG_MAX_CHARS` | 75 | Writer prompt, Audit |
 | `PARAGRAPH_MAX_WORDS` | 120 | Writer prompt, Brief, Audit |
-| `CONTENT_MIN_WORDS_PILLAR` | 2500 | Writer prompt, Audit (informational) |
+| (Word count) | User preset / brief target | Writer prompt (STRICT ±5%) |
 
 **Status:** ✅ **SINGLE SOURCE OF TRUTH**
 

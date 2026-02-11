@@ -3,12 +3,15 @@
  */
 
 import OpenAI from "openai";
+import { SEO } from "@/lib/constants";
+import { getAuditRulesForPrompt } from "@/lib/seo/article-audit";
 import {
   type PipelineInput,
   type TopicExtractionResult,
   type CurrentData,
   type ResearchBrief,
   type CompetitorArticle,
+  type TokenUsageRecord,
   ResearchBriefWithoutCurrentDataSchema,
   TopicExtractionResultSchema,
 } from "@/lib/pipeline/types";
@@ -37,14 +40,30 @@ function stripJsonMarkdown(raw: string): string {
   return jsonMatch ? jsonMatch[0] : s;
 }
 
+/** Normalize contentMix from extraction: no tables (frontend does not format them). Redistribute to prose/lists only. */
+function normalizeContentMix(raw: unknown): { prose: number; lists: number; tables: number } | undefined {
+  if (raw == null || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const o = raw as Record<string, unknown>;
+  const p = Number(o.prose);
+  const l = Number(o.lists);
+  const t = Number.isFinite(Number(o.tables)) ? Number(o.tables) : 0;
+  const total = p + l + t;
+  if (!Number.isFinite(p) || !Number.isFinite(l) || total <= 0) return undefined;
+  const prose = Math.round((p / total) * 100);
+  const lists = 100 - prose;
+  return { prose, lists, tables: 0 };
+}
+
 /**
  * Extract topics, heading patterns, gaps, editorial style, and competitor analysis from competitors.
  * Uses GPT-4.1 for strong schema adherence and reasoning. EXTRACT only — outline is decided in buildResearchBrief.
  */
 export async function extractTopicsAndStyle(
-  competitors: CompetitorArticle[]
+  competitors: CompetitorArticle[],
+  tokenUsage?: TokenUsageRecord[]
 ): Promise<TopicExtractionResult> {
   const openai = getClient();
+  const startMs = Date.now();
   const successful = competitors.filter((c) => c.fetchSuccess && c.content.length > 0);
   const payload =
     successful.length > 0
@@ -77,14 +96,14 @@ C) EDITORIAL STYLE ANALYSIS
 - Sentence length distribution: % short (1-8), medium (9-17), long (18-30), veryLong (30+).
 - Average paragraph length (sentences).
 - Paragraph distribution: % single, standard (2-4), long (5-7), veryLong (8+).
-- Tone, reading level (e.g. "Grade 8-9"), contentMix (prose/lists/tables %), dataDensity, introStyle, ctaStyle.
+- Tone, reading level (e.g. "Grade 8-9"), contentMix (prose/lists % only — no tables; frontend does not format tables), dataDensity, introStyle, ctaStyle.
 
 D) COMPETITOR ANALYSIS
 - Per competitor: url, strengths, weaknesses.
 - For EACH competitor assess AI-generated likelihood: "likely_human", "uncertain", or "likely_ai" based on: uniform sentence length, repetitive structure, AI-typical phrases (delve, landscape, crucial, comprehensive, leverage, seamless, robust), lack of personal voice.
 
 E) WORD COUNT
-- competitorAverage, recommended (avg + 15%), note. The note must state that length is a guideline only; prioritize value over length; the goal is to provide more value than competitors, not just match word count.
+- competitorAverage, recommended (avg + 15%), note. In the note field include this exact sentence: "STRICT — the target MUST be met within ±5%. Do not pad; do not fall short." This flows to the writer; missing it breaks the pipeline.
 
 Return ONLY valid JSON matching this EXACT top-level structure (no wrapper keys, no nesting under "extraction" or "data" or "result"):
 {
@@ -92,7 +111,7 @@ Return ONLY valid JSON matching this EXACT top-level structure (no wrapper keys,
   "competitorHeadings": [{"url":"...","h2s":["..."],"h3s":["..."]}],
   "gaps": [{"topic":"...","opportunity":"...","recommendedApproach":"..."}],
   "competitorStrengths": [{"url":"...","strengths":"...","weaknesses":"...","aiLikelihood":"likely_human"|"uncertain"|"likely_ai"}],
-  "editorialStyle": {"sentenceLength":{"average":15,"distribution":{"short":20,"medium":40,"long":30,"veryLong":10}},"paragraphLength":{"averageSentences":3,"distribution":{"single":15,"standard":50,"long":30,"veryLong":5}},"tone":"...","readingLevel":"Grade 8-10","contentMix":{"prose":65,"lists":20,"tables":15},"dataDensity":"...","introStyle":"...","ctaStyle":"..."},
+  "editorialStyle": {"sentenceLength":{"average":15,"distribution":{"short":20,"medium":40,"long":30,"veryLong":10}},"paragraphLength":{"averageSentences":3,"distribution":{"single":15,"standard":50,"long":30,"veryLong":5}},"tone":"...","readingLevel":"Grade 8-10","contentMix":{"prose":75,"lists":25},"dataDensity":"...","introStyle":"...","ctaStyle":"..."},
   "wordCount": {"competitorAverage":1500,"recommended":1725,"note":"..."}
 }
 
@@ -110,9 +129,22 @@ ${payload}`;
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
     ],
-    temperature: 0.3,
+    temperature: 0.1,
     response_format: { type: "json_object" },
   });
+
+  const durationMs = Date.now() - startMs;
+  const usage = completion.usage;
+  if (tokenUsage && usage) {
+    tokenUsage.push({
+      callName: "extractTopicsAndStyle",
+      model: completion.model ?? "gpt-4.1",
+      promptTokens: usage.prompt_tokens ?? 0,
+      completionTokens: usage.completion_tokens ?? 0,
+      totalTokens: usage.total_tokens ?? 0,
+      durationMs,
+    });
+  }
 
   const content = completion.choices[0]?.message?.content;
   if (!content) {
@@ -288,16 +320,16 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
     parsed.wordCount != null && typeof parsed.wordCount === "object" && !Array.isArray(parsed.wordCount)
       ? {
           target: Number((parsed.wordCount as Record<string, unknown>).target) || 1500,
-          note: String((parsed.wordCount as Record<string, unknown>).note ?? "Guideline only."),
+          note: String((parsed.wordCount as Record<string, unknown>).note ?? "STRICT: target must be met within ±5%."),
         }
-      : { target: 1500, note: "Guideline only." };
+      : { target: 1500, note: "STRICT: target must be met within ±5%." };
 
   const defaultEditorialStyle = {
     sentenceLength: { average: 15, distribution: { short: 20, medium: 40, long: 30, veryLong: 10 } },
     paragraphLength: { averageSentences: 3, distribution: { single: 15, standard: 50, long: 30, veryLong: 5 } },
     tone: "Semi-formal, instructional, direct address with 'you'",
     readingLevel: "Grade 8-10",
-    contentMix: { prose: 65, lists: 20, tables: 15 },
+    contentMix: { prose: 75, lists: 25, tables: 0 },
     dataDensity: "1 stat per 200 words, 1 example per 400 words",
     introStyle: "Direct answer or definition in first 1-2 sentences, then expand",
     ctaStyle: "Soft recommendation with next step suggestion",
@@ -310,7 +342,7 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
           paragraphLength: (rawStyle as Record<string, unknown>).paragraphLength ?? defaultEditorialStyle.paragraphLength,
           tone: String((rawStyle as Record<string, unknown>).tone ?? defaultEditorialStyle.tone),
           readingLevel: String((rawStyle as Record<string, unknown>).readingLevel ?? defaultEditorialStyle.readingLevel),
-          contentMix: (rawStyle as Record<string, unknown>).contentMix ?? defaultEditorialStyle.contentMix,
+          contentMix: normalizeContentMix((rawStyle as Record<string, unknown>).contentMix) ?? defaultEditorialStyle.contentMix,
           dataDensity: String((rawStyle as Record<string, unknown>).dataDensity ?? defaultEditorialStyle.dataDensity),
           introStyle: String((rawStyle as Record<string, unknown>).introStyle ?? defaultEditorialStyle.introStyle),
           ctaStyle: String((rawStyle as Record<string, unknown>).ctaStyle ?? defaultEditorialStyle.ctaStyle),
@@ -357,7 +389,8 @@ export async function buildResearchBrief(
   topics: TopicExtractionResult,
   currentData: CurrentData,
   input: PipelineInput,
-  wordCountOverride?: WordCountOverride
+  wordCountOverride?: WordCountOverride,
+  tokenUsage?: TokenUsageRecord[]
 ): Promise<ResearchBrief> {
   const openai = getClient();
   const intent = Array.isArray(input.intent) ? input.intent[0] : input.intent ?? "informational";
@@ -367,14 +400,14 @@ export async function buildResearchBrief(
   const systemPrompt = `You are the strategist for a blog content pipeline. Your ONLY job is to produce a compact ResearchBrief as JSON. The writer (another model) will receive this brief as its ONLY input — no raw competitor content. So your brief must be self-contained and decisive.
 
 RULES:
-1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition → how-to → advanced → FAQ; commercial: overview → comparison → pros/cons → pricing → recommendation; transactional: value prop → features → pricing → CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't).
+1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition → how-to → advanced → FAQ; commercial: overview → comparison → pros/cons → pricing → recommendation; transactional: value prop → features → pricing → CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't). Every outline section must have enough topics and targetWords so the writer can hit the total word count without padding.
 2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote. Include H3 subsections where competitors commonly do.
-3. BEST-VERSION FIELDS (required in your JSON): (a) similaritySummary: 2-4 sentences summarizing what the top 5 competitors collectively cover and how they're similar. (b) extraValueThemes: array of 3-6 short strings — "what we will add that they don't" (from gaps and currentData angles). Each should be a concrete theme the writer must clearly cover. (c) freshnessNote: 1-2 sentences on how to position for freshness (e.g. "Lead with currentData numbers; avoid pre-2024 framing; mention [recent development] where relevant.").
+3. BEST-VERSION FIELDS (required in your JSON): (a) similaritySummary: 2-4 sentences summarizing what the top 5 competitors collectively cover and how they're similar. (b) extraValueThemes: array of 3-6 short strings, each 5-12 words, actionable (e.g. "Include 2025 pricing benchmarks from currentData" or "Add comparison table as bulleted lists" — not vague like "Be fresh"). These are concrete themes the writer must clearly cover. (c) freshnessNote: 1-2 sentences on how to position for freshness (e.g. "Lead with currentData numbers; avoid pre-2024 framing; mention [recent development] where relevant.").
 
-CONTENT MIX — MANDATORY STRUCTURE (applies to every article):
-1. SUMMARY ELEMENT (required, non-optional): Place a scannable summary section early, after the intro, before detailed sections. Format by article type: Analysis = HTML table (2x2 grid, matrix, or pros/cons); Comparison = side-by-side HTML table; How-to = numbered key steps summary; Listicle = ranked list with one-line per item; Review = score/rating box with top pros and cons; Informational = key takeaways bulleted list (5-7 items). Must render as actual HTML structure (table tags, ul/ol). Not prose that describes a table.
-2. INLINE LISTS IN EVERY H2 SECTION: Every H2 section that exceeds 200 words MUST contain at least one of: bulleted list (3-7 items), numbered list, or small comparison table. Place after the section makes its main argument. Pattern: 2-3 paragraphs of prose, then bulleted list of key data points or takeaways, then 1 closing paragraph.
-3. TARGET MIX: 65% prose, 20% lists, 10-15% tables. Minimum 3-4 bulleted or numbered lists spread across H2 sections, plus at least one table. If an article has zero lists inside detailed sections, it fails this requirement.
+CONTENT MIX — MANDATORY STRUCTURE (applies to every article). Do NOT use HTML table tags — the frontend does not format tables. Use only lists (ul/ol).
+1. SUMMARY ELEMENT (required, non-optional): Place a scannable summary section early, after the intro, before detailed sections. Format by article type: Analysis = key takeaways or pros/cons as bulleted list (5-7 items); Comparison = two bulleted lists (e.g. "Option A" vs "Option B") or side-by-side bullets; How-to = numbered key steps summary; Listicle = ranked list with one-line per item; Review = score/rating with top pros and cons as bullets; Informational = key takeaways bulleted list (5-7 items). Must render as actual HTML lists (ul/ol only). Not prose that describes a list.
+2. INLINE LISTS IN EVERY H2 SECTION: Every H2 section that exceeds 200 words MUST contain at least one of: bulleted list (3-7 items) or numbered list. Place after the section makes its main argument. Pattern: 2-3 paragraphs of prose, then bulleted list of key data points or takeaways, then 1 closing paragraph.
+3. TARGET MIX: ~75% prose, ~25% lists. Minimum 3-4 bulleted or numbered lists spread across H2 sections. No tables — use lists only.
 
 H3 SUBSECTION REQUIREMENT — applies to every article regardless of type:
 Any H2 section that covers 3 or more distinct sub-points MUST break them into H3 subsections — one H3 per distinct point. Do NOT produce flat prose blocks where multiple separate ideas sit under a single H2 with no heading structure.
@@ -384,7 +417,7 @@ Each H3 gets its own topics, word target, and optional geoNote in the OutlineSec
 3. EDITORIAL STYLE: If 3+ competitors are rated "likely_ai", set editorialStyleFallback: true and use hardcoded human-like defaults. Otherwise use the extracted editorialStyle from the extraction and set editorialStyleFallback: false.
 4. GEO: directAnswer — Intro opens with a direct factual answer (primary keyword + specific claim in first 30-40 words), then a hook (15-25 words). User value first; banned openings (e.g. 'In this article we will...'). statDensity, entities (1 primary + 3-6 supporting), qaBlocks, faqStrategy.
 5. SEO: keywordInTitle, keywordInFirst10Percent: true, keywordInSubheadings: true, maxParagraphWords: 120, faqCount: "5-8".
-6. wordCount: target from competitor recommended (or from override when provided). Note: it's a guideline only. Prioritize value over length; the article must provide more value than competitors.
+6. wordCount: target from competitor recommended (or from override when provided). Note: STRICT — the target MUST be met within ±5%. The writer will be held to this.
 
 POST-GENERATION VALIDATION AWARENESS — design the brief so the writer can pass these checks:
 
@@ -392,15 +425,12 @@ GOOGLE SEARCH CENTRAL ALIGNMENT:
 - The article must pass Google's Helpful Content self-assessment: original analysis, substantial value beyond competitors, complete intent satisfaction, would-be-bookmarked quality.
 - Design the outline to cover the topic comprehensively. Every H2 should earn its place by answering a real user question or providing unique value.
 
-RANK MATH SEO AUDIT:
-- Title: keyword in first 50%, max 60 chars, ideally with a number.
-- Meta: 120-160 chars with keyword.
-- Slug: keyword present, max 75 chars.
+RANK MATH SEO AUDIT (body content only; title/meta/slug are generated separately):
 - Paragraphs: never exceed 120 words.
 - Keyword in first 10% of body and in at least one subheading. Ensure at least one outline section heading includes the primary keyword or a natural variant (e.g. "SWOT Analysis" for keyword "SWOT analysis") so the writer can pass the subheading check.
 - No keyword stuffing (< 3% density).
 
-TYPOGRAPHY: The writer must use straight quotes/apostrophes only (no em-dash, en-dash, curly quotes). Design headings that don't tempt these patterns.
+TYPOGRAPHY: The writer must use straight quotes/apostrophes only. ZERO em-dash, en-dash, or curly quotes — any instance fails the audit. No excessive symbols: no !! or !!!, no repeated ellipses (...). Single punctuation only. Avoid AI-typical phrases in section guidance where possible: delve, leverage, comprehensive, crucial, seamless, robust — the writer is instructed to prefer specific language.
 
 FACT CHECK: Every specific number must trace to currentData. The writer cannot invent stats. If the brief lacks data for a section, note in that section's geoNote that the writer should use qualitative language.
 
@@ -462,15 +492,29 @@ Output ONLY valid JSON. Do NOT include "currentData" in your output — it will 
   for (let attempt = 1; attempt <= 2; attempt++) {
     const userPrompt = attempt === 2 ? userPromptBase + bestVersionHint : userPromptBase;
     try {
+      const briefStartMs = Date.now();
       const completion = await openai.chat.completions.create({
         model: "gpt-4.1",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        temperature: 0.3,
+        temperature: 0.1,
         response_format: { type: "json_object" },
       });
+
+      const briefDurationMs = Date.now() - briefStartMs;
+      const usage = completion.usage;
+      if (tokenUsage && usage) {
+        tokenUsage.push({
+          callName: "buildResearchBrief",
+          model: completion.model ?? "gpt-4.1",
+          promptTokens: usage.prompt_tokens ?? 0,
+          completionTokens: usage.completion_tokens ?? 0,
+          totalTokens: usage.total_tokens ?? 0,
+          durationMs: briefDurationMs,
+        });
+      }
 
       const content = completion.choices[0]?.message?.content;
       if (!content) {
@@ -508,5 +552,174 @@ Output ONLY valid JSON. Do NOT include "currentData" in your output — it will 
     }
   }
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
+
+/** Intent-specific guidance for meta generation (Google: match search intent). */
+function getIntentGuidanceForMeta(intent: string): string {
+  const i = intent.toLowerCase();
+  if (i.includes("transactional") || i.includes("commercial")) {
+    return "User wants to buy or take action. Meta should emphasize value, outcomes, or conversion.";
+  }
+  if (i.includes("navigational")) {
+    return "User seeks a specific brand/page. Title should be clear and direct.";
+  }
+  if (i.includes("informational")) {
+    return "User wants to learn. Emphasize educational value: guide, tips, how-to, learn.";
+  }
+  return "Informational (default). Emphasize learning: guide, tips, how-to, discover.";
+}
+
+/** SEO limits for title/meta/slug (must match constants.ts). */
+const TITLE_MAX = SEO.TITLE_MAX_CHARS;
+const META_MAX = SEO.META_DESCRIPTION_MAX_CHARS;
+const SLUG_MAX = SEO.URL_SLUG_MAX_CHARS;
+
+/** Single meta option (title + meta + slug). */
+export type TitleMetaSlugOption = {
+  title: string;
+  metaDescription: string;
+  suggestedSlug: string;
+};
+
+/** Result with 2 options for user to choose from. */
+export type TitleMetaSlugResult = {
+  options: [TitleMetaSlugOption, TitleMetaSlugOption];
+};
+
+function normalizeMetaOption(
+  raw: { title?: unknown; metaDescription?: unknown; suggestedSlug?: unknown },
+  primaryKeyword: string
+): TitleMetaSlugOption {
+  const title = String(raw.title ?? primaryKeyword).trim() || primaryKeyword;
+  const metaDescription = String(raw.metaDescription ?? "").trim() || primaryKeyword;
+  const suggestedSlugRaw = String(raw.suggestedSlug ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "") || primaryKeyword.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+  const suggestedSlug =
+    suggestedSlugRaw.length > SLUG_MAX ? suggestedSlugRaw.slice(0, SLUG_MAX).replace(/-+$/, "") : suggestedSlugRaw;
+
+  return {
+    title: title.length > TITLE_MAX ? title.slice(0, TITLE_MAX - 3).trim() + "..." : title,
+    metaDescription:
+      metaDescription.length > META_MAX ? metaDescription.slice(0, META_MAX - 3).trim() + "..." : metaDescription,
+    suggestedSlug: suggestedSlug || primaryKeyword.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+  };
+}
+
+/**
+ * Generate 2 SEO-optimized title/meta/slug options from draft content.
+ * Aligned with article audit system: Google Search Central + Rank Math (src/lib/seo/article-audit.ts).
+ * Use this after the draft is written so meta reflects the actual article.
+ */
+export async function generateTitleMetaSlugFromContent(
+  primaryKeyword: string,
+  intent: string,
+  content: string,
+  tokenUsage?: TokenUsageRecord[]
+): Promise<TitleMetaSlugResult> {
+  const openai = getClient();
+  const startMs = Date.now();
+
+  // Strip HTML and extract structure for context
+  const plainText = content
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const fullExcerpt = plainText.slice(0, 4500);
+
+  // Extract H2 headings for topic structure (simple regex; no import needed)
+  const h2Matches = content.match(/<h2[^>]*>([\s\S]*?)<\/h2>/gi) || [];
+  const headings = h2Matches
+    .map((m) => m.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  const auditRules = getAuditRulesForPrompt();
+  const intentGuidance = getIntentGuidanceForMeta(intent);
+
+  const systemPrompt = `You are an expert SEO copywriter. Generate exactly TWO distinct, high-quality meta options for a blog post. Each option must pass Google Search Central and Rank Math 100/100 checks.
+
+CRITICAL RULES (each option MUST satisfy — our audit will fail otherwise):
+${auditRules}
+
+VARIANT STRATEGY:
+• optionA: Lead with sentiment + power words. E.g. "Proven Guide to…", "Discover the Best…", "Avoid These [X] Mistakes…"
+• optionB: Lead with numbers + action. E.g. "7 Tips for…", "How to [X] in 5 Steps", "[N] Ways to…"
+
+ADDITIONAL GUIDANCE:
+• Match the article's actual content — never mislead
+• Search intent: ${intentGuidance}
+• Title: front-load the primary keyword; make every word earn its place
+• Meta: write a compelling pitch, not a dry summary; include keyword naturally in first 120 chars
+• Slug: concise, keyword-rich; omit articles (a, the) and prepositions where possible
+
+Return ONLY valid JSON, no markdown or explanation:
+{"optionA":{"title":"...","metaDescription":"...","suggestedSlug":"..."},"optionB":{"title":"...","metaDescription":"...","suggestedSlug":"..."}}`;
+
+  const headingsBlock = headings.length > 0
+    ? `\nArticle structure (H2s):\n${headings.map((h) => `- ${h}`).join("\n")}\n`
+    : "";
+
+  const userMessage = `Primary keyword: "${primaryKeyword}"
+Search intent: ${intent}
+${headingsBlock}
+Article content (first part):
+${fullExcerpt}
+
+Generate two distinct meta options (optionA and optionB). Each must satisfy all audit rules. Return JSON only.`;
+
+  const completion = await openai.chat.completions.create({
+    model: "gpt-4.1",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+    temperature: 0.25,
+    response_format: { type: "json_object" },
+  });
+
+  const durationMs = Date.now() - startMs;
+  const usage = completion.usage;
+  if (tokenUsage && usage) {
+    tokenUsage.push({
+      callName: "generateTitleMetaSlugFromContent",
+      model: completion.model ?? "gpt-4.1",
+      promptTokens: usage.prompt_tokens ?? 0,
+      completionTokens: usage.completion_tokens ?? 0,
+      totalTokens: usage.total_tokens ?? 0,
+      durationMs,
+    });
+  }
+
+  const rawContent = completion.choices[0]?.message?.content;
+  if (!rawContent) {
+    throw new Error("generateTitleMetaSlugFromContent: empty response from GPT-4.1");
+  }
+  const raw = stripJsonMarkdown(rawContent);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch (e) {
+    throw new Error(`generateTitleMetaSlugFromContent: invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  const optionARaw = (parsed.optionA ?? parsed.optiona) as Record<string, unknown> | undefined;
+  const optionBRaw = (parsed.optionB ?? parsed.optionb) as Record<string, unknown> | undefined;
+
+  if (!optionARaw || !optionBRaw) {
+    throw new Error("generateTitleMetaSlugFromContent: response must include optionA and optionB");
+  }
+
+  const optionA = normalizeMetaOption(optionARaw, primaryKeyword);
+  const optionB = normalizeMetaOption(optionBRaw, primaryKeyword);
+
+  return {
+    options: [optionA, optionB],
+  };
 }
 

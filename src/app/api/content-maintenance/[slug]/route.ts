@@ -90,6 +90,9 @@ export async function PATCH(
     const lastReviewedAt = markAsReviewed ? new Date() : null;
     const statusProvided = status !== undefined;
     const noteProvided = note !== undefined;
+    // Use explicit sql fragments for nulls to avoid "could not determine data type of parameter"
+    const noteFragment = noteVal !== null ? sql`${noteVal}` : sql`NULL`;
+    const lastReviewedFragment = lastReviewedAt !== null ? sql`${lastReviewedAt.toISOString()}::timestamptz` : sql`NULL`;
 
     try {
       await ensureContentMaintenanceTable();
@@ -110,8 +113,8 @@ export async function PATCH(
       VALUES (
         ${slug},
         COALESCE(${statusVal}, 'unreviewed'),
-        ${noteVal},
-        ${lastReviewedAt},
+        ${noteFragment},
+        ${lastReviewedFragment},
         NOW()
       )
       ON CONFLICT (post_slug) DO UPDATE SET

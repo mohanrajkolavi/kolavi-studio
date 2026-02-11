@@ -170,4 +170,173 @@
       transform: none;
     }
   }
+
+  /* Premium loading overlay: shimmer progress bar */
+  @keyframes loading-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .loading-bar-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(24 95% 53%) 0%,
+      hsl(30 95% 60%) 25%,
+      hsl(24 95% 53%) 50%,
+      hsl(30 95% 60%) 75%,
+      hsl(24 95% 53%) 100%
+    );
+    background-size: 200% 100%;
+    animation: loading-shimmer 2.5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loading-bar-shimmer {
+      animation: none;
+    }
+  }
+
+  /* Premium ring spinner */
+  @keyframes spin-slow {
+    to { transform: rotate(360deg); }
+  }
+
+  .loader-ring {
+    width: 48px;
+    height: 48px;
+    border: 3px solid hsl(var(--muted));
+    border-top-color: hsl(24 95% 53%);
+    border-radius: 50%;
+    animation: spin-slow 1s linear infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .loader-ring {
+      animation: none;
+      transform: none;
+    }
+  }
+
+  /* Subtle pulse for active step */
+  @keyframes step-pulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 hsl(24 95% 53% / 0.4); }
+    50% { opacity: 1; box-shadow: 0 0 0 8px hsl(24 95% 53% / 0); }
+  }
+
+  .step-active-ring {
+    animation: step-pulse 2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .step-active-ring {
+      animation: none;
+    }
+  }
+
+  /* Generation loading overlay: Apple/Google premium style */
+  .generation-loading-card {
+    animation: generation-loading-fade-in 0.35s ease-out;
+  }
+
+  @keyframes generation-loading-fade-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .generation-loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 2.5px solid hsl(var(--muted));
+    border-top-color: hsl(24 95% 53%);
+    border-radius: 50%;
+    animation: spin-slow 0.9s linear infinite;
+  }
+
+  .generation-loading-spinner-sm {
+    width: 16px;
+    height: 16px;
+    border: 2px solid hsl(var(--muted));
+    border-top-color: hsl(var(--primary));
+    border-radius: 50%;
+    animation: spin-slow 0.8s linear infinite;
+  }
+
+  .generation-loading-spinner-on-orange {
+    border-color: hsl(0 0% 100% / 0.35);
+    border-top-color: hsl(0 0% 100%);
+  }
+
+  .generation-loading-bar {
+    background: linear-gradient(
+      90deg,
+      hsl(24 95% 53%) 0%,
+      hsl(30 95% 58%) 50%,
+      hsl(24 95% 53%) 100%
+    );
+    background-size: 200% 100%;
+    animation: loading-shimmer 2.5s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .generation-loading-card {
+      animation: none;
+    }
+    .generation-loading-spinner,
+    .generation-loading-spinner-sm,
+    .generation-loading-spinner-on-orange {
+      animation: none;
+    }
+    .generation-loading-bar {
+      animation: none;
+    }
+  }
+
+  /* Outline editor: premium section row */
+  .outline-section-row {
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .outline-section-row:hover,
+  .outline-section-row:focus-within {
+    background-color: hsl(var(--muted) / 0.25);
+    border-color: hsl(var(--border) / 0.7);
+  }
+  .outline-section-row:focus-within {
+    box-shadow: 0 0 0 1px hsl(var(--border) / 0.5);
+  }
+  .outline-add-btn {
+    transition: color 0.2s ease, transform 0.15s ease;
+  }
+  .outline-add-btn:hover {
+    transform: translateX(2px);
+  }
+  .outline-empty-btn {
+    transition: opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .outline-empty-btn:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px hsl(var(--foreground) / 0.12);
+  }
+  .outline-empty-btn:active {
+    transform: scale(0.98);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .outline-section-row,
+    .outline-add-btn,
+    .outline-empty-btn {
+      transition: none;
+    }
+    .outline-add-btn:hover {
+      transform: none;
+    }
+    .outline-empty-btn:hover,
+    .outline-empty-btn:active {
+      transform: none;
+    }
+  }
 }

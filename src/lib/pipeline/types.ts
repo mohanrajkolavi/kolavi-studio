@@ -5,6 +5,7 @@
 
 import { z } from "zod";
 import type { ArticleAuditResult } from "@/lib/seo/article-audit";
+import type { PipelineRunMetrics, PerformanceSummary } from "@/lib/pipeline/metrics/types";
 
 // =============================================================================
 // 1. PipelineInput
@@ -24,7 +25,23 @@ export type PipelineInput = {
   wordCountPreset?: WordCountPreset;
   /** Used only when wordCountPreset is "custom". */
   wordCountCustom?: number;
+  /** When true (default), auto-fix fact-check hallucinations via Claude. */
+  autoFixHallucinations?: boolean;
 };
+
+/** Zod schema for validating job input (e.g. when loading from store). */
+export const PipelineInputSchema = z.object({
+  primaryKeyword: z.string().min(1, "primaryKeyword is required"),
+  secondaryKeywords: z.array(z.string()).optional(),
+  peopleAlsoSearchFor: z.array(z.string()).optional(),
+  intent: z.union([
+    z.string(),
+    z.array(z.string()),
+  ]).optional(),
+  wordCountPreset: z.string().optional(),
+  wordCountCustom: z.number().optional(),
+  autoFixHallucinations: z.boolean().optional(),
+});
 
 // =============================================================================
 // 2. SerpResult
@@ -163,7 +180,7 @@ export const EditorialStyleSchema = z.object({
   contentMix: z.object({
     prose: numeric,
     lists: numeric,
-    tables: numeric,
+    tables: z.optional(numeric).default(0),
   }),
   dataDensity: z.string(),
   introStyle: z.string(),
@@ -312,12 +329,9 @@ export const TitleMetaVariantSchema = z.object({
   approach: z.string(),
 });
 
-// Claude draft output (writeDraft response) — Zod validated
+// Claude draft output (writeDraft response) — content only. Title, meta, slug come from OpenAI generateTitleMetaSlugFromContent (called from result page).
 export const ClaudeDraftOutputSchema = z.object({
-  titleMetaVariants: z.array(TitleMetaVariantSchema).min(2).max(4),
-  outline: z.array(z.string()),
   content: z.string().min(1),
-  suggestedSlug: z.string(),
   suggestedCategories: z.array(z.string()),
   suggestedTags: z.array(z.string()),
 });
@@ -355,6 +369,27 @@ export type OutlineDrift = {
   extra: string[];
 };
 
+/** Record of one auto-fix applied for a fact-check hallucination. */
+export type HallucinationFix = {
+  originalText: string;
+  replacement: string;
+  reason: string;
+  replacedWithVerifiedFact: boolean;
+};
+
+/** Token usage for one LLM call; used for cost tracking and metrics. */
+export type TokenUsageRecord = {
+  /** Call identifier (e.g. "extractTopicsAndStyle", "writeDraft"). */
+  callName: string;
+  /** Model name (e.g. "gpt-4.1", "claude-sonnet-4-5"). */
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  /** Call duration in milliseconds. */
+  durationMs: number;
+};
+
 export type PipelineOutput = {
   article: {
     content: string;
@@ -363,8 +398,10 @@ export type PipelineOutput = {
     suggestedCategories: string[];
     suggestedTags: string[];
   };
-  titleMetaVariants: TitleMetaVariant[];
-  selectedTitleMeta: TitleMetaVariant | null;
+  /** Single title from OpenAI (no variants). */
+  title: string;
+  /** Single meta description from OpenAI (no variants). */
+  metaDescription: string;
   sourceUrls: string[];
   auditResult: ArticleAuditResult;
   schemaMarkup: SchemaMarkup;
@@ -389,6 +426,14 @@ export type PipelineOutput = {
   briefSummary?: BriefSummary;
   /** Non-blocking: draft outline vs brief outline. */
   outlineDrift?: OutlineDrift;
+  /** Auto-fixes applied for fact-check hallucinations (when autoFixHallucinations enabled). */
+  hallucinationFixes?: HallucinationFix[];
+  /** Per-call token usage for cost estimation and metrics. */
+  tokenUsage?: TokenUsageRecord[];
+  /** Full timing and performance metrics for this run (observability). */
+  metrics?: PipelineRunMetrics;
+  /** Human-readable performance summary (observability). */
+  performanceSummary?: PerformanceSummary;
 };
 
 // =============================================================================
@@ -442,4 +487,39 @@ export const RETRY_EXPENSIVE: RetryConfig = {
   retryDelayMs: 3000,
   timeoutMs: 60000,
   retryOn: ["timeout", "rate_limit"],
+};
+
+export const RETRY_STANDARD_FAST: RetryConfig = {
+  maxRetries: 2,
+  retryDelayMs: 1000,
+  timeoutMs: 40000,
+  retryOn: ["timeout", "rate_limit", "server_error"],
+};
+
+export const RETRY_CLAUDE_DRAFT: RetryConfig = {
+  maxRetries: 1,
+  retryDelayMs: 2000,
+  timeoutMs: 180000,
+  retryOn: ["timeout", "rate_limit"],
+};
+
+// -----------------------------------------------------------------------------
+// BriefOverrides — draft endpoint: edit/reorder/remove outline sections
+// -----------------------------------------------------------------------------
+
+export type BriefOverridesSection = {
+  heading?: string;
+  level?: "h2" | "h3";
+  targetWords?: number;
+  topics?: string[];
+  geoNote?: string;
+  subsections?: BriefOverridesSection[];
+};
+
+export type BriefOverrides = {
+  sections?: BriefOverridesSection[];
+  reorderedSectionIndexes?: number[];
+  removedSectionIndexes?: number[];
+  /** User-added sections (appended after existing outline). Does not change research. */
+  addedSections?: BriefOverridesSection[];
 };

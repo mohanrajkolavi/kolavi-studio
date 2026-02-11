@@ -130,8 +130,6 @@ if (article.focusKeyword?.trim()) {
     else results.push({ icon: "✓", label: "Rank Math: Keyword in URL", msg: "OK.", level: 3, source: "rankmath" });
   }
 }
-if (wc >= 2500) results.push({ icon: "✓", label: "Rank Math: Content length", msg: `${wc} words (100%).`, level: 3, source: "rankmath" });
-else if (wc >= 1500) results.push({ icon: "⚠", label: "Rank Math: Content length", msg: `${wc} words (2500+ for 100%).`, level: 3, source: "rankmath" });
 if (article.title && !/\d/.test(article.title)) results.push({ icon: "⚠", label: "Rank Math: Number in title", msg: "Numbers often improve CTR.", level: 3, source: "rankmath" });
 else if (article.title) results.push({ icon: "✓", label: "Rank Math: Number in title", msg: "OK.", level: 3, source: "rankmath" });
 

@@ -130,9 +130,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const phoneVal = phone?.trim() || null;
+    const businessTypeVal = businessType || null;
+    const phoneFragment = phoneVal !== null ? sql`${phoneVal}` : sql`NULL`;
+    const businessTypeFragment = businessTypeVal !== null ? sql`${businessTypeVal}` : sql`NULL`;
     await sql`
       INSERT INTO leads (name, email, phone, business_type, message, source, status)
-      VALUES (${name.trim()}, ${email.trim().toLowerCase()}, ${phone?.trim() || null}, ${businessType || null}, ${message.trim()}, 'contact_form', 'new')
+      VALUES (${name.trim()}, ${email.trim().toLowerCase()}, ${phoneFragment}, ${businessTypeFragment}, ${message.trim()}, 'contact_form', 'new')
     `;
 
     return NextResponse.json({ success: true });

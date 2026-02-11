@@ -1,6 +1,6 @@
 # Kolavi Studio
 
-A production-ready Next.js website for Kolavi Studio agency, featuring mobile-first design, SEO-first architecture, and headless WordPress integration.
+A production-ready Next.js website for Kolavi Studio agency: mobile-first design, SEO-first architecture, headless WordPress blog, and an owner dashboard with AI-powered Content Writer (Blog Maker), leads, and content maintenance.
 
 > **Public repository:** Never commit `.env.local`, API keys, or credentials. Run `npm run check:secrets` before pushing. See [SECURITY.md](SECURITY.md).
 
@@ -41,6 +41,18 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Scripts
+
+| Command | Description |
+|--------|-------------|
+| `npm run dev` | Start development server |
+| `npm run build` | Production build |
+| `npm start` | Start production server |
+| `npm run lint` | Run ESLint |
+| `npm run check:secrets` | Verify no secrets in staged files (run before push) |
+| `npm run prepush` | Run `check:secrets` and `lint` |
+| `npm run open:browser` | Open app in browser (dev) |
+
 ## Project Structure
 
 - **`/src/app`** – Next.js App Router: pages, layouts, API routes (`/api/auth`, `/api/blog`, `/api/contact`, `/api/content-audit`, `/api/content-maintenance`, `/api/leads`, `/api/revalidate`), sitemap, RSS
@@ -69,9 +81,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Documentation
 
-- **[SETUP.md](SETUP.md)** – Full setup, env vars, GSC, sitemap
+- **[SETUP.md](SETUP.md)** – Full setup, env vars, database, GSC, sitemap, deployment
 - **[SECURITY.md](SECURITY.md)** – Never commit API keys or secrets; what’s gitignored
 - **[docs/README.md](docs/README.md)** – Doc index: architecture, dashboard, integrations, blog, content audit
+- **[docs/TECH_STACK_AUDIT.md](docs/TECH_STACK_AUDIT.md)** – Tech stack audit and recommendations
 
 ## Features
 
@@ -81,3 +94,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **Content Writer (Blog Maker):** AI pipeline (Serper/Jina/Gemini, OpenAI brief, Claude draft, humanize, SEO audit, fact check); publishable = 75%+ score and no Level 1 fails
 - **Content audit:** In-app SEO article audit (`src/lib/seo/article-audit.ts`); optional Python E-E-A-T tool in `content_audit/`; API route `/api/content-audit/quality`
 - **Scalable:** Multiple verticals (e.g. medical-spas, industries); legal pages (privacy, terms, disclaimer, cookies)
+
+## License
+
+Proprietary – All Rights Reserved. See [LICENSE](LICENSE).

@@ -1,0 +1,53 @@
+---
+description: PostgreSQL parameter typing rules to avoid "could not determine data type of parameter" errors
+globs: "**/*.ts"
+alwaysApply: false
+---
+
+# PostgreSQL Parameter Typing (Postgres.js)
+
+When using `sql` from `@/lib/db` or `@/lib/db/client`, follow these rules to avoid runtime errors.
+
+## 1. Array parameters (text[])
+
+**Always** use `sql.array(arr, 1009)` or `textArray(arr)` from `@/lib/db/params` for `text[]` parameters (e.g. `jsonb_set` path).
+
+```typescript
+// ❌ BAD - causes "could not determine data type of parameter"
+await sql`UPDATE t SET data = jsonb_set(data, ${path}, ...)`;
+
+// ✅ GOOD
+import { textArray } from "@/lib/db/params";
+await sql`UPDATE t SET data = jsonb_set(data, ${textArray(path)}, ...)`;
+```
+
+OID 1009 = `text[]` in PostgreSQL.
+
+## 2. JSON/JSONB
+
+Use `(${value})::jsonb` (not `(${value}::text)::jsonb`). The `::jsonb` cast lets PostgreSQL infer the parameter type.
+
+```typescript
+// ✅ GOOD
+const json = JSON.stringify(obj);
+await sql`UPDATE t SET col = (${json})::jsonb`;
+```
+
+## 3. Null values
+
+For nullable columns (especially TEXT), use `optionalText(value)` from `@/lib/db/params` or explicit sql-tagged `NULL` when the value is null.
+
+```typescript
+// ❌ BAD - causes "could not determine data type of parameter" when value is null
+await sql`UPDATE t SET error_message = ${errorMessage} WHERE id = ${id}`;
+
+// ✅ GOOD
+import { optionalText } from "@/lib/db/params";
+const errorFragment = optionalText(errorMessage);
+await sql`UPDATE t SET error_message = ${errorFragment} WHERE id = ${id}`;
+```
+
+## 4. References
+
+- `src/lib/db/params.ts` – `textArray`, `optionalText`, OID constants
+- `src/lib/pipeline/jobs/db-store.ts` – reference implementation

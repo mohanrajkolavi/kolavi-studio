@@ -79,11 +79,14 @@ export async function PATCH(
       );
     }
 
+    // Use explicit sql fragments for nulls to avoid "could not determine data type of parameter"
+    const notesFragment = notes !== null && notes !== undefined ? sql`${notes}` : sql`NULL`;
+
     // Build update query dynamically
     if (status !== undefined && notes !== undefined) {
       await sql`
         UPDATE leads
-        SET status = ${status}, notes = ${notes}, updated_at = NOW()
+        SET status = ${status}, notes = ${notesFragment}, updated_at = NOW()
         WHERE id = ${id}
       `;
     } else if (status !== undefined) {
@@ -95,7 +98,7 @@ export async function PATCH(
     } else if (notes !== undefined) {
       await sql`
         UPDATE leads
-        SET notes = ${notes}, updated_at = NOW()
+        SET notes = ${notesFragment}, updated_at = NOW()
         WHERE id = ${id}
       `;
     }

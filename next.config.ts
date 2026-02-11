@@ -1,6 +1,8 @@
+import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: path.join(__dirname),
   async rewrites() {
     return [
       { source: "/blog/rss.xml", destination: "/blog/rss" },

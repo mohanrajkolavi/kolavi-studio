@@ -38,7 +38,7 @@
 | Keyword in slug | "Primary keyword in slug" | N/A | L3: auditRankMathSlugKeyword |
 | Keyword in first 10% of content | "First 10% or first 300 words" | Preserves structure; wording only | L3: auditRankMathFirst10Percent |
 | Keyword in subheadings (H2/H3) | "Primary + secondary in H2/H3 naturally" | Keeps H2/H3 text | L3: auditRankMathSubheadingKeyword |
-| Content length (1500+ / 2500+) | "2500+ = 100%; 1500+ pillar; don't pad" | No word-count targeting | L3: auditRankMathContentLength |
+| Content length | Removed (Rank Math 2500) | STRICT: brief target ±5% | ( enforced in writer only ) |
 | FAQ (3–5 Q&As) | "FAQ 3–5 Q&As, People Also Search For" | Keeps FAQ section | Not a separate audit item (covered by structure) |
 
 ---
@@ -80,7 +80,7 @@
 | Keyword in first 10% | 3 | Rank Math | Competitive |
 | Keyword in slug | 3 | Rank Math | Competitive |
 | Keyword in subheadings | 3 | Rank Math | Competitive |
-| Content length (2500+ etc.) | 3 | Rank Math | Competitive (excluded from score; see Section 5b) |
+| Content length | — | — | Removed (Rank Math 2500); word count enforced strictly in writer |
 | Title keyword position | 3 | Rank Math | Competitive |
 | Number in title | 3 | Rank Math | Competitive |
 
@@ -90,7 +90,7 @@
 
 ## 5b. Weightage list (how the score is calculated)
 
-**Formula:** `score = (pass / total) × 100`. Every **scored** check has **equal weight (1)**. Only **pass** counts toward the numerator; **warn** and **fail** do not. So each pass = +1 to the score, each warn/fail = 0. **Total** is the number of scored checks (check #21, Rank Math content length, is excluded from the denominator; see table below).
+**Formula:** `score = (pass / total) × 100`. Every scored check has **equal weight (1)**. Only **pass** counts toward the numerator; **warn** and **fail** do not. So each pass = +1 to the score, each warn/fail = 0. **Total** is the number of scored checks.
 
 **Publishability:** In addition to score ≥ 75, there must be **no Level 1 failures** (any L1 fail blocks publish even if score is high).
 
@@ -116,11 +116,10 @@
 | 18 | Rank Math: First 10% | 3 | +1 | 0 (warn) |
 | 19 | Rank Math: Slug keyword | 3 | +1 | 0 (warn) |
 | 20 | Rank Math: Subheading keyword | 3 | +1 | 0 (warn) |
-| 21 | Rank Math: Content length | 3 | Excluded from score (informational only) | 1500+ = pass, 600–1499 = warn; not counted in total |
-| 22 | Rank Math: Keyword position in title | 3 | +1 | 0 (warn) |
-| 23 | Rank Math: Number in title | 3 | +1 | 0 (warn) |
+| 21 | Rank Math: Keyword position in title | 3 | +1 | 0 (warn) |
+| 22 | Rank Math: Number in title | 3 | +1 | 0 (warn) |
 
-**Example:** 19 pass, 3 warn, 0 fail → 22 checks counted (Rank Math content length #21 excluded from score) → score = round(19/22 × 100) = **86%**. If any of the 3 warn were Level 1 fail, publishable would be false.
+**Example:** 19 pass, 3 warn, 0 fail → 22 checks counted → score = round(19/22 × 100) = **86%**. If any of the 3 warn were Level 1 fail, publishable would be false. (Rank Math content length check removed.)
 
 ---
 
@@ -204,7 +203,7 @@ This section maps **every audit check** to the **Content Writer pipeline** (Brie
 
 ### Constants (single source of truth)
 
-- **SEO** (`src/lib/constants.ts`): TITLE_MAX_CHARS 60, META 160, URL_SLUG 75, PARAGRAPH_MAX_WORDS 120, CONTENT_MIN_WORDS_PILLAR 2500.
+- **SEO** (`src/lib/constants.ts`): TITLE_MAX_CHARS 60, META 160, URL_SLUG 75, PARAGRAPH_MAX_WORDS 120.
 - **Audit** uses `SEO.PARAGRAPH_MAX_WORDS` (120); **Brief** uses maxParagraphWords: 120; **Draft** says "120 words". Aligned.
 - **FAQ max chars:** 300 in enforceFaqCharacterLimit, GEO_FAQ_ANSWER_MAX_CHARS, and draft prompt. Aligned.
 
@@ -212,7 +211,7 @@ This section maps **every audit check** to the **Content Writer pipeline** (Brie
 
 1. **Keyword in subheadings:** Brief builder now instructs GPT to ensure at least one outline section heading includes the primary keyword (or natural variant) so the generated outline satisfies Rank Math subheading check.
 2. **Content thinness:** Draft prompt explicitly states article must be at least 300 words (Google thin-content threshold) as a self-check alongside word count target.
-3. **Scoring note:** Editorial checks (generic phrases) are excluded from score except ai-typography; rm-content-length is excluded. So score reflects technical SEO + typography + structure + Rank Math placement.
+3. **Scoring note:** Editorial checks (generic phrases) are excluded from score except ai-typography. So score reflects technical SEO + typography + structure + Rank Math placement.
 
 ### High-quality content summary
 

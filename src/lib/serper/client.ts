@@ -73,10 +73,14 @@ function isArticleUrl(url: string): boolean {
 }
 
 /**
- * Search Google via Serper and return top 5 filtered article URLs as SerpResult[].
+ * Search Google via Serper and return top N filtered article URLs as SerpResult[].
+ * Default 3 for diminishing returns on 4th/5th article; callers can override.
  * Filters out homepages, non-article domains, file URLs, and category/tag pages.
  */
-export async function searchCompetitorUrls(keyword: string): Promise<SerpResult[]> {
+export async function searchCompetitorUrls(
+  keyword: string,
+  maxResults = 3
+): Promise<SerpResult[]> {
   const apiKey = process.env.SERPER_API_KEY;
   if (!apiKey) {
     throw new Error("SERPER_API_KEY is not set. Get a key at https://serper.dev");
@@ -115,11 +119,11 @@ export async function searchCompetitorUrls(keyword: string): Promise<SerpResult[
       snippet: item.snippet ?? "",
       isArticle: true,
     });
-    if (filtered.length >= 5) break;
+    if (filtered.length >= maxResults) break;
   }
 
   if (process.env.NODE_ENV !== "test") {
-    console.log(`[serper] keyword="${keyword}": ${beforeCount} results before filter, ${filtered.length} after (top 5 articles)`);
+    console.log(`[serper] keyword="${keyword}": ${beforeCount} results before filter, ${filtered.length} after (top ${maxResults} articles)`);
   }
 
   return filtered;

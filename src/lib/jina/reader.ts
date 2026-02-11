@@ -7,6 +7,8 @@
 import type { CompetitorArticle } from "@/lib/pipeline/types";
 
 const JINA_READER_BASE = "https://r.jina.ai";
+/** Stagger between starting each URL fetch (ms) to be respectful to rate limits. */
+const JINA_STAGGER_MS = 400;
 
 export type FetchResult = {
   url: string;
@@ -80,8 +82,8 @@ export async function fetchViaJinaReader(url: string): Promise<FetchResult> {
       };
     }
 
-    // Truncate very long content to avoid token overflow (keep ~8k chars per article)
-    const maxChars = 8000;
+    // Truncate very long content (downstream slices to 12k total; 5k per article is sufficient)
+    const maxChars = 5000;
     const truncated =
       trimmed.length > maxChars
         ? trimmed.slice(0, maxChars) + "\n\n[... content truncated for length ...]"
@@ -103,39 +105,61 @@ export async function fetchViaJinaReader(url: string): Promise<FetchResult> {
 }
 
 /**
- * Fetch multiple URLs via Jina Reader, one after another to respect rate limits.
+ * Fetch multiple URLs via Jina Reader with staggered parallel requests.
+ * Callers can override maxUrls (default 3 for diminishing returns on 4th/5th article).
  */
-export async function fetchCompetitorUrls(urls: string[]): Promise<FetchResult[]> {
-  const results: FetchResult[] = [];
-
-  for (const url of urls.slice(0, 5)) {
-    const result = await fetchViaJinaReader(url);
-    results.push(result);
-    // Small delay between requests to avoid rate limits (20 RPM = ~3s apart)
-    if (urls.indexOf(url) < urls.length - 1) {
-      await new Promise((r) => setTimeout(r, 2000));
-    }
-  }
-
-  return results;
+export async function fetchCompetitorUrls(
+  urls: string[],
+  maxUrls = 3
+): Promise<FetchResult[]> {
+  const toFetch = urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean);
+  const promises = toFetch.map(
+    (url, i) =>
+      new Promise<FetchResult>((resolve) => {
+        setTimeout(() => fetchViaJinaReader(url).then(resolve), i * JINA_STAGGER_MS);
+      })
+  );
+  const settled = await Promise.allSettled(promises);
+  return settled.map((s, i): FetchResult => {
+    if (s.status === "fulfilled") return s.value;
+    const url = toFetch[i] ?? "";
+    return {
+      url,
+      content: "",
+      success: false,
+      error: s.reason instanceof Error ? s.reason.message : String(s.reason),
+    };
+  });
 }
 
 /**
- * Fetch competitor content from URLs. Without JINA_API_KEY, enforces ~2s delay between
- * fetches (same as fetchCompetitorUrls) to avoid rate limits (20 RPM). With API key,
- * fetches sequentially with delay for consistency. Failed fetches return an entry
- * with fetchSuccess: false and empty content (no throw).
+ * Fetch competitor content from URLs in parallel with a short stagger (400ms) to
+ * respect rate limits. Each URL has its own 15s timeout. Failed fetches return an
+ * entry with fetchSuccess: false and empty content (no throw).
+ * @param maxUrls Default 3; callers can override (diminishing returns on 4th/5th).
  */
-export async function fetchCompetitorContent(urls: string[]): Promise<CompetitorArticle[]> {
-  const toFetch = urls.slice(0, 5).map((u) => u.trim()).filter(Boolean);
-  const results: Awaited<ReturnType<typeof fetchViaJinaReader>>[] = [];
-  for (const url of toFetch) {
-    const result = await fetchViaJinaReader(url);
-    results.push(result);
-    if (toFetch.indexOf(url) < toFetch.length - 1) {
-      await new Promise((r) => setTimeout(r, 2000));
-    }
-  }
+export async function fetchCompetitorContent(
+  urls: string[],
+  maxUrls = 3
+): Promise<CompetitorArticle[]> {
+  const toFetch = urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean);
+  const promises = toFetch.map(
+    (url, i) =>
+      new Promise<FetchResult>((resolve) => {
+        setTimeout(() => fetchViaJinaReader(url).then(resolve), i * JINA_STAGGER_MS);
+      })
+  );
+  const settled = await Promise.allSettled(promises);
+  const results = settled.map((s, i): FetchResult => {
+    if (s.status === "fulfilled") return s.value;
+    const url = toFetch[i] ?? "";
+    return {
+      url,
+      content: "",
+      success: false,
+      error: s.reason instanceof Error ? s.reason.message : String(s.reason),
+    };
+  });
 
   return results.map((r, i): CompetitorArticle => {
     const url = toFetch[i] ?? "";

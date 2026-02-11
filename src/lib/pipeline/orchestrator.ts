@@ -24,23 +24,29 @@ import {
   type RetryConfig,
   type ValidatedSourceUrl,
   type SchemaMarkup,
+  type TokenUsageRecord,
   RETRY_FAST,
   RETRY_STANDARD,
+  RETRY_STANDARD_FAST,
   RETRY_EXPENSIVE,
+  RETRY_CLAUDE_DRAFT,
 } from "@/lib/pipeline/types";
 import { searchCompetitorUrls } from "@/lib/serper/client";
 import { fetchCompetitorContent } from "@/lib/jina/reader";
 import { fetchCurrentData } from "@/lib/gemini/client";
 import { extractTopicsAndStyle, buildResearchBrief } from "@/lib/openai/client";
-import { writeDraft } from "@/lib/claude/client";
+import { writeDraft, fixHallucinationsInContent } from "@/lib/claude/client";
 import {
   auditArticle,
   generateSchemaMarkup,
   enforceFaqCharacterLimit,
+  extractH2sFromHtml,
   verifyFactsAgainstSource,
 } from "@/lib/seo/article-audit";
 
 export type { PipelineInput, PipelineOutput };
+
+import { createPipelineMetricsCollector } from "@/lib/pipeline/metrics";
 
 // ---------------------------------------------------------------------------
 // Progress callback for SSE streaming
@@ -69,6 +75,9 @@ export type PipelineProgressEvent = {
 };
 
 export type ProgressCallback = (event: PipelineProgressEvent) => void;
+
+/** Default number of competitor URLs to fetch (Serper + Jina). Callers can override. */
+const DEFAULT_MAX_COMPETITOR_URLS = 3;
 
 // ---------------------------------------------------------------------------
 // Time-budget helper: caps per-step timeout so we never exceed route budget
@@ -217,6 +226,10 @@ export async function runPipeline(
   budgetMs = 270_000,
 ): Promise<PipelineOutput> {
   const startTotal = Date.now();
+  const tokenUsage: TokenUsageRecord[] = [];
+  const metrics = createPipelineMetricsCollector();
+  const runId = `orch-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  metrics.startRun(runId, input.primaryKeyword?.trim() ?? "");
   const budget = new TimeBudget(budgetMs);
   const emit = (
     step: PipelineStep,
@@ -233,26 +246,52 @@ export async function runPipeline(
   }
 
   // --- Step 1a: Serper ---
+  metrics.startChunk("serper");
   emit("serper", "started", "Searching competitors...", 0);
+  const serperStartMs = Date.now();
   const serperResult = await withRetry(
-    async () => searchCompetitorUrls(primaryKeyword),
+    async () => searchCompetitorUrls(primaryKeyword, DEFAULT_MAX_COMPETITOR_URLS),
     { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
     "serper"
   );
+  metrics.recordApiCall("serper", Date.now() - serperStartMs, { endpoint: "search" });
+  metrics.endChunk("serper", "completed");
   const serpResults: SerpResult[] = serperResult.success && serperResult.data ? serperResult.data : [];
-  const urls = serpResults.map((s) => s.url).slice(0, 5);
+  const urls = serpResults.map((s) => s.url).slice(0, DEFAULT_MAX_COMPETITOR_URLS);
   emit("serper", "completed", `Found ${urls.length} competitor URLs`, 5);
 
-  // --- Step 1b + 1c: Jina and Gemini grounding in parallel (both only need keyword/URLs) ---
+  // --- Step 1b + 1c: Jina and Gemini grounding in parallel (use FAST retry to stay under 5 min on Vercel) ---
   emit("jina", "started", "Fetching competitor articles...", 5);
   emit("gemini-grounding", "started", "Gathering current data...", 5);
+  let jinaDurationMs = 0;
+  let geminiDurationMs = 0;
   const [jinaResult, groundingResult] = await Promise.all([
-    withRetry(async () => fetchCompetitorContent(urls), { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) }, "jina"),
-    withRetry(
-      async () => fetchCurrentData(primaryKeyword, input.secondaryKeywords ?? []),
-      { ...RETRY_STANDARD, timeoutMs: budget.cap(RETRY_STANDARD.timeoutMs) },
-      "gemini-grounding"
-    ),
+    (async () => {
+      metrics.startChunk("jina");
+      const t0 = Date.now();
+      const r = await withRetry(
+        async () => fetchCompetitorContent(urls, DEFAULT_MAX_COMPETITOR_URLS),
+        { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
+        "jina"
+      );
+      jinaDurationMs = Date.now() - t0;
+      metrics.recordApiCall("jina", jinaDurationMs, { endpoint: "fetch" });
+      metrics.endChunk("jina", "completed");
+      return r;
+    })(),
+    (async () => {
+      metrics.startChunk("gemini-grounding");
+      const t0 = Date.now();
+      const r = await withRetry(
+        async () => fetchCurrentData(primaryKeyword, input.secondaryKeywords ?? []),
+        { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(RETRY_STANDARD_FAST.timeoutMs) },
+        "gemini-grounding"
+      );
+      geminiDurationMs = Date.now() - t0;
+      metrics.recordApiCall("gemini", geminiDurationMs, { endpoint: "grounding" });
+      metrics.endChunk("gemini-grounding", "completed");
+      return r;
+    })(),
   ]);
 
   const competitors: CompetitorArticle[] =
@@ -274,10 +313,12 @@ export async function runPipeline(
     `${currentData.facts.length} current data facts`, 15);
 
   // --- Step 2 and source URL validation in parallel (extraction needs competitors only; validation needs currentData) ---
+  metrics.startChunk("topic-extraction");
+  let topicExtractionTokenStart = tokenUsage.length;
   emit("topic-extraction", "started", "Analyzing competitor topics & style...", 20);
   const extractionPromise = withRetry(
-    async () => extractTopicsAndStyle(competitors),
-    { ...RETRY_STANDARD, timeoutMs: budget.cap(90000) },
+    async () => extractTopicsAndStyle(competitors, tokenUsage),
+    { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
     "topic-extraction"
   );
   const validationPromise =
@@ -312,9 +353,11 @@ export async function runPipeline(
   }
 
   if (!extractionResult.success || !extractionResult.data) {
+    metrics.endChunk("topic-extraction", "failed");
     emit("topic-extraction", "failed", extractionResult.error ?? "topic extraction failed", 25);
     throw new Error(`Step 2 failed: ${extractionResult.error ?? "topic extraction failed"}`);
   }
+  metrics.endChunk("topic-extraction", "completed", tokenUsage.slice(topicExtractionTokenStart));
   const topicExtraction: TopicExtractionResult = extractionResult.data;
   const aiLikelyCount = topicExtraction.competitorStrengths.filter(
     (c) => c.aiLikelihood === "likely_ai"
@@ -336,7 +379,7 @@ export async function runPipeline(
       if (n == null || n < 500 || n > 6000) return undefined;
       return {
         target: Math.round(n),
-        note: "Guideline only. Strong value: provide more value than competitors; length is secondary.",
+        note: "STRICT: target must be met within ±5%.",
       };
     }
     const target =
@@ -344,20 +387,24 @@ export async function runPipeline(
     if (target == null) return undefined;
     return {
       target,
-      note: "Guideline only. Strong value: provide more value than competitors; length is secondary.",
+      note: "STRICT: target must be met within ±5%.",
     };
   })();
 
+  metrics.startChunk("gpt-brief");
+  const gptBriefTokenStart = tokenUsage.length;
   emit("gpt-brief", "started", "Building strategic research brief...", 30);
   const briefResult = await withRetry(
-    async () => buildResearchBrief(topicExtraction, currentData, input, wordCountOverride),
-    { ...RETRY_STANDARD, timeoutMs: budget.cap(90000) },
+    async () => buildResearchBrief(topicExtraction, currentData, input, wordCountOverride, tokenUsage),
+    { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
     "gpt-brief"
   );
   if (!briefResult.success || !briefResult.data) {
+    metrics.endChunk("gpt-brief", "failed");
     emit("gpt-brief", "failed", briefResult.error ?? "research brief failed", 40);
     throw new Error(`Step 3 failed: ${briefResult.error ?? "research brief failed"}`);
   }
+  metrics.endChunk("gpt-brief", "completed", tokenUsage.slice(gptBriefTokenStart));
   const brief: ResearchBrief = briefResult.data;
   emit("gpt-brief", "completed",
     `Brief: ${brief.outline.sections.length} sections, ${brief.editorialStyleFallback ? "fallback" : "dynamic"} style`, 40);
@@ -367,28 +414,45 @@ export async function runPipeline(
     );
   }
 
-  // --- Step 4: Write draft (long timeout: full article generation; v4 prompts are larger) ---
-  emit("claude-draft", "started", "Writing article draft (this is the longest step)...", 40);
+  // Placeholder title/meta/slug — draft is written first; user generates meta from content via "Generate meta" button
+  const fallbackSlug =
+    primaryKeyword
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-+|-+$/g, "") || "draft";
+  const titleMetaSlug = {
+    title: "Draft",
+    metaDescription: "",
+    suggestedSlug: fallbackSlug.length > 75 ? fallbackSlug.slice(0, 75).replace(/-+$/, "") : fallbackSlug,
+  };
+
+  // --- Step 4: Write draft (one long attempt, no retry — must fit in Vercel 5 min) ---
+  metrics.startChunk("claude-draft");
+  const claudeDraftTokenStart = tokenUsage.length;
+  emit("claude-draft", "started", "Writing article draft (this is the longest step)...", 45);
   const draftResult = await withRetry(
-    async () => writeDraft(brief),
-    { ...RETRY_EXPENSIVE, timeoutMs: budget.cap(300000) },
+    async () => writeDraft(brief, titleMetaSlug, tokenUsage),
+    { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
     "claude-draft"
   );
   if (!draftResult.success || !draftResult.data) {
+    metrics.endChunk("claude-draft", "failed");
     emit("claude-draft", "failed", draftResult.error ?? "draft failed", 75);
     throw new Error(`Step 4 failed: ${draftResult.error ?? "draft failed"}`);
   }
+  metrics.endChunk("claude-draft", "completed", tokenUsage.slice(claudeDraftTokenStart));
   const draft = draftResult.data;
   const wordCount = draft.content.split(/\s+/).filter(Boolean).length;
-  emit("claude-draft", "completed",
-    `Draft: ${wordCount} words, ${draft.titleMetaVariants.length} title variants`, 75);
+  emit("claude-draft", "completed", `Draft: ${wordCount} words`, 75);
   if (process.env.NODE_ENV !== "test") {
-    console.log(
-      `[pipeline] Step 4 complete: draft ${wordCount} words, ${draft.titleMetaVariants.length} title/meta options`
-    );
+    console.log(`[pipeline] Step 4 complete: draft ${wordCount} words`);
   }
 
   // --- Step 5: FAQ character limit enforcement ---
+  metrics.startChunk("faq-enforcement");
   emit("faq-enforcement", "started", "Enforcing FAQ character limits...", 82);
   let finalContent = draft.content;
   const faqEnforcement = enforceFaqCharacterLimit(finalContent, 300);
@@ -398,6 +462,7 @@ export async function runPipeline(
       console.log(`[pipeline] Step 5: FAQ enforcement — ${faqEnforcement.violations.length} answer(s) truncated to 300 chars`);
     }
   }
+  metrics.endChunk("faq-enforcement", "completed");
   emit("faq-enforcement", "completed", "FAQ enforcement complete", 92);
 
   if (process.env.NODE_ENV !== "test") {
@@ -406,7 +471,7 @@ export async function runPipeline(
 
   // --- Outline drift (draft vs brief) — non-blocking ---
   const expectedH2s = brief.outline.sections.filter((s) => s.level === "h2").map((s) => s.heading.trim());
-  const actualH2s = draft.outline.map((h) => (typeof h === "string" ? h : "").trim()).filter(Boolean);
+  const actualH2s = extractH2sFromHtml(draft.content);
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ");
   const missing = expectedH2s.filter((e) => !actualH2s.some((a) => norm(a) === norm(e)));
   const extra = actualH2s.filter((a) => !expectedH2s.some((e) => norm(e) === norm(a)));
@@ -419,15 +484,13 @@ export async function runPipeline(
   };
 
   // --- Step 6: Audit + schema ---
+  metrics.startChunk("audit");
   emit("audit", "started", "Running SEO audit and generating schema...", 92);
-  const firstVariant = draft.titleMetaVariants[0];
-  const titleForAudit = firstVariant?.title ?? primaryKeyword;
-  const metaForAudit = firstVariant?.metaDescription ?? "";
   const auditResult = auditArticle({
-    title: titleForAudit,
-    metaDescription: metaForAudit,
+    title: titleMetaSlug.title,
+    metaDescription: titleMetaSlug.metaDescription,
     content: finalContent,
-    slug: draft.suggestedSlug,
+    slug: titleMetaSlug.suggestedSlug,
     focusKeyword: primaryKeyword,
     extraValueThemes: brief.extraValueThemes?.length ? brief.extraValueThemes : undefined,
   });
@@ -435,16 +498,19 @@ export async function runPipeline(
     auditResult.schemaMarkup ??
     generateSchemaMarkup(
       finalContent,
-      titleForAudit,
-      metaForAudit,
-      draft.suggestedSlug,
+      titleMetaSlug.title,
+      titleMetaSlug.metaDescription,
+      titleMetaSlug.suggestedSlug,
       primaryKeyword
     );
+  metrics.endChunk("audit", "completed");
   emit("audit", "completed", `Audit score: ${auditResult.score}%`, 96);
 
   // --- Step 7: Hallucination check ---
+  metrics.startChunk("fact-check");
+  const factCheckTokenStart = tokenUsage.length;
   emit("fact-check", "started", "Verifying facts against sources...", 96);
-  const factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+  let factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
   if (process.env.NODE_ENV !== "test") {
     console.log(
       `[pipeline] Step 7: Fact check — ${factCheck.hallucinations.length} hallucinations, ${factCheck.issues.length} warnings`
@@ -455,12 +521,41 @@ export async function runPipeline(
       if (process.env.NODE_ENV !== "test") console.warn(`[pipeline] HALLUCINATION: ${h}`);
     }
   }
-  emit("fact-check", "completed",
-    `${factCheck.hallucinations.length} hallucinations, ${factCheck.issues.length} warnings`, 98);
+
+  // --- Optional: auto-fix hallucinations via Claude (surgical rewrite) ---
+  let hallucinationFixes: PipelineOutput["hallucinationFixes"] = undefined;
+  const autoFixEnabled = input.autoFixHallucinations !== false;
+  if (factCheck.hallucinations.length > 0 && autoFixEnabled) {
+    emit("fact-check", "started", "Auto-fixing hallucinations...", 97);
+    try {
+      const { fixedHtml, fixes } = await fixHallucinationsInContent(
+        finalContent,
+        factCheck.hallucinations,
+        currentData,
+        tokenUsage
+      );
+      if (fixes.length > 0 || fixedHtml !== finalContent) {
+        finalContent = fixedHtml;
+        hallucinationFixes = fixes;
+        const recheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+        if (recheck.hallucinations.length > 0 && process.env.NODE_ENV !== "test") {
+          console.warn(
+            `[pipeline] After auto-fix, fact-check still found ${recheck.hallucinations.length} hallucination(s); proceeding with fixed content`
+          );
+        }
+        factCheck = recheck;
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[pipeline] Auto-fix hallucinations failed, using original content:", err);
+      }
+    }
+    emit("fact-check", "completed",
+      `${factCheck.hallucinations.length} hallucinations after fix`, 98);
+  }
+  metrics.endChunk("fact-check", "completed", tokenUsage.slice(factCheckTokenStart));
 
   // Hallucinations are now non-blocking (downgraded to warning).
-  // After derived-number and rhetorical checks, remaining flags are often false positives.
-  // They're still visible in the UI for editor review.
   if (factCheck.hallucinations.length > 0 && process.env.NODE_ENV !== "test") {
     console.warn(
       `[pipeline] ${factCheck.hallucinations.length} potential hallucination(s) detected (non-blocking; review recommended)`
@@ -489,16 +584,24 @@ export async function runPipeline(
       }
     : undefined;
 
+  const targetWords = brief.wordCount?.target ?? 0;
+  const actualWords = finalContent.split(/\s+/).filter(Boolean).length;
+  metrics.setTargetWordCount(targetWords);
+  metrics.setActualWordCount(actualWords);
+  metrics.setAuditScore(auditResult.score ?? 0);
+  metrics.setHallucinationCount(factCheck.hallucinations.length);
+  const runMetrics = metrics.finishRun("completed");
+
   return {
     article: {
       content: finalContent,
-      outline: draft.outline,
-      suggestedSlug: draft.suggestedSlug,
+      outline: actualH2s,
+      suggestedSlug: titleMetaSlug.suggestedSlug,
       suggestedCategories: draft.suggestedCategories,
       suggestedTags: draft.suggestedTags,
     },
-    titleMetaVariants: draft.titleMetaVariants,
-    selectedTitleMeta: null,
+    title: titleMetaSlug.title,
+    metaDescription: titleMetaSlug.metaDescription,
     sourceUrls,
     auditResult,
     schemaMarkup,
@@ -516,5 +619,9 @@ export async function runPipeline(
     generationTimeMs: totalMs,
     briefSummary: briefSummary ?? undefined,
     outlineDrift,
+    hallucinationFixes,
+    ...(tokenUsage.length > 0 ? { tokenUsage } : {}),
+    metrics: runMetrics,
+    performanceSummary: runMetrics.performanceSummary,
   };
 }
