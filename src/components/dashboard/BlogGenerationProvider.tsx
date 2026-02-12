@@ -667,11 +667,19 @@ async function processResearchSSE(
     if (eventType === "result") {
       const r = parsed as { jobId?: string; serpResults?: Array<{ position: number; title: string; url: string }> };
       const jid = r.jobId ?? null;
-      guarded.setJobId?.(jid);
       const serpResults = r.serpResults ?? [];
+      if (serpResults.length === 0) {
+        guarded.setError("No search results found for this keyword. Try a different keyword or check your SERPER_API_KEY.");
+        guarded.setPhase("error");
+        guarded.setStatus?.("error");
+        guarded.setErrorChunk("research");
+        guarded.setGenerationStartedAt?.(null);
+        return;
+      }
+      guarded.setJobId?.(jid);
       guarded.setChunkOutputs((prev) => ({
         ...prev,
-        researchSerp: serpResults.length > 0 ? { results: serpResults } : null,
+        researchSerp: { results: serpResults },
         research: null,
       }));
       guarded.setPhase("reviewing");

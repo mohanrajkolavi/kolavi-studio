@@ -122,6 +122,22 @@ export async function searchCompetitorUrls(
     if (filtered.length >= maxResults) break;
   }
 
+  // When filter removes all results (e.g. Reddit/YouTube-heavy SERP), fall back to top organic URLs
+  if (filtered.length === 0 && organic.length > 0) {
+    for (const item of organic) {
+      const url = item.link?.trim();
+      if (!url) continue;
+      filtered.push({
+        url,
+        title: item.title ?? "",
+        position: item.position ?? filtered.length + 1,
+        snippet: item.snippet ?? "",
+        isArticle: false,
+      });
+      if (filtered.length >= maxResults) break;
+    }
+  }
+
   if (process.env.NODE_ENV !== "test") {
     console.log(`[serper] keyword="${keyword}": ${beforeCount} results before filter, ${filtered.length} after (top ${maxResults} articles)`);
   }
