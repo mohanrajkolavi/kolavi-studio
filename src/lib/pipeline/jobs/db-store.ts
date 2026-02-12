@@ -91,17 +91,18 @@ export function createDbJobStore(): JobStore {
       const chunkRecordsJson = JSON.stringify(job.chunkRecords);
       const errorMsg = job.errorMessage ?? null;
       const errorFragment = errorMsg !== null ? sql`${errorMsg}` : sql`NULL`;
+      // Explicit ::text::jsonb so PostgreSQL infers param type (avoids "could not determine data type of parameter $N")
       await sql`
         INSERT INTO pipeline_jobs (id, phase, input, created_at, updated_at, error_message, pipeline_version, chunk_records)
         VALUES (
           ${id},
           ${job.phase},
-          (${inputJson})::jsonb,
+          (${inputJson}::text)::jsonb,
           ${job.createdAt},
           ${job.updatedAt},
           ${errorFragment},
           ${job.pipelineVersion},
-          (${chunkRecordsJson})::jsonb
+          (${chunkRecordsJson}::text)::jsonb
         )
         ON CONFLICT (id) DO NOTHING
       `;
@@ -144,6 +145,7 @@ export function createDbJobStore(): JobStore {
       const completedAtJson = JSON.stringify(completedAt);
       const costJson = cost != null ? JSON.stringify(cost) : "null";
       const path = [kind] as string[];
+      // Explicit ::text::jsonb so PostgreSQL infers param type (avoids "could not determine data type of parameter $N")
       await sql`
         UPDATE pipeline_jobs
         SET
@@ -154,9 +156,9 @@ export function createDbJobStore(): JobStore {
               'status', 'completed',
               'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0) + 1,
               'errorMessage', null,
-              'output', (${outputJson})::jsonb,
-              'completedAt', (${completedAtJson})::jsonb,
-              'cost', (${costJson})::jsonb
+              'output', (${outputJson}::text)::jsonb,
+              'completedAt', (${completedAtJson}::text)::jsonb,
+              'cost', (${costJson}::text)::jsonb
             )
           ),
           updated_at = ${completedAt},
@@ -200,6 +202,7 @@ export function createDbJobStore(): JobStore {
     async setChunkFailed(id: string, kind: ChunkKind, errorMessage: string): Promise<void> {
       const updatedAt = now();
       const path = [kind] as string[];
+      const errorFragment = optionalText(errorMessage);
       await sql`
         UPDATE pipeline_jobs
         SET
@@ -209,11 +212,11 @@ export function createDbJobStore(): JobStore {
             jsonb_build_object(
               'status', 'failed',
               'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0) + 1,
-              'errorMessage', ${errorMessage}
+              'errorMessage', ${errorFragment}
             )
           ),
           updated_at = ${updatedAt},
-          error_message = ${errorMessage},
+          error_message = ${errorFragment},
           phase = 'failed'
         WHERE id = ${id}
       `;

@@ -25,12 +25,12 @@ OID 1009 = `text[]` in PostgreSQL.
 
 ## 2. JSON/JSONB
 
-Use `(${value})::jsonb` (not `(${value}::text)::jsonb`). The `::jsonb` cast lets PostgreSQL infer the parameter type.
+Use `(${value}::text)::jsonb` to explicitly type the parameter. The `::text` cast lets PostgreSQL infer the parameter type in contexts where it otherwise cannot (e.g. `jsonb_build_object`, `prepare: false`).
 
 ```typescript
-// ✅ GOOD
+// ✅ GOOD - explicit ::text avoids "could not determine data type of parameter $N"
 const json = JSON.stringify(obj);
-await sql`UPDATE t SET col = (${json})::jsonb`;
+await sql`UPDATE t SET col = (${json}::text)::jsonb`;
 ```
 
 ## 3. Null values

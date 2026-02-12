@@ -35,3 +35,11 @@ export function textArray(value: string[]): ReturnType<typeof sql.array> {
 export function optionalText(value: string | null | undefined) {
   return value != null ? sql`${value}` : sql`NULL`;
 }
+
+/**
+ * Safe fragment for nullable integer. Use for INTEGER columns that may be null.
+ * Prevents "could not determine data type of parameter" when passing null.
+ */
+export function optionalInt(value: number | null | undefined) {
+  return value != null ? sql`${value}` : sql`NULL`;
+}

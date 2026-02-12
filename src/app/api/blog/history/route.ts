@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { sql, optionalText, optionalInt } from "@/lib/db";
 
 const MAX_HISTORY = 10;
 
@@ -285,13 +285,13 @@ export async function POST(request: NextRequest) {
       VALUES (
         ${title.trim()},
         ${metaDescription.trim()},
-        ${JSON.stringify(outline)}::jsonb,
+        (${JSON.stringify(outline)}::text)::jsonb,
         ${content},
-        ${suggestedSlugVal},
-        ${suggestedCategoriesVal != null ? sql`${JSON.stringify(suggestedCategoriesVal)}::jsonb` : sql`NULL`},
-        ${suggestedTagsVal != null ? sql`${JSON.stringify(suggestedTagsVal)}::jsonb` : sql`NULL`},
-        ${focusKeywordVal},
-        ${generationTimeMsVal}
+        ${optionalText(suggestedSlugVal)},
+        ${suggestedCategoriesVal != null ? sql`(${JSON.stringify(suggestedCategoriesVal)}::text)::jsonb` : sql`NULL`},
+        ${suggestedTagsVal != null ? sql`(${JSON.stringify(suggestedTagsVal)}::text)::jsonb` : sql`NULL`},
+        ${optionalText(focusKeywordVal)},
+        ${optionalInt(generationTimeMsVal)}
       )
       RETURNING id
     `;
@@ -443,13 +443,13 @@ export async function PATCH(request: NextRequest) {
       SET
         title = ${title.trim()},
         meta_description = ${metaDescription.trim()},
-        outline = ${JSON.stringify(outline)}::jsonb,
+        outline = (${JSON.stringify(outline)}::text)::jsonb,
         content = ${content},
-        suggested_slug = ${suggestedSlugVal},
-        suggested_categories = ${suggestedCategoriesVal != null ? sql`${JSON.stringify(suggestedCategoriesVal)}::jsonb` : sql`NULL`},
-        suggested_tags = ${suggestedTagsVal != null ? sql`${JSON.stringify(suggestedTagsVal)}::jsonb` : sql`NULL`},
-        focus_keyword = ${focusKeywordVal},
-        generation_time_ms = ${generationTimeMsVal}
+        suggested_slug = ${optionalText(suggestedSlugVal)},
+        suggested_categories = ${suggestedCategoriesVal != null ? sql`(${JSON.stringify(suggestedCategoriesVal)}::text)::jsonb` : sql`NULL`},
+        suggested_tags = ${suggestedTagsVal != null ? sql`(${JSON.stringify(suggestedTagsVal)}::text)::jsonb` : sql`NULL`},
+        focus_keyword = ${optionalText(focusKeywordVal)},
+        generation_time_ms = ${optionalInt(generationTimeMsVal)}
       WHERE id = ${id}
       RETURNING id
     `;
