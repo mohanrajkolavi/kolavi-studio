@@ -8,7 +8,7 @@
  * Used by:
  *   1. SEO Audit (`article-audit.ts`) — flags them as editorial quality warnings
  *   2. Claude writer prompt (`claude/client.ts`) — encourages the model to use specific language
- *   3. E-E-A-T Python audit (`content_audit/`) — scored under "lazy phrasing"
+ *   3. E-E-A-T Python audit (`tools/content_audit/`) — scored under "lazy phrasing"
  *
  * Split into two tiers:
  *   HIGH — Strong generic markers that weaken content quality. Weighted in audit.

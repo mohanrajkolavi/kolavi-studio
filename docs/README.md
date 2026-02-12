@@ -33,14 +33,25 @@ Index for project documentation and guides.
 
 | Doc | Description |
 |-----|-------------|
-| [WORKFLOW.md](WORKFLOW.md) | Pipeline workflow, steps, providers, error handling, retries |
+| [blog/WORKFLOW.md](blog/WORKFLOW.md) | Pipeline workflow, steps, providers, error handling, retries |
 | [blog/BLOG_SYSTEM_AUDIT.md](blog/BLOG_SYSTEM_AUDIT.md) | Blog generator, humanize, article audit vs Google/Rank Math; pipeline alignment |
 | [blog/blog-maker-guidelines-comparison.md](blog/blog-maker-guidelines-comparison.md) | Google vs Rank Math guidelines; priority and resolution |
 
 ---
 
-## Content audit
+## Audits & quality
 
 | Doc | Description |
 |-----|-------------|
-| [content_audit/README.md](../content_audit/README.md) | Optional Python E-E-A-T / Helpful Content auditor; integration with app |
+| [audits/AUDIT_REPORT.md](audits/AUDIT_REPORT.md) | Content audit report and recommendations |
+| [audits/TECH_STACK_AUDIT.md](audits/TECH_STACK_AUDIT.md) | Tech stack audit and recommendations |
+| [audits/PROMPT_AUDIT_AND_SUGGESTIONS.md](audits/PROMPT_AUDIT_AND_SUGGESTIONS.md) | Prompt audit and improvement suggestions |
+| [planning/OUTPUT_QUALITY_PLAN.md](planning/OUTPUT_QUALITY_PLAN.md) | Output quality improvement plan |
+
+---
+
+## Content audit (Python tool)
+
+| Doc | Description |
+|-----|-------------|
+| [tools/content_audit/README.md](../tools/content_audit/README.md) | Optional Python E-E-A-T / Helpful Content auditor; integration with app |

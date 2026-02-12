@@ -60,7 +60,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **`/src/lib`** – Shared logic: `auth/`, `blog/`, `claude/`, `gemini/`, `openai/`, `pipeline/`, `seo/`, `graphql/`, `jina/`, `serper/`, `supabase/`, `db/`, `constants/`
 - **`/src/types`** – TypeScript type definitions
 - **`/scripts`** – Dev/ops scripts (check-secrets, run-audit, open-app-in-browser)
-- **`/content_audit`** – Optional Python E-E-A-T/content-audit tool (see [content_audit/README.md](content_audit/README.md))
+- **`/tools/content_audit`** – Optional Python E-E-A-T/content-audit tool (see [tools/content_audit/README.md](tools/content_audit/README.md))
 - **`/docs`** – Documentation (architecture, dashboard, integrations, blog)
 
 ## Sitemap
@@ -68,7 +68,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **URL:** `https://<your-domain>/sitemap.xml` (or `http://localhost:3000/sitemap.xml` in dev)
 - **Format:** Sitemap index (Google-style). Root lists child sitemaps; each child is a standard `<urlset>`.
 - **Child sitemaps:** `/sitemap/static`, `/sitemap/posts`, `/sitemap/categories`, `/sitemap/tags`
-- **Implementation:** `src/app/sitemap/route.ts` (index) + `src/app/sitemap/*/route.ts` (children); shared logic in `src/lib/sitemap-index.ts`
+- **Implementation:** `src/app/sitemap/route.ts` (index) + `src/app/sitemap/*/route.ts` (children); shared logic in `src/lib/sitemap/`
 - **Standards:** [sitemaps.org](https://www.sitemaps.org/protocol.html) (UTF-8, entity escaping, &lt;loc&gt; &lt; 2048 chars, schemaLocation for validation)
 - **robots.txt** references `Sitemap: <SITE_URL>/sitemap.xml`
 
@@ -84,7 +84,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **[SETUP.md](SETUP.md)** – Full setup, env vars, database, GSC, sitemap, deployment
 - **[SECURITY.md](SECURITY.md)** – Never commit API keys or secrets; what’s gitignored
 - **[docs/README.md](docs/README.md)** – Doc index: architecture, dashboard, integrations, blog, content audit
-- **[docs/TECH_STACK_AUDIT.md](docs/TECH_STACK_AUDIT.md)** – Tech stack audit and recommendations
+- **[docs/audits/TECH_STACK_AUDIT.md](docs/audits/TECH_STACK_AUDIT.md)** – Tech stack audit and recommendations
 
 ## Features
 
@@ -92,7 +92,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - **Security:** Security headers (CSP, X-Frame-Options, etc.), HTML sanitization for post content; Core Web Vitals; skip-to-main link and jsx-a11y
 - **Dashboard:** Owner dashboard (Overview, Leads, Content Writer, Recent, Content Maintenance); login with rate limiting; optional Supabase for Blog Maker “Recent” history
 - **Content Writer (Blog Maker):** AI pipeline (Serper/Jina/Gemini, OpenAI brief, Claude draft, humanize, SEO audit, fact check); publishable = 75%+ score and no Level 1 fails
-- **Content audit:** In-app SEO article audit (`src/lib/seo/article-audit.ts`); optional Python E-E-A-T tool in `content_audit/`; API route `/api/content-audit/quality`
+- **Content audit:** In-app SEO article audit (`src/lib/seo/article-audit.ts`); optional Python E-E-A-T tool in `tools/content_audit/`; API route `/api/content-audit/quality`
 - **Scalable:** Multiple verticals (e.g. medical-spas, industries); legal pages (privacy, terms, disclaimer, cookies)
 
 ## License

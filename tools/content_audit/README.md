@@ -8,9 +8,9 @@ Python-based content audit for Google's "Helpful Content" guidelines. The `Googl
 ## Setup
 
 ```bash
-cd content_audit
+cd tools/content_audit
 pip install -r requirements.txt
-python -m nltk.downloader punkt
+python -m nltk.downloader punkt_tab
 python -m spacy download en_core_web_sm
 ```
 

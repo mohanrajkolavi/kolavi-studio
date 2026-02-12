@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { SITE_URL, getSitemapBuildDate } from "@/lib/constants";
-import { buildSitemapIndexXml } from "@/lib/sitemap-index";
+import { buildSitemapIndexXml } from "@/lib/sitemap";
 
 /**
  * Sitemap index (Google-style): root lists child sitemaps.

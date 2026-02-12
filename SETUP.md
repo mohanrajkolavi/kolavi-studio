@@ -149,7 +149,7 @@ Also ensure these API keys are set in production: `SERPER_API_KEY`, `ANTHROPIC_A
 ### Content Audit (optional)
 
 - **In-app:** SEO article audit runs in the dashboard (Content Writer) and is implemented in `src/lib/seo/article-audit.ts`. The API route `POST /api/content-audit/quality` can audit HTML/metadata for quality and E-E-A-T–related signals.
-- **Python tool:** The `content_audit/` folder contains an optional Python-based E-E-A-T and “Helpful Content” auditor. See [content_audit/README.md](content_audit/README.md) for setup and usage. It can be run standalone or integrated via scripts.
+- **Python tool:** The `tools/content_audit/` folder contains an optional Python-based E-E-A-T and “Helpful Content” auditor. See [tools/content_audit/README.md](tools/content_audit/README.md) for setup and usage. It can be run standalone or integrated via scripts.
 
 ## Project Structure
 
@@ -190,11 +190,11 @@ src/
 │   ├── jina/, serper/              # Reader, search
 │   ├── supabase/, db/              # Supabase, Postgres (schema in db/schema.sql)
 │   ├── constants/                   # Site constants + banned-phrases
-│   └── utils.ts, sitemap-index.ts
+│   └── utils.ts, sitemap/
 └── types/
     └── global.d.ts
 
-content_audit/        # Optional Python E-E-A-T audit (see content_audit/README.md)
+tools/                # Optional tools (content_audit for Python E-E-A-T audit)
 scripts/              # check-secrets.sh, run-audit.mjs, open-app-in-browser.mjs
 docs/                 # architecture, dashboard, integrations, blog
 ```
@@ -253,7 +253,7 @@ docs/                 # architecture, dashboard, integrations, blog
 1. Create a new file in `src/app/[page-name]/page.tsx`
 2. Export metadata using `getPageMetadata()`
 3. Add the route to `NAV_LINKS` in `src/lib/constants.ts`
-4. Add static routes in `src/lib/sitemap-index.ts` (STATIC_ROUTES) if needed
+4. Add static routes in `src/lib/sitemap/index.ts` (STATIC_ROUTES) if needed
 
 ### Styling
 

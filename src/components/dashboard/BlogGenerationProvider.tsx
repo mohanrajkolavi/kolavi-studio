@@ -24,6 +24,7 @@ import {
   buildPipelineResultFromChunks,
   pipelineToGenerated,
 } from "@/lib/blog/generation-types";
+import { ERROR_CODE_RESEARCH_INCOMPLETE } from "@/lib/blog/errors";
 
 type Status = "idle" | "generating" | "success" | "error";
 
@@ -140,6 +141,8 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
   const mountedRef = useRef(true);
   const statusRef = useRef<Status>(status);
   statusRef.current = status;
+  const phaseRef = useRef<Phase>(phase);
+  phaseRef.current = phase;
 
   const generated: GeneratedContent | null = result
     ? result.pipelineResult
@@ -388,7 +391,8 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         guarded.setError(msg);
         guarded.setPhase("error");
         guarded.setStatus("error");
-        guarded.setErrorChunk("brief");
+        const code = (err as Error & { code?: string }).code;
+        guarded.setErrorChunk(code === ERROR_CODE_RESEARCH_INCOMPLETE ? "research" : "brief");
       }
     })();
   }, [mountedRef]);
@@ -398,7 +402,8 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
   }, [startBrief]);
 
   const startReviseBrief = useCallback((jid: string, wordCountTarget: number) => {
-    if (statusRef.current === "generating") return;
+    // Allow when in "reviewing" phase (outline step) so user can revise brief while waiting to continue
+    if (statusRef.current === "generating" && phaseRef.current !== "reviewing") return;
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -785,8 +790,10 @@ async function processBriefSSE(
     signal,
   });
   if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error((data as { error?: string }).error ?? "Brief request failed");
+    const data = (await response.json().catch(() => ({}))) as { error?: string; code?: string };
+    const err = new Error(data.error ?? "Brief request failed") as Error & { code?: string };
+    if (data.code) err.code = data.code;
+    throw err;
   }
   const contentType = response.headers.get("content-type") ?? "";
   if (!contentType.includes("text/event-stream")) throw new Error("Expected SSE stream");
@@ -827,7 +834,10 @@ async function processBriefSSE(
       });
     }
     if (eventType === "error") {
-      throw new Error((parsed as { error?: string }).error ?? "Brief failed");
+      const { error, code } = parsed as { error?: string; code?: string };
+      const err = new Error(error ?? "Brief failed") as Error & { code?: string };
+      if (code) err.code = code;
+      throw err;
     }
   });
 }

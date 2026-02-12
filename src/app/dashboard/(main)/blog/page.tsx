@@ -922,7 +922,9 @@ export default function BlogMakerPage() {
         }
         const newId = (data as { id?: string }).id ?? id;
         if (newId && !currentHistoryIdRef.current) {
-          setCurrentHistoryId(newId);
+          // Only update ref so future saves use PATCH; do NOT set currentHistoryId (state).
+          // currentHistoryId is only set when loading from Recent — that keeps Generate meta
+          // visible for newly generated content.
           currentHistoryIdRef.current = newId;
         }
         setSaveStatus("saved");
@@ -1376,6 +1378,168 @@ export default function BlogMakerPage() {
   const showInputSections = !inStepMode || displayStep === 0;
   // When going back to step 1, use cached SERP if provider cleared it
   const showStep1Content = inStepMode && (serpForStep1 || demoChunkOutputs.researchSerp) && displayStep === 1;
+
+  /** 30s auto-advance: Competitors → Research & Brief → Output (with defaults) */
+  const AUTO_ADVANCE_MS = 30_000;
+  const autoAdvanceCompetitorsDoneRef = useRef(false);
+  const autoAdvanceBriefDoneRef = useRef(false);
+  const autoAdvanceOutputDoneRef = useRef(false);
+
+  // Section 2.1: Competitors — after 30s, auto-advance to next (with default selection)
+  useEffect(() => {
+    if (!showStep1Content || generating || demoRunning) {
+      autoAdvanceCompetitorsDoneRef.current = false;
+      return;
+    }
+    const serp = serpForStep1 ?? demoChunkOutputs.researchSerp;
+    const results = (serp as { results?: ResearchSerpItem[] })?.results ?? [];
+    if (results.length === 0) return;
+    const defaultUrls = results.slice(0, 3).map((r) => r.url);
+    const urlsToUse = selectedSerpUrls.length > 0 ? selectedSerpUrls : defaultUrls;
+    if (selectedSerpUrls.length === 0) {
+      setSelectedSerpUrls(defaultUrls);
+    }
+    const t = setTimeout(() => {
+      const isValidCustom = (() => {
+        const u = customCompetitorUrl.trim();
+        if (!u) return false;
+        try {
+          new URL(u);
+          return u.startsWith("http");
+        } catch {
+          return false;
+        }
+      })();
+      const urls = isValidCustom ? [...urlsToUse, customCompetitorUrl.trim()] : urlsToUse;
+      if (urls.length === 0) return;
+      autoAdvanceCompetitorsDoneRef.current = true;
+      if (demoRunning && demoChunkOutputs.researchSerp) {
+        setDemoStep("fetch");
+        setDemoStartedAt(Date.now());
+        setDemoElapsedTick(0);
+      } else if (jobId && urls.length >= 1 && urls.length <= 3) {
+        startResearchFetch(jobId, urls);
+      }
+    }, AUTO_ADVANCE_MS);
+    return () => clearTimeout(t);
+  }, [showStep1Content, generating, demoRunning, serpForStep1, demoChunkOutputs.researchSerp, selectedSerpUrls, customCompetitorUrl, jobId, startResearchFetch]);
+
+  // Section 2.2: Research & Brief — after 30s, auto-advance to draft (with current outline)
+  useEffect(() => {
+    const inBriefStep = inStepMode && (chunkOutputs.brief || demoChunkOutputs.brief) && displayStep === 2;
+    if (!inBriefStep || generating || demoRunning || editedOutline.length === 0) {
+      autoAdvanceBriefDoneRef.current = false;
+      return;
+    }
+    const t = setTimeout(() => {
+      autoAdvanceBriefDoneRef.current = true;
+      if (demoRunning && demoChunkOutputs.brief) {
+        setDemoStep("draft");
+        setDemoStartedAt(Date.now());
+        setDemoElapsedTick(0);
+      } else if (jobId) {
+        const N = chunkOutputs.brief?.outline?.length ?? 0;
+        const existing = editedOutline.filter((e) => e.originalIndex >= 0);
+        const added = editedOutline.filter((e) => e.originalIndex < 0);
+        const removedSectionIndexes = Array.from({ length: N }, (_, i) => i).filter(
+          (i) => !existing.some((e) => e.originalIndex === i)
+        );
+        const reorderedSectionIndexes = editedOutline.map((e) =>
+          e.originalIndex >= 0 ? e.originalIndex : -1 - added.indexOf(e)
+        );
+        const sections: BriefOverridesForDraft["sections"] = new Array(N);
+        existing.forEach((e) => {
+          if (e.originalIndex >= 0 && e.originalIndex < N) {
+            sections[e.originalIndex] = {
+              heading: e.heading,
+              level: e.level,
+              targetWords: e.targetWords,
+              topics: e.topics,
+              geoNote: e.geoNote,
+            };
+          }
+        });
+        const addedSections: BriefOverridesForDraft["addedSections"] = added.length
+          ? added.map((e) => ({
+              heading: e.heading,
+              level: e.level,
+              targetWords: e.targetWords,
+              topics: e.topics,
+              geoNote: e.geoNote,
+            }))
+          : undefined;
+        startDraft(jobId, {
+          sections,
+          reorderedSectionIndexes,
+          removedSectionIndexes,
+          ...(addedSections?.length ? { addedSections } : {}),
+        });
+      }
+    }, AUTO_ADVANCE_MS);
+    return () => clearTimeout(t);
+  }, [inStepMode, chunkOutputs.brief, demoChunkOutputs.brief, displayStep, generating, demoRunning, editedOutline, jobId, startDraft]);
+
+  // Section 2.3: Output — after 30s, auto-generate meta and save to Recent
+  useEffect(() => {
+    if (!editing?.content || generating || saveInProgress || generateMetaLoading) return;
+    if (sampleResult != null) return; // Skip for demo sample
+    const t = setTimeout(async () => {
+      if (autoAdvanceOutputDoneRef.current) return;
+      const current = editingRef.current;
+      if (!current?.content) return;
+      autoAdvanceOutputDoneRef.current = true;
+      const primaryKeyword = generationInput.keywords[0]?.trim() || keywords[0]?.trim();
+      if (!primaryKeyword) return;
+      setGenerateMetaLoading(true);
+      try {
+        const res = await fetch("/api/blog/meta", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            content: current.content,
+            primaryKeyword,
+            intent: generationInput.intent?.[0] || intent[0] || "informational",
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.options) && data.options.length > 0) {
+          const best = data.options.reduce((a: { audit?: { score?: number } }, b: { audit?: { score?: number } }) =>
+            (b.audit?.score ?? 0) > (a.audit?.score ?? 0) ? b : a
+          );
+          setEditing((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  title: best.title,
+                  metaDescription: best.metaDescription,
+                  suggestedSlug: best.suggestedSlug ?? prev.suggestedSlug,
+                }
+              : prev
+          );
+          const currentKw = keywords[0]?.trim();
+          const genKw = generationInput.keywords[0]?.trim();
+          const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
+          const upToDate = editingRef.current;
+          if (!upToDate) return;
+          await saveToHistory({
+            ...upToDate,
+            title: best.title,
+            metaDescription: best.metaDescription,
+            suggestedSlug: best.suggestedSlug ?? upToDate.suggestedSlug,
+            focusKeyword,
+            ...(typeof pipelineResult?.generationTimeMs === "number" && { generationTimeMs: pipelineResult.generationTimeMs }),
+          });
+          setStatus({ type: "success", message: "Meta generated and saved to Recent" });
+        }
+      } catch {
+        // Silent fail for auto
+      } finally {
+        setGenerateMetaLoading(false);
+      }
+    }, AUTO_ADVANCE_MS);
+    return () => clearTimeout(t);
+  }, [editing, generating, saveInProgress, generateMetaLoading, sampleResult, keywords, generationInput, intent, pipelineResult, saveToHistory]);
 
   return (
     <div className="space-y-12">
@@ -1930,7 +2094,7 @@ export default function BlogMakerPage() {
                           {(jobId || demoChunkOutputs.brief) && (
                             <button
                               type="button"
-                              disabled={generating}
+                              disabled={generating && phase !== "reviewing"}
                               onClick={() => {
                                 const sum = editedOutline.reduce((s, x) => s + (x.targetWords || 150), 0);
                                 const effectiveTarget = Math.max(
@@ -2700,7 +2864,7 @@ export default function BlogMakerPage() {
                         </p>
                         {eeatError.includes("not available") && (
                           <p className="text-[11px] text-muted-foreground">
-                            See <code className="rounded bg-muted px-1">content_audit/README.md</code> for setup.
+                            See <code className="rounded bg-muted px-1">tools/content_audit/README.md</code> for setup.
                           </p>
                         )}
                       </div>
@@ -2893,7 +3057,6 @@ export default function BlogMakerPage() {
                     <h3 className="text-sm font-semibold text-foreground">Meta</h3>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">Edit and copy title, meta description, and URL slug.</p>
                   </div>
-                  {!currentHistoryId && (
                   <Button
                     type="button"
                     variant="outline"
@@ -2909,7 +3072,6 @@ export default function BlogMakerPage() {
                     )}
                     Generate meta
                   </Button>
-                  )}
                 </div>
                 {metaOptions && metaOptions.length >= 2 ? (
                   <div className="mt-3 space-y-2">

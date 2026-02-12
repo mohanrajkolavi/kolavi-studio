@@ -1,4 +1,9 @@
 /**
+ * Site constants and configuration.
+ * Banned phrases for editorial quality: @/lib/constants/banned-phrases
+ */
+
+/**
  * Canonical site URL for SEO (canonical, OG, sitemap, RSS).
  * In production, set NEXT_PUBLIC_SITE_URL to your real domain so SEO and OG tags are correct.
  */
@@ -30,7 +35,7 @@ export function getSitemapBuildDate(): Date | undefined {
 }
 
 export const SITE_NAME = "Kolavi Studio";
-export const SITE_DESCRIPTION = "Kolavi Studio helps businesses grow with expert digital marketing, web design, and SEO services. Specializing in medical spas, dental practices, and law firms.";
+export const SITE_DESCRIPTION = "Kolavi Studio: Expert digital marketing, web design & SEO for medical spas, dental practices, and law firms.";
 
 // Rank Math 100/100 alignment (rankmath.com/kb/score-100-in-tests) + Google Search (developers.google.com/search/docs)
 export const SEO = {

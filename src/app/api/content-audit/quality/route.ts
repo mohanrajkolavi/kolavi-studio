@@ -3,12 +3,12 @@ import { isAuthenticated } from "@/lib/auth";
 import { spawn } from "child_process";
 import path from "path";
 
-const SCRIPT_PATH = path.join(process.cwd(), "content_audit", "run_audit.py");
+const SCRIPT_PATH = path.join(process.cwd(), "tools", "content_audit", "run_audit.py");
 const TIMEOUT_MS = 60_000;
 const PYTHON_CMDS = ["python3", "python"] as const;
 
 const UNAVAILABLE_MESSAGE =
-  "Python content audit not available. Install Python 3 and run: pip install -r content_audit/requirements.txt (see content_audit/README.md).";
+  "Python content audit not available. Install Python 3 and run: pip install -r tools/content_audit/requirements.txt (see tools/content_audit/README.md).";
 
 /** Run the audit script with the given Python command; rejects if process fails to start. Returns promise and a kill function for timeout. */
 function runWithPython(

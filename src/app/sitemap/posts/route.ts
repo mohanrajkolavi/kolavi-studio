@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { SITE_URL } from "@/lib/constants";
-import { getPostEntries, buildUrlsetXml } from "@/lib/sitemap-index";
+import { getPostEntries, buildUrlsetXml } from "@/lib/sitemap";
 
 export async function GET() {
   const entries = await getPostEntries();

@@ -94,7 +94,9 @@ export function buildUrlsetXml(entries: UrlEntry[], baseUrl: string): string {
     `<urlset xmlns="${NS}" xmlns:xsi="${XSI}" xsi:schemaLocation="${NS} ${SITEMAP_XSD}">`,
     ...entries
       .map((e) => {
-        const url = baseUrl + (e.path.startsWith("/") ? e.path : `/${e.path}`);
+        const base = baseUrl.replace(/\/$/, "");
+        const path = e.path.startsWith("/") ? e.path : `/${e.path}`;
+        const url = `${base}${path}`;
         return { ...e, url };
       })
       .filter((e) => e.url.length < MAX_LOC_LENGTH)
@@ -174,10 +176,14 @@ export async function getPostEntries(): Promise<UrlEntry[]> {
       if (WP_GRAPHQL_URL?.trim()) {
         try {
           const nodes = await fetchAllPostSlugs();
+          const fallback = getSitemapBuildDate() ?? now;
           nodes.forEach((post) => {
+            const raw = post.modified;
+            const d = raw ? new Date(raw) : fallback;
+            const lastModified = Number.isNaN(d.getTime()) ? fallback : d;
             entries.push({
               path: `/blog/${post.slug}`,
-              lastModified: new Date(post.modified),
+              lastModified,
               changeFrequency: SITEMAP.changeFrequency.post,
               priority: SITEMAP.priority.post,
             });
@@ -188,10 +194,14 @@ export async function getPostEntries(): Promise<UrlEntry[]> {
       } else {
         try {
           const posts = await getPosts();
+          const fallback = getSitemapBuildDate() ?? now;
           posts.forEach((post) => {
+            const raw = post.modified ?? post.date;
+            const d = raw ? new Date(raw) : fallback;
+            const lastModified = Number.isNaN(d.getTime()) ? fallback : d;
             entries.push({
               path: `/blog/${post.slug}`,
-              lastModified: new Date(post.modified ?? now),
+              lastModified,
               changeFrequency: SITEMAP.changeFrequency.post,
               priority: SITEMAP.priority.post,
             });

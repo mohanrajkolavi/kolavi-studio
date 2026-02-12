@@ -93,7 +93,6 @@ class LazyWritingAuditor:
                 found_tells=[],
             )
 
-        text_lower = text.lower()
         words = re.findall(r"\S+", text)
         word_count = len(words)
         found_transitions: list[str] = []

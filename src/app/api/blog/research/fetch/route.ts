@@ -11,7 +11,7 @@ const SSE_HEADERS = {
   "X-Accel-Buffering": "no",
 } as const;
 
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 function logResearchFetchApi(level: "info" | "error", data: Record<string, unknown>) {
   const payload = { stage: "research_fetch_api", ...data };
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
           jobId,
           selectedUrls,
           jobStore,
-          45_000,
+          75_000,
           (evt) => sendEvent("progress", evt)
         );
         sendEvent("result", {

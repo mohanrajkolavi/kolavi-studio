@@ -299,7 +299,7 @@ class GoogleQualityAuditor:
         stats += len(re.findall(r"\$\s*\d+(?:,\d{3})*(?:\.\d+)?|\d+(?:,\d{3})*(?:\.\d+)?\s*\$", text))
         stats += len(re.findall(r"\d+(?:\.\d+)?\s*x\b", text, re.I))
         # Other numeric stats (e.g. "3.5 million", "2024")
-        stats += len(re.findall(r"\b\d+(?:\.\d+)?\s*(?:million|billion|percent|%)", text, re.I))
+        stats += len(re.findall(r"\b\d+(?:\.\d+)?\s*(?:million|billion|percent)", text, re.I))
 
         for pat in CITATION_PATTERNS:
             stats += len(re.findall(pat, text, re.I))

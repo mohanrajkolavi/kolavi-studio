@@ -9,9 +9,9 @@ import re
 import sys
 from dataclasses import asdict
 
-# When run as python3 content_audit/run_audit.py, project root must be on path
+# When run as python3 tools/content_audit/run_audit.py, tools/ must be on path for content_audit import
 _script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
+_root = os.path.dirname(_script_dir)  # tools/ - parent of content_audit package
 if _root not in sys.path:
     sys.path.insert(0, _root)
 

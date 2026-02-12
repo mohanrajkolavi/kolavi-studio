@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { runBriefChunk } from "@/lib/pipeline/chunks";
 import { jobStore } from "@/lib/pipeline/jobs";
+import { ERROR_CODE_RESEARCH_INCOMPLETE } from "@/lib/blog/errors";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
@@ -55,10 +56,14 @@ export async function POST(request: NextRequest) {
   }
   const research = await jobStore.getChunkOutput(jobId, "research");
   if (!research || !research.competitors) {
-    return new Response(JSON.stringify({ error: "Research not completed" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error:
+          "Research not completed. Go back to Select competitors, pick 1–3 URLs, and click Continue.",
+        code: ERROR_CODE_RESEARCH_INCOMPLETE,
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   const encoder = new TextEncoder();
@@ -89,8 +94,13 @@ export async function POST(request: NextRequest) {
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Brief failed";
+        const code =
+          error instanceof Error &&
+          message.startsWith("Research not completed")
+            ? ERROR_CODE_RESEARCH_INCOMPLETE
+            : undefined;
         console.error("Blog brief error:", error);
-        sendEvent("error", { error: message });
+        sendEvent("error", { error: message, ...(code && { code }) });
       } finally {
         try {
           controller.close();
