@@ -137,6 +137,15 @@ CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_genera
 -- ALTER TABLE blog_generation_history ADD COLUMN IF NOT EXISTS generation_time_ms INTEGER;
 ```
 
+### Content Writer (production)
+
+The Content Writer pipeline requires **DATABASE_URL** and the **pipeline_jobs** table in production. Without them, jobs are lost between serverless requests and the flow fails after "Select competitors".
+
+1. Add `DATABASE_URL` to your deployment environment (e.g. Vercel → Project → Settings → Environment Variables).
+2. Run the full schema in your Postgres database once: `src/lib/db/schema.sql` (includes `pipeline_jobs`).
+
+Also ensure these API keys are set in production: `SERPER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `JINA_API_KEY`.
+
 ### Content Audit (optional)
 
 - **In-app:** SEO article audit runs in the dashboard (Content Writer) and is implemented in `src/lib/seo/article-audit.ts`. The API route `POST /api/content-audit/quality` can audit HTML/metadata for quality and E-E-A-T–related signals.

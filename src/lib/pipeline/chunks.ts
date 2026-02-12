@@ -17,7 +17,7 @@ import type {
   SchemaMarkup,
 } from "./types";
 import type { BriefOverrides, BriefOverridesSection } from "./types";
-import type { JobStore } from "./jobs/types";
+import type { Job, JobStore } from "./jobs/types";
 import type { ChunkCost } from "./jobs/types";
 import type { PipelineProgressEvent } from "./orchestrator";
 import { buildChunkCost } from "./cost";
@@ -118,12 +118,19 @@ export async function runResearchSerpOnly(
   onProgress?: (evt: PipelineProgressEvent) => void,
   metrics?: PipelineMetricsCollector
 ): Promise<RunResearchSerpOnlyResult> {
-  let job = await store.getJob<PipelineInput>(jobId);
-  if (!job) {
-    await store.createJob(jobId, input);
-    job = (await store.getJob<PipelineInput>(jobId))!;
+  let job: Job<PipelineInput> | undefined;
+  try {
+    job = await store.getJob<PipelineInput>(jobId);
+    if (!job) {
+      await store.createJob(jobId, input);
+      job = (await store.getJob<PipelineInput>(jobId))!;
+    }
+    await store.updatePhase(jobId, "researching");
+  } catch (storeErr) {
+    if (process.env.NODE_ENV !== "test") {
+      console.warn("[pipeline] Job store init failed, SERP will be returned; client will send on fetch:", storeErr);
+    }
   }
-  await store.updatePhase(jobId, "researching");
 
   const emit = (
     step: PipelineProgressEvent["step"],
@@ -150,8 +157,14 @@ export async function runResearchSerpOnly(
     serperResult.success && serperResult.data ? serperResult.data : [];
   emit("serper", "completed", `Found ${serpResults.length} results`, 100);
 
-  await store.saveChunkOutput(jobId, "research_serp", { results: serpResults });
-  await store.updatePhase(jobId, "waiting_for_review");
+  try {
+    await store.saveChunkOutput(jobId, "research_serp", { results: serpResults });
+    await store.updatePhase(jobId, "waiting_for_review");
+  } catch (storeErr) {
+    if (process.env.NODE_ENV !== "test") {
+      console.warn("[pipeline] Job store persist failed (research_serp), client will send on fetch:", storeErr);
+    }
+  }
   return { serpResults };
 }
 

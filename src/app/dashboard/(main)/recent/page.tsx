@@ -59,7 +59,7 @@ export default function RecentPage() {
     setError(null);
     setDeleteError(null);
     if (!showLoading) setRefreshing(true);
-    return fetch("/api/blog/history", { credentials: "include" })
+    return fetch("/api/blog/history", { credentials: "include", cache: "no-store" })
       .then((res) => {
         if (res.status === 401) {
           setError("auth");
@@ -101,10 +101,14 @@ export default function RecentPage() {
       const res = await fetch(`/api/blog/history?id=${id}`, {
         method: "DELETE",
         credentials: "include",
+        cache: "no-store",
       });
       if (!res.ok) {
         throw new Error("Failed to delete entry");
       }
+      // Optimistic update: remove from UI immediately
+      setEntries((prev) => prev.filter((e) => e.id !== id));
+      // Refresh to ensure consistency with server
       await loadEntries(false);
     } catch (err) {
       console.error("Failed to delete entry:", err);

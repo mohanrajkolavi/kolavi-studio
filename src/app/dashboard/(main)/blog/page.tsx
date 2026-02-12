@@ -864,6 +864,18 @@ export default function BlogMakerPage() {
     }
   }, [generating]);
 
+  // Scroll error banner into view when generation fails so user sees the message
+  const generationErrorRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (generationError && generationError !== generationErrorRef.current) {
+      generationErrorRef.current = generationError;
+      const el = document.getElementById("generation-error-banner");
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } else if (!generationError) {
+      generationErrorRef.current = null;
+    }
+  }, [generationError]);
+
   /** Save current or partial content to history (appears on Recent). Returns id if created. */
   const saveToHistory = useCallback(
     async (payload: {
@@ -1360,7 +1372,8 @@ export default function BlogMakerPage() {
   const displayStep =
     stepView !== null ? (stepView <= 0 ? 0 : Math.min(stepView, maxStep)) : maxStep;
   const hasDemoChunks = !!(demoChunkOutputs.brief || demoChunkOutputs.researchSerp);
-  const showInputSections = !inStepMode || displayStep === 0 || hasDemoChunks;
+  // Input sections (Keywords, People also search for, Search intent) + bottom bar only on initial input (step 0), not on competitor or outline steps
+  const showInputSections = !inStepMode || displayStep === 0;
   // When going back to step 1, use cached SERP if provider cleared it
   const showStep1Content = inStepMode && (serpForStep1 || demoChunkOutputs.researchSerp) && displayStep === 1;
 
@@ -1463,6 +1476,7 @@ export default function BlogMakerPage() {
 
       {(status.type || generationError) && (
         <div
+          id="generation-error-banner"
           role="alert"
           className={`flex items-start justify-between gap-4 rounded-2xl px-5 py-4 text-sm ${
             status.type === "success"
@@ -2350,8 +2364,17 @@ export default function BlogMakerPage() {
                 disabled={generating || demoRunning || keywords.length === 0}
                 className="h-12 shrink-0 rounded-full bg-orange-600 px-8 text-base font-medium text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/25 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600 disabled:shadow-none"
               >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Generate post
+                {(generating || demoRunning) ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate post
+                  </>
+                )}
               </Button>
             </section>
             )}

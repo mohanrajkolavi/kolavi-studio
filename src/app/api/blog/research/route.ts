@@ -13,7 +13,9 @@ const SSE_HEADERS = {
 
 export const maxDuration = 60;
 
-/** Phase 1: Serper only. Returns top 10 results (position, title, url) for user to select up to 3. */
+/** Phase 1: Serper only. Returns top 10 results (position, title, url) for user to select up to 3.
+ * Uses job store when available (DATABASE_URL set); if store fails, still returns SERP results
+ * so the client can send them to research/fetch for serverless compatibility. */
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
+import { parseGenerateBody } from "@/lib/pipeline/parse-generate-body";
 import { runResearchFetch } from "@/lib/pipeline/chunks";
 import { jobStore } from "@/lib/pipeline/jobs";
 
@@ -21,7 +22,9 @@ function logResearchFetchApi(level: "info" | "error", data: Record<string, unkno
   }
 }
 
-/** Phase 2: Fetch content for selected URLs (Jina) + current data (Gemini), save research chunk. */
+/** Phase 2: Fetch content for selected URLs (Jina) + current data (Gemini), save research chunk.
+ * When job is not found (e.g. serverless in-memory store), accepts input + serpResults from client
+ * to create the job on-the-fly for production compatibility. */
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -40,9 +43,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const parsed = body as { jobId?: string; selectedUrls?: string[] };
+  const parsed = body as {
+    jobId?: string;
+    selectedUrls?: string[];
+    input?: unknown;
+    serpResults?: Array<{ position?: number; title?: string; url: string }>;
+  };
   const jobId = parsed?.jobId;
   const selectedUrls = Array.isArray(parsed?.selectedUrls) ? parsed.selectedUrls : [];
+  const clientInput = parsed?.input;
+  const clientSerpResults = Array.isArray(parsed?.serpResults) ? parsed.serpResults : [];
 
   if (!jobId || typeof jobId !== "string") {
     return new Response(JSON.stringify({ error: "jobId is required" }), {
@@ -57,12 +67,53 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  const job = await jobStore.getJob(jobId);
+  let job = await jobStore.getJob(jobId);
+
+  // Fallback: job not found (e.g. in-memory store, different serverless instance).
+  // Create job from client-provided input + serpResults.
+  if (!job && clientInput && clientSerpResults.length > 0) {
+    const parseResult = parseGenerateBody(clientInput);
+    if ("error" in parseResult) {
+      return new Response(JSON.stringify({ error: parseResult.error }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const { pipelineInput } = parseResult;
+    try {
+      await jobStore.createJob(jobId, pipelineInput);
+      await jobStore.saveChunkOutput(jobId, "research_serp", {
+        results: clientSerpResults.map((s) => ({
+          url: s.url,
+          title: s.title ?? "",
+          position: s.position ?? 0,
+          snippet: "",
+          isArticle: true,
+        })),
+      });
+      await jobStore.updatePhase(jobId, "waiting_for_review");
+      job = await jobStore.getJob(jobId);
+      logResearchFetchApi("info", { event: "job_created_from_client", jobId });
+    } catch (err) {
+      logResearchFetchApi("error", { event: "job_create_failed", jobId, error: String(err) });
+      return new Response(
+        JSON.stringify({
+          error:
+            "Job not found. Ensure DATABASE_URL is set in production so jobs persist across requests.",
+        }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+  }
+
   if (!job) {
-    return new Response(JSON.stringify({ error: "Job not found" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json" },
-    });
+    return new Response(
+      JSON.stringify({
+        error:
+          "Job not found. If running in production, ensure DATABASE_URL is set in your deployment environment.",
+      }),
+      { status: 404, headers: { "Content-Type": "application/json" } }
+    );
   }
 
   const serpOutput = await jobStore.getChunkOutput(jobId, "research_serp");

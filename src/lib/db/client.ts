@@ -16,6 +16,8 @@ function getSql(): Sql {
       max: 10,
       idle_timeout: 20,
       connect_timeout: 10,
+      // Required for Supabase connection pooler (transaction mode / port 6543)
+      prepare: false,
     });
   }
   return _sql;

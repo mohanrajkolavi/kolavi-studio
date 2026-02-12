@@ -248,6 +248,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildGenerateBody(input)),
+        credentials: "include",
         signal,
       });
       if (signal.aborted || !mountedRef.current) return;
@@ -315,12 +316,20 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
       setErrorChunk: (c: ChunkName | null) => { if (!signal.aborted && mountedRef.current) setErrorChunk(c); },
       setGenerationStartedAt: (v: number | null) => { if (!signal.aborted && mountedRef.current) setGenerationStartedAt(v); },
     };
+    const input = lastInputRef.current;
+    const serp = chunkOutputs.researchSerp?.results ?? [];
+    const body: Record<string, unknown> = { jobId: jid, selectedUrls };
+    if (input && serp.length > 0) {
+      body.input = buildGenerateBody(input);
+      body.serpResults = serp;
+    }
     (async () => {
       try {
         const response = await fetch("/api/blog/research/fetch", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jobId: jid, selectedUrls }),
+          body: JSON.stringify(body),
+          credentials: "include",
           signal,
         });
         if (signal.aborted || !mountedRef.current) return;
@@ -345,7 +354,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         guarded.setErrorChunk("research");
       }
     })();
-  }, []);
+  }, [chunkOutputs.researchSerp]);
 
   const startBrief = useCallback((jid: string) => {
     abortControllerRef.current?.abort();
