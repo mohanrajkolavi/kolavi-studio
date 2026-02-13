@@ -379,9 +379,20 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
       setErrorChunk: (c: ChunkName | null) => { if (!signal.aborted && mountedRef.current) setErrorChunk(c); },
       setGenerationStartedAt: (v: number | null) => { if (!signal.aborted && mountedRef.current) setGenerationStartedAt(v); },
     };
+    const input = lastInputRef.current;
+    const serp = chunkOutputs.researchSerp as { results?: Array<{ url: string; title?: string; position?: number }> } | null;
+    const urls = (chunkOutputs.research as { competitorUrls?: string[] } | null)?.competitorUrls ?? [];
+    const fallback =
+      input && serp?.results?.length && urls.length >= 1 && urls.length <= 3
+        ? {
+            input: buildGenerateBody(input),
+            serpResults: serp.results.map((r) => ({ url: r.url, title: r.title, position: r.position })),
+            selectedUrls: urls,
+          }
+        : undefined;
     (async () => {
       try {
-        await processBriefSSE(jid, signal, guarded);
+        await processBriefSSE(jid, signal, guarded, { fallback });
         if (!signal.aborted && mountedRef.current) setPhase("reviewing");
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -395,7 +406,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         guarded.setErrorChunk(code === ERROR_CODE_RESEARCH_INCOMPLETE ? "research" : "brief");
       }
     })();
-  }, [mountedRef]);
+  }, [mountedRef, chunkOutputs.research, chunkOutputs.researchSerp]);
 
   useEffect(() => {
     startBriefRef.current = startBrief;
@@ -423,9 +434,20 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
       setErrorChunk: (c: ChunkName | null) => { if (!signal.aborted && mountedRef.current) setErrorChunk(c); },
       setGenerationStartedAt: (v: number | null) => { if (!signal.aborted && mountedRef.current) setGenerationStartedAt(v); },
     };
+    const input = lastInputRef.current;
+    const serp = chunkOutputs.researchSerp as { results?: Array<{ url: string; title?: string; position?: number }> } | null;
+    const urls = (chunkOutputs.research as { competitorUrls?: string[] } | null)?.competitorUrls ?? [];
+    const fallback =
+      input && serp?.results?.length && urls.length >= 1 && urls.length <= 3
+        ? {
+            input: buildGenerateBody(input),
+            serpResults: serp.results.map((r) => ({ url: r.url, title: r.title, position: r.position })),
+            selectedUrls: urls,
+          }
+        : undefined;
     (async () => {
       try {
-        await processBriefSSE(jid, signal, guarded, { revise: true, wordCountTarget });
+        await processBriefSSE(jid, signal, guarded, { revise: true, wordCountTarget, fallback });
         if (!signal.aborted && mountedRef.current) setPhase("reviewing");
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -438,7 +460,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         guarded.setErrorChunk("brief");
       }
     })();
-  }, [mountedRef]);
+  }, [mountedRef, chunkOutputs.research, chunkOutputs.researchSerp]);
 
   const startDraft = useCallback((jid: string, briefOverrides?: BriefOverridesForDraft) => {
     abortControllerRef.current?.abort();
@@ -533,6 +555,12 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
       return;
     }
     if (chunk === "research") {
+      const urls = (chunkOutputs.research as { competitorUrls?: string[] } | null)?.competitorUrls ?? [];
+      const serp = chunkOutputs.researchSerp as { results?: unknown[] } | null;
+      if (serp?.results?.length && urls.length >= 1 && urls.length <= 3) {
+        startResearchFetch(jid, urls);
+        return;
+      }
       startGeneration(input);
       return;
     }
@@ -550,7 +578,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
       setChunkOutputs((p) => ({ ...p, validation: null }));
       startValidate(jid);
     }
-  }, [jobId, startGeneration, startBrief, startDraft, startValidate]);
+  }, [jobId, chunkOutputs.research, chunkOutputs.researchSerp, startGeneration, startResearchFetch, startBrief, startDraft, startValidate]);
 
   const value: BlogGenerationContextValue = {
     status,
@@ -776,12 +804,21 @@ async function processBriefSSE(
   jobId: string,
   signal: AbortSignal,
   guarded: StepGuarded,
-  options?: { revise?: boolean; wordCountTarget?: number }
+  options?: {
+    revise?: boolean;
+    wordCountTarget?: number;
+    fallback?: { input: Record<string, unknown>; serpResults: Array<{ url: string; title?: string; position?: number }>; selectedUrls: string[] };
+  }
 ) {
   const body: Record<string, unknown> = { jobId };
   if (options?.revise && typeof options?.wordCountTarget === "number") {
     body.revise = true;
     body.wordCountTarget = options.wordCountTarget;
+  }
+  if (options?.fallback) {
+    body.input = options.fallback.input;
+    body.serpResults = options.fallback.serpResults;
+    body.selectedUrls = options.fallback.selectedUrls;
   }
   const response = await fetch("/api/blog/brief", {
     method: "POST",
