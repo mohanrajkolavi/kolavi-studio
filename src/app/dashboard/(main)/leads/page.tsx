@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { TableSkeleton } from "@/components/dashboard/TableSkeleton";
-import { Users, Search, Mail, Phone, Briefcase, X } from "lucide-react";
+import { Users, Search, Mail, Phone, Briefcase, X, Trash2 } from "lucide-react";
 
 type Lead = {
   id: string;
@@ -68,6 +68,7 @@ export default function LeadsPage() {
     search: "",
   });
   const [updating, setUpdating] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -132,6 +133,22 @@ export default function LeadsPage() {
       console.error("Error updating notes:", error);
     } finally {
       setUpdating(null);
+    }
+  }
+
+  async function handleDelete(leadId: string, leadName: string) {
+    if (!confirm(`Delete lead "${leadName}"? This cannot be undone.`)) return;
+    setDeleting(leadId);
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Failed to delete lead");
+      if (selectedLead?.id === leadId) setSelectedLead(null);
+      await fetchLeads();
+    } catch (error) {
+      console.error("Error deleting lead:", error);
+      alert("Failed to delete lead. Please try again.");
+    } finally {
+      setDeleting(null);
     }
   }
 
@@ -244,7 +261,7 @@ export default function LeadsPage() {
                     <th className="px-6 py-4 text-left text-xs font-medium text-muted-foreground">
                       Received
                     </th>
-                    <th className="px-6 py-4 text-right text-xs font-medium text-muted-foreground w-28">
+                    <th className="px-6 py-4 text-right text-xs font-medium text-muted-foreground w-36">
                       Actions
                     </th>
                   </tr>
@@ -288,21 +305,36 @@ export default function LeadsPage() {
                         {formatRelativeDate(lead.createdAt)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <select
-                          value={lead.status}
-                          onChange={(e) =>
-                            handleStatusChange(lead.id, e.target.value as LeadStatus)
-                          }
-                          disabled={updating === lead.id}
-                          onClick={(e) => e.stopPropagation()}
-                          className="h-9 rounded-2xl border border-border bg-background px-3 text-xs focus:ring-2 focus:ring-ring"
-                        >
-                          {STATUS_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center justify-end gap-2">
+                          <select
+                            value={lead.status}
+                            onChange={(e) =>
+                              handleStatusChange(lead.id, e.target.value as LeadStatus)
+                            }
+                            disabled={updating === lead.id}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-9 rounded-2xl border border-border bg-background px-3 text-xs focus:ring-2 focus:ring-ring"
+                          >
+                            {STATUS_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(lead.id, lead.name);
+                            }}
+                            disabled={deleting === lead.id}
+                            className="h-9 w-9 shrink-0 rounded-full text-muted-foreground hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400"
+                            aria-label={`Delete ${lead.name}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -450,6 +482,18 @@ export default function LeadsPage() {
                   rows={3}
                   placeholder="Add notes for your team..."
                 />
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-border">
+                <Button
+                  variant="outline"
+                  onClick={() => handleDelete(selectedLead.id, selectedLead.name)}
+                  disabled={deleting === selectedLead.id}
+                  className="rounded-2xl border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/20"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete lead
+                </Button>
               </div>
             </div>
           </div>

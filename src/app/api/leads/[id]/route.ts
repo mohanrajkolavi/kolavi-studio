@@ -151,3 +151,36 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  if (!(await isAuthenticated(_request))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  try {
+    const { id } = await params;
+
+    const result = await sql`
+      DELETE FROM leads
+      WHERE id = ${id}
+      RETURNING id
+    `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: "Lead not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting lead:", error);
+    return NextResponse.json(
+      { error: "Failed to delete lead" },
+      { status: 500 }
+    );
+  }
+}
