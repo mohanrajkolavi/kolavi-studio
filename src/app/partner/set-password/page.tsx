@@ -139,15 +139,19 @@ export default function PartnerSetPasswordPage() {
     }
   }
 
+  const boxBase = "overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/5 px-6 py-8 sm:px-8 sm:py-10";
+
   if (authState === "checking") {
     return (
       <PartnerAuthShell
         title="Set your password"
         subtitle="You've been invited to the partner program. Set a password to access your dashboard."
       >
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card px-8 py-16 shadow-md">
-          <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
-          <p className="mt-4 text-sm text-muted-foreground">Setting up your account…</p>
+        <div className={boxBase}>
+          <div className="flex flex-col items-center justify-center py-12">
+            <Loader2 className="h-10 w-10 animate-spin text-orange-500" />
+            <p className="mt-4 text-sm text-muted-foreground">Setting up your account…</p>
+          </div>
         </div>
       </PartnerAuthShell>
     );
@@ -159,17 +163,19 @@ export default function PartnerSetPasswordPage() {
         title="Invalid or expired link"
         subtitle="This invitation link may have expired or already been used."
       >
-        <div className="rounded-2xl border border-border bg-card px-8 py-10 shadow-md">
-          <p className="text-sm text-muted-foreground">
-            Please contact your administrator for a new invitation, or try signing in if you already have an account.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button asChild className="rounded-lg bg-orange-600 hover:bg-orange-700">
-              <Link href="/partner/login">Sign in</Link>
-            </Button>
-            <Button asChild variant="outline" className="rounded-lg">
-              <Link href="/partner">Back to Partner Program</Link>
-            </Button>
+        <div className={boxBase}>
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Please contact your administrator for a new invitation, or try signing in if you already have an account.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Button asChild className="h-11 rounded-2xl bg-orange-600 hover:bg-orange-700">
+                <Link href="/partner/login">Sign in</Link>
+              </Button>
+              <Button asChild variant="outline" className="h-11 rounded-2xl">
+                <Link href="/partner/apply">Apply to Partner</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </PartnerAuthShell>
@@ -182,14 +188,16 @@ export default function PartnerSetPasswordPage() {
         title="Configuration error"
         subtitle="Partner login is not available. The site administrator needs to configure Supabase."
       >
-        <div className="rounded-2xl border border-border bg-card px-8 py-10 shadow-md">
-          <p className="text-sm text-muted-foreground">
-            Please contact your administrator. They need to set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in the environment.
-          </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button asChild variant="outline" className="rounded-lg">
-              <Link href="/partner">Back to Partner Program</Link>
-            </Button>
+        <div className={boxBase}>
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Please contact your administrator. They need to set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in the environment.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <Button asChild className="h-11 rounded-2xl bg-orange-600 hover:bg-orange-700">
+                <Link href="/partner/apply">Apply to Partner</Link>
+              </Button>
+            </div>
           </div>
         </div>
       </PartnerAuthShell>
@@ -201,86 +209,82 @@ export default function PartnerSetPasswordPage() {
       title="Set your password"
       subtitle="Create a password to access your partner dashboard and track commissions."
     >
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-md ring-1 ring-black/[0.04] dark:ring-white/5">
-        <div className="border-b border-border/60 bg-muted/30 px-6 py-5 sm:px-8 sm:py-6">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-            Create your password
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Choose a secure password (at least 6 characters)
-          </p>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6 sm:px-8 sm:pb-8 sm:pt-6">
-          <div className="space-y-2">
-            <label htmlFor="password" className="block text-sm font-medium text-foreground">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 pl-11 pr-4 rounded-lg border-border bg-muted/20 focus:bg-background"
-                placeholder="••••••••"
-                required
-                minLength={6}
-                autoComplete="new-password"
-                disabled={loading}
-              />
+      <div className={boxBase}>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-11 pl-10 pr-4 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  disabled={loading}
+                />
+              </div>
             </div>
-          </div>
 
-          <div className="space-y-2">
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
-              Confirm password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="confirmPassword"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="h-11 pl-11 pr-4 rounded-lg border-border bg-muted/20 focus:bg-background"
-                placeholder="••••••••"
-                required
-                minLength={6}
-                autoComplete="new-password"
-                disabled={loading}
-              />
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+                Confirm password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+                <Input
+                  id="confirmPassword"
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="h-11 pl-10 pr-4 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
+                  placeholder="••••••••"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  disabled={loading}
+                />
+              </div>
             </div>
-          </div>
 
-          {error && (
-            <div
-              className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-              role="alert"
-            >
-              {error}
-            </div>
-          )}
-
-          <Button
-            type="submit"
-            className="h-11 w-full rounded-lg bg-orange-600 text-sm font-semibold text-white hover:bg-orange-700"
-            disabled={loading}
+        {error && (
+          <div
+            className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+            role="alert"
           >
-            {loading ? "Setting up…" : "Set password & continue"}
-          </Button>
+            {error}
+          </div>
+        )}
 
-          <p className="text-center text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link
-              href="/partner/login"
-              className="font-medium text-orange-600 underline-offset-4 hover:text-orange-700 dark:text-orange-400"
-            >
-              Sign in
-            </Link>
-          </p>
-        </form>
+        <Button
+          type="submit"
+          className="h-11 w-full rounded-2xl bg-orange-600 text-sm font-medium text-white hover:bg-orange-700"
+          disabled={loading}
+        >
+              {loading ? "Setting up…" : "Set password & continue"}
+            </Button>
+
+            <p className="text-center text-sm text-muted-foreground pt-1">
+              Already have an account?{" "}
+              <Link
+                href="/partner/login"
+                className="font-medium text-orange-600 underline-offset-4 hover:text-orange-700 dark:text-orange-400"
+              >
+                Sign in
+              </Link>
+            </p>
+        <div className="pt-2">
+          <Button asChild variant="outline" className="h-11 w-full rounded-2xl">
+            <Link href="/partner/apply">Apply to Partner</Link>
+          </Button>
+        </div>
+      </form>
       </div>
     </PartnerAuthShell>
   );

@@ -32,9 +32,6 @@ export default function SetPasswordError({
           <Button asChild variant="outline" className="rounded-lg">
             <Link href="/partner/login">Sign in</Link>
           </Button>
-          <Button asChild variant="ghost" className="rounded-lg">
-            <Link href="/partner">Back to Partner Program</Link>
-          </Button>
         </div>
       </div>
     </PartnerAuthShell>

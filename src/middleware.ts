@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
+import {
+  PARTNER_COOKIE_NAME,
+  PARTNER_COOKIE_MAX_AGE,
+  PARTNER_CODE_REGEX,
+  hasPartnerRefCookie,
+} from "@/lib/partner/cookie-server";
 
 /**
  * Nonce-based CSP. In production, allow 'unsafe-inline' for style-src so
@@ -90,6 +96,24 @@ export async function middleware(request: NextRequest) {
   });
 
   response = await updateSupabaseSession(request, response);
+
+  // Partner referral: set partner_ref cookie when ?ref=CODE (first-touch, server-side)
+  const ref = request.nextUrl.searchParams.get("ref");
+  if (
+    ref &&
+    PARTNER_CODE_REGEX.test(ref.trim()) &&
+    !hasPartnerRefCookie(request.headers.get("cookie"))
+  ) {
+    const code = ref.trim().slice(0, 50);
+    const secure = request.nextUrl.protocol === "https:";
+    response.cookies.set(PARTNER_COOKIE_NAME, code, {
+      path: "/",
+      maxAge: PARTNER_COOKIE_MAX_AGE,
+      sameSite: "lax",
+      secure,
+      httpOnly: false, // client reads it for form submission
+    });
+  }
 
   response.headers.set("Content-Security-Policy", cspHeader);
   for (const [key, value] of Object.entries(SECURITY_HEADERS_STATIC)) {

@@ -18,6 +18,12 @@ import {
   X,
   ChevronDown,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SITE_URL } from "@/lib/constants";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Logo } from "@/components/layout/Logo";
@@ -177,7 +183,7 @@ export default function PartnerDashboardPage() {
           <p className="text-sm font-medium text-muted-foreground">
             {error.message}
           </p>
-          <Button onClick={loadData} variant="outline">
+          <Button onClick={loadData} variant="outline" className="rounded-2xl">
             Retry
           </Button>
         </div>
@@ -199,6 +205,10 @@ export default function PartnerDashboardPage() {
 
   const { partner, stats, referredLeads, payouts } = data;
   const referralUrl = `${SITE_URL}/partner?ref=${partner.code}`;
+  const trimmedName = partner.name?.trim();
+  const firstName = trimmedName ? trimmedName.split(/\s+/)[0] : "Partner";
+  const displayName =
+    firstName.charAt(0).toUpperCase() + firstName.slice(1);
 
   const statCards = [
     { label: "Referred leads", value: stats.referredLeadsCount, icon: Users },
@@ -217,7 +227,7 @@ export default function PartnerDashboardPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground antialiased transition-colors duration-200">
-      {/* Header - matches main site pill style */}
+      {/* Header - pill style matching main site */}
       <header className="sticky top-0 z-40 w-full bg-background/95 px-4 pt-4 backdrop-blur-xl sm:px-6 dark:bg-background/90">
         <a
           href="#main-content"
@@ -226,7 +236,6 @@ export default function PartnerDashboardPage() {
           Skip to main content
         </a>
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-border bg-background/80 px-5 shadow-sm backdrop-blur-xl sm:px-6 dark:bg-background/80 dark:border-border">
-          {/* Logo */}
           <Link
             href="/partner"
             className="flex items-center space-x-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-lg"
@@ -234,29 +243,60 @@ export default function PartnerDashboardPage() {
             <Logo className="text-xl font-bold tracking-tight text-foreground sm:text-2xl" withPeriod />
           </Link>
 
-          {/* Desktop: centered label */}
           <div className="hidden md:flex md:flex-1 md:items-center md:justify-center">
             <span className="rounded-2xl px-4 py-2 text-[15px] font-medium text-muted-foreground">
               Partner Dashboard
             </span>
           </div>
 
-          {/* Desktop: Theme toggle + Sign out */}
+          {/* Desktop: Theme toggle + Profile */}
           <div className="hidden md:flex md:items-center md:gap-2">
             <ThemeToggle />
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="inline-flex items-center gap-2 rounded-2xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              <LogOut className="h-4 w-4" strokeWidth={1.5} />
-              Sign out
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-base font-semibold text-orange-600 transition-colors hover:bg-orange-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background dark:bg-orange-400/25 dark:text-orange-400 dark:hover:bg-orange-400/40"
+                  aria-label="Partner profile menu"
+                >
+                  {(partner?.name?.[0] ?? "P").toUpperCase()}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
-          {/* Mobile: Theme toggle + Menu */}
+          {/* Mobile: Theme toggle + Profile + Menu */}
           <div className="flex items-center gap-2 md:hidden">
             <ThemeToggle />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-100 text-base font-semibold text-orange-600 transition-colors hover:bg-orange-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:bg-orange-400/25 dark:text-orange-400 dark:hover:bg-orange-400/40"
+                  aria-label="Partner profile menu"
+                >
+                  {(partner?.name?.[0] ?? "P").toUpperCase()}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" strokeWidth={1.5} />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <button
               type="button"
               className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-2xl text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -304,19 +344,22 @@ export default function PartnerDashboardPage() {
                 </button>
               </div>
               <nav className="flex flex-1 flex-col items-center justify-center px-6 py-8">
-                <p className="text-[17px] font-semibold text-muted-foreground">
-                  Partner Dashboard
-                </p>
-                <div className="mt-10 w-full max-w-sm">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-2xl font-semibold text-orange-600 dark:bg-orange-400/25 dark:text-orange-400">
+                    {(partner?.name?.[0] ?? "P").toUpperCase()}
+                  </div>
+                  <p className="text-center text-sm font-medium text-foreground">
+                    {partner?.name ?? "Partner"}
+                  </p>
                   <button
                     type="button"
                     onClick={() => {
                       setMobileMenuOpen(false);
                       handleLogout();
                     }}
-                    className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:opacity-90"
+                    className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-2xl bg-orange-600 px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-orange-700 active:opacity-90"
                   >
-                    <LogOut className="h-5 w-5" strokeWidth={1.5} />
+                    <LogOut className="h-4 w-4" strokeWidth={1.5} />
                     Sign out
                   </button>
                 </div>
@@ -330,7 +373,19 @@ export default function PartnerDashboardPage() {
         id="main-content"
         className="mx-auto w-full max-w-[1600px] min-w-0 overflow-x-clip px-4 pb-24 pt-10 sm:px-6 lg:px-8 xl:px-10"
       >
-        {/* Share and earn - Premium hero card */}
+        {/* Welcome - Hi + partner name + empowering message */}
+        <section className="mb-8">
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+            Hi, {displayName}!
+          </h2>
+          <p className="mt-1.5 text-base text-muted-foreground">
+            {stats.referredLeadsCount > 0 || stats.totalCommissionEarned > 0
+              ? "Your impact is growing. Here's your partner overview."
+              : "You're in the right place. Share your link to grow your influence."}
+          </p>
+        </section>
+
+        {/* Share and earn */}
         <Card className="overflow-hidden border border-border/60 shadow-sm ring-1 ring-black/5 dark:ring-white/5">
           <div className="bg-gradient-to-b from-muted/30 to-transparent">
             <CardHeader className="pb-4">
@@ -355,9 +410,10 @@ export default function PartnerDashboardPage() {
                 variant={copied ? "outline" : "default"}
                 size="lg"
                 className={cn(
-                  "shrink-0 gap-2 rounded-xl",
-                  copied &&
-                    "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-400"
+                  "shrink-0 gap-2 rounded-2xl",
+                  copied
+                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-400"
+                    : "bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
                 )}
               >
                 {copied ? (
@@ -377,7 +433,7 @@ export default function PartnerDashboardPage() {
           </div>
         </Card>
 
-        {/* Stats - Premium metric cards */}
+        {/* Stats */}
         <section className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4">
           {statCards.map((stat) => (
             <Card
@@ -440,7 +496,7 @@ export default function PartnerDashboardPage() {
               <div className="scrollbar-thin max-h-[340px] overflow-y-auto">
                 {referredLeads.length === 0 ? (
                   <div className="flex min-h-[240px] flex-col items-center justify-center gap-6 py-16 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/60 ring-1 ring-border/30">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border/60 text-muted-foreground">
                       <Users
                         className="h-8 w-8 text-muted-foreground/50"
                         strokeWidth={1.75}
@@ -454,7 +510,7 @@ export default function PartnerDashboardPage() {
                         Share your link to get started
                       </p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={copyLink} className="rounded-lg">
+                    <Button size="sm" onClick={copyLink} className="rounded-2xl bg-orange-600 hover:bg-orange-700">
                       Copy link
                     </Button>
                   </div>
@@ -508,7 +564,7 @@ export default function PartnerDashboardPage() {
               <div className="scrollbar-thin max-h-[340px] overflow-y-auto">
                 {payouts.length === 0 ? (
                   <div className="flex min-h-[240px] flex-col items-center justify-center gap-6 py-16 text-center">
-                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/60 ring-1 ring-border/30">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-border/60 text-muted-foreground">
                       <Banknote
                         className="h-8 w-8 text-muted-foreground/50"
                         strokeWidth={1.75}

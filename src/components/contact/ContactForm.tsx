@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { getPartnerRefFromCookie } from "@/lib/partner/cookie";
+import { getReferralCodeForSubmit } from "@/lib/partner/cookie";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -20,7 +20,7 @@ export function ContactForm() {
     setSubmitStatus({ type: null, message: "" });
 
     const formData = new FormData(form);
-    const referralCode = getPartnerRefFromCookie();
+    const referralCode = getReferralCodeForSubmit();
     const data = {
       name: formData.get("name"),
       email: formData.get("email"),

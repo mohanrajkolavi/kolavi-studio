@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { RefLink } from "@/components/partner/RefLink";
 import { NAV_LINKS, LEGAL_LINKS } from "@/lib/constants";
 import { Logo } from "./Logo";
 
@@ -32,12 +35,12 @@ export function Footer() {
               <ul className="mt-4 space-y-3">
                 {NAV_LINKS.map((link) => (
                   <li key={link.href}>
-                    <Link
+                    <RefLink
                       href={link.href}
                       className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
                     >
                       {link.name}
-                    </Link>
+                    </RefLink>
                   </li>
                 ))}
               </ul>
@@ -56,20 +59,20 @@ export function Footer() {
                   </Link>
                 </li>
                 <li>
-                  <Link
+                  <RefLink
                     href="/contact"
                     className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
                   >
                     Contact
-                  </Link>
+                  </RefLink>
                 </li>
                 <li>
-                  <Link
+                  <RefLink
                     href="/partner"
                     className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
                   >
                     Partner Program
-                  </Link>
+                  </RefLink>
                 </li>
               </ul>
             </div>

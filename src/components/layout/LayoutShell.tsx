@@ -18,16 +18,25 @@ export function LayoutShell({
   const isPartnerPortal =
     pathname?.startsWith("/partner/dashboard") ||
     pathname?.startsWith("/partner/login") ||
-    pathname?.startsWith("/partner/set-password");
+    pathname?.startsWith("/partner/set-password") ||
+    pathname?.startsWith("/partner/forgot-password");
 
   return (
     <>
       <Suspense fallback={null}>
         <PartnerRefHandler />
       </Suspense>
-      {!isPartnerPortal && <Header isAdmin={isAdmin ?? false} />}
+      {!isPartnerPortal && (
+        <Suspense fallback={<header className="h-14" />}>
+          <Header isAdmin={isAdmin ?? false} />
+        </Suspense>
+      )}
       {children}
-      {!isDashboard && !isPartnerPortal && <Footer />}
+      {!isDashboard && !isPartnerPortal && (
+        <Suspense fallback={null}>
+          <Footer />
+        </Suspense>
+      )}
     </>
   );
 }

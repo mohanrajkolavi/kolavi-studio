@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft, Handshake } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type PartnerAuthShellProps = {
   children: React.ReactNode;
@@ -19,9 +20,9 @@ export function PartnerAuthShell({
 }: PartnerAuthShellProps) {
   return (
     <div className="min-h-screen bg-background">
-      {/* Top bar - full-rounded pill style */}
+      {/* Pill header - refined with subtle backdrop */}
       <header className="bg-background/95 px-4 pt-4 backdrop-blur-sm sm:px-6">
-        <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-border bg-background/80 px-5 shadow-sm backdrop-blur-xl sm:px-6">
+        <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-border bg-background/80 px-5 shadow-sm backdrop-blur-xl sm:px-6 dark:bg-background/80 dark:border-border">
           <Link
             href="/partner"
             className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -29,9 +30,12 @@ export function PartnerAuthShell({
             <ArrowLeft className="h-4 w-4" />
             Back to Partner Program
           </Link>
-          <Link href="/" className="text-lg font-semibold tracking-tight">
-            <Logo withPeriod />
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link href="/" className="text-lg font-semibold tracking-tight">
+              <Logo withPeriod />
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -39,7 +43,7 @@ export function PartnerAuthShell({
         {/* Left: Branding panel */}
         <div className="mx-auto max-w-md lg:mx-0 lg:max-w-lg lg:flex-1">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:text-orange-400">
-            <Handshake className="h-10 w-10" />
+            <Handshake className="h-10 w-10" strokeWidth={1.5} />
           </div>
           <h1 className="mt-8 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             {title.includes(" ") ? (
@@ -55,7 +59,7 @@ export function PartnerAuthShell({
               </span>
             )}
           </h1>
-          <p className="mt-4 text-lg text-muted-foreground">{subtitle}</p>
+          <p className="mt-4 text-lg text-muted-foreground leading-relaxed">{subtitle}</p>
           <div className="mt-10 hidden space-y-4 lg:block">
             <div className="flex gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-400/20">

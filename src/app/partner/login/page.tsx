@@ -18,12 +18,17 @@ export default function PartnerLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (!acceptedTerms) {
+      setError("Please accept the Program Terms and Terms of Service to continue.");
+      return;
+    }
     setLoading(true);
     try {
       if (!HAS_SUPABASE) {
@@ -53,85 +58,103 @@ export default function PartnerLoginPage() {
 
   return (
     <PartnerAuthShell>
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-md ring-1 ring-black/[0.04] dark:ring-white/5">
-        {/* Accent header */}
-        <div className="border-b border-border/60 bg-muted/30 px-6 py-5 sm:px-8 sm:py-6">
-          <h2 className="text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-            Sign in with email & password
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Enter your partner account credentials. If you&apos;ve been approved, check your email for an invitation link to set up your password.
-          </p>
-        </div>
+      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/5 px-6 py-8 sm:px-8 sm:py-10">
+        <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
+                Email
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-11 pl-10 pr-4 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
+                  placeholder="partner@example.com"
+                  required
+                  autoComplete="email"
+                  disabled={loading}
+                />
+              </div>
+            </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 px-6 py-6 sm:px-8 sm:pb-8 sm:pt-6">
-          <div className="space-y-2">
-            <label htmlFor="email" className="block text-sm font-medium text-foreground">
-              Email
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="h-11 pl-11 pr-4 rounded-lg border-border bg-muted/20 focus:bg-background"
-                placeholder="partner@example.com"
-                required
-                autoComplete="email"
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label htmlFor="password" className="text-sm font-medium text-foreground">
+                  Password
+                </label>
+                <Link
+                  href="/partner/forgot-password"
+                  className="text-xs font-medium text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 transition-colors"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-11 pl-10 pr-4 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 py-2">
+              <input
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
                 disabled={loading}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-input text-orange-600 focus:ring-2 focus:ring-ring focus:ring-offset-0"
               />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="password" className="block text-sm font-medium text-foreground">
-              Password
+              <span className="text-sm text-foreground">
+                I accept the{" "}
+                <Link href="/partner/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-orange-600 underline-offset-4 hover:text-orange-700 dark:text-orange-400">
+                  Partner Program Terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-medium text-orange-600 underline-offset-4 hover:text-orange-700 dark:text-orange-400">
+                  Kolavi Studio Terms of Service
+                </Link>
+              </span>
             </label>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 pl-11 pr-4 rounded-lg border-border bg-muted/20 focus:bg-background"
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-                disabled={loading}
-              />
-            </div>
-          </div>
 
-          {error && (
-            <div
-              className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-              role="alert"
+            {error && (
+              <div
+                className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+                role="alert"
+              >
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              className="h-11 w-full rounded-2xl bg-orange-600 text-sm font-medium text-white hover:bg-orange-700"
+              disabled={loading || !acceptedTerms}
             >
-              {error}
-            </div>
-          )}
+              {loading ? "Signing in…" : "Sign in"}
+            </Button>
 
-          <Button
-            type="submit"
-            className="h-11 w-full rounded-lg bg-orange-600 text-sm font-semibold text-white hover:bg-orange-700"
-            disabled={loading}
-          >
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
-
-          <p className="text-center text-sm text-muted-foreground">
-            Not a partner yet?{" "}
-            <Link
-              href="/partner/apply"
-              className="font-medium text-orange-600 underline-offset-4 hover:text-orange-700 dark:text-orange-400"
-            >
-              Apply here
-            </Link>
-          </p>
-        </form>
+            <p className="text-center text-sm text-muted-foreground pt-2">
+              Not a partner yet?{" "}
+              <Link
+                href="/partner/apply"
+                className="text-foreground underline underline-offset-4 hover:no-underline"
+              >
+                Apply here
+              </Link>
+            </p>
+          </form>
       </div>
     </PartnerAuthShell>
   );

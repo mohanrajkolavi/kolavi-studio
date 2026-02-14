@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { parsePartnerRefFromCookieHeader } from "@/lib/partner/cookie-server";
 
 const RATE_LIMIT_WINDOW_SEC = 60;
 const RATE_LIMIT_MAX = 5;
@@ -80,24 +81,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
-    const { name, email, phone, businessType, message, honeypot, referralCode } = body;
+    let body: Record<string, unknown>;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    const { name, email, phone, businessType, message, honeypot, referralCode: bodyRef } = body;
 
     // Honeypot spam protection - silently fail for bots
     if (honeypot) {
       return NextResponse.json({ success: true });
     }
 
-    // Partner attribution: if visitor came via partner link, attribute lead to that partner
+    // Partner attribution: body first, then Cookie header (handles fetch + cookie, or traditional POST)
+    const referralCode =
+      bodyRef && typeof bodyRef === "string" && bodyRef.trim().length >= 6
+        ? bodyRef.trim()
+        : parsePartnerRefFromCookieHeader(request.headers.get("cookie"));
+
     let partnerId: string | null = null;
     let referralCodeVal: string | null = null;
     let source = "contact_form";
-    if (referralCode && typeof referralCode === "string" && referralCode.trim().length >= 6) {
+    if (referralCode && referralCode.length >= 6) {
       try {
         const code = referralCode.trim().slice(0, 50);
+        // Case-insensitive lookup so partner links work regardless of URL casing (e.g. ?ref=John2025 vs ?ref=JOHN2025)
         const partner = await sql`
           SELECT id, code FROM partners
-          WHERE code = ${code} AND status = 'active'
+          WHERE LOWER(code) = LOWER(${code}) AND status = 'active'
           LIMIT 1
         `;
         if (partner[0]) {
@@ -152,8 +164,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const phoneVal = phone?.trim() || null;
-    const businessTypeVal = businessType || null;
+    const phoneVal = (typeof phone === "string" ? phone.trim() : null) || null;
+    const businessTypeVal = (typeof businessType === "string" ? businessType.trim() : null) || null;
     const phoneFragment = phoneVal !== null ? sql`${phoneVal}` : sql`NULL`;
     const businessTypeFragment = businessTypeVal !== null ? sql`${businessTypeVal}` : sql`NULL`;
     const partnerFragment = partnerId ? sql`${partnerId}` : sql`NULL`;

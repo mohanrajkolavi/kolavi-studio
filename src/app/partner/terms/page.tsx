@@ -52,7 +52,7 @@ export default function PartnerTermsPage() {
               <section>
                 <h2 className="text-xl font-semibold">3. Attribution</h2>
                 <p>
-                  Attribution is based on a 30-day first-touch cookie. When a visitor clicks your partner link (kolavistudio.com/partner?ref=YOURCODE), we set a cookie. If they submit a contact form within 30 days, the lead is attributed to you. The first partner link clicked receives credit.
+                  Attribution is based on a 30-day first-touch cookie. When a visitor clicks your partner link (<code className="rounded bg-muted px-1 py-0.5 text-sm">/partner?ref=YOURCODE</code>), we set a cookie. If they submit a contact form within 30 days, the lead is attributed to you. The first partner link clicked receives credit.
                 </p>
               </section>
 

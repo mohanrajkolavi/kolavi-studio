@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RefLink } from "@/components/partner/RefLink";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
@@ -99,13 +100,13 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
           )}
           {NAV_LINKS.map((link) => (
             <li key={link.href}>
-              <Link
+              <RefLink
                 href={link.href}
                 className="block min-h-[48px] py-3 text-[17px] font-semibold leading-tight text-foreground transition-colors hover:text-primary active:opacity-80"
                 onClick={() => onOpenChange(false)}
               >
                 {link.name}
-              </Link>
+              </RefLink>
             </li>
           ))}
         </ul>
@@ -118,13 +119,13 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
               className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-orange-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-orange-700 active:opacity-90"
             />
           ) : (
-            <Link
+            <RefLink
               href="/contact"
               className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-orange-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-orange-700 active:opacity-90"
               onClick={() => onOpenChange(false)}
             >
               Get in Touch
-            </Link>
+            </RefLink>
           )}
         </div>
       </nav>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { RefLink } from "@/components/partner/RefLink";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import { NAV_LINKS } from "@/lib/constants";
@@ -45,13 +46,13 @@ export function Header({ isAdmin = false }: HeaderProps) {
               </Link>
             )}
             {NAV_LINKS.map((link) => (
-              <Link
+              <RefLink
                 key={link.href}
                 href={link.href}
                 className="rounded-2xl px-4 py-2 text-[15px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 {link.name}
-              </Link>
+              </RefLink>
             ))}
           </nav>
         </div>
@@ -62,12 +63,12 @@ export function Header({ isAdmin = false }: HeaderProps) {
           {isAdmin ? (
             <LogoutButton className="inline-flex items-center rounded-2xl bg-orange-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background" />
           ) : (
-            <Link
+            <RefLink
               href="/contact"
               className="inline-flex items-center rounded-2xl bg-orange-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-orange-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               Get in Touch
-            </Link>
+            </RefLink>
           )}
         </div>
 
