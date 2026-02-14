@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, FileEdit, FileSearch, History, Loader2 } from "lucide-react";
+import { LayoutDashboard, Users, FileEdit, FileSearch, History, Loader2, Handshake } from "lucide-react";
 import { useBlogGenerationOptional } from "@/components/dashboard/BlogGenerationProvider";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/leads", label: "Leads", icon: Users },
+  { href: "/dashboard/partners", label: "Partners", icon: Handshake },
   { href: "/dashboard/blog", label: "Content Writer", icon: FileEdit },
   { href: "/dashboard/recent", label: "Recent", icon: History },
   { href: "/dashboard/content-maintenance", label: "Content", icon: FileSearch },
@@ -35,7 +36,7 @@ export function DashboardNavStrip() {
           <Link
             key={item.href}
             href={item.href}
-            className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-colors ${
+            className={`flex min-h-[44px] shrink-0 items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium transition-colors ${
               isActive
                 ? "bg-orange-600 text-white dark:bg-orange-500"
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"

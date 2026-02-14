@@ -6,8 +6,8 @@ export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-border" role="contentinfo">
-      <div className="container mx-auto px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
+    <footer className="border-t border-border bg-muted/20" role="contentinfo">
+      <div className="container mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
         {/* Main footer content - clean, premium design */}
         <div className="grid grid-cols-1 gap-12 sm:gap-16 lg:grid-cols-12 lg:gap-8">
           {/* Brand block */}
@@ -63,6 +63,14 @@ export function Footer() {
                     Contact
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    href="/partner"
+                    className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+                  >
+                    Partner Program
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
@@ -89,6 +97,8 @@ export function Footer() {
           </p>
         </div>
       </div>
+      {/* Safe area for devices with home indicator */}
+      <div className="h-[env(safe-area-inset-bottom)]" aria-hidden />
     </footer>
   );
 }

@@ -48,9 +48,9 @@ export const SEO = {
 } as const;
 
 export const NAV_LINKS = [
-  { name: "Home", href: "/" },
   { name: "Who We Serve", href: "/industries" },
   { name: "Services", href: "/services" },
+  { name: "Partners", href: "/partner" },
   { name: "Blog", href: "/blog" },
   { name: "About", href: "/about" },
 ];

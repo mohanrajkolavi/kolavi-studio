@@ -65,7 +65,7 @@ export function Testimonials({
         </div>
         <div className={cn("mx-auto grid max-w-6xl grid-cols-1 gap-8 md:grid-cols-3", (title || sectionLabel) ? "mt-16" : "mt-0")}>
           {testimonials.map((testimonial, index) => (
-            <Card key={index} className="overflow-hidden rounded-2xl border border-border transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
+            <Card key={index} className="min-w-0 overflow-hidden rounded-2xl border border-border transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
               <CardContent className="p-6">
                 <p className="text-base leading-relaxed text-muted-foreground">
                   &quot;{testimonial.quote}&quot;

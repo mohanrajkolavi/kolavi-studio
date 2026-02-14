@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
+function toIso(d: unknown): string | null {
+  if (d == null) return null;
+  const date = d instanceof Date ? d : new Date(d as string);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,6 +30,11 @@ export async function GET(
         source,
         status,
         notes,
+        partner_id,
+        referral_code,
+        paid_at,
+        one_time_amount,
+        recurring_amount,
         created_at,
         updated_at
       FROM leads
@@ -48,8 +60,13 @@ export async function GET(
       source: lead.source,
       status: lead.status,
       notes: lead.notes,
-      createdAt: lead.created_at != null ? (lead.created_at instanceof Date ? lead.created_at.toISOString() : new Date(lead.created_at).toISOString()) : null,
-      updatedAt: lead.updated_at != null ? (lead.updated_at instanceof Date ? lead.updated_at.toISOString() : new Date(lead.updated_at).toISOString()) : null,
+      partnerId: lead.partner_id,
+      referralCode: lead.referral_code,
+      paidAt: lead.paid_at ? toIso(lead.paid_at) : null,
+      oneTimeAmount: lead.one_time_amount != null ? Number(lead.one_time_amount) : null,
+      recurringAmount: lead.recurring_amount != null ? Number(lead.recurring_amount) : null,
+      createdAt: toIso(lead.created_at),
+      updatedAt: toIso(lead.updated_at),
     });
   } catch (error) {
     console.error("Error fetching lead:", error);
@@ -70,38 +87,47 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, notes } = body;
+    const { status, notes, paidAt, oneTimeAmount, recurringAmount } = body;
 
-    if (status === undefined && notes === undefined) {
+    const updateData: Record<string, unknown> = { updated_at: new Date() };
+    if (status !== undefined) updateData.status = status;
+    if (notes !== undefined) updateData.notes = notes === null || notes === "" ? null : notes;
+    if (paidAt !== undefined) {
+      const normalized = paidAt === null || paidAt === "" ? null : paidAt;
+      if (normalized !== null) {
+        const parsed = new Date(normalized as string);
+        if (Number.isNaN(parsed.getTime())) {
+          return NextResponse.json(
+            { error: "Invalid paidAt date format" },
+            { status: 400 }
+          );
+        }
+        updateData.paid_at = parsed.toISOString();
+      } else {
+        updateData.paid_at = null;
+      }
+    }
+    if (oneTimeAmount !== undefined) {
+      const val = oneTimeAmount === null || oneTimeAmount === "" ? null : Number(oneTimeAmount);
+      updateData.one_time_amount = val != null && !Number.isNaN(val) ? val : null;
+    }
+    if (recurringAmount !== undefined) {
+      const val = recurringAmount === null || recurringAmount === "" ? null : Number(recurringAmount);
+      updateData.recurring_amount = val != null && !Number.isNaN(val) ? val : null;
+    }
+
+    const columns = Object.keys(updateData);
+    if (columns.length <= 1) {
       return NextResponse.json(
         { error: "No fields to update" },
         { status: 400 }
       );
     }
 
-    // Use explicit sql fragments for nulls to avoid "could not determine data type of parameter"
-    const notesFragment = notes !== null && notes !== undefined ? sql`${notes}` : sql`NULL`;
-
-    // Build update query dynamically
-    if (status !== undefined && notes !== undefined) {
-      await sql`
-        UPDATE leads
-        SET status = ${status}, notes = ${notesFragment}, updated_at = NOW()
-        WHERE id = ${id}
-      `;
-    } else if (status !== undefined) {
-      await sql`
-        UPDATE leads
-        SET status = ${status}, updated_at = NOW()
-        WHERE id = ${id}
-      `;
-    } else if (notes !== undefined) {
-      await sql`
-        UPDATE leads
-        SET notes = ${notesFragment}, updated_at = NOW()
-        WHERE id = ${id}
-      `;
-    }
+    await sql`
+      UPDATE leads SET ${sql(updateData, ...columns)}
+      WHERE id = ${id}
+    `;
 
     // Fetch updated lead
     const result = await sql`
@@ -115,6 +141,11 @@ export async function PATCH(
         source,
         status,
         notes,
+        partner_id,
+        referral_code,
+        paid_at,
+        one_time_amount,
+        recurring_amount,
         created_at,
         updated_at
       FROM leads
@@ -140,8 +171,13 @@ export async function PATCH(
       source: lead.source,
       status: lead.status,
       notes: lead.notes,
-      createdAt: lead.created_at != null ? (lead.created_at instanceof Date ? lead.created_at.toISOString() : new Date(lead.created_at).toISOString()) : null,
-      updatedAt: lead.updated_at != null ? (lead.updated_at instanceof Date ? lead.updated_at.toISOString() : new Date(lead.updated_at).toISOString()) : null,
+      partnerId: lead.partner_id,
+      referralCode: lead.referral_code,
+      paidAt: lead.paid_at ? toIso(lead.paid_at) : null,
+      oneTimeAmount: lead.one_time_amount != null ? Number(lead.one_time_amount) : null,
+      recurringAmount: lead.recurring_amount != null ? Number(lead.recurring_amount) : null,
+      createdAt: toIso(lead.created_at),
+      updatedAt: toIso(lead.updated_at),
     });
   } catch (error) {
     console.error("Error updating lead:", error);

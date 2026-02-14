@@ -18,21 +18,17 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit;
 
     // Build WHERE clause from conditions
-    const parts: ReturnType<typeof sql>[] = [];
-    if (status) parts.push(sql`status = ${status}`);
-    if (source) parts.push(sql`source = ${source}`);
+    const conditions: ReturnType<typeof sql>[] = [];
+    if (status) conditions.push(sql`status = ${status}`);
+    if (source) conditions.push(sql`source = ${source}`);
     if (search) {
       const searchPattern = `%${search}%`;
-      parts.push(sql`(name ILIKE ${searchPattern} OR email ILIKE ${searchPattern})`);
+      conditions.push(sql`(name ILIKE ${searchPattern} OR email ILIKE ${searchPattern})`);
     }
     const whereClause =
-      parts.length === 0
+      conditions.length === 0
         ? sql``
-        : parts.length === 1
-          ? sql`WHERE ${parts[0]}`
-          : parts.length === 2
-            ? sql`WHERE ${parts[0]} AND ${parts[1]}`
-            : sql`WHERE ${parts[0]} AND ${parts[1]} AND ${parts[2]}`;
+        : sql`WHERE ${conditions.reduce((prev, curr) => sql`${prev} AND ${curr}`)}`;
 
     // Get total count
     const countResult = await sql`
@@ -42,7 +38,7 @@ export async function GET(request: NextRequest) {
     `;
     const total = Number(countResult[0]?.total || 0);
 
-    // Get leads
+    // Get leads (include partner fields for commission tracking)
     const leads = await sql`
       SELECT 
         id,
@@ -54,6 +50,11 @@ export async function GET(request: NextRequest) {
         source,
         status,
         notes,
+        partner_id,
+        referral_code,
+        paid_at,
+        one_time_amount,
+        recurring_amount,
         created_at,
         updated_at
       FROM leads
@@ -63,8 +64,11 @@ export async function GET(request: NextRequest) {
       OFFSET ${offset}
     `;
 
-    const toIso = (d: unknown) =>
-      d != null ? (d instanceof Date ? d.toISOString() : new Date(d as string).toISOString()) : null;
+    const toIso = (d: unknown): string | null => {
+      if (d == null) return null;
+      const date = d instanceof Date ? d : new Date(d as string);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    };
 
     return NextResponse.json({
       leads: leads.map((lead) => ({
@@ -77,6 +81,11 @@ export async function GET(request: NextRequest) {
         source: lead.source,
         status: lead.status,
         notes: lead.notes,
+        partnerId: lead.partner_id,
+        referralCode: lead.referral_code,
+        paidAt: lead.paid_at ? toIso(lead.paid_at) : null,
+        oneTimeAmount: lead.one_time_amount != null ? Number(lead.one_time_amount) : null,
+        recurringAmount: lead.recurring_amount != null ? Number(lead.recurring_amount) : null,
         createdAt: toIso(lead.created_at),
         updatedAt: toIso(lead.updated_at),
       })),

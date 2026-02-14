@@ -15,7 +15,7 @@ export function LegalPageLayout({ title, lastUpdated, children }: LegalPageLayou
               {title}
             </h1>
             <p className="mt-4 text-sm text-muted-foreground">Last updated: {lastUpdated}</p>
-            <div className="prose prose-neutral mt-10 dark:prose-invert max-w-none prose-p:text-muted-foreground prose-li:text-muted-foreground prose-headings:text-foreground prose-strong:text-foreground">
+            <div className="prose prose-neutral mt-10 min-w-0 dark:prose-invert max-w-none prose-p:text-muted-foreground prose-li:text-muted-foreground prose-headings:text-foreground prose-strong:text-foreground">
               {children}
             </div>
           </div>

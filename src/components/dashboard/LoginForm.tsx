@@ -31,7 +31,7 @@ export function LoginForm({ redirectTo, error, unlocked }: LoginFormProps) {
           type="password"
           id="password"
           name="password"
-          className="mt-2 h-11 rounded-2xl border-input"
+          className="mt-2 min-h-[44px] h-11 rounded-2xl border-input"
           placeholder="Enter your password"
           required
           autoComplete="current-password"

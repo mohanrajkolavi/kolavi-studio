@@ -66,7 +66,7 @@ export function Benefits({
         </div>
         <div className={cn("mx-auto mt-16 grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4", sectionLabel && "mt-12")}>
           {benefits.map((benefit, index) => (
-            <div key={index} className="text-center">
+            <div key={index} className="min-w-0 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:border dark:border-orange-400/40 dark:text-white">
                 {benefit.icon}
               </div>

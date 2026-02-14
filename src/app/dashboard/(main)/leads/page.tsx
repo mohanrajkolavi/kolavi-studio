@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { TableSkeleton } from "@/components/dashboard/TableSkeleton";
-import { Users, Search, Mail, Phone, Briefcase, X, Trash2 } from "lucide-react";
+import { Users, Search, Phone, Briefcase, X, Trash2, DollarSign, Check } from "lucide-react";
 
 type Lead = {
   id: string;
@@ -18,17 +18,23 @@ type Lead = {
   source: string;
   status: string;
   notes: string | null;
+  partnerId: string | null;
+  referralCode: string | null;
+  paidAt: string | null;
+  oneTimeAmount: number | null;
+  recurringAmount: number | null;
   createdAt: string;
   updatedAt: string;
 };
 
-type LeadStatus = "new" | "contacted" | "proposal_sent" | "won" | "lost";
+type LeadStatus = "new" | "contacted" | "proposal_sent" | "won" | "converted" | "lost";
 
 const STATUS_OPTIONS: { value: LeadStatus; label: string }[] = [
   { value: "new", label: "New" },
   { value: "contacted", label: "Contacted" },
   { value: "proposal_sent", label: "Proposal" },
   { value: "won", label: "Won" },
+  { value: "converted", label: "Converted" },
   { value: "lost", label: "Lost" },
 ];
 
@@ -55,6 +61,7 @@ const statusStyles: Record<string, string> = {
   contacted: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200",
   proposal_sent: "bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-200",
   won: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200",
+  converted: "bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-200",
   lost: "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200",
 };
 
@@ -69,6 +76,10 @@ export default function LeadsPage() {
   });
   const [updating, setUpdating] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [paymentForm, setPaymentForm] = useState({
+    oneTimeAmount: "",
+    recurringAmount: "",
+  });
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -93,6 +104,15 @@ export default function LeadsPage() {
     fetchLeads();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch on status/source change; search runs on submit
   }, [filters.status, filters.source]);
+
+  useEffect(() => {
+    if (selectedLead) {
+      setPaymentForm({
+        oneTimeAmount: selectedLead.oneTimeAmount != null ? String(selectedLead.oneTimeAmount) : "",
+        recurringAmount: selectedLead.recurringAmount != null ? String(selectedLead.recurringAmount) : "",
+      });
+    }
+  }, [selectedLead]);
 
   async function handleStatusChange(leadId: string, newStatus: LeadStatus) {
     setUpdating(leadId);
@@ -136,6 +156,36 @@ export default function LeadsPage() {
     }
   }
 
+  async function handleConfirmPayment(
+    leadId: string,
+    oneTimeAmount: number,
+    recurringAmount: number
+  ) {
+    setUpdating(leadId);
+    try {
+      const response = await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          paidAt: new Date().toISOString(),
+          oneTimeAmount: oneTimeAmount || null,
+          recurringAmount: recurringAmount || null,
+        }),
+      });
+      if (!response.ok) throw new Error("Failed to confirm payment");
+      await fetchLeads();
+      if (selectedLead?.id === leadId) {
+        const updated = await fetch(`/api/leads/${leadId}`).then((r) => r.json());
+        setSelectedLead(updated);
+      }
+    } catch (error) {
+      console.error("Error confirming payment:", error);
+      alert("Failed to confirm payment. Please try again.");
+    } finally {
+      setUpdating(null);
+    }
+  }
+
   async function handleDelete(leadId: string, leadName: string) {
     if (!confirm(`Delete lead "${leadName}"? This cannot be undone.`)) return;
     setDeleting(leadId);
@@ -162,7 +212,7 @@ export default function LeadsPage() {
       <header>
         <h1 className="text-xl font-semibold text-foreground">Leads</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage contact form submissions and track pipeline
+          Contact form submissions from your website
         </p>
       </header>
 
@@ -213,9 +263,10 @@ export default function LeadsPage() {
               >
                 <option value="">All sources</option>
                 <option value="contact_form">Contact Form</option>
+                <option value="partner">Partner referral</option>
+                <option value="google_form">Google Form</option>
                 <option value="typeform">Typeform</option>
                 <option value="tally">Tally</option>
-                <option value="google_form">Google Form</option>
               </select>
               <Button
                 type="submit"
@@ -239,8 +290,8 @@ export default function LeadsPage() {
           <div className="overflow-hidden rounded-2xl border border-dashed border-border bg-muted/30">
             <EmptyState
               icon={Users}
-              heading="No leads found"
-              description="Leads will appear here when someone submits the contact form. Try adjusting your filters."
+              heading="No leads yet"
+              description="Leads will appear here when someone submits the contact form on your website."
             />
           </div>
         ) : (
@@ -364,7 +415,7 @@ export default function LeadsPage() {
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Modal content: stop propagation except Escape so overlay can close */}
           <div
             role="document"
-            className="w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-card shadow-sm"
+            className="w-full max-w-xl max-h-[90vh] overflow-x-clip overflow-y-auto rounded-2xl border border-border bg-card shadow-sm"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => {
               if (e.key === "Escape") setSelectedLead(null);
@@ -427,13 +478,10 @@ export default function LeadsPage() {
                   </div>
                 )}
                 <div className="flex items-start gap-3 sm:col-span-2">
-                  <Mail className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Source</p>
-                    <p className="mt-0.5 text-sm text-muted-foreground capitalize">
-                      {selectedLead.source.replace("_", " ")}
-                    </p>
-                  </div>
+                  <span className="text-sm font-medium text-foreground">Source</span>
+                  <span className="text-sm text-muted-foreground capitalize">
+                    {selectedLead.source.replace("_", " ")}
+                  </span>
                 </div>
               </div>
 
@@ -464,6 +512,90 @@ export default function LeadsPage() {
                   ))}
                 </select>
               </div>
+
+              {(selectedLead.source === "partner" || selectedLead.partnerId) && (
+                <div className="rounded-2xl border border-border bg-muted/30 p-4">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <h3 className="text-sm font-medium text-foreground">Partner referral – confirm payment</h3>
+                    {selectedLead.paidAt && (
+                      <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/50 dark:text-green-200">
+                        <Check className="h-3 w-3" />
+                        Confirmed
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    When this lead pays for services, enter amounts and confirm. Commission (15% one-time, 10% recurring) will count toward partner pending.
+                  </p>
+                  {selectedLead.paidAt ? (
+                    <div className="mt-3 flex gap-4 text-sm">
+                      <span>
+                        One-time: ${(selectedLead.oneTimeAmount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                      <span>
+                        Recurring: ${(selectedLead.recurringAmount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}/mo
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="one-time-amount" className="block text-xs font-medium text-muted-foreground">
+                          One-time amount ($)
+                        </label>
+                        <Input
+                          id="one-time-amount"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0"
+                          value={paymentForm.oneTimeAmount ?? ""}
+                          onChange={(e) =>
+                            setPaymentForm((f) => ({ ...f, oneTimeAmount: e.target.value }))
+                          }
+                          className="mt-1 rounded-2xl"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="recurring-amount" className="block text-xs font-medium text-muted-foreground">
+                          Recurring amount ($/mo)
+                        </label>
+                        <Input
+                          id="recurring-amount"
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0"
+                          value={paymentForm.recurringAmount ?? ""}
+                          onChange={(e) =>
+                            setPaymentForm((f) => ({ ...f, recurringAmount: e.target.value }))
+                          }
+                          className="mt-1 rounded-2xl"
+                        />
+                      </div>
+                      <Button
+                        onClick={() =>
+                          handleConfirmPayment(
+                            selectedLead.id,
+                            parseFloat(paymentForm.oneTimeAmount || "0") || 0,
+                            parseFloat(paymentForm.recurringAmount || "0") || 0
+                          )
+                        }
+                        disabled={
+                          updating === selectedLead.id ||
+                          (parseFloat(paymentForm.oneTimeAmount || "0") || 0) +
+                            (parseFloat(paymentForm.recurringAmount || "0") || 0) <=
+                            0
+                        }
+                        className="sm:col-span-2 rounded-2xl bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600"
+                      >
+                        <Check className="mr-2 h-4 w-4" />
+                        {updating === selectedLead.id ? "Confirming…" : "Confirm payment"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label htmlFor="lead-notes" className="block text-sm font-medium text-foreground">

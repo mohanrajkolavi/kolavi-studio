@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { Viewport } from "next";
 import Script from "next/script";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
@@ -13,6 +14,12 @@ const inter = Inter({ subsets: ["latin"], display: "swap" });
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
 export const metadata: Metadata = getBaseMetadata();
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+};
 
 export default async function RootLayout({
   children,

@@ -65,7 +65,7 @@ export function Process({
         </div>
         <div className={cn("mx-auto grid max-w-5xl grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4", (title || sectionLabel) ? "mt-16" : "mt-0")}>
           {steps.map((step, index) => (
-            <div key={index} className="relative">
+            <div key={index} className="relative min-w-0">
               <div className="text-5xl font-semibold text-orange-500/10 dark:text-orange-400/15">
                 {step.number}
               </div>

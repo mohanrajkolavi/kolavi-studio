@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
+import { getPartnerRefFromCookie } from "@/lib/partner/cookie";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -19,6 +20,7 @@ export function ContactForm() {
     setSubmitStatus({ type: null, message: "" });
 
     const formData = new FormData(form);
+    const referralCode = getPartnerRefFromCookie();
     const data = {
       name: formData.get("name"),
       email: formData.get("email"),
@@ -26,6 +28,7 @@ export function ContactForm() {
       businessType: formData.get("businessType"),
       message: formData.get("message"),
       honeypot: formData.get("website"), // Honeypot field
+      referralCode: referralCode || undefined,
     };
 
     try {
@@ -117,7 +120,7 @@ export function ContactForm() {
         <select
           id="businessType"
           name="businessType"
-          className="mt-2 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20 md:text-sm"
+          className="mt-2 flex min-h-[44px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20 md:min-h-9 md:py-1 md:text-sm"
           disabled={isSubmitting}
         >
           <option value="">Select your business type</option>

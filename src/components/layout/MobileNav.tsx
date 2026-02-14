@@ -59,12 +59,13 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
       data-state={show ? "open" : "closed"}
       className={cn(
         "fixed inset-0 z-[100] flex flex-col bg-background transition-[opacity,visibility] duration-300 ease-out",
+        "pb-[env(safe-area-inset-bottom)]",
         "data-[state=open]:visible data-[state=open]:opacity-100",
         "data-[state=closed]:invisible data-[state=closed]:opacity-0 data-[state=closed]:pointer-events-none"
       )}
     >
-      {/* Header: logo + close (FINSHOTS-style) */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 sm:px-6">
+      {/* Header: logo + close (matches main site) */}
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4 pt-[env(safe-area-inset-top)] sm:px-6">
         <Link
           href="/"
           className="text-lg font-semibold tracking-tight text-foreground"
@@ -83,7 +84,7 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
       </div>
 
       {/* Centered nav links - premium spacing and typography */}
-      <nav className="flex flex-1 flex-col items-center justify-center px-6 py-8">
+      <nav className="flex flex-1 flex-col items-center justify-center px-6 py-8" aria-label="Main">
         <ul className="flex w-full max-w-sm flex-col gap-1 text-center">
           {isAdmin && (
             <li>
@@ -114,12 +115,12 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
           {isAdmin ? (
             <LogoutButton
               onClick={() => onOpenChange(false)}
-              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:opacity-90"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-orange-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-orange-700 active:opacity-90"
             />
           ) : (
             <Link
               href="/contact"
-              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-primary px-6 py-3 text-base font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:opacity-90"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-orange-600 px-6 py-3 text-base font-semibold text-white transition-colors hover:bg-orange-700 active:opacity-90"
               onClick={() => onOpenChange(false)}
             >
               Get in Touch

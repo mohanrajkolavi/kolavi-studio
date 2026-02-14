@@ -52,6 +52,14 @@ CREATE TABLE IF NOT EXISTS contact_rate_limit (
 
 CREATE INDEX IF NOT EXISTS idx_contact_rate_limit_reset_at ON contact_rate_limit(reset_at);
 
+-- Check signup rate limit: prevent enumeration (e.g. 5 requests per minute per IP)
+CREATE TABLE IF NOT EXISTS check_signup_rate_limit (
+  ip_hash VARCHAR(64) PRIMARY KEY,
+  request_count INT NOT NULL DEFAULT 0,
+  reset_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_check_signup_rate_limit_reset_at ON check_signup_rate_limit(reset_at);
+
 -- Pipeline jobs: persist content-writer jobs so retries work across restarts and serverless instances
 CREATE TABLE IF NOT EXISTS pipeline_jobs (
   id TEXT PRIMARY KEY,
@@ -81,3 +89,7 @@ CREATE TABLE IF NOT EXISTS blog_generation_history (
   generation_time_ms INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_generation_history(created_at DESC);
+
+-- Partner Program: Run src/lib/db/migrations/001_partner_program.sql to add:
+-- partner_applications, partners, lead_revenue, partner_payouts, admin_action_logs,
+-- partner_click_logs, and extend leads with partner_id, referral_code, paid_at, one_time_amount, recurring_amount

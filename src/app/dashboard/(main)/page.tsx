@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Users, FileEdit, FileSearch, ArrowRight } from "lucide-react";
+import { Users, FileEdit, FileSearch, ArrowRight, Handshake } from "lucide-react";
 
 type DashboardStats = {
   leadsTotal: number;
@@ -55,6 +55,7 @@ export default function DashboardOverviewPage() {
 
   const quickActions = [
     { href: "/dashboard/leads", label: "Leads", description: "Manage contact form submissions and track pipeline", icon: Users },
+    { href: "/dashboard/partners", label: "Partners", description: "Manage partner program and approve applications", icon: Handshake },
     { href: "/dashboard/blog", label: "Content Writer", description: "Generate and publish posts with Claude AI", icon: FileEdit },
     { href: "/dashboard/content-maintenance", label: "Content Maintenance", description: "Track and update blog post status", icon: FileSearch },
   ];

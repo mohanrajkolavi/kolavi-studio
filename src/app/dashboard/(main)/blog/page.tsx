@@ -686,13 +686,17 @@ export default function BlogMakerPage() {
   const result = contextResult ?? sampleResult;
   const generated = contextGenerated ?? sampleOutput;
   const pipelineResult = result?.pipelineResult ?? null;
-  const generationInput = result?.input ?? {
-    keywords: [],
-    peopleAlsoSearchFor: [],
-    intent: [],
-    competitorUrls: [],
-    wordCountPreset: "auto",
-  };
+  const defaultGenerationInput = useMemo(
+    () => ({
+      keywords: [],
+      peopleAlsoSearchFor: [],
+      intent: [],
+      competitorUrls: [],
+      wordCountPreset: "auto",
+    }),
+    []
+  );
+  const generationInput = result?.input ?? defaultGenerationInput;
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [metaCopyField, setMetaCopyField] = useState<"title" | "metaDescription" | "slug" | null>(null);
   const [schemaOpen, setSchemaOpen] = useState(false);
@@ -1542,7 +1546,7 @@ export default function BlogMakerPage() {
   }, [editing, generating, saveInProgress, generateMetaLoading, sampleResult, keywords, generationInput, intent, pipelineResult, saveToHistory]);
 
   return (
-    <div className="space-y-12">
+    <div className="min-w-0 space-y-12 overflow-x-clip">
       {/* Header – title + subtitle left; Back or Start over right, vertically centred */}
       <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">

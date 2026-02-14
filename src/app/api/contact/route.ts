@@ -81,11 +81,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, email, phone, businessType, message, honeypot } = body;
+    const { name, email, phone, businessType, message, honeypot, referralCode } = body;
 
     // Honeypot spam protection - silently fail for bots
     if (honeypot) {
       return NextResponse.json({ success: true });
+    }
+
+    // Partner attribution: if visitor came via partner link, attribute lead to that partner
+    let partnerId: string | null = null;
+    let referralCodeVal: string | null = null;
+    let source = "contact_form";
+    if (referralCode && typeof referralCode === "string" && referralCode.trim().length >= 6) {
+      try {
+        const code = referralCode.trim().slice(0, 50);
+        const partner = await sql`
+          SELECT id, code FROM partners
+          WHERE code = ${code} AND status = 'active'
+          LIMIT 1
+        `;
+        if (partner[0]) {
+          partnerId = partner[0].id as string;
+          referralCodeVal = partner[0].code as string;
+          source = "partner";
+        }
+      } catch {
+        // Partners table may not exist; proceed without attribution
+      }
     }
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -134,9 +156,11 @@ export async function POST(request: NextRequest) {
     const businessTypeVal = businessType || null;
     const phoneFragment = phoneVal !== null ? sql`${phoneVal}` : sql`NULL`;
     const businessTypeFragment = businessTypeVal !== null ? sql`${businessTypeVal}` : sql`NULL`;
+    const partnerFragment = partnerId ? sql`${partnerId}` : sql`NULL`;
+    const referralFragment = referralCodeVal ? sql`${referralCodeVal}` : sql`NULL`;
     await sql`
-      INSERT INTO leads (name, email, phone, business_type, message, source, status)
-      VALUES (${name.trim()}, ${email.trim().toLowerCase()}, ${phoneFragment}, ${businessTypeFragment}, ${message.trim()}, 'contact_form', 'new')
+      INSERT INTO leads (name, email, phone, business_type, message, source, status, partner_id, referral_code)
+      VALUES (${name.trim()}, ${email.trim().toLowerCase()}, ${phoneFragment}, ${businessTypeFragment}, ${message.trim()}, ${source}, 'new', ${partnerFragment}, ${referralFragment})
     `;
 
     return NextResponse.json({ success: true });

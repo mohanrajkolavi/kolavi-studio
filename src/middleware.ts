@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
+import { updateSupabaseSession } from "@/lib/supabase/middleware";
 
 /**
  * Nonce-based CSP. In production, allow 'unsafe-inline' for style-src so
@@ -36,7 +37,7 @@ function getCspWithNonce(nonce: string): string {
     "style-src " + styleSrc,
     "img-src 'self' data: blob: https:",
     "font-src 'self' https://fonts.gstatic.com data:",
-    "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://form.typeform.com https://embed.typeform.com https://www.typeform.com https://tally.so",
+    "connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://form.typeform.com https://embed.typeform.com https://www.typeform.com https://tally.so https://*.supabase.co wss://*.supabase.co",
     "frame-src https://embed.typeform.com https://form.typeform.com https://www.typeform.com https://tally.so https://docs.google.com",
     "object-src 'none'",
     "base-uri 'self'",
@@ -84,9 +85,11 @@ export async function middleware(request: NextRequest) {
     requestHeaders.set("x-authenticated", "0");
   }
 
-  const response = NextResponse.next({
+  let response = NextResponse.next({
     request: { headers: requestHeaders },
   });
+
+  response = await updateSupabaseSession(request, response);
 
   response.headers.set("Content-Security-Policy", cspHeader);
   for (const [key, value] of Object.entries(SECURITY_HEADERS_STATIC)) {

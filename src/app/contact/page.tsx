@@ -55,14 +55,14 @@ export default async function ContactPage() {
             </div>
 
             {USE_THIRD_PARTY_FORM ? (
-              <div className="mt-12 min-h-[500px] w-full overflow-hidden rounded-lg border bg-muted/30">
+              <div className="mt-12 min-h-[400px] w-full overflow-hidden rounded-lg border bg-muted/30 sm:min-h-[500px]">
                 {TYPEFORM_EMBED_URL ? (
                   <>
                     <div
                       data-tf-widget={TYPEFORM_EMBED_URL}
                       data-tf-live={TYPEFORM_EMBED_URL}
                       data-tf-inline-on-mobile
-                      className="min-h-[600px] w-full"
+                      className="h-[450px] w-full sm:h-[600px]"
                     />
                     <Script
                       src="https://embed.typeform.com/next/embed.js"
@@ -81,14 +81,14 @@ export default async function ContactPage() {
                       data-tally-embed
                       src={TALLY_EMBED_URL}
                       title="Contact form"
-                      className="h-[600px] w-full border-0"
+                      className="h-[450px] w-full border-0 sm:h-[600px]"
                     />
                   </>
                 ) : GOOGLE_FORM_EMBED_URL ? (
                   <iframe
                     src={GOOGLE_FORM_EMBED_URL}
                     title="Contact form"
-                    className="h-[600px] w-full border-0"
+                    className="h-[450px] w-full border-0 sm:h-[600px]"
                     frameBorder={0}
                   />
                 ) : null}

@@ -27,10 +27,10 @@ export default async function DashboardMainLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen overflow-x-clip bg-background">
       <IdleLogout />
       <main>
-        <div className="mx-auto w-full max-w-[1400px] px-6 py-8 sm:px-10 sm:py-10 lg:px-12 lg:py-12">
+        <div className="mx-auto w-full max-w-[1400px] px-4 py-8 sm:px-10 sm:py-10 lg:px-12 lg:py-12">
           <BlogGenerationProvider>
             <DashboardNavStrip />
             <div className="pt-8">{children}</div>
