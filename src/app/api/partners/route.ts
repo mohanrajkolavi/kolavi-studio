@@ -162,26 +162,44 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "A partner with this code already exists" }, { status: 409 });
     }
     if (msg.includes("relation") && msg.includes("does not exist")) {
+      console.error("Partners table not found:", msg, error instanceof Error ? error.stack : "");
       return NextResponse.json(
         {
           error:
-            "Partners table not found. Run the database migrations: 001_partner_program.sql, 002, 003, 005, 006_partner_phone.sql",
+            process.env.NODE_ENV !== "production"
+              ? "Partners table not found. Run the database migrations: 001_partner_program.sql, 002, 003, 005, 006_partner_phone.sql"
+              : "Database error. Please contact support.",
         },
         { status: 500 }
       );
     }
     if (msg.includes("column") && msg.includes("does not exist")) {
+      console.error("Database schema outdated:", msg, error instanceof Error ? error.stack : "");
       return NextResponse.json(
         {
           error:
-            "Database schema outdated. Run migration 006_partner_phone.sql: psql $DATABASE_URL -f src/lib/db/migrations/006_partner_phone.sql",
+            process.env.NODE_ENV !== "production"
+              ? "Database schema outdated. Run migration 006_partner_phone.sql: psql $DATABASE_URL -f src/lib/db/migrations/006_partner_phone.sql"
+              : "Database error. Please contact support.",
         },
         { status: 500 }
       );
     }
-    if (msg.includes("DATABASE_URL") || msg.includes("connection") || msg.includes("ECONNREFUSED")) {
+    const isConnectionFailure =
+      msg.includes("DATABASE_URL") ||
+      msg.includes("ECONNREFUSED") ||
+      msg.includes("connection refused") ||
+      msg.includes("failed to connect") ||
+      /\bconnect\s+ECONNREFUSED\b/i.test(msg);
+    if (isConnectionFailure) {
+      console.error("Database connection failed:", msg, error instanceof Error ? error.stack : "");
       return NextResponse.json(
-        { error: "Database connection failed. Check DATABASE_URL in .env.local and ensure the database is reachable." },
+        {
+          error:
+            process.env.NODE_ENV !== "production"
+              ? "Database connection failed. Check DATABASE_URL in .env.local and ensure the database is reachable."
+              : "Service temporarily unavailable. Please try again later.",
+        },
         { status: 503 }
       );
     }
