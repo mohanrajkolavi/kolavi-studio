@@ -15,40 +15,92 @@ export default function PartnerSetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [authState, setAuthState] = useState<"checking" | "ready" | "invalid">("checking");
+  const [authState, setAuthState] = useState<
+    "checking" | "ready" | "invalid" | "config_error"
+  >("checking");
 
   useEffect(() => {
-    // Supabase redirects with #error=access_denied when invite expires, is reused, or redirect URL isn't allowed
-    const hash = typeof window !== "undefined" ? window.location.hash : "";
-    if (hash.includes("error=access_denied") || hash.includes("error=")) {
-      setAuthState("invalid");
-      return;
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    async function run() {
+      try {
+        // Fail fast if Supabase is not configured (avoids throw from createClient)
+        if (typeof window !== "undefined") {
+          const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          const key =
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+            process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+          if (!url || !key) {
+            setAuthState("config_error");
+            return;
+          }
+        }
+
+        // Supabase redirects with #error=access_denied when invite expires, is reused, or redirect URL isn't allowed
+        const hash = typeof window !== "undefined" ? window.location.hash : "";
+        if (hash.includes("error=access_denied") || hash.includes("error=")) {
+          setAuthState("invalid");
+          return;
+        }
+
+        const supabase = createClient();
+
+        // Explicitly parse invite tokens from URL hash and set session (Supabase invite uses implicit flow)
+        const hashParams = new URLSearchParams(hash.replace(/^#/, ""));
+        const accessToken = hashParams.get("access_token");
+        const refreshToken = hashParams.get("refresh_token");
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (!error) {
+            // Clear the hash from URL for security (tokens no longer visible)
+            window.history.replaceState(null, "", window.location.pathname);
+            setAuthState("ready");
+            return;
+          }
+        }
+
+        async function checkSession() {
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.user) {
+            setAuthState("ready");
+            return;
+          }
+          // Fallback: token might still be processing. Wait and retry.
+          await new Promise((r) => setTimeout(r, 1500));
+          const { data: retry } = await supabase.auth.getSession();
+          if (retry.session?.user) {
+            setAuthState("ready");
+          } else {
+            setAuthState("invalid");
+          }
+        }
+
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session?.user) setAuthState("ready");
+        });
+        subscription = data.subscription;
+
+        await checkSession();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (
+          msg.includes("Missing") ||
+          msg.includes("SUPABASE") ||
+          msg.includes("anon") ||
+          msg.includes("publishable")
+        ) {
+          setAuthState("config_error");
+        } else {
+          setAuthState("invalid");
+        }
+      }
     }
 
-    const supabase = createClient();
-
-    async function checkSession() {
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.user) {
-        setAuthState("ready");
-        return;
-      }
-      // Token might be in URL hash - Supabase client will exchange it. Wait a moment.
-      await new Promise((r) => setTimeout(r, 1500));
-      const { data: retry } = await supabase.auth.getSession();
-      if (retry.session?.user) {
-        setAuthState("ready");
-      } else {
-        setAuthState("invalid");
-      }
-    }
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) setAuthState("ready");
-    });
-
-    checkSession();
-    return () => subscription.unsubscribe();
+    run();
+    return () => subscription?.unsubscribe();
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -115,6 +167,26 @@ export default function PartnerSetPasswordPage() {
             <Button asChild className="rounded-lg bg-orange-600 hover:bg-orange-700">
               <Link href="/partner/login">Sign in</Link>
             </Button>
+            <Button asChild variant="outline" className="rounded-lg">
+              <Link href="/partner">Back to Partner Program</Link>
+            </Button>
+          </div>
+        </div>
+      </PartnerAuthShell>
+    );
+  }
+
+  if (authState === "config_error") {
+    return (
+      <PartnerAuthShell
+        title="Configuration error"
+        subtitle="Partner login is not available. The site administrator needs to configure Supabase."
+      >
+        <div className="rounded-2xl border border-border bg-card px-8 py-10 shadow-md">
+          <p className="text-sm text-muted-foreground">
+            Please contact your administrator. They need to set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in the environment.
+          </p>
+          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button asChild variant="outline" className="rounded-lg">
               <Link href="/partner">Back to Partner Program</Link>
             </Button>

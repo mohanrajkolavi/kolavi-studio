@@ -147,9 +147,9 @@ Request → Middleware (updateSupabaseSession) → Refreshes JWT in cookies
          → Partner lookup by supabase_user_id
 ```
 
-### Fallback
+### Supabase Required
 
-When Supabase env vars are **not** set, the app falls back to the legacy **email + partner code** auth. No code changes needed to switch; just add or remove the env vars.
+Partner login uses **email + password** via Supabase Auth only. When Supabase env vars are not set, the login form shows a message that configuration is required.
 
 ---
 
@@ -295,3 +295,12 @@ SELECT id, code, email, supabase_user_id FROM partners WHERE email = 'partner@ex
 
 - Add your domain to Supabase **Authentication** → **URL Configuration** → **Redirect URLs**
 - Ensure `connect-src` in middleware includes Supabase domains
+
+### "Something went wrong" when clicking set password link
+
+1. **Check browser console** (F12 → Console) for the actual error message
+2. **Supabase env vars**: Ensure `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are set in `.env.local` (or Vercel env vars for production)
+3. **Redirect URLs**: In Supabase Dashboard → Authentication → URL Configuration, add:
+   - `https://kolavistudio.com/partner/set-password` (production)
+   - `http://localhost:3000/partner/set-password` (local dev)
+4. **Invite link expired**: Supabase invite links are single-use and expire. Request a new invite from the admin

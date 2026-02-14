@@ -161,6 +161,30 @@ export async function POST(request: NextRequest) {
     if (msg.includes("duplicate key") || msg.includes("unique constraint")) {
       return NextResponse.json({ error: "A partner with this code already exists" }, { status: 409 });
     }
+    if (msg.includes("relation") && msg.includes("does not exist")) {
+      return NextResponse.json(
+        {
+          error:
+            "Partners table not found. Run the database migrations: 001_partner_program.sql, 002, 003, 005, 006_partner_phone.sql",
+        },
+        { status: 500 }
+      );
+    }
+    if (msg.includes("column") && msg.includes("does not exist")) {
+      return NextResponse.json(
+        {
+          error:
+            "Database schema outdated. Run migration 006_partner_phone.sql: psql $DATABASE_URL -f src/lib/db/migrations/006_partner_phone.sql",
+        },
+        { status: 500 }
+      );
+    }
+    if (msg.includes("DATABASE_URL") || msg.includes("connection") || msg.includes("ECONNREFUSED")) {
+      return NextResponse.json(
+        { error: "Database connection failed. Check DATABASE_URL in .env.local and ensure the database is reachable." },
+        { status: 503 }
+      );
+    }
     console.error("Error creating partner:", error);
     return NextResponse.json({ error: "Failed to create partner" }, { status: 500 });
   }

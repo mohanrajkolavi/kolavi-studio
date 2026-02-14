@@ -19,10 +19,12 @@ psql $DATABASE_URL < src/lib/db/migrations/001_partner_program.sql
 psql $DATABASE_URL < src/lib/db/migrations/002_application_status.sql
 psql $DATABASE_URL < src/lib/db/migrations/003_partner_soft_delete.sql
 psql $DATABASE_URL < src/lib/db/migrations/005_check_signup_rate_limit.sql
+psql $DATABASE_URL -f src/lib/db/migrations/006_partner_phone.sql
 ```
 
 - Migration 002 adds a `status` column to `partner_applications` so approved applications are hidden from the list (kept for audit).
 - Migration 003 adds `deleted_at` to partners for soft delete. Deleted partners are kept for at least 3 months for financial records.
+- Migration 006 adds `phone` to partners and partner_applications (required for the Add partner form).
 
 ## Link Format
 

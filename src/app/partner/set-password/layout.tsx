@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { SetPasswordErrorBoundary } from "./SetPasswordErrorBoundary";
 
 export const metadata: Metadata = {
   title: "Set Password - Partner Portal",
@@ -10,5 +11,5 @@ export default function PartnerSetPasswordLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <SetPasswordErrorBoundary>{children}</SetPasswordErrorBoundary>;
 }
