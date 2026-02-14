@@ -2,10 +2,10 @@
 
 ## Project structure
 
-- **`src/app/`** – Routes and page composition: pages (home, about, contact, services, portfolio, industries, medical-spas, privacy, terms, disclaimer, cookies), blog (index, [slug], category, tag, rss), dashboard (login, (main): Overview, leads, blog, recent, content-maintenance), API routes (auth, blog, contact, content-audit, content-maintenance, leads, revalidate), sitemap, robots. No shared UI in app.
-- **`src/components/`** – Reusable UI: `blog/` (BlogContent, BlogSubscribe, BlogPostTOC, ShareButtons), `layout/` (Header, Footer, CTAStrip, MobileNav, LayoutShell, Logo), `sections/`, `ui/` (shadcn), `contact/`, `dashboard/`, `legal/`.
-- **`src/lib/`** – Shared logic: `auth/` (auth, login-rate-limit), `blog/` (data, utils, sample-posts, generation-types), `graphql/` (client, queries, types), `seo/` (metadata, JSON-LD, canonical, article-audit, rank-math-parser), `pipeline/` (orchestrator, types for Content Writer), `claude/`, `gemini/`, `openai/` (AI clients), `jina/`, `serper/`, `supabase/`, `db/`, `constants/` (site constants, banned-phrases), `sitemap/` (sitemap index, urlset builders), `utils.ts`.
-- **`docs/`** – `architecture/`, `integrations/`, `dashboard/`, `blog/`. Optional Python tool: `tools/content_audit/`.
+- **`src/app/`** – Routes and page composition: pages (home, about, contact, services, portfolio, industries, medical-spas, privacy, terms, disclaimer, cookies), blog (index, [slug], category, tag, rss), partner (landing, login, apply, dashboard, set-password, forgot-password, terms), dashboard (login, (main): Overview, leads, blog, recent, content-maintenance, partners), API routes (auth, blog, contact, content-audit, content-maintenance, leads, partner, partners, revalidate), sitemap, robots. No shared UI in app.
+- **`src/components/`** – Reusable UI: `blog/` (BlogContent, BlogSubscribe, BlogPostTOC, ShareButtons), `layout/` (Header, Footer, CTAStrip, MobileNav, LayoutShell, Logo), `sections/`, `ui/` (shadcn), `contact/`, `dashboard/`, `legal/`, `partner/` (PartnerAuthShell, PartnerRefHandler, PartnerPageCTAs, RefLink).
+- **`src/lib/`** – Shared logic: `auth/` (auth, login-rate-limit), `blog/` (data, utils, sample-posts, generation-types), `graphql/` (client, queries, types), `seo/` (metadata, JSON-LD, canonical, article-audit, rank-math-parser), `pipeline/` (orchestrator, types for Content Writer), `claude/`, `gemini/`, `openai/` (AI clients), `jina/`, `serper/`, `supabase/`, `partner/` (cookie, cookie-server), `db/`, `constants/` (site constants, banned-phrases), `sitemap/` (sitemap index, urlset builders), `rate-limit/`, `utils.ts`.
+- **`docs/`** – `architecture/`, `integrations/`, `dashboard/`, `blog/`, `partner/`, `audits/`, `planning/`. Optional Python tool: `tools/content_audit/`.
 
 ## Environment variables
 

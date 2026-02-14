@@ -1,6 +1,6 @@
 # Kolavi Studio
 
-A production-ready Next.js website for Kolavi Studio agency: mobile-first design, SEO-first architecture, headless WordPress blog, and an owner dashboard with AI-powered Content Writer (Blog Maker), leads, and content maintenance.
+A production-ready Next.js website for Kolavi Studio agency: mobile-first design, SEO-first architecture, headless WordPress blog, owner dashboard with AI-powered Content Writer (Blog Maker), partner program, leads, and content maintenance.
 
 > **Public repository:** Never commit `.env.local`, API keys, or credentials. Run `npm run check:secrets` before pushing. See [SECURITY.md](SECURITY.md).
 
@@ -55,13 +55,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Project Structure
 
-- **`/src/app`** – Next.js App Router: pages, layouts, API routes (`/api/auth`, `/api/blog`, `/api/contact`, `/api/content-audit`, `/api/content-maintenance`, `/api/leads`, `/api/revalidate`), sitemap, RSS
-- **`/src/components`** – Reusable UI: `blog/`, `contact/`, `dashboard/`, `layout/`, `legal/`, `sections/`, `ui/` (shadcn)
-- **`/src/lib`** – Shared logic: `auth/`, `blog/`, `claude/`, `gemini/`, `openai/`, `pipeline/`, `seo/`, `graphql/`, `jina/`, `serper/`, `supabase/`, `db/`, `constants/`
+- **`/src/app`** – Next.js App Router: pages (home, about, contact, services, portfolio, industries, medical-spas, blog, legal), partner program (`/partner`, login, apply, dashboard, set-password, forgot-password), owner dashboard (`/dashboard`), API routes (`/api/auth`, `/api/blog`, `/api/contact`, `/api/content-audit`, `/api/content-maintenance`, `/api/leads`, `/api/partner`, `/api/partners`, `/api/revalidate`), sitemap, RSS
+- **`/src/components`** – Reusable UI: `blog/`, `contact/`, `dashboard/`, `layout/`, `legal/`, `partner/`, `sections/`, `ui/` (shadcn)
+- **`/src/lib`** – Shared logic: `auth/`, `blog/`, `claude/`, `gemini/`, `openai/`, `pipeline/`, `seo/`, `graphql/`, `jina/`, `serper/`, `supabase/`, `partner/`, `db/`, `constants/`, `rate-limit/`, `sitemap/`
 - **`/src/types`** – TypeScript type definitions
 - **`/scripts`** – Dev/ops scripts (check-secrets, run-audit, open-app-in-browser)
 - **`/tools/content_audit`** – Optional Python E-E-A-T/content-audit tool (see [tools/content_audit/README.md](tools/content_audit/README.md))
-- **`/docs`** – Documentation (architecture, dashboard, integrations, blog)
+- **`/docs`** – Documentation: [docs/README.md](docs/README.md) (architecture, dashboard, integrations, partner, blog, audits, planning)
 
 ## Sitemap
 
@@ -83,14 +83,14 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 - **[SETUP.md](SETUP.md)** – Full setup, env vars, database, GSC, sitemap, deployment
 - **[SECURITY.md](SECURITY.md)** – Never commit API keys or secrets; what’s gitignored
-- **[docs/README.md](docs/README.md)** – Doc index: architecture, dashboard, integrations, blog, content audit
-- **[docs/audits/TECH_STACK_AUDIT.md](docs/audits/TECH_STACK_AUDIT.md)** – Tech stack audit and recommendations
+- **[docs/README.md](docs/README.md)** – Doc index: architecture, dashboard, integrations, partner, blog, audits, planning, content audit
 
 ## Features
 
 - **Site:** Mobile-first responsive design; SEO (metadata, JSON-LD, sitemap, FAQ schema); headless WordPress blog with ISR and paginated slugs
 - **Security:** Security headers (CSP, X-Frame-Options, etc.), HTML sanitization for post content; Core Web Vitals; skip-to-main link and jsx-a11y
-- **Dashboard:** Owner dashboard (Overview, Leads, Content Writer, Recent, Content Maintenance); login with rate limiting; optional Supabase for Blog Maker “Recent” history
+- **Partner program:** Partner portal (`/partner`) with apply, login, dashboard, set-password, forgot-password; Supabase auth; referral links; partner terms
+- **Dashboard:** Owner dashboard (Overview, Leads, Content Writer, Recent, Content Maintenance, Partners); login with rate limiting; optional Supabase for Blog Maker "Recent" history
 - **Content Writer (Blog Maker):** AI pipeline (Serper/Jina/Gemini, OpenAI brief, Claude draft, humanize, SEO audit, fact check); publishable = 75%+ score and no Level 1 fails
 - **Content audit:** In-app SEO article audit (`src/lib/seo/article-audit.ts`); optional Python E-E-A-T tool in `tools/content_audit/`; API route `/api/content-audit/quality`
 - **Scalable:** Multiple verticals (e.g. medical-spas, industries); legal pages (privacy, terms, disclaimer, cookies)
