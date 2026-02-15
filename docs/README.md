@@ -4,6 +4,14 @@ Index for project documentation and guides.
 
 ---
 
+## General guides
+
+| Doc | Description |
+|-----|-------------|
+| [BUILDING_APPS_GUIDE.md](BUILDING_APPS_GUIDE.md) | Step-by-step guide for building apps (design, UX, security, performance, AI/ML, stability, testing, deployment, monitoring). For Cursor users and new projects. |
+
+---
+
 ## Getting started (root)
 
 - **[README.md](../README.md)** – Project overview, tech stack, quick start
