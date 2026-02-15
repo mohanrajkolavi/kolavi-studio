@@ -89,7 +89,7 @@ export default function ServicesPage() {
     <main>
       {/* Hero (match Blog index) */}
       <section className="relative border-b border-border bg-background">
-        <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-muted/50 via-background to-background dark:from-muted/20 dark:via-background dark:to-background" />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden bg-gradient-to-b from-muted/50 via-background to-background dark:from-muted/20 dark:via-background dark:to-background" />
         <div className="relative overflow-visible">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl py-12 sm:py-16 lg:py-20 text-center">

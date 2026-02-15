@@ -60,12 +60,14 @@ If you don't have a project yet: go to [supabase.com](https://supabase.com) → 
 
 4. **Auth settings** (Authentication → URL Configuration):
    - **Site URL**: `http://localhost:3000` (dev) or `https://kolavistudio.com` (prod)
-   - **Redirect URLs**: Add these exactly:
-     - `https://kolavistudio.com/**`
+   - **Redirect URLs**: Add these exact paths only (no wildcards). Supabase validates redirect targets against this allowlist:
      - `https://kolavistudio.com/partner/set-password`
-     - `http://localhost:3000/**`
+     - `https://kolavistudio.com/partner/dashboard`
+     - `https://kolavistudio.com/partner/login`
      - `http://localhost:3000/partner/set-password`
-   - If the set-password URL is missing, Supabase returns `access_denied` when users click invite links.
+     - `http://localhost:3000/partner/dashboard`
+     - `http://localhost:3000/partner/login`
+   - If the set-password URL is missing, Supabase returns `access_denied` when users click invite links. If you must add a wildcard (e.g., `https://kolavistudio.com/**`) for a specific Supabase feature that redirects to dynamic paths, add it explicitly and document the reason; wildcards weaken redirect validation, so prefer exact paths.
 
 ---
 

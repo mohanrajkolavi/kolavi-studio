@@ -72,7 +72,7 @@ export default function PartnerApplyPage() {
     <main>
       {/* Hero */}
       <section className="relative border-b border-border bg-background">
-        <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-muted/40 via-background to-background dark:from-muted/15 dark:via-background dark:to-background" />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden bg-gradient-to-b from-muted/40 via-background to-background dark:from-muted/15 dark:via-background dark:to-background" />
         <div className="relative container mx-auto px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
           <div className="mx-auto max-w-2xl">
             <Link
