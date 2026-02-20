@@ -13,7 +13,7 @@ export function HeroRevamp() {
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
           </span>
-          Engineered for High-Ticket Medical Spas
+          Revenue First AI Agency
         </div>
 
         <h1 className="text-[clamp(28px,8vw,40px)] leading-[1.1] font-bold tracking-[-0.03em] md:text-[64px] text-foreground max-w-[1000px] mx-auto text-balance mb-4 sm:mb-5">
