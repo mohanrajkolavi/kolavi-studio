@@ -121,6 +121,7 @@ export default function PartnerDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const loadData = useCallback(() => {
@@ -166,6 +167,11 @@ export default function PartnerDashboardPage() {
 
   async function copyLink() {
     if (!data) return;
+    setCopyError(null);
+    if (!navigator?.clipboard) {
+      setCopyError("Copy not supported in this browser");
+      return;
+    }
     const url = `${SITE_URL}/partner?ref=${data.partner.code}`;
     try {
       await navigator.clipboard.writeText(url);
@@ -173,6 +179,7 @@ export default function PartnerDashboardPage() {
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Copy failed:", err);
+      setCopyError("Failed to copy link. Try selecting and copying manually.");
     }
   }
 
@@ -405,29 +412,36 @@ export default function PartnerDashboardPage() {
                 <div className="flex min-w-0 flex-1 items-center rounded-lg border border-border/60 bg-background/50 px-4 py-3 font-mono text-sm ring-1 ring-border/30">
                   <span className="truncate text-foreground/90">{referralUrl}</span>
                 </div>
-                <Button
-                onClick={copyLink}
-                variant={copied ? "outline" : "default"}
-                size="lg"
-                className={cn(
-                  "shrink-0 gap-2 rounded-2xl",
-                  copied
-                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-400"
-                    : "bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
-                )}
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" strokeWidth={2} />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" strokeWidth={2} />
-                    Copy link
-                  </>
-                )}
-              </Button>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <Button
+                    onClick={copyLink}
+                    variant={copied ? "outline" : "default"}
+                    size="lg"
+                    className={cn(
+                      "gap-2 rounded-2xl",
+                      copied
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:border-emerald-400/40 dark:bg-emerald-500/20 dark:text-emerald-400"
+                        : "bg-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                    )}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-4 w-4" strokeWidth={2} />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4" strokeWidth={2} />
+                        Copy link
+                      </>
+                    )}
+                  </Button>
+                  {copyError && (
+                    <p className="text-xs text-destructive" role="alert">
+                      {copyError}
+                    </p>
+                  )}
+                </div>
             </div>
           </CardContent>
           </div>

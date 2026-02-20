@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import { Check } from "lucide-react";
+import { useRevealOnScroll } from "@/hooks/useRevealOnScroll";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
@@ -58,26 +58,7 @@ const plans = [
 ];
 
 export function PricingSection() {
-  const [isVisible, setIsVisible] = useState(false);
-  const sectionRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
+  const [sectionRef, isVisible] = useRevealOnScroll({ threshold: 0.1 });
 
   return (
     <section

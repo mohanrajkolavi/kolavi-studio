@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Plus, Minus } from "lucide-react";
+import { useRevealOnScroll } from "@/hooks/useRevealOnScroll";
 import { HOMEPAGE_FAQ_ITEMS } from "@/lib/constants/homepage-faq";
 
 function FAQItem({
@@ -55,26 +56,7 @@ function FAQItem({
 
 export function FAQsSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
-  const [isVisible, setIsVisible] = useState(false);
-  const sectionRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.2 }
-    );
-
-    if (sectionRef.current) {
-      observer.observe(sectionRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
+  const [sectionRef, isVisible] = useRevealOnScroll({ threshold: 0.2 });
 
   return (
     <section

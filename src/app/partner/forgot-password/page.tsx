@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { PartnerAuthShell } from "@/components/partner/PartnerAuthShell";
-import { Mail } from "lucide-react";
+import { Mail, Loader2 } from "lucide-react";
 import { SITE_URL } from "@/lib/constants";
 
 const HAS_SUPABASE =
@@ -52,85 +52,86 @@ export default function PartnerForgotPasswordPage() {
 
   if (success) {
     return (
-      <PartnerAuthShell
-        title="Check your email"
-        subtitle="If an account exists for that email, we've sent a password reset link."
-      >
-        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/5 px-6 py-8 sm:px-8 sm:py-10">
-          <div className="space-y-5">
-            <div
-              className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400"
-              role="status"
-            >
-              Check your inbox for a link to reset your password. If you don&apos;t see it, check your spam folder.
-            </div>
-            <Button asChild className="h-11 w-full rounded-2xl bg-orange-600 text-sm font-medium text-white hover:bg-orange-700">
-              <Link href="/partner/login">Back to sign in</Link>
-            </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              Remember your password?{" "}
-              <Link href="/partner/login" className="text-foreground underline underline-offset-4 hover:no-underline">
-                Sign in
-              </Link>
-            </p>
+      <PartnerAuthShell maxWidth="480px">
+        <div className="text-center mb-6">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-6">
+            <Mail className="h-8 w-8" />
           </div>
+          <h1 className="text-h3 text-foreground mb-2">Check Your Inbox</h1>
+          <p className="text-body text-muted-foreground mt-4 mb-8">
+            We've sent a password reset link to <span className="font-medium text-foreground">{email}</span>. The link expires in 1 hour. If you don't see it, check your spam folder.
+          </p>
+          <Button asChild variant="outline" className="h-12 w-full rounded-[48px] text-button">
+            <Link href="/partner/login">Back to Login</Link>
+          </Button>
         </div>
       </PartnerAuthShell>
     );
   }
 
   return (
-    <PartnerAuthShell
-      title="Forgot password"
-      subtitle="Enter your partner account email and we'll send you a link to reset your password."
-    >
-      <div className="overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm ring-1 ring-black/5 dark:ring-white/5 px-6 py-8 sm:px-8 sm:py-10">
-        <form onSubmit={handleSubmit} className="space-y-5">
+    <PartnerAuthShell maxWidth="480px">
+      <div className="text-center mb-6">
+        <h1 className="text-h3 text-foreground mb-2">Reset Your Password</h1>
+        <p className="text-small text-muted-foreground">
+          Enter your email and we'll send you a reset link.
+        </p>
+      </div>
+
+      <div className="h-px bg-border my-8 w-full" />
+
+      <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
-          <label htmlFor="email" className="text-sm font-medium text-foreground">
-            Email
+          <label htmlFor="email" className="text-[14px] font-medium text-foreground">
+            Email Address
           </label>
-          <div className="relative">
-            <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="h-11 pl-10 pr-4 rounded-lg border border-input bg-background text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
-              placeholder="partner@example.com"
-              required
-              autoComplete="email"
-              disabled={loading}
-            />
-          </div>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="h-12 px-4 rounded-[12px] border border-input bg-background text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors"
+            placeholder="partner@example.com"
+            required
+            autoComplete="email"
+            disabled={loading}
+          />
         </div>
 
         {error && (
           <div
-            className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+            className="text-[14px] text-destructive flex items-start gap-2"
             role="alert"
           >
-            {error}
+            <span className="block">{error}</span>
           </div>
         )}
 
         <Button
           type="submit"
-          className="h-11 w-full rounded-2xl bg-orange-600 text-sm font-medium text-white hover:bg-orange-700"
+          className="h-12 w-full rounded-[48px] bg-primary text-button text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm mt-2"
           disabled={loading}
         >
-          {loading ? "Sending…" : "Send reset link"}
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Sending...
+            </>
+          ) : (
+            "Send Reset Link"
+          )}
         </Button>
 
-        <p className="text-center text-sm text-muted-foreground">
+        <p className="text-center text-[14px] text-muted-foreground pt-2">
           Remember your password?{" "}
-          <Link href="/partner/login" className="text-foreground underline underline-offset-4 hover:no-underline">
-            Sign in
+          <Link
+            href="/partner/login"
+            className="font-medium text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md"
+          >
+            Back to login
           </Link>
         </p>
       </form>
-      </div>
     </PartnerAuthShell>
   );
 }

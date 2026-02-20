@@ -315,37 +315,49 @@ export default function PricingPage() {
             <table className="w-full text-left border-collapse min-w-[800px]">
               <thead>
                 <tr>
-                  <th className="p-6 text-small font-semibold text-muted-foreground uppercase tracking-wider border-b border-border bg-muted/20 w-[40%]">Feature</th>
+                  <th className="p-6 text-small font-semibold text-muted-foreground uppercase tracking-wider border-b border-border bg-muted/20 w-[40%] align-bottom">Feature</th>
                   {tiers.map(t => (
-                    <th key={t.name} className="p-6 text-body font-semibold text-foreground border-b border-border bg-muted/20 w-[20%]">
-                      {t.name}
+                    <th key={t.name} className={`p-6 border-b w-[20%] align-bottom ${t.popular ? 'bg-primary/5 border-x border-t border-primary text-primary border-b-primary relative' : 'border-border bg-muted/20 text-foreground'}`}>
+                      <div className="flex flex-col items-start gap-1">
+                        {t.popular && (
+                          <span className="px-2.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm whitespace-nowrap mb-1">
+                            Most Popular
+                          </span>
+                        )}
+                        <span className="text-body font-semibold">
+                          {t.name}
+                        </span>
+                      </div>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {featuresList.map((feature, i) => (
-                  <tr key={i} className="transition-colors hover:bg-muted/10">
-                    <td className="p-6 text-body font-medium text-foreground">{feature}</td>
-                    {tiers.map(t => {
-                      const val = feature in t.features ? t.features[feature as keyof typeof t.features] : undefined;
-                      return (
-                        <td key={t.name} className="p-6 text-body text-muted-foreground">
-                          {val === true ? (
-                            <Check className="w-5 h-5 text-primary" />
-                          ) : val === false || val === undefined ? (
-                            <div className="flex items-center gap-2">
-                              <X className="w-5 h-5 text-muted-foreground/30" />
-                              <span className="text-muted-foreground/50 text-[14px]">Not included</span>
-                            </div>
-                          ) : (
-                            <span className="font-medium text-foreground whitespace-pre-line">{val as string}</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {featuresList.map((feature, i) => {
+                  const isLastRow = i === featuresList.length - 1;
+                  return (
+                    <tr key={i} className="transition-colors hover:bg-muted/10">
+                      <td className={`p-6 text-body font-medium text-foreground ${isLastRow ? 'border-b border-border' : ''}`}>{feature}</td>
+                      {tiers.map(t => {
+                        const val = feature in t.features ? t.features[feature as keyof typeof t.features] : undefined;
+                        return (
+                          <td key={t.name} className={`p-6 text-body ${t.popular ? `bg-primary/5 border-x border-primary text-foreground ${isLastRow ? 'border-b' : ''}` : `text-muted-foreground ${isLastRow ? 'border-b border-border' : ''}`}`}>
+                            {val === true ? (
+                              <Check className="w-5 h-5 text-primary" />
+                            ) : val === false || val === undefined ? (
+                              <div className="flex items-center gap-2">
+                                <X className="w-5 h-5 text-muted-foreground/30" />
+                                <span className="text-muted-foreground/50 text-[14px]">Not included</span>
+                              </div>
+                            ) : (
+                              <span className="font-medium text-foreground whitespace-pre-line">{val as string}</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -25,7 +25,7 @@ export function Header({ isAdmin = false }: HeaderProps) {
       >
         Skip to main content
       </a>
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-white/20 bg-white/70 backdrop-blur-[20px] px-5 sm:px-6 relative pointer-events-auto shadow-sm dark:border-white/10 dark:bg-zinc-950/60 supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-950/60">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-white/20 bg-white/70 backdrop-blur-[12px] md:backdrop-blur-[20px] transform-gpu px-5 sm:px-6 relative pointer-events-auto shadow-sm dark:border-white/10 dark:bg-zinc-950/60 supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-950/60">
         
         {/* Left Side Navigation (Desktop) */}
         <div className="hidden md:flex md:flex-1 md:items-center md:justify-start md:gap-1">

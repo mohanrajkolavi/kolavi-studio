@@ -1,89 +1,45 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Handshake } from "lucide-react";
 import { Logo } from "@/components/layout/Logo";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 type PartnerAuthShellProps = {
   children: React.ReactNode;
-  /** Title for the branding panel (e.g. "Partner Portal") */
-  title?: string;
-  /** Subtitle/description under the title */
-  subtitle?: string;
+  /** Max width of the centered card. Default is 480px for auth pages. */
+  maxWidth?: "480px" | "560px" | "800px";
 };
 
 export function PartnerAuthShell({
   children,
-  title = "Partner Portal",
-  subtitle = "Sign in to view your referrals, track commissions, and manage your partner link.",
+  maxWidth = "480px",
 }: PartnerAuthShellProps) {
   return (
-    <div className="min-h-screen bg-background">
-      {/* Pill header - refined with subtle backdrop */}
-      <header className="bg-background/95 px-4 pt-4 backdrop-blur-sm sm:px-6">
-        <div className="container mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-border bg-background/80 px-5 shadow-sm backdrop-blur-xl sm:px-6 dark:bg-background/80 dark:border-border">
+    <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 sm:px-6">
+      {/* Premium Gradient Background (softer than landing page) */}
+      <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-primary/5 via-background to-primary/5 dark:from-primary/5 dark:via-background dark:to-primary/10 pointer-events-none transform-gpu" />
+      <div
+        className="absolute top-0 left-0 -translate-y-1/4 -translate-x-1/4 w-[400px] h-[400px] md:w-[600px] md:h-[600px] rounded-full blur-[80px] md:blur-[120px] opacity-10 bg-primary pointer-events-none transform-gpu"
+        aria-hidden
+      />
+      <div
+        className="absolute bottom-0 right-0 translate-y-1/4 translate-x-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] rounded-full blur-[80px] md:blur-[120px] opacity-10 bg-primary pointer-events-none transform-gpu"
+        aria-hidden
+      />
+
+      {/* Centered Card */}
+      <div
+        className="relative z-10 w-full rounded-[20px] sm:rounded-[24px] border border-border bg-background shadow-sm dark:bg-card px-6 py-8 sm:px-12 sm:py-12"
+        style={{ maxWidth: maxWidth === "800px" ? "800px" : maxWidth === "560px" ? "560px" : "480px" }}
+      >
+        <div className="flex justify-center mb-8">
           <Link
-            href="/partner"
-            className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            href="/"
+            className="transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-lg"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Partner Program
+            <Logo className="text-xl font-bold tracking-wide text-foreground" withPeriod />
           </Link>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <Link href="/" className="text-lg font-semibold tracking-tight">
-              <Logo withPeriod />
-            </Link>
-          </div>
         </div>
-      </header>
-
-      <div className="container mx-auto px-4 py-12 sm:px-6 lg:flex lg:min-h-[calc(100vh-3.5rem)] lg:items-center lg:gap-16 lg:py-16">
-        {/* Left: Branding panel */}
-        <div className="mx-auto max-w-md lg:mx-0 lg:max-w-lg lg:flex-1">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:text-orange-400">
-            <Handshake className="h-10 w-10" strokeWidth={1.5} />
-          </div>
-          <h1 className="mt-8 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-            {title.includes(" ") ? (
-              <>
-                {title.split(" ")[0]}{" "}
-                <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
-                  {title.split(" ").slice(1).join(" ")}
-                </span>
-              </>
-            ) : (
-              <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
-                {title}
-              </span>
-            )}
-          </h1>
-          <p className="mt-4 text-lg text-muted-foreground leading-relaxed">{subtitle}</p>
-          <div className="mt-10 hidden space-y-4 lg:block">
-            <div className="flex gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-400/20">
-                <span className="text-xs font-bold text-orange-600 dark:text-orange-400">15%</span>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">One-time fees</p>
-                <p className="text-sm text-muted-foreground">Earn when referred leads pay for projects</p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-orange-100 dark:bg-orange-400/20">
-                <span className="text-xs font-bold text-orange-600 dark:text-orange-400">10%</span>
-              </div>
-              <div>
-                <p className="font-medium text-foreground">Recurring revenue</p>
-                <p className="text-sm text-muted-foreground">Ongoing commission on monthly payments</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Form area */}
-        <div className="mt-12 lg:mt-0 lg:w-full lg:max-w-md">{children}</div>
+        {children}
       </div>
     </div>
   );

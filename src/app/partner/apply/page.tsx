@@ -5,13 +5,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CheckCircle2 } from "lucide-react";
-import { PageHero } from "@/components/layout/PageHero";
+import { CheckCircle2, Loader2 } from "lucide-react";
+import { PartnerAuthShell } from "@/components/partner/PartnerAuthShell";
 
 const inputClass =
-  "h-14 rounded-xl border border-input bg-background text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent px-4";
+  "h-12 rounded-[12px] border border-input bg-background text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors px-4";
 const selectClass =
-  "h-14 w-full rounded-xl border border-input bg-background px-4 text-body text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent disabled:opacity-50";
+  "h-12 w-full rounded-[12px] border border-input bg-background px-4 text-body text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors disabled:opacity-50";
 
 export default function PartnerApplyPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,8 +36,10 @@ export default function PartnerApplyPage() {
       name: formData.get("name"),
       email: formData.get("email"),
       phone: formData.get("phone"),
-      audience: formData.get("audience"),
-      promotionMethod: formData.get("promotionMethod"),
+      company: formData.get("company"),
+      role: formData.get("role"),
+      networkSize: formData.get("networkSize"),
+      source: formData.get("source"),
       message: formData.get("message"),
     };
 
@@ -53,9 +55,10 @@ export default function PartnerApplyPage() {
         throw new Error(result.error || "Failed to submit");
       }
 
+      const submittedEmail = formData.get("email") as string;
       setStatus({
         type: "success",
-        message: "Thank you! We'll review your application and get back to you within a few business days.",
+        message: `Thanks for applying. We review every application within 48 hours. You'll receive an email at ${submittedEmail} with next steps. If approved, you'll get login credentials and your unique referral link.`,
       });
       form.reset();
       setAcceptedTerms(false);
@@ -69,183 +72,236 @@ export default function PartnerApplyPage() {
     }
   }
 
+  if (status.type === "success") {
+    return (
+      <PartnerAuthShell maxWidth="800px">
+        <div className="flex flex-col items-center py-12 text-center animate-reveal">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary mb-6">
+            <CheckCircle2 className="h-8 w-8" strokeWidth={2} />
+          </div>
+          <h2 className="text-h3 text-foreground mb-4">
+            Application Submitted
+          </h2>
+          <p className="text-body text-muted-foreground mb-8 max-w-lg">
+            {status.message}
+          </p>
+          <Button asChild variant="outline" className="h-12 w-full sm:w-auto px-8 rounded-[48px] text-button">
+            <Link href="/partner">Back to Partner Program</Link>
+          </Button>
+        </div>
+      </PartnerAuthShell>
+    );
+  }
+
   return (
-    <main>
-      <PageHero
-        title="Apply to Partner"
-        description="Tell us about yourself and how you plan to strategically promote Kolavi Studio. We thoroughly review all applications within a few business days."
-        badge="Application"
-      />
+    <PartnerAuthShell maxWidth="800px">
+      <div className="text-center mb-8">
+        <h1 className="text-h3 text-foreground mb-2">Apply to the Partner Program</h1>
+        <p className="text-small text-muted-foreground">
+          Refer med spa owners. Earn recurring commissions. Takes 2 minutes to apply.
+        </p>
+      </div>
 
-      <section className="relative z-10 bg-background py-24 sm:py-32">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl animate-reveal">
-            <div className="overflow-hidden rounded-[32px] border border-border bg-card shadow-premium p-8 sm:p-12">
+      <div className="h-px bg-border my-8 w-full" />
 
-              {status.type === "success" ? (
-                <div className="flex flex-col items-center py-8 text-center animate-reveal">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-full bg-green-500/10 text-green-500 mb-8">
-                    <CheckCircle2 className="h-10 w-10" strokeWidth={2} />
-                  </div>
-                  <h2 className="text-h3 text-foreground mb-4">
-                    Application Received
-                  </h2>
-                  <p className="text-body text-muted-foreground mb-10 max-w-sm">
-                    {status.message}
-                  </p>
-                  <Button asChild size="lg" className="h-14 px-8 rounded-[48px] bg-primary hover:bg-primary/90 text-primary-foreground text-button shadow-premium">
-                    <Link href="/partner">Back to Partner Program</Link>
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-3">
-                    <label htmlFor="name" className="text-small font-semibold text-foreground">
-                      Full Name (as per government ID)
-                    </label>
-                    <Input
-                      id="name"
-                      name="name"
-                      className={inputClass}
-                      placeholder="Legal name on ID"
-                      required
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label htmlFor="email" className="text-small font-semibold text-foreground">
-                      Email Address
-                    </label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      className={inputClass}
-                      placeholder="you@example.com"
-                      required
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label htmlFor="phone" className="text-small font-semibold text-foreground">
-                      Phone Number
-                    </label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      className={inputClass}
-                      placeholder="+1 234 567 8900"
-                      required
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <label htmlFor="audience" className="text-small font-semibold text-foreground">
-                      Your Audience
-                    </label>
-                    <select
-                      id="audience"
-                      name="audience"
-                      className={selectClass}
-                      required
-                      disabled={isSubmitting}
-                    >
-                      <option value="">Select your primary audience</option>
-                      <option value="medical-spa">Medical spas / aesthetics</option>
-                      <option value="dental">Dental practices</option>
-                      <option value="law">Law firms</option>
-                      <option value="agencies">Marketing agencies</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-3">
-                    <label htmlFor="promotionMethod" className="text-small font-semibold text-foreground">
-                      How will you actively promote?
-                    </label>
-                    <select
-                      id="promotionMethod"
-                      name="promotionMethod"
-                      className={selectClass}
-                      required
-                      disabled={isSubmitting}
-                    >
-                      <option value="">Select promotion method</option>
-                      <option value="website">Website / blog</option>
-                      <option value="social">Social media</option>
-                      <option value="email">Email / newsletter</option>
-                      <option value="referral">Direct referrals</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-3">
-                    <label htmlFor="message" className="text-small font-semibold text-foreground">
-                      Additional details (optional)
-                    </label>
-                    <Textarea
-                      id="message"
-                      name="message"
-                      rows={4}
-                      className="min-h-[120px] rounded-xl border border-input bg-background px-4 py-3 text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-transparent resize-none"
-                      placeholder="Tell us more about your exact audience, reach, or why you want to partner with us."
-                      disabled={isSubmitting}
-                    />
-                  </div>
-
-                  <label className="flex cursor-pointer items-start gap-4 py-4">
-                    <input
-                      type="checkbox"
-                      checked={acceptedTerms}
-                      onChange={(e) => setAcceptedTerms(e.target.checked)}
-                      disabled={isSubmitting}
-                      className="mt-1 h-5 w-5 shrink-0 rounded border-input text-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
-                    />
-                    <span className="text-small text-muted-foreground leading-relaxed">
-                      I fully accept the{" "}
-                      <Link href="/partner/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-                        Partner Program Terms
-                      </Link>{" "}
-                      and{" "}
-                      <Link href="/terms" target="_blank" rel="noopener noreferrer" className="font-semibold text-primary hover:underline">
-                        Kolavi Studio Terms of Service
-                      </Link>
-                    </span>
-                  </label>
-
-                  {status.type === "error" && (
-                    <div
-                      role="alert"
-                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-6 py-4 text-small text-red-500"
-                    >
-                      {status.message}
-                    </div>
-                  )}
-
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting || !acceptedTerms}
-                    className="h-14 w-full rounded-[48px] bg-primary text-button text-primary-foreground hover:bg-primary/90 shadow-premium mt-4"
-                  >
-                    {isSubmitting ? "Submitting Application..." : "Submit Application"}
-                  </Button>
-                </form>
-              )}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+          {/* Left Column */}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="name" className="text-[14px] font-medium text-foreground">
+                Full Name <span className="text-destructive">*</span>
+              </label>
+              <Input
+                id="name"
+                name="name"
+                className={inputClass}
+                required
+                disabled={isSubmitting}
+              />
             </div>
 
-            <p className="mt-8 text-center text-body text-muted-foreground">
-              Already a partner?{" "}
-              <Link href="/partner/login" className="text-foreground font-semibold hover:text-primary transition-colors">
-                Sign in securely
-              </Link>
-            </p>
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-[14px] font-medium text-foreground">
+                Email Address <span className="text-destructive">*</span>
+              </label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                className={inputClass}
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="phone" className="text-[14px] font-medium text-foreground">
+                Phone Number <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Input
+                id="phone"
+                name="phone"
+                type="tel"
+                className={inputClass}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="company" className="text-[14px] font-medium text-foreground">
+                Company / Organization <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Input
+                id="company"
+                name="company"
+                className={inputClass}
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+
+          {/* Right Column */}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <label htmlFor="role" className="text-[14px] font-medium text-foreground">
+                Your Role <span className="text-destructive">*</span>
+              </label>
+              <select
+                id="role"
+                name="role"
+                className={selectClass}
+                required
+                disabled={isSubmitting}
+                defaultValue=""
+              >
+                <option value="" disabled className="text-muted-foreground">Select your role</option>
+                <option value="consultant">Consultant</option>
+                <option value="software">Software Vendor</option>
+                <option value="equipment">Equipment Supplier</option>
+                <option value="professional">Accountant / Attorney</option>
+                <option value="agency">Web Developer / Designer</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="networkSize" className="text-[14px] font-medium text-foreground">
+                Network Size <span className="text-destructive">*</span>
+              </label>
+              <select
+                id="networkSize"
+                name="networkSize"
+                className={selectClass}
+                required
+                disabled={isSubmitting}
+                defaultValue=""
+              >
+                <option value="" disabled className="text-muted-foreground">Med spa relationships</option>
+                <option value="1-5">1-5</option>
+                <option value="6-15">6-15</option>
+                <option value="16-50">16-50</option>
+                <option value="50+">50+</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="source" className="text-[14px] font-medium text-foreground">
+                How did you hear about Kolavi? <span className="text-destructive">*</span>
+              </label>
+              <select
+                id="source"
+                name="source"
+                className={selectClass}
+                required
+                disabled={isSubmitting}
+                defaultValue=""
+              >
+                <option value="" disabled className="text-muted-foreground">Select an option</option>
+                <option value="google">Google</option>
+                <option value="social">Social Media</option>
+                <option value="referral">Referral</option>
+                <option value="blog">Blog</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="message" className="text-[14px] font-medium text-foreground">
+                Brief description of how you'd refer clients <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <Textarea
+                id="message"
+                name="message"
+                rows={3}
+                maxLength={500}
+                className="min-h-[72px] rounded-[12px] border border-input bg-background text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors p-3 resize-none"
+                placeholder="Tell us a bit about your network and how you'd introduce Kolavi to med spa owners."
+                disabled={isSubmitting}
+              />
+            </div>
           </div>
         </div>
-      </section>
-    </main>
+
+        <div className="pt-2">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              disabled={isSubmitting}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-input text-primary focus:ring-2 focus:ring-primary focus:ring-offset-0"
+            />
+            <span className="text-[14px] text-muted-foreground leading-relaxed">
+              I agree to the{" "}
+              <Link href="/partner/terms" target="_blank" className="font-medium text-foreground underline-offset-4 hover:underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm">
+                Partner Program Terms and Conditions
+              </Link>
+            </span>
+          </label>
+        </div>
+
+        {status.type === "error" && (
+          <div
+            className="text-[14px] text-destructive flex items-start gap-2"
+            role="alert"
+          >
+            <span className="block">{status.message}</span>
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          className="h-12 w-full rounded-[48px] bg-primary text-button text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm mt-4"
+          disabled={isSubmitting || !acceptedTerms}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            "Submit Application"
+          )}
+        </Button>
+      </form>
+
+      <div className="h-px bg-border my-8 w-full" />
+
+      <div className="flex flex-col sm:flex-row items-center justify-between text-[14px] text-muted-foreground gap-4">
+        <div>
+          Already a partner?{" "}
+          <Link href="/partner/login" className="font-medium text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm">
+            Log in here
+          </Link>
+        </div>
+        <div>
+          Questions about the program?{" "}
+          <Link href="/contact" className="font-medium text-foreground hover:text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-sm">
+            Contact us
+          </Link>
+        </div>
+      </div>
+    </PartnerAuthShell>
   );
 }

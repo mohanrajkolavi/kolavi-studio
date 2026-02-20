@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import type { Viewport } from "next";
-import Script from "next/script";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import Script from "next/script";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LayoutShell } from "@/components/layout/LayoutShell";
 import { getBaseMetadata } from "@/lib/seo/metadata";
