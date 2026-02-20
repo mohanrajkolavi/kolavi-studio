@@ -187,12 +187,7 @@ export default function PricingPage() {
     <main className="relative w-full">
       {/* SECTION 1: HERO */}
       <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden border-b border-border -mt-[72px] pt-[72px]">
-        <div className="absolute inset-0 w-full h-full bg-background" />
-        <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:via-background dark:to-primary/20 pointer-events-none" />
-        <div
-          className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 bg-primary pointer-events-none -translate-y-1/2 -translate-x-1/2"
-          aria-hidden
-        />
+        <div className="absolute inset-0 w-full h-full bg-hero-atmosphere pointer-events-none" />
 
         <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center animate-reveal">
           <div className="inline-flex items-center justify-center px-5 py-2.5 mb-8 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground gap-2">
@@ -228,11 +223,10 @@ export default function PricingPage() {
             {tiers.map((tier, index) => (
               <div
                 key={tier.name}
-                className={`relative rounded-[32px] border bg-card p-8 sm:p-10 shadow-premium flex flex-col animate-reveal ${
-                  tier.popular 
-                    ? "border-primary lg:-mt-8 lg:mb-8 ring-1 ring-primary/20" 
-                    : "border-border mt-0"
-                }`}
+                className={`relative rounded-[32px] border bg-card p-8 sm:p-10 shadow-premium flex flex-col animate-reveal ${tier.popular
+                  ? "border-primary lg:-mt-8 lg:mb-8 ring-1 ring-primary/20"
+                  : "border-border mt-0"
+                  }`}
                 style={{ animationDelay: `${index * 150}ms` }}
               >
                 {tier.popular && (
@@ -240,10 +234,10 @@ export default function PricingPage() {
                     Most Popular
                   </div>
                 )}
-                
+
                 <h3 className="text-h3 text-foreground mb-2">{tier.name}</h3>
                 <p className="text-small text-muted-foreground mb-6 min-h-[42px]">{tier.bestFor}</p>
-                
+
                 <div className="mb-6 pb-6 border-b border-border">
                   <div className="flex items-baseline mb-2">
                     <span className="text-[48px] font-bold leading-none tracking-tight text-foreground">{tier.monthly}</span>
@@ -368,7 +362,7 @@ export default function PricingPage() {
       <section className="relative z-10 bg-muted/30 py-24 sm:py-32 border-y border-border">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
-            
+
             {/* One-Time Projects */}
             <div className="animate-reveal">
               <h2 className="text-h3 text-foreground mb-8">One-Time Projects</h2>
@@ -461,7 +455,7 @@ export default function PricingPage() {
 
       {/* SECTION 8: CTA */}
       <section className="relative z-10 bg-background py-32 lg:py-[160px] overflow-hidden flex flex-col justify-center min-h-[50vh]">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] opacity-10 bg-primary pointer-events-none" />
+        <div className="absolute inset-0 w-full h-full bg-cta-atmosphere pointer-events-none" />
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10 animate-reveal">
           <h2 className="text-h2 text-foreground mb-8 text-balance">

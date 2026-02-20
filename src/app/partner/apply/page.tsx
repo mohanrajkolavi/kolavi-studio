@@ -9,9 +9,9 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { PartnerAuthShell } from "@/components/partner/PartnerAuthShell";
 
 const inputClass =
-  "h-12 rounded-[12px] border border-input bg-background text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors px-4";
+  "h-12 rounded-[12px] border border-input bg-background/50 backdrop-blur-sm text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors px-4";
 const selectClass =
-  "h-12 w-full rounded-[12px] border border-input bg-background px-4 text-body text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors disabled:opacity-50";
+  "h-12 w-full rounded-[12px] border border-input bg-background/50 backdrop-blur-sm px-4 text-body text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors disabled:opacity-50";
 
 export default function PartnerApplyPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,7 +96,7 @@ export default function PartnerApplyPage() {
   return (
     <PartnerAuthShell maxWidth="800px">
       <div className="text-center mb-8">
-        <h1 className="text-h3 text-foreground mb-2">Apply to the Partner Program</h1>
+        <h1 className="text-h2 text-foreground mb-4">Apply to the Partner Program</h1>
         <p className="text-small text-muted-foreground">
           Refer med spa owners. Earn recurring commissions. Takes 2 minutes to apply.
         </p>
@@ -235,7 +235,7 @@ export default function PartnerApplyPage() {
                 name="message"
                 rows={3}
                 maxLength={500}
-                className="min-h-[72px] rounded-[12px] border border-input bg-background text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors p-3 resize-none"
+                className="min-h-[72px] rounded-[12px] border border-input bg-background/50 backdrop-blur-sm text-body text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-0 transition-colors p-3 resize-none"
                 placeholder="Tell us a bit about your network and how you'd introduce Kolavi to med spa owners."
                 disabled={isSubmitting}
               />
@@ -272,7 +272,7 @@ export default function PartnerApplyPage() {
 
         <Button
           type="submit"
-          className="h-12 w-full rounded-[48px] bg-primary text-button text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm mt-4"
+          className="h-12 w-full rounded-[48px] bg-primary text-button text-primary-foreground hover:bg-primary/90 transition-all duration-300 shadow-premium hover:-translate-y-1 mt-4"
           disabled={isSubmitting || !acceptedTerms}
         >
           {isSubmitting ? (

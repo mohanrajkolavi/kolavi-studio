@@ -17,9 +17,8 @@ export default function SpeedAuditPage() {
     <main className="relative w-full">
       {/* SECTION 1: HERO */}
       <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden border-b border-border -mt-[72px] pt-[120px] pb-20">
-        {/* Subtle gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-background to-background dark:from-primary/10 dark:via-background dark:to-background pointer-events-none" />
-        
+        <div className="absolute inset-0 bg-hero-atmosphere pointer-events-none" />
+
         <div className="relative z-10 w-full animate-reveal">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-5xl text-center">
@@ -32,7 +31,7 @@ export default function SpeedAuditPage() {
               <p className="text-[18px] sm:text-[20px] text-muted-foreground max-w-2xl mx-auto mb-6 leading-relaxed text-balance">
                 Enter your website and we&apos;ll generate an instant performance snapshot of your med spa&apos;s digital presence. PageSpeed, SEO health, local visibility gaps, and critical issues your current agency probably isn&apos;t telling you about.
               </p>
-              
+
               <p className="text-[15px] font-medium text-muted-foreground/80 mb-16">
                 Takes 30 seconds. No credit card. No commitment. Just data.
               </p>
@@ -146,7 +145,7 @@ export default function SpeedAuditPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative animate-reveal" style={{ animationDelay: "150ms" }}>
             <div className="hidden md:block absolute top-12 left-[16%] right-[16%] h-[2px] bg-gradient-to-r from-border via-primary/30 to-border" />
-            
+
             {[
               { num: "01", title: "Instant Snapshot", desc: "The moment you submit, we run an automated performance scan on your website. Within seconds, you'll see a basic score preview covering PageSpeed, mobile optimization, and critical technical issues." },
               { num: "02", title: "Deep Audit (24 hours)", desc: "Within 24 hours, our team layers on a comprehensive manual review: SEO health, local visibility, competitor analysis, and specific recommendations tailored to your med spa's market and services. This is not a generic automated report. It's a real audit with real insights." },
@@ -199,7 +198,7 @@ export default function SpeedAuditPage() {
 
       {/* SECTION 7: CTA Fallback */}
       <section className="relative z-10 bg-background py-32 lg:py-[160px] overflow-hidden flex flex-col justify-center min-h-[50vh]">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] opacity-10 bg-primary pointer-events-none" />
+        <div className="absolute inset-0 w-full h-full bg-cta-atmosphere pointer-events-none" />
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10 animate-reveal">
           <h2 className="text-h2 text-foreground mb-6 text-balance">

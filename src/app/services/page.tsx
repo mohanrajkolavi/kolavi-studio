@@ -146,12 +146,7 @@ export default function ServicesPage() {
     <main className="relative w-full">
       {/* SECTION 1: HERO */}
       <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden border-b border-border -mt-[72px] pt-[72px]">
-        <div className="absolute inset-0 w-full h-full bg-background" />
-        <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:via-background dark:to-primary/20 pointer-events-none" />
-        <div
-          className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 bg-primary pointer-events-none -translate-y-1/2 -translate-x-1/2"
-          aria-hidden
-        />
+        <div className="absolute inset-0 w-full h-full bg-hero-atmosphere pointer-events-none" />
 
         <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center animate-reveal">
           <div className="inline-flex items-center justify-center px-5 py-2.5 mb-8 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground gap-2">
@@ -203,7 +198,7 @@ export default function ServicesPage() {
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
                   <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-primary/5 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/10 transition-colors duration-500 pointer-events-none" />
-                  
+
                   <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
                     <div className="lg:col-span-7 flex flex-col justify-center">
                       <div className="w-16 h-16 rounded-[16px] bg-primary/10 flex items-center justify-center mb-8 border border-primary/20">
@@ -218,7 +213,7 @@ export default function ServicesPage() {
                         ))}
                       </div>
                     </div>
-                    
+
                     <div className="lg:col-span-5 flex flex-col justify-center">
                       <div className="rounded-[24px] bg-muted/30 p-8 border border-border">
                         <h3 className="text-h4 text-foreground mb-6">Core Deliverables</h3>
@@ -274,7 +269,7 @@ export default function ServicesPage() {
 
       {/* SECTION 4: CTA */}
       <section className="relative z-10 bg-background py-32 lg:py-[160px] overflow-hidden flex flex-col justify-center min-h-[50vh]">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] opacity-10 bg-primary pointer-events-none" />
+        <div className="absolute inset-0 w-full h-full bg-cta-atmosphere pointer-events-none" />
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10 animate-reveal">
           <h2 className="text-h2 text-foreground mb-8 text-balance">

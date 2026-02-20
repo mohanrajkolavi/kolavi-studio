@@ -14,21 +14,13 @@ export function PartnerAuthShell({
   maxWidth = "480px",
 }: PartnerAuthShellProps) {
   return (
-    <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 sm:px-6">
-      {/* Premium Gradient Background (softer than landing page) */}
-      <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-primary/5 via-background to-primary/5 dark:from-primary/5 dark:via-background dark:to-primary/10 pointer-events-none transform-gpu" />
-      <div
-        className="absolute top-0 left-0 -translate-y-1/4 -translate-x-1/4 w-[400px] h-[400px] md:w-[600px] md:h-[600px] rounded-full blur-[80px] md:blur-[120px] opacity-10 bg-primary pointer-events-none transform-gpu"
-        aria-hidden
-      />
-      <div
-        className="absolute bottom-0 right-0 translate-y-1/4 translate-x-1/4 w-[300px] h-[300px] md:w-[500px] md:h-[500px] rounded-full blur-[80px] md:blur-[120px] opacity-10 bg-primary pointer-events-none transform-gpu"
-        aria-hidden
-      />
+    <div className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden px-4 py-12 sm:px-6 -mt-[72px] pt-[120px] md:pt-[100px]">
+      {/* Full-bleed background that sits behind the fixed header */}
+      <div className="absolute inset-0 w-full h-full bg-cta-atmosphere pointer-events-none -z-10" />
 
       {/* Centered Card */}
       <div
-        className="relative z-10 w-full rounded-[20px] sm:rounded-[24px] border border-border bg-background shadow-sm dark:bg-card px-6 py-8 sm:px-12 sm:py-12"
+        className="relative z-10 w-full rounded-[20px] sm:rounded-[24px] border border-border/50 bg-card/60 backdrop-blur-2xl shadow-premium px-6 py-8 sm:px-12 sm:py-12"
         style={{ maxWidth: maxWidth === "800px" ? "800px" : maxWidth === "560px" ? "560px" : "480px" }}
       >
         <div className="flex justify-center mb-8">

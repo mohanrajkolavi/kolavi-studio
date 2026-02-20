@@ -25,8 +25,8 @@ export function Header({ isAdmin = false }: HeaderProps) {
       >
         Skip to main content
       </a>
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-white/20 bg-white/70 backdrop-blur-[12px] md:backdrop-blur-[20px] transform-gpu px-5 sm:px-6 relative pointer-events-auto shadow-sm dark:border-white/10 dark:bg-zinc-950/60 supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-zinc-950/60">
-        
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between rounded-full border border-white/20 bg-white/50 backdrop-blur-xl md:backdrop-blur-2xl transform-gpu px-5 sm:px-6 relative pointer-events-auto shadow-sm dark:border-white/10 dark:bg-zinc-950/50 supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-zinc-950/40">
+
         {/* Left Side Navigation (Desktop) */}
         <div className="hidden md:flex md:flex-1 md:items-center md:justify-start md:gap-1">
           <nav className="flex items-center gap-0.5" aria-label="Main">
@@ -56,7 +56,7 @@ export function Header({ isAdmin = false }: HeaderProps) {
             href="/"
             className="flex items-center space-x-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-lg"
           >
-            <Logo className="text-xl font-bold tracking-wide text-foreground sm:text-2xl" withPeriod />
+            <Logo className="text-2xl font-extrabold tracking-wide text-foreground sm:text-3xl" withPeriod />
           </Link>
         </div>
 

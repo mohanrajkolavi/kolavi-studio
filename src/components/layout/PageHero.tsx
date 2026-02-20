@@ -12,8 +12,8 @@ export function PageHero({ title, description, badge, children }: PageHeroProps)
     <section className="relative overflow-hidden bg-background py-16 sm:py-24 border-b border-border">
       {/* Background gradients */}
       <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-hero-atmosphere" />
         <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
-        <div className="absolute left-0 right-0 top-0 -z-10 m-auto h-[310px] w-[310px] rounded-full bg-primary opacity-10 blur-[100px]"></div>
       </div>
 
       <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center animate-reveal">

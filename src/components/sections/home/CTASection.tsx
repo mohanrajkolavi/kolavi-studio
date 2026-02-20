@@ -14,9 +14,7 @@ export function CTASection() {
       id="cta"
     >
       {/* Subtle Background Glow */}
-      <div className="absolute inset-0 w-full h-full bg-background" />
-      <div className="absolute inset-0 w-full h-full bg-gradient-to-tr from-background via-primary/5 to-orange-500/10 dark:from-background dark:via-primary/10 dark:to-orange-500/20 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 translate-y-1/4 -translate-x-1/4 w-[600px] h-[600px] rounded-full blur-[100px] opacity-20 bg-primary pointer-events-none" />
+      <div className="absolute inset-0 w-full h-full bg-cta-atmosphere pointer-events-none" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10">
         <div className={isVisible ? "animate-reveal" : "opacity-0"}>
