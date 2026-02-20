@@ -317,11 +317,12 @@ function EeatResultsDisplay({
 
 type IntentType = "informational" | "navigational" | "commercial" | "transactional";
 
-const INTENT_OPTIONS: { value: IntentType; label: string }[] = [
+/** Base intents only; user picks 1 or 2. Word count is auto-calculated in backend from selection. */
+const BASE_INTENTS: { value: IntentType; label: string }[] = [
   { value: "informational", label: "Informational" },
-  { value: "navigational", label: "Navigational" },
   { value: "commercial", label: "Commercial" },
   { value: "transactional", label: "Transactional" },
+  { value: "navigational", label: "Navigational" },
 ];
 
 /**
@@ -553,10 +554,9 @@ const SAMPLE_PIPELINE_RESULT: PipelineResult = {
 
 const SAMPLE_INPUT: GenerationInput = {
   keywords: ["medical spa SEO", "aesthetic practice marketing"],
-  peopleAlsoSearchFor: ["how long for SEO results", "medical spa blog"],
   intent: ["informational"],
   competitorUrls: [],
-  wordCountPreset: "standard",
+  draftModel: "sonnet-4.6",
 };
 
 const SAMPLE_RESULT: ResultState = {
@@ -591,11 +591,12 @@ export default function BlogMakerPage() {
   } = useBlogGeneration();
 
   const [keywords, setKeywords] = useState<string[]>([]);
-  const [peopleAlsoSearchFor, setPeopleAlsoSearchFor] = useState<string[]>([]);
-  const [intent, setIntent] = useState<IntentType[]>([]);
+  /** Selected intents (1 or 2). Word count is auto-calculated in backend from this. */
+  const [selectedIntents, setSelectedIntents] = useState<IntentType[]>(["informational"]);
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
-  const [wordCountPreset, setWordCountPreset] = useState<"auto" | "concise" | "standard" | "in_depth" | "custom">("auto");
-  const [wordCountCustom, setWordCountCustom] = useState<number | "">("");
+  const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("sonnet-4.6");
+  /** Intent array sent to API (1 or 2; default informational if none selected). */
+  const intent = selectedIntents.length > 0 ? selectedIntents : ["informational"];
   const [sampleOutput, setSampleOutput] = useState<GeneratedContent | null>(null);
   const [sampleResult, setSampleResult] = useState<ResultState | null>(null);
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
@@ -638,11 +639,9 @@ export default function BlogMakerPage() {
     setSelectedSerpUrls([]);
     setCustomCompetitorUrl("");
     setKeywords(SAMPLE_INPUT.keywords);
-    setPeopleAlsoSearchFor(SAMPLE_INPUT.peopleAlsoSearchFor);
-    setIntent(SAMPLE_INPUT.intent as IntentType[]);
+    setSelectedIntents(["informational"]);
     setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
-    setWordCountPreset((SAMPLE_INPUT.wordCountPreset as "auto" | "concise" | "standard" | "in_depth" | "custom") ?? "auto");
-    setWordCountCustom(SAMPLE_INPUT.wordCountCustom ?? "");
+    setDraftModel(SAMPLE_INPUT.draftModel ?? "sonnet-4.6");
     lastResearchSerpRef.current = SAMPLE_RESEARCH_SERP;
 
     if (stage === "select") {
@@ -689,10 +688,9 @@ export default function BlogMakerPage() {
   const defaultGenerationInput = useMemo(
     () => ({
       keywords: [],
-      peopleAlsoSearchFor: [],
-      intent: [],
+      intent: [] as string[],
       competitorUrls: [],
-      wordCountPreset: "auto",
+      draftModel: "sonnet-4.6" as const,
     }),
     []
   );
@@ -1042,7 +1040,6 @@ export default function BlogMakerPage() {
           fallbackGenerated: historyContent,
           input: {
             keywords: data.focus_keyword ? [data.focus_keyword] : [],
-            peopleAlsoSearchFor: [],
             intent: [],
             competitorUrls: [],
           },
@@ -1350,12 +1347,10 @@ export default function BlogMakerPage() {
     e.preventDefault();
     setStatus({ type: null, message: "" });
     startGeneration({
-      keywords,
-      peopleAlsoSearchFor,
-      intent: intent.length > 0 ? intent : ["informational"],
+      keywords: keywords.slice(0, 3),
+      intent,
       competitorUrls,
-      wordCountPreset,
-      ...(wordCountPreset === "custom" && typeof wordCountCustom === "number" && wordCountCustom >= 500 && wordCountCustom <= 6000 && { wordCountCustom }),
+      draftModel,
     });
     setContentView("preview");
   }
@@ -1703,12 +1698,10 @@ export default function BlogMakerPage() {
                       onClick={() => {
                         clearError();
                         startGeneration({
-                          keywords,
-                          peopleAlsoSearchFor,
-                          intent: intent.length > 0 ? intent : ["informational"],
+                          keywords: keywords.slice(0, 3),
+                          intent,
                           competitorUrls,
-                          wordCountPreset,
-                          ...(wordCountPreset === "custom" && typeof wordCountCustom === "number" && wordCountCustom >= 500 && wordCountCustom <= 6000 && { wordCountCustom }),
+                          draftModel,
                         });
                       }}
                       className="rounded-full"
@@ -2402,29 +2395,16 @@ export default function BlogMakerPage() {
               </section>
             )}
 
-            {/* Keywords, People also search for, Search intent, Word count — single flat section (hidden when reviewing or demo review) */}
+            {/* Keywords, Search intent, Word count, Draft model — single flat section (hidden when reviewing or demo review) */}
             {showInputSections && (
             <section className="p-8 sm:p-10 space-y-10">
               <div className="space-y-3">
-                <h3 className="text-sm font-medium text-foreground">Keywords</h3>
-                <p className="text-sm text-muted-foreground">Primary focus. First keyword is most important. Max 6.</p>
+                <h3 className="text-sm font-medium text-foreground">Primary keyword</h3>
+                <p className="text-sm text-muted-foreground">Required. Add up to 2 secondary keywords in the next field.</p>
                 <TagInput
                   tags={keywords}
-                  onTagsChange={setKeywords}
-                  placeholder="Add a keyword, press Enter"
-                  maxTags={6}
-                  disabled={generating || demoRunning}
-                  className="min-h-11 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
-                />
-              </div>
-
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-foreground">People also search for</h3>
-                <p className="text-sm text-muted-foreground">Related phrases for FAQs. Max 3.</p>
-                <TagInput
-                  tags={peopleAlsoSearchFor}
-                  onTagsChange={setPeopleAlsoSearchFor}
-                  placeholder="Add a phrase, press Enter"
+                  onTagsChange={(tags) => setKeywords(tags.slice(0, 3))}
+                  placeholder="Primary keyword, then add up to 2 secondary (press Enter)"
                   maxTags={3}
                   disabled={generating || demoRunning}
                   className="min-h-11 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
@@ -2433,27 +2413,63 @@ export default function BlogMakerPage() {
 
               <div className="space-y-3 pt-2">
                 <h3 className="text-sm font-medium text-foreground">Search intent</h3>
-                <p className="text-sm text-muted-foreground">Select one or more to shape tone and structure.</p>
+                <p className="text-sm text-muted-foreground">Pick 1 or 2. Word count is set automatically from your selection.</p>
                 <div className="flex flex-wrap gap-2">
-                  {INTENT_OPTIONS.map((opt) => (
+                  {BASE_INTENTS.map((opt) => {
+                    const selected = selectedIntents.includes(opt.value);
+                    const atMax = selectedIntents.length >= 2 && !selected;
+                    const toggle = () => {
+                      if (selected) {
+                        setSelectedIntents((prev) => prev.filter((i) => i !== opt.value));
+                      } else if (selectedIntents.length < 2) {
+                        setSelectedIntents((prev) => [...prev, opt.value].sort());
+                      }
+                    };
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={toggle}
+                        disabled={generating || demoRunning || atMax}
+                        aria-pressed={selected}
+                        aria-label={atMax ? "Maximum 2 intents selected" : selected ? `Deselect ${opt.label}` : `Select ${opt.label}`}
+                        className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                          selected
+                            ? "bg-orange-600 text-white dark:bg-orange-500"
+                            : atMax
+                              ? "cursor-not-allowed bg-muted/40 text-muted-foreground opacity-60"
+                              : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-foreground">Draft model</h3>
+                <p className="text-sm text-muted-foreground">Claude model used to write the article draft.</p>
+                <div className="flex flex-wrap gap-3">
+                  {(["sonnet-4.6", "opus-4.6"] as const).map((model) => (
                     <label
-                      key={opt.value}
+                      key={model}
                       className={`inline-flex cursor-pointer items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                        intent.includes(opt.value)
+                        draftModel === model
                           ? "bg-orange-600 text-white dark:bg-orange-500"
                           : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      } ${generating ? "pointer-events-none opacity-60" : ""}`}
+                      } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
                     >
                       <input
-                        type="checkbox"
-                        checked={intent.includes(opt.value)}
-                        onChange={(e) => {
-                          if (e.target.checked) setIntent([...intent, opt.value]);
-                          else setIntent(intent.filter((i) => i !== opt.value));
-                        }}
+                        type="radio"
+                        name="draftModel"
+                        value={model}
+                        checked={draftModel === model}
+                        onChange={() => setDraftModel(model)}
                         className="sr-only"
                       />
-                      {opt.label}
+                      {model === "opus-4.6" ? "Opus 4.6" : "Sonnet 4.6"}
                     </label>
                   ))}
                 </div>
@@ -2490,11 +2506,9 @@ export default function BlogMakerPage() {
                     setSampleOutput(null);
                     setEditing(null);
                     setKeywords(SAMPLE_INPUT.keywords);
-                    setPeopleAlsoSearchFor(SAMPLE_INPUT.peopleAlsoSearchFor);
-                    setIntent(SAMPLE_INPUT.intent as IntentType[]);
+                    setSelectedIntents(["informational"]);
                     setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
-                    setWordCountPreset((SAMPLE_INPUT.wordCountPreset as "auto" | "concise" | "standard" | "in_depth" | "custom") ?? "auto");
-                    setWordCountCustom(SAMPLE_INPUT.wordCountCustom ?? "");
+                    setDraftModel(SAMPLE_INPUT.draftModel ?? "sonnet-4.6");
                     setDemoRunning(true);
                     setDemoStep("research");
                     setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });

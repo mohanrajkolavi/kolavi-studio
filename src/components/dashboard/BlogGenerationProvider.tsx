@@ -112,11 +112,12 @@ const STEP_LABELS: Record<string, string> = {
 function buildGenerateBody(input: GenerationInput): Record<string, unknown> {
   return {
     keywords: input.keywords.join(", "),
-    peopleAlsoSearchFor: input.peopleAlsoSearchFor.join(", "),
     intent: input.intent.length > 0 ? input.intent : ["informational"],
     competitorUrls: input.competitorUrls,
+    ...(input.peopleAlsoSearchFor?.length && { peopleAlsoSearchFor: input.peopleAlsoSearchFor.join(", ") }),
     ...(input.wordCountPreset != null && { wordCountPreset: input.wordCountPreset }),
     ...(input.wordCountPreset === "custom" && input.wordCountCustom != null && { wordCountCustom: input.wordCountCustom }),
+    ...(input.draftModel != null && { draftModel: input.draftModel }),
   };
 }
 

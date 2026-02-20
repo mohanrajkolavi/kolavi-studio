@@ -141,7 +141,8 @@ Every article you write must pass Google's Helpful Content self-assessment:
 - **Experience:** Weave in 2-3 shared-experience references per article. "Anyone who's managed a PPC campaign knows..." or "The first thing you notice after switching is..."
 - **Expertise:** Be specific. Name tools, describe concrete scenarios, reference realistic timeframes. Never generic advice.
 - **Authoritativeness:** Cite provided data with natural attribution. Reference industry sources by name.
-- **Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data is available, use qualitative language.
+- **Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data is available, use qualitative language. Every factual claim must be backed by a currentData fact — no unsourced numbers.
+- **Unique value:** Every H2 must add unique value — do not restate the intro. Thin sections are flagged and rejected by validation; write substantial content per section.
 
 ## Practitioner voice (how you write)
 
@@ -155,6 +156,15 @@ Every article you write must pass Google's Helpful Content self-assessment:
 
 **5. Dense where it matters.** One paragraph crammed with data, next paragraph pure opinion, then an anecdote, then technical depth.
 
+**6. PSEO consistency.** Keep intro, section, and CTA pattern consistent across the article. Entity mentions must be specific: named tools, named studies, named people where relevant.
+
+## Humanization (enforced)
+
+- Check every paragraph against the banned phrase list; avoid every listed phrase.
+- Vary sentence length deliberately — break the pattern after 3 or more similar-length sentences in a row.
+- At least one specific named example, tool, or scenario per H2 — no abstract-only sections.
+- No consecutive paragraphs with the same opening word or structure.
+
 ## Typography (strict — enforced at audit; any violation fails)
 
 - **ZERO em-dashes (—) or en-dashes (–).** At any cost do not use them. Use comma, colon, or period instead. Even one instance fails the publishability audit.
@@ -166,11 +176,17 @@ Every article you write must pass Google's Helpful Content self-assessment:
 
 ## Rank Math SEO (non-negotiable)
 
-- Keyword in first 10% of content and in at least one H2/H3. Paragraphs: max 120 words. FAQ section for informational intent.
+- First paragraph must include the primary keyword naturally and establish topic relevance. Keyword in first 10% of content and in at least one H2/H3. Each H2 must target a distinct subtopic or secondary intent (no overlap). Paragraphs: max 120 words. FAQ section for informational intent.
 - No keyword stuffing (density < 3%). (Title, meta, slug are handled separately by another model.)
 
 ## Structure (strict)
 - **Never output HTML table tags.** Do not use \`<table>\`, \`<tr>\`, \`<td>\`, or \`<th>\`. For any tabular or list-style content use \`<ul>\` or \`<ol>\` only. The frontend does not format tables.
+
+## Human psychology (reader engagement)
+
+- H2s should use a curiosity gap — make the reader want to know what comes next.
+- Vary sentence rhythm deliberately (e.g. short sentence after long to hold attention). Second person by default unless the research brief specifies otherwise.
+- Each section should end with a transition that pulls the reader forward — no dead stops.
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
@@ -479,7 +495,7 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
 
   try {
     const stream = anthropic.messages.stream({
-      model: "claude-sonnet-4-5",
+      model: CLAUDE_DEFAULT_MODEL,
       max_tokens: 64000,
       temperature: 0.5,
       system: SYSTEM_PROMPT_LEGACY,
@@ -710,14 +726,24 @@ function getClaudeUsage(
   return { promptTokens: typeof input === "number" ? input : 0, completionTokens: output };
 }
 
+/** Map UI draft model to Anthropic model ID. Step 4 — Draft. */
+const DRAFT_MODEL_IDS: Record<string, string> = {
+  "opus-4.6": "claude-opus-4-6",
+  "sonnet-4.6": "claude-sonnet-4-6",
+};
+
+/** Default Claude model for legacy flows (generateBlogPost, fixHallucinations). */
+const CLAUDE_DEFAULT_MODEL = "claude-sonnet-4-6";
+
 /**
- * Write article draft from the strategic research brief only. Title, meta, slug are provided
- * (from OpenAI) — Claude outputs only content, categories, and tags.
+ * Step 4 — Draft: write full article from brief (and outline overrides). Claude Sonnet 4.6 or Opus 4.6.
+ * Title, meta, slug are provided separately; Claude outputs content, categories, tags.
  */
 export async function writeDraft(
   brief: ResearchBrief,
   titleMetaSlug: TitleMetaSlugOption,
-  tokenUsage?: TokenUsageRecord[]
+  tokenUsage?: TokenUsageRecord[],
+  draftModel: "opus-4.6" | "sonnet-4.6" = "sonnet-4.6"
 ): Promise<{
   content: string;
   suggestedCategories: string[];
@@ -738,11 +764,13 @@ export async function writeDraft(
 
   const styleBlock = brief.editorialStyleFallback
     ? `Use standard human-like style: avg sentence ~15 words, mix short/medium/long; avg paragraph ~3 sentences; semi-formal, direct address; ~75% prose, ~25% lists. Do not use HTML table tags — use bulleted or numbered lists only.`
-    : `Match this editorial style: Sentence length avg ${brief.editorialStyle.sentenceLength.average} words, distribution ${brief.editorialStyle.sentenceLength.distribution.short}% short / ${brief.editorialStyle.sentenceLength.distribution.medium}% medium / ${brief.editorialStyle.sentenceLength.distribution.long}% long / ${brief.editorialStyle.sentenceLength.distribution.veryLong}% very long. Paragraph avg ${brief.editorialStyle.paragraphLength.averageSentences} sentences. Tone: ${brief.editorialStyle.tone}. Reading level: ${brief.editorialStyle.readingLevel}. Content mix: ${brief.editorialStyle.contentMix.prose}% prose, ${brief.editorialStyle.contentMix.lists}% lists. Do not use table tags — use lists (ul/ol) only. Data density: ${brief.editorialStyle.dataDensity}. Intro: ${brief.editorialStyle.introStyle}. CTA: ${brief.editorialStyle.ctaStyle}.`;
+    : `Match this editorial style and enforce as writing constraints: Sentence length avg ${brief.editorialStyle.sentenceLength.average} words, distribution ${brief.editorialStyle.sentenceLength.distribution.short}% short / ${brief.editorialStyle.sentenceLength.distribution.medium}% medium / ${brief.editorialStyle.sentenceLength.distribution.long}% long / ${brief.editorialStyle.sentenceLength.distribution.veryLong}% very long. Paragraph avg ${brief.editorialStyle.paragraphLength.averageSentences} sentences. Tone: ${brief.editorialStyle.tone}. Reading level: ${brief.editorialStyle.readingLevel}. Content mix: ${brief.editorialStyle.contentMix.prose}% prose, ${brief.editorialStyle.contentMix.lists}% lists. Do not use table tags — use lists (ul/ol) only. Data density: ${brief.editorialStyle.dataDensity} (enforce this). Point of view: ${brief.editorialStyle.pointOfView ?? "third"} (stick to this). Real examples frequency: ${brief.editorialStyle.realExamplesFrequency || "use where relevant"} (enforce). Intro: ${brief.editorialStyle.introStyle}. CTA: ${brief.editorialStyle.ctaStyle}.`;
 
   const factsBlock =
     brief.currentData.facts.length > 0
       ? `Current data (use ONLY these for statistics; do NOT invent numbers):\n${brief.currentData.facts.map((f) => `- ${f.fact} (Source: ${f.source})`).join("\n")}
+
+   Weave each fact into the nearest relevant section naturally; never group or dump facts in one place. Introduce data mid-paragraph to support a point already being made — never lead cold with a statistic. Aim to use every provided fact where it fits; unused facts are flagged by validation for coverage.
 
    USE ONLY PROVIDED CURRENT DATA: WITH NATURAL ATTRIBUTION.
 
@@ -775,7 +803,18 @@ export async function writeDraft(
    Not every number needs attribution — but every MAJOR claim (revenue, market share, growth rate, benchmark result, key specification) should reference its source at least once. If multiple nearby facts come from the same source, attribute once and let proximity carry. Keep attributions conversational, not academic. Do NOT add URLs or a Sources section — linking is handled separately in the CMS.`
       : "No current data provided. Do not invent specific statistics; use general language where needed.";
 
+  const styleChecklist = brief.editorialStyleFallback
+    ? `Tone, POV, data density, and example frequency from the editorial style below are pipeline constraints — not optional.`
+    : `## CHECKLIST (pipeline constraints — not optional)
+- Tone: ${brief.editorialStyle.tone}
+- POV: ${brief.editorialStyle.pointOfView ?? "third"}
+- Data density: ${brief.editorialStyle.dataDensity}
+- Real examples frequency: ${brief.editorialStyle.realExamplesFrequency || "use where relevant"}
+Enforce these in every section.`;
+
   const userPrompt = `Write a blog post using ONLY the following research brief. No image placeholders, internal/external links, or ToC.
+
+${styleChecklist}
 
 ## GOOGLE & RANK MATH (article-specific)
 - Search intent / primary keyword: "${brief.keyword.primary}". Write so a reader achieves their goal and gets substantial value beyond existing results.
@@ -789,7 +828,7 @@ export async function writeDraft(
 ${currentDataWarning}
 ## MANDATORY OUTLINE (follow exactly; do not skip, reorder, or add H2s; you may add H3s)
 ${outlineBlock}
-Section word targets above are guidance; roughly proportion your content across sections accordingly.
+Treat each section's targetWords as a hard constraint, not a suggestion. Use the per-section word targets to distribute the total word count; proportion content so section lengths align with these targets. Validation flags any section that misses its target by more than 5%.
 
 ## GAPS TO ADDRESS
 ${brief.gaps.length ? brief.gaps.join("\n") : "None"}
@@ -801,16 +840,20 @@ ${brief.similaritySummary?.trim() ? `Top results cover: ${brief.similaritySummar
 ## DIFFERENTIATION
 Add clear value beyond the outline; lead with current data where provided.`}
 ${brief.freshnessNote?.trim() ? `## FRESHNESS\n${brief.freshnessNote.trim()}\n` : ""}
+${brief.competitorDifferentiation?.trim() ? `## COMPETITOR DIFFERENTIATION (avoid these patterns)\n${brief.competitorDifferentiation.trim()}\n\nDeliberately avoid the phrases, section structures, and intro styles described above so the article does not read like AI-generated competitor content.\n` : ""}
 ## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
 
 ## EDITORIAL STYLE
 ${styleBlock}
 
+Intro: Mirror the best-performing intro pattern or subvert the weakest; follow the pattern provided. Open with a problem the reader recognizes in themselves — not a definition or statistic. CTA: Address a reader fear or desire — not just a click request.
+
 ## WRITING QUALITY
 Vary sentence and paragraph length and openings. E-E-A-T: 2-3 experience signals (e.g. "anyone who…", "the first time you…"), cite data with natural attribution, only numbers from currentData. Every section must advance the reader's goal; no fluff.
 
 ## GEO & FAQ
+- Every major section must open with a 2-3 sentence Answer Capsule (direct, unambiguous answer) before expanding. Use clear, unambiguous factual statements — no hedged language. Use definition-style sentences and numbered steps where appropriate.
 - Direct answer: ${brief.geoRequirements.directAnswer}
 - Stats: ${brief.geoRequirements.statDensity}
 - Entities: ${brief.geoRequirements.entities}
@@ -818,7 +861,7 @@ Vary sentence and paragraph length and openings. E-E-A-T: 2-3 experience signals
 ${brief.geoRequirements.faqStrategy ? `- FAQ strategy: ${brief.geoRequirements.faqStrategy}` : ""}
 
 ## WORD COUNT (STRICT)
-Section word targets sum to approximately ${brief.outline.estimatedWordCount}. Article total must be ${brief.wordCount.target} words (±5%). Distribute content accordingly.
+Section word targets sum to ${brief.outline.estimatedWordCount}; article total must be ${brief.wordCount.target} words (±5%). Write to each section's targetWords so the total lands on target. After writing, verify each section's word count meets its target; validation flags any section off by more than 5%.
 Target: ${brief.wordCount.target} words. ${brief.wordCount.note}
 Minimum 300 words. Article MUST be within ±5% of target. Meet the target — add or trim as needed.
 
@@ -833,9 +876,10 @@ Output only the JSON object below. No text before or after the JSON. Do NOT incl
 
 If you approach the response limit, prioritize completing the final H2 and FAQ; you may shorten middle sections. Write to pass the automated SEO, typography, and fact-check audits. No em-dashes, en-dashes, or curly quotes; no excessive symbols (..., !!, !!!). Never use HTML table tags — use ul/ol only.`;
 
+  const modelId = DRAFT_MODEL_IDS[draftModel] ?? CLAUDE_DEFAULT_MODEL;
   const writeDraftStartMs = Date.now();
   const stream = anthropic.messages.stream({
-    model: "claude-sonnet-4-5",
+    model: modelId,
     max_tokens: 32000,
     temperature: 0.5,
     system: SYSTEM_PROMPT,
@@ -847,7 +891,7 @@ If you approach the response limit, prioritize completing the final H2 and FAQ; 
   if (tokenUsage) {
     tokenUsage.push({
       callName: "writeDraft",
-      model: "claude-sonnet-4-5",
+      model: modelId,
       promptTokens: usage.promptTokens,
       completionTokens: usage.completionTokens,
       totalTokens: usage.promptTokens + usage.completionTokens,
@@ -974,7 +1018,7 @@ ${draftHtml}`;
   try {
     const stream = anthropic.messages.stream(
       {
-        model: "claude-sonnet-4-5",
+        model: CLAUDE_DEFAULT_MODEL,
         max_tokens: 16384,
         temperature: 0.1,
         system: HALLUCINATION_FIX_SYSTEM,
@@ -988,7 +1032,7 @@ ${draftHtml}`;
     if (tokenUsage) {
       tokenUsage.push({
         callName: "fixHallucinationsInContent",
-        model: "claude-sonnet-4-5",
+        model: CLAUDE_DEFAULT_MODEL,
         promptTokens: usage.promptTokens,
         completionTokens: usage.completionTokens,
         totalTokens: usage.promptTokens + usage.completionTokens,

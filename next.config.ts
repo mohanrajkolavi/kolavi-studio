@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
+  async redirects() {
+    return [{ source: "/medical-spas", destination: "/", permanent: true }];
+  },
   async rewrites() {
     return [
       { source: "/blog/rss.xml", destination: "/blog/rss" },

@@ -1,179 +1,187 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import {
+  Gem,
+  Cpu,
   Target,
-  TrendingUp,
-  MessageSquare,
-  Handshake,
+  LineChart,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const metadata = getPageMetadata({
-  title: "About Us - Digital Marketing Experts",
-  description: "Learn about Kolavi Studio, our mission to help businesses grow through strategic digital marketing, and the team behind our success.",
+  title: "About Us - Built Different From Day One",
+  description: "Learn about Kolavi Studio, our mission to help med spas grow with Next.js websites, AI-powered SEO, and an obsessive attention to detail.",
   path: "/about",
-  keywords: "digital marketing agency, about Kolavi Studio, marketing team, business growth experts",
+  keywords: "med spa marketing agency, about Kolavi Studio, medical spa digital marketing, growth team",
 });
 
-const whyUsItems = [
+const values = [
   {
-    icon: <Target className="h-8 w-8" />,
-    title: "Industry Expertise",
+    icon: Gem,
+    title: "Obsession with Craft",
     description:
-      "We specialize in serving specific industries, giving us unique insights into what works and what doesn't in your market.",
+      "We do not ship \"good enough.\" Every website, every page, every automation is built to a standard most agencies do not even aim for. If a button does not feel right on hover, we rebuild it. If a page loads in 2.1 seconds instead of 1.8, we optimize it. This is not a marketing line. It is how we operate.",
   },
   {
-    icon: <TrendingUp className="h-8 w-8" />,
-    title: "Proven Results",
+    icon: Cpu,
+    title: "AI-Native, Not AI-Adjacent",
     description:
-      "Our track record speaks for itself. We've helped dozens of businesses achieve significant growth through strategic digital marketing.",
+      "We did not bolt AI onto existing workflows. We built our entire operation around it from day one. Content generation, SEO auditing, lead nurture, competitive analysis. AI is not a feature we offer. It is the infrastructure we run on.",
   },
   {
-    icon: <MessageSquare className="h-8 w-8" />,
-    title: "Transparent Communication",
+    icon: Target,
+    title: "Med Spa Exclusive",
     description:
-      "You'll always know what we're working on, why we're doing it, and what results to expect. No surprises, just clear communication.",
+      "We do not serve other industries. We do not want to. Every template, every automation, every content strategy is built specifically for medical spas. Botox. Fillers. Body contouring. Laser treatments. GLP-1. We know the business because we chose to know nothing else.",
   },
   {
-    icon: <Handshake className="h-8 w-8" />,
-    title: "Long-Term Partnership",
+    icon: LineChart,
+    title: "Results Over Activity",
     description:
-      "We're not interested in quick wins. We build lasting relationships and continuously optimize to ensure your sustained success.",
+      "We do not measure success by how many blog posts we published or how many emails we sent. We measure it by patient bookings, revenue growth, and cost per acquisition. If a deliverable does not move a business metric, we kill it and replace it with something that does.",
   },
 ];
 
 export default function AboutPage() {
   return (
-    <main>
-      {/* Hero (match Who We Serve / Services) */}
-      <section className="relative border-b border-border bg-background">
-        <div className="pointer-events-none absolute inset-0 overflow-hidden bg-gradient-to-b from-muted/50 via-background to-background dark:from-muted/20 dark:via-background dark:to-background" />
-        <div className="relative overflow-visible">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-3xl py-12 sm:py-16 lg:py-20 text-center">
-              <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                About{" "}
-                <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
-                  Kolavi Studio
-                </span>
-              </h1>
-              <p className="mt-6 text-lg leading-relaxed text-muted-foreground sm:text-xl max-w-2xl mx-auto">
-                We're a digital marketing agency on a mission to help businesses thrive in the digital age. With a focus on medical spas, dental practices, and law firms, we combine industry expertise with cutting-edge marketing strategies to deliver exceptional results.
-              </p>
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <Button asChild size="lg" className="rounded-full bg-orange-600 px-8 font-semibold hover:bg-orange-700">
-                  <Link href="/contact">Get in Touch</Link>
-                </Button>
-                <Button asChild size="lg" variant="outline" className="rounded-full border-2 px-8 font-semibold">
-                  <Link href="/services">Our Services</Link>
-                </Button>
-              </div>
-            </div>
+    <main className="relative w-full">
+      {/* SECTION 1: HERO */}
+      <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden border-b border-border -mt-[72px] pt-[72px]">
+        <div className="absolute inset-0 w-full h-full bg-background" />
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:via-background dark:to-primary/20 pointer-events-none" />
+        <div
+          className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 bg-primary pointer-events-none -translate-y-1/2 -translate-x-1/2"
+          aria-hidden
+        />
+
+        <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center animate-reveal">
+          <div className="inline-flex items-center justify-center px-5 py-2.5 mb-8 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+            </span>
+            ABOUT US
           </div>
+
+          <h1 className="text-hero text-foreground max-w-[900px] mx-auto text-balance mb-8">
+            Built Different From Day One.
+          </h1>
+
+          <p className="text-body text-muted-foreground max-w-[650px] mx-auto text-balance mb-12">
+            Founded in 2026. Purpose-built for medical spas. Obsessed with performance, design, and results.
+          </p>
         </div>
       </section>
 
-      {/* Our Story */}
-      <section className="border-b border-border bg-muted/30 py-14 sm:py-20" aria-labelledby="story-heading">
+      {/* SECTION 2: OUR STORY */}
+      <section className="relative z-10 bg-background py-24 sm:py-32 border-b border-border" aria-labelledby="story-heading">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl">
-            <div className="mb-10 flex items-center gap-3">
-              <div className="h-1 w-8 rounded-full bg-orange-500" aria-hidden />
-              <h2 id="story-heading" className="text-sm font-bold uppercase tracking-wider text-foreground">
-                Our Story
-              </h2>
+          <div className="mx-auto max-w-4xl animate-reveal">
+            <div className="inline-flex items-center justify-center px-5 py-2.5 mb-6 rounded-[48px] bg-background border border-border text-label text-muted-foreground shadow-sm">
+              OUR STORY
             </div>
-            <div className="space-y-6 text-lg leading-relaxed text-muted-foreground">
+            <h2 id="story-heading" className="text-h2 text-foreground mb-10">
+              The Industry is Stuck in 2015
+            </h2>
+            <div className="space-y-8 text-body text-muted-foreground leading-relaxed text-[18px]">
               <p>
-                Kolavi Studio was founded with a simple belief: every business deserves a digital presence that truly represents their brand and drives real results. Too many agencies promise the world but deliver generic, cookie-cutter solutions that don't move the needle.
+                Kolavi Studio was founded in 2026 with a single conviction: the med spa marketing industry is stuck in 2015. Agencies charging premium retainers for slow WordPress templates, two generic blog posts a month, and automated dashboards that nobody checks.
               </p>
               <p>
-                We took a different approach. By specializing in specific industries, starting with medical spas, we developed deep expertise in what actually works. We understand the unique challenges, regulations, and opportunities in each market we serve.
+                We asked an entirely different question. What would a med spa agency look like if it were built today? From scratch. With modern software engineering. With AI-native workflows. And with an obsessive attention to detail that most agencies do not even aspire to.
               </p>
-              <p>
-                Today, we're proud to partner with businesses across the country, helping them attract more clients, increase revenue, and build brands that stand out in competitive markets.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Our Approach */}
-      <section className="border-b border-border bg-muted/20 py-14 sm:py-20" aria-labelledby="approach-heading">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl">
-            <div className="mb-10 flex items-center gap-3">
-              <div className="h-1 w-8 rounded-full bg-orange-500" aria-hidden />
-              <h2 id="approach-heading" className="text-sm font-bold uppercase tracking-wider text-foreground">
-                Our Approach
-              </h2>
-            </div>
-            <div className="space-y-6 text-lg leading-relaxed text-muted-foreground">
-              <p>
-                We believe in transparency, data-driven decisions, and building long-term partnerships. Our approach combines strategic thinking with hands-on execution, ensuring every campaign is optimized for maximum ROI.
-              </p>
-              <p>
-                Whether it's SEO, web design, content marketing, or paid advertising, we focus on what matters most: driving real business results. No vanity metrics, no fluff. Just strategies that work.
+              <p className="text-xl font-medium text-foreground border-l-2 border-primary pl-6 py-2">
+                The answer is Kolavi.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Why Work With Us */}
-      <section className="border-b border-border bg-muted/30 py-14 sm:py-20" aria-labelledby="why-heading">
+      {/* SECTION 3: FOUNDER STORY */}
+      <section className="relative z-10 bg-muted/30 py-24 sm:py-32 border-b border-border" aria-labelledby="founder-heading">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-5xl">
-            <div className="mb-10 flex items-center gap-3">
-              <div className="h-1 w-8 rounded-full bg-orange-500" aria-hidden />
-              <h2 id="why-heading" className="text-sm font-bold uppercase tracking-wider text-foreground">
-                Why Work With Us
-              </h2>
+          <div className="mx-auto max-w-4xl animate-reveal">
+            <div className="inline-flex items-center justify-center px-5 py-2.5 mb-6 rounded-[48px] bg-background border border-border text-label text-muted-foreground shadow-sm">
+              FOUNDER BACKGROUND
             </div>
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {whyUsItems.map((item) => (
-                <Card
+            <h2 id="founder-heading" className="text-h2 text-foreground mb-10">
+              Proof Over Promises
+            </h2>
+            <div className="space-y-8 text-body text-muted-foreground leading-relaxed text-[18px]">
+              <p>
+                Before Kolavi, our founder built Business Mavericks to over 31,000 monthly organic visitors and 60,000 Instagram followers. Not through expensive paid ads or temporary growth hacks. This was achieved through a systematic, AI-powered content strategy executed with ruthless precision over years of testing what actually compounds at scale.
+              </p>
+              <p>
+                That experience proved something incredibly important: when you combine modern technology with relentless iteration and a refusal to cut corners, the results compound in ways traditional approaches simply cannot match.
+              </p>
+              <p>
+                That exact same philosophy is the foundation of Kolavi. Every workflow. Every automation. Every single pixel on every single page. Built with the kind of obsessive perfectionism that most agencies reserve for their own pitch decks, not their clients' actual results.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 4: OUR VALUES (BENTO GRID) */}
+      <section className="relative z-10 bg-background py-24 sm:py-32" aria-labelledby="values-heading">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
+          <div className="mb-20 text-center animate-reveal">
+            <div className="inline-flex items-center justify-center px-5 py-2.5 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
+              CORE PRINCIPLES
+            </div>
+            <h2 id="values-heading" className="text-h2 text-foreground mb-6">
+              What Drives Us
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {values.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <div
                   key={item.title}
-                  className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800"
+                  className="group relative p-10 rounded-[32px] border border-border bg-card shadow-premium hover:shadow-xl transition-all duration-500 animate-reveal overflow-hidden"
+                  style={{ animationDelay: `${index * 100}ms` }}
                 >
-                  <CardHeader>
-                    <div className="mb-2 flex h-12 w-12 items-center justify-center rounded-xl bg-orange-100 text-orange-600 dark:bg-orange-400/25 dark:border dark:border-orange-400/40 dark:text-white">
-                      {item.icon}
+                  <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-primary/5 rounded-full blur-[80px] -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/10 transition-colors duration-500 pointer-events-none" />
+                  
+                  <div className="relative z-10">
+                    <div className="w-16 h-16 rounded-[16px] bg-primary/10 flex items-center justify-center mb-8 border border-primary/20">
+                      <Icon className="w-8 h-8 text-primary" />
                     </div>
-                    <CardTitle className="text-lg">{item.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <p className="text-muted-foreground leading-relaxed">
+                    <h3 className="text-h4 text-foreground mb-4">
+                      {item.title}
+                    </h3>
+                    <p className="text-body text-muted-foreground leading-relaxed">
                       {item.description}
                     </p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* Bottom CTA (light strip, match Services / Industries) */}
-      <section className="border-t border-border bg-muted/30 py-12 sm:py-16">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
-              Ready to work together?
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Partner with a team that's committed to your success. Get in touch today.
-            </p>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
-              <Button asChild size="lg" className="rounded-full bg-orange-600 px-8 font-semibold hover:bg-orange-700">
-                <Link href="/contact">Get in Touch</Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="rounded-full border-2 px-8 font-semibold">
-                <Link href="/industries">Who We Serve</Link>
-              </Button>
-            </div>
-          </div>
+      {/* SECTION 5: CTA */}
+      <section className="relative z-10 bg-background py-32 lg:py-[160px] overflow-hidden flex flex-col justify-center min-h-[50vh] border-t border-border">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] opacity-10 bg-primary pointer-events-none" />
+
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10 animate-reveal">
+          <h2 className="text-h2 text-foreground mb-8 text-balance">
+            Ready to Work With an Agency That Actually Cares?
+          </h2>
+          <p className="text-body text-muted-foreground mb-12 max-w-2xl mx-auto text-balance">
+            Start with a free SEO audit. We will show you exactly what is possible.
+          </p>
+          <Button
+            asChild
+            size="lg"
+            className="h-14 px-10 rounded-[48px] bg-primary hover:bg-primary/90 text-primary-foreground text-button shadow-premium"
+          >
+            <Link href="/tools/speed-audit">Get Your Free SEO Audit</Link>
+          </Button>
         </div>
       </section>
     </main>

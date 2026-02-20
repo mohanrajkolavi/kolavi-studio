@@ -20,6 +20,7 @@ export function LayoutShell({
     pathname?.startsWith("/partner/login") ||
     pathname?.startsWith("/partner/set-password") ||
     pathname?.startsWith("/partner/forgot-password");
+  const isPublicPage = !isDashboard && !isPartnerPortal;
 
   return (
     <>
@@ -32,7 +33,7 @@ export function LayoutShell({
         </Suspense>
       )}
       {children}
-      {!isDashboard && !isPartnerPortal && (
+      {isPublicPage && (
         <Suspense fallback={null}>
           <Footer />
         </Suspense>

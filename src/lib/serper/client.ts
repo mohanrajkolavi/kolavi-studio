@@ -1,9 +1,15 @@
 /**
- * Serper API client — automated Google search for competitor article URLs.
- * Replaces manual URL pasting: user enters keyword, we return top 5 article URLs.
+ * Serper API client — automated Google search for competitor article URLs and PAA.
+ * Replaces manual URL pasting: user enters keyword, we return top N article URLs and optional PAA questions.
  */
 
 import type { SerpResult } from "@/lib/pipeline/types";
+
+/** Result of search that includes People Also Ask questions (for gap analysis). */
+export type SerperSearchWithPaaResult = {
+  results: SerpResult[];
+  paaQuestions: string[];
+};
 
 const SERPER_API_URL = "https://google.serper.dev/search";
 
@@ -103,6 +109,8 @@ export async function searchCompetitorUrls(
 
   const data = (await response.json()) as {
     organic?: Array<{ link?: string; title?: string; snippet?: string; position?: number }>;
+    peopleAlsoAsk?: Array<{ question?: string }>;
+    people_also_ask?: Array<{ question?: string }>;
   };
   const organic = data.organic ?? [];
   const beforeCount = organic.length;
@@ -143,4 +151,82 @@ export async function searchCompetitorUrls(
   }
 
   return filtered;
+}
+
+/**
+ * Search via Serper and return both competitor URLs and PAA questions.
+ * Use this when running the full pipeline so topic extraction can use PAA for gap detection.
+ */
+export async function searchCompetitorUrlsWithPaa(
+  keyword: string,
+  maxResults = 3
+): Promise<SerperSearchWithPaaResult> {
+  const apiKey = process.env.SERPER_API_KEY;
+  if (!apiKey) {
+    throw new Error("SERPER_API_KEY is not set. Get a key at https://serper.dev");
+  }
+
+  const response = await fetch(SERPER_API_URL, {
+    method: "POST",
+    headers: {
+      "X-API-KEY": apiKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ q: keyword.trim(), num: 10 }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Serper API error: ${response.status} ${response.statusText}. ${text || ""}`);
+  }
+
+  const data = (await response.json()) as {
+    organic?: Array<{ link?: string; title?: string; snippet?: string; position?: number }>;
+    peopleAlsoAsk?: Array<{ question?: string }>;
+    people_also_ask?: Array<{ question?: string }>;
+  };
+  const organic = data.organic ?? [];
+  const paaRaw = data.peopleAlsoAsk ?? data.people_also_ask ?? [];
+  const paaQuestions = paaRaw
+    .map((item) => (typeof item.question === "string" ? item.question.trim() : ""))
+    .filter(Boolean);
+
+  const beforeCount = organic.length;
+  const filtered: SerpResult[] = [];
+  for (const item of organic) {
+    const url = item.link?.trim();
+    if (!url) continue;
+    if (!isArticleUrl(url)) continue;
+    filtered.push({
+      url,
+      title: item.title ?? "",
+      position: item.position ?? filtered.length + 1,
+      snippet: item.snippet ?? "",
+      isArticle: true,
+    });
+    if (filtered.length >= maxResults) break;
+  }
+  if (filtered.length === 0 && organic.length > 0) {
+    for (const item of organic) {
+      const url = item.link?.trim();
+      if (!url) continue;
+      filtered.push({
+        url,
+        title: item.title ?? "",
+        position: item.position ?? filtered.length + 1,
+        snippet: item.snippet ?? "",
+        isArticle: false,
+      });
+      if (filtered.length >= maxResults) break;
+    }
+  }
+
+  if (process.env.NODE_ENV !== "test") {
+    console.log(
+      `[serper] keyword="${keyword}": ${beforeCount} results → ${filtered.length} URLs, ${paaQuestions.length} PAA questions`
+    );
+  }
+
+  return { results: filtered, paaQuestions };
 }

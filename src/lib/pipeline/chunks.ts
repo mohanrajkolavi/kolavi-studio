@@ -5,7 +5,7 @@
  */
 
 import type { PipelineInput, PipelineOutput, BriefSummary, OutlineDrift, TokenUsageRecord } from "./types";
-import { PipelineInputSchema } from "./types";
+import { PipelineInputSchema, getDefaultWordCountForIntent } from "./types";
 import type { PipelineMetricsCollector } from "./metrics/collector";
 import type {
   SerpResult,
@@ -23,7 +23,7 @@ import type { PipelineProgressEvent } from "./orchestrator";
 import { buildChunkCost } from "./cost";
 import { withRetry, validateSourceUrls } from "./orchestrator";
 import { RETRY_FAST, RETRY_STANDARD_FAST, RETRY_CLAUDE_DRAFT } from "./types";
-import { searchCompetitorUrls } from "@/lib/serper/client";
+import { searchCompetitorUrls, searchCompetitorUrlsWithPaa } from "@/lib/serper/client";
 import { fetchCompetitorContent } from "@/lib/jina/reader";
 import { fetchCurrentData } from "@/lib/gemini/client";
 import {
@@ -80,6 +80,8 @@ export type ResearchChunkOutput = {
   serpResults: SerpResult[];
   competitors: CompetitorArticle[];
   currentData: CurrentData;
+  /** PAA questions from Serper (for topic extraction gap analysis). */
+  paaQuestions?: string[];
 };
 
 export type ResearchSummary = {
@@ -108,8 +110,8 @@ export type RunResearchFetchResult = {
 };
 
 /**
- * Phase 1: Run Serper only, return top 10 results for user to select up to 3.
- * Does not run Jina or Gemini; does not save research chunk.
+ * Step 1 — SERP research: Serper only, top results for user to select up to 3 (+ optional custom URL).
+ * No Jina/Gemini; no research chunk saved until Step 2.
  */
 export async function runResearchSerpOnly(
   input: PipelineInput,
@@ -179,7 +181,8 @@ function logResearchFetch(level: "info" | "error", data: Record<string, unknown>
 }
 
 /**
- * Phase 2: Fetch content for user-selected URLs (Jina) + current data (Gemini), save research chunk.
+ * Step 2 — Competitor scraping + current data: Jina scrapes selected URLs; Gemini (search grounding) fetches current data.
+ * Research chunk saved to job; brief can then run (Step 3).
  */
 export async function runResearchFetch(
   jobId: string,
@@ -399,16 +402,18 @@ export async function runResearchChunk(
   emit("serper", "started", "Searching competitors...", 0);
   const serperStartMs = Date.now();
   const serperResult = await withRetry(
-    async () => searchCompetitorUrls(primaryKeyword, DEFAULT_MAX_COMPETITOR_URLS),
+    async () => searchCompetitorUrlsWithPaa(primaryKeyword, DEFAULT_MAX_COMPETITOR_URLS),
     { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
     "serper"
   );
   const serperDurationMs = Date.now() - serperStartMs;
   metrics?.recordApiCall("serper", serperDurationMs, { endpoint: "search" });
   const serpResults: SerpResult[] =
-    serperResult.success && serperResult.data ? serperResult.data : [];
+    serperResult.success && serperResult.data ? serperResult.data.results : [];
+  const paaQuestions: string[] =
+    serperResult.success && serperResult.data ? serperResult.data.paaQuestions : [];
   const urls = serpResults.map((s) => s.url).slice(0, DEFAULT_MAX_COMPETITOR_URLS);
-  emit("serper", "completed", `Found ${urls.length} competitor URLs`, 5);
+  emit("serper", "completed", `Found ${urls.length} URLs, ${paaQuestions.length} PAA`, 5);
 
   emit("jina", "started", "Fetching competitor articles...", 5);
   emit("gemini-grounding", "started", "Gathering current data...", 5);
@@ -481,7 +486,7 @@ export async function runResearchChunk(
     }
   }
 
-  const output: ResearchChunkOutput = { serpResults, competitors, currentData };
+  const output: ResearchChunkOutput = { serpResults, competitors, currentData, paaQuestions };
   const durationMs = Date.now() - researchStartMs;
   const cost = buildChunkCost(
     {
@@ -517,23 +522,20 @@ export async function runResearchChunk(
 
 function computeWordCountOverride(input: PipelineInput): WordCountOverride | undefined {
   const preset = input.wordCountPreset;
-  if (!preset || preset === "auto") return undefined;
   if (preset === "custom") {
     const n = input.wordCountCustom;
     if (n == null || n < 500 || n > 6000) return undefined;
     return {
       target: Math.round(n),
-      note:
-        "Guideline only. Strong value: provide more value than competitors; length is secondary.",
+      note: "STRICT: target must be met within ±5%.",
     };
   }
-  const target =
-    preset === "concise" ? 1250 : preset === "standard" ? 2000 : preset === "in_depth" ? 3200 : undefined;
-  if (target == null) return undefined;
+  // "auto" or unspecified: use intent-based default
+  const intentList = Array.isArray(input.intent) ? input.intent : input.intent ? [input.intent] : undefined;
+  const target = getDefaultWordCountForIntent(intentList);
   return {
     target,
-    note:
-      "Guideline only. Strong value: provide more value than competitors; length is secondary.",
+    note: "STRICT: target must be met within ±5%.",
   };
 }
 
@@ -604,8 +606,9 @@ export async function runBriefChunk(
 
     try {
       emit("topic-extraction", "started", "Analyzing competitor topics & style...", 20);
+      const paaQuestions = (research as ResearchChunkOutput).paaQuestions ?? [];
       const extractionResult = await withRetry(
-        async () => extractTopicsAndStyle(competitors, tokenUsage),
+        async () => extractTopicsAndStyle(competitors, { tokenUsage, paaQuestions }),
         { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
         "topic-extraction"
       );
@@ -664,6 +667,7 @@ export async function runBriefChunk(
           note: "Guideline only. Strong value: provide more value than competitors; length is secondary.",
         }
       : computeWordCountOverride(input);
+  // Step 3 — Brief: GPT-4.1 builds outline, H2/H3, word count from intent, keyword rules
   emit("gpt-brief", "started", options?.revise ? "Revising brief with new word count..." : "Building strategic research brief...", 30);
   const briefResult = await withRetry(
     async () => buildResearchBrief(topicExtraction, currentData, input, wordCountOverride, tokenUsage),
@@ -836,9 +840,11 @@ export async function runDraftChunk(
     suggestedSlug: fallbackSlug.length > 75 ? fallbackSlug.slice(0, 75).replace(/-+$/, "") : fallbackSlug,
   };
 
+  // Step 4 — Draft: Claude Sonnet 4.6 or Opus 4.6 writes article from brief (+ outline overrides)
+  const draftModel = (job.input as PipelineInput).draftModel ?? "sonnet-4.6";
   emit("claude-draft", "started", "Writing article draft...", 0);
   const draftResult = await withRetry(
-    async () => writeDraft(brief, titleMetaSlug, tokenUsage),
+    async () => writeDraft(brief, titleMetaSlug, tokenUsage, draftModel),
     { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
     "claude-draft"
   );
@@ -891,6 +897,8 @@ export type ValidationChunkOutput = {
   finalContent: string;
 };
 
+/** Step 5 — Validate: FAQ enforcement, SEO audit, fact check against current data, schema.
+ * Final article (finalContent) and audit report returned for UI. */
 export async function runValidationChunk(
   jobId: string,
   store: JobStore,

@@ -9,7 +9,7 @@ import { LayoutShell } from "@/components/layout/LayoutShell";
 import { getBaseMetadata } from "@/lib/seo/metadata";
 import { getOrganizationSchema } from "@/lib/seo/jsonld/organization";
 
-const inter = Inter({ subsets: ["latin"], display: "swap" });
+const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
 
 const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
@@ -43,9 +43,10 @@ export default async function RootLayout({
             __html: JSON.stringify(organizationSchema),
           }}
           nonce={nonce}
+          suppressHydrationWarning
         />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} font-sans antialiased`}>
         <a
           href="#main-content"
           className="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:block focus:w-auto focus:h-auto focus:p-4 focus:m-0 focus:overflow-visible focus:[clip:auto] focus:whitespace-normal focus:rounded focus:bg-primary focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring"

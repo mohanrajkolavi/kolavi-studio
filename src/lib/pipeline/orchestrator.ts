@@ -25,13 +25,14 @@ import {
   type ValidatedSourceUrl,
   type SchemaMarkup,
   type TokenUsageRecord,
+  getDefaultWordCountForIntent,
   RETRY_FAST,
   RETRY_STANDARD,
   RETRY_STANDARD_FAST,
   RETRY_EXPENSIVE,
   RETRY_CLAUDE_DRAFT,
 } from "@/lib/pipeline/types";
-import { searchCompetitorUrls } from "@/lib/serper/client";
+import { searchCompetitorUrlsWithPaa } from "@/lib/serper/client";
 import { fetchCompetitorContent } from "@/lib/jina/reader";
 import { fetchCurrentData } from "@/lib/gemini/client";
 import { extractTopicsAndStyle, buildResearchBrief } from "@/lib/openai/client";
@@ -245,22 +246,25 @@ export async function runPipeline(
     throw new Error("primaryKeyword is required");
   }
 
-  // --- Step 1a: Serper ---
+  // --- Step 1: SERP research (Serper + PAA for gap analysis) ---
   metrics.startChunk("serper");
   emit("serper", "started", "Searching competitors...", 0);
   const serperStartMs = Date.now();
   const serperResult = await withRetry(
-    async () => searchCompetitorUrls(primaryKeyword, DEFAULT_MAX_COMPETITOR_URLS),
+    async () => searchCompetitorUrlsWithPaa(primaryKeyword, DEFAULT_MAX_COMPETITOR_URLS),
     { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
     "serper"
   );
   metrics.recordApiCall("serper", Date.now() - serperStartMs, { endpoint: "search" });
   metrics.endChunk("serper", "completed");
-  const serpResults: SerpResult[] = serperResult.success && serperResult.data ? serperResult.data : [];
+  const serpResults: SerpResult[] =
+    serperResult.success && serperResult.data ? serperResult.data.results : [];
+  const paaQuestions: string[] =
+    serperResult.success && serperResult.data ? serperResult.data.paaQuestions : [];
   const urls = serpResults.map((s) => s.url).slice(0, DEFAULT_MAX_COMPETITOR_URLS);
-  emit("serper", "completed", `Found ${urls.length} competitor URLs`, 5);
+  emit("serper", "completed", `Found ${urls.length} URLs, ${paaQuestions.length} PAA questions`, 5);
 
-  // --- Step 1b + 1c: Jina and Gemini grounding in parallel (use FAST retry to stay under 5 min on Vercel) ---
+  // --- Step 2: Jina (scrape) + Gemini (current data with search grounding) in parallel ---
   emit("jina", "started", "Fetching competitor articles...", 5);
   emit("gemini-grounding", "started", "Gathering current data...", 5);
   let jinaDurationMs = 0;
@@ -312,12 +316,12 @@ export async function runPipeline(
   emit("gemini-grounding", groundingResult.success ? "completed" : "failed",
     `${currentData.facts.length} current data facts`, 15);
 
-  // --- Step 2 and source URL validation in parallel (extraction needs competitors only; validation needs currentData) ---
+  // --- Step 2 continued: topic extraction (GPT-4.1) + source URL validation in parallel ---
   metrics.startChunk("topic-extraction");
   let topicExtractionTokenStart = tokenUsage.length;
   emit("topic-extraction", "started", "Analyzing competitor topics & style...", 20);
   const extractionPromise = withRetry(
-    async () => extractTopicsAndStyle(competitors, tokenUsage),
+    async () => extractTopicsAndStyle(competitors, { tokenUsage, paaQuestions }),
     { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
     "topic-extraction"
   );
@@ -370,10 +374,9 @@ export async function runPipeline(
     );
   }
 
-  // --- Step 3: Strategic brief (long timeout + trimmed payload in client) ---
+  // --- Step 3: Brief (GPT-4.1) — outline, H2/H3, word count from intent, keyword rules ---
   const wordCountOverride = (() => {
     const preset = input.wordCountPreset;
-    if (!preset || preset === "auto") return undefined;
     if (preset === "custom") {
       const n = input.wordCountCustom;
       if (n == null || n < 500 || n > 6000) return undefined;
@@ -382,9 +385,9 @@ export async function runPipeline(
         note: "STRICT: target must be met within ±5%.",
       };
     }
-    const target =
-      preset === "concise" ? 1250 : preset === "standard" ? 2000 : preset === "in_depth" ? 3200 : undefined;
-    if (target == null) return undefined;
+    // "auto" or unspecified: use intent-based default word count
+    const intentList = Array.isArray(input.intent) ? input.intent : input.intent ? [input.intent] : undefined;
+    const target = getDefaultWordCountForIntent(intentList);
     return {
       target,
       note: "STRICT: target must be met within ±5%.",
@@ -429,12 +432,13 @@ export async function runPipeline(
     suggestedSlug: fallbackSlug.length > 75 ? fallbackSlug.slice(0, 75).replace(/-+$/, "") : fallbackSlug,
   };
 
-  // --- Step 4: Write draft (one long attempt, no retry — must fit in Vercel 5 min) ---
+  // --- Step 4: Draft (Claude Sonnet 4.6 or Opus 4.6) — full article from brief ---
   metrics.startChunk("claude-draft");
   const claudeDraftTokenStart = tokenUsage.length;
   emit("claude-draft", "started", "Writing article draft (this is the longest step)...", 45);
+  const draftModel = input.draftModel ?? "sonnet-4.6";
   const draftResult = await withRetry(
-    async () => writeDraft(brief, titleMetaSlug, tokenUsage),
+    async () => writeDraft(brief, titleMetaSlug, tokenUsage, draftModel),
     { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
     "claude-draft"
   );
@@ -451,7 +455,7 @@ export async function runPipeline(
     console.log(`[pipeline] Step 4 complete: draft ${wordCount} words`);
   }
 
-  // --- Step 5: FAQ character limit enforcement ---
+  // --- Step 5: Validate — FAQ enforcement, SEO audit, fact check, schema ---
   metrics.startChunk("faq-enforcement");
   emit("faq-enforcement", "started", "Enforcing FAQ character limits...", 82);
   let finalContent = draft.content;

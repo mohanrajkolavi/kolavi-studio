@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
-import { sql } from "@/lib/db";
+import { sql, optionalText } from "@/lib/db";
 
 function toIso(d: unknown): string | null {
   if (d == null) return null;
@@ -41,7 +41,7 @@ export async function POST(
 
     const result = await sql`
       INSERT INTO partner_payouts (partner_id, amount, status, notes)
-      VALUES (${partnerId}, ${amountNum}, 'pending', ${notesVal})
+      VALUES (${partnerId}, ${amountNum}, 'pending', ${optionalText(notesVal)})
       RETURNING id, amount, status, paid_at, notes, created_at
     `;
 

@@ -13,18 +13,46 @@ import type { PipelineRunMetrics, PerformanceSummary } from "@/lib/pipeline/metr
 
 export type SearchIntent = "informational" | "commercial" | "transactional" | "navigational";
 
-/** Word count guideline preset. "auto" = use competitor-derived target; custom uses wordCountCustom. */
-export type WordCountPreset = "auto" | "concise" | "standard" | "in_depth" | "custom";
+/** Word count: "auto" = default by search intent; "custom" = wordCountCustom. */
+export type WordCountPreset = "auto" | "custom";
+
+/** Draft model for Claude writeDraft step. */
+export type DraftModel = "opus-4.6" | "sonnet-4.6";
+
+/**
+ * Default word count by intent (single or combo). Key = single intent or sorted combo "a,b".
+ * Single: Informational 2,500 | Commercial 1,750 | Transactional 1,000 | Navigational 600.
+ * Combos: Inf+Comm 2,250 | Inf+Trans 1,750 | Comm+Trans 1,350 | Inf+Nav 1,250.
+ */
+export const INTENT_DEFAULT_WORD_COUNT: Record<string, number> = {
+  informational: 2500,
+  commercial: 1750,
+  transactional: 1000,
+  navigational: 600,
+  "commercial,informational": 2250,
+  "informational,transactional": 1750,
+  "commercial,transactional": 1350,
+  "informational,navigational": 1250,
+};
+
+export function getDefaultWordCountForIntent(intent: SearchIntent[] | undefined): number {
+  if (!intent?.length) return INTENT_DEFAULT_WORD_COUNT.informational ?? 2500;
+  const key = [...intent].sort().join(",");
+  return INTENT_DEFAULT_WORD_COUNT[key] ?? INTENT_DEFAULT_WORD_COUNT.informational ?? 2500;
+}
 
 export type PipelineInput = {
   primaryKeyword: string;
+  /** Max 2 secondary keywords. */
   secondaryKeywords?: string[];
   peopleAlsoSearchFor?: string[];
   intent?: SearchIntent | SearchIntent[];
-  /** When set and not "auto", overrides competitor-derived word count. */
+  /** "auto" = default by intent; "custom" = wordCountCustom. */
   wordCountPreset?: WordCountPreset;
   /** Used only when wordCountPreset is "custom". */
   wordCountCustom?: number;
+  /** Draft model: Opus 4.6 or Sonnet 4.6. */
+  draftModel?: DraftModel;
   /** When true (default), auto-fix fact-check hallucinations via Claude. */
   autoFixHallucinations?: boolean;
 };
@@ -40,6 +68,7 @@ export const PipelineInputSchema = z.object({
   ]).optional(),
   wordCountPreset: z.string().optional(),
   wordCountCustom: z.number().optional(),
+  draftModel: z.enum(["opus-4.6", "sonnet-4.6"]).optional(),
   autoFixHallucinations: z.boolean().optional(),
 });
 
@@ -113,6 +142,8 @@ export type Topic = {
 // 6. EditorialStyle
 // =============================================================================
 
+export type PointOfView = "first" | "second" | "third" | "mixed";
+
 export type EditorialStyle = {
   sentenceLength: {
     average: number;
@@ -125,7 +156,12 @@ export type EditorialStyle = {
   tone: string;
   readingLevel: string;
   contentMix: { prose: number; lists: number; tables: number };
+  /** e.g. "data-heavy with stats in every section" — specific, not generic. */
   dataDensity: string;
+  /** First, second, third person, or mixed across competitors. */
+  pointOfView: PointOfView;
+  /** How often competitors use real examples (names, case studies, numbers). */
+  realExamplesFrequency: string;
   introStyle: string;
   ctaStyle: string;
 };
@@ -134,23 +170,39 @@ export type EditorialStyle = {
 // 7. TopicExtractionResult (from Gemini Pro) — Zod validated
 // =============================================================================
 
+/** Coerce AI output (string/number/undefined/null) to string so schema validation passes. */
+const stringCoerce = z
+  .union([z.string(), z.number(), z.undefined(), z.null()])
+  .transform((v) => (v != null && v !== "" ? String(v) : ""));
+
+/** Array of strings where AI may return mixed types; filter and coerce to string[]. */
+const stringArrayCoerce = z
+  .array(z.union([z.string(), z.number(), z.undefined(), z.null()]).transform((v) => (v != null && v !== "" ? String(v) : "")))
+  .transform((arr) => arr.filter(Boolean) as string[])
+  .default([]);
+
 export const TopicSchema = z.object({
-  name: z.string(),
-  importance: z.enum(["essential", "recommended", "differentiator"]),
-  coverageCount: z.string(),
-  keyTerms: z.array(z.string()),
-  exampleContent: z.string(),
-  recommendedDepth: z.string(),
+  name: stringCoerce,
+  importance: z.enum(["essential", "recommended", "differentiator"]).catch("recommended"),
+  coverageCount: stringCoerce,
+  keyTerms: stringArrayCoerce,
+  exampleContent: stringCoerce,
+  recommendedDepth: stringCoerce,
 });
 
-/** Coerce string or number to number (AI often returns "20" or "20%"). */
-const numeric = z.union([
-  z.number(),
-  z.string().transform((s) => {
-    const n = Number(String(s).replace(/%/g, "").trim());
+/** Coerce string or number or undefined to number (AI often returns "20", "20%", or undefined). */
+const numeric = z
+  .union([
+    z.number(),
+    z.string(),
+    z.undefined(),
+    z.null(),
+  ])
+  .transform((v) => {
+    if (v == null) return 0;
+    const n = typeof v === "number" ? v : Number(String(v).replace(/%/g, "").trim());
     return Number.isFinite(n) ? n : 0;
-  }),
-]);
+  });
 
 export const SentenceLengthDistributionSchema = z.object({
   short: numeric,
@@ -175,28 +227,37 @@ export const EditorialStyleSchema = z.object({
     averageSentences: numeric,
     distribution: ParagraphLengthDistributionSchema,
   }),
-  tone: z.string(),
-  readingLevel: z.string(),
+  tone: stringCoerce,
+  readingLevel: stringCoerce,
   contentMix: z.object({
     prose: numeric,
     lists: numeric,
     tables: z.optional(numeric).default(0),
   }),
-  dataDensity: z.string(),
-  introStyle: z.string(),
-  ctaStyle: z.string(),
+  dataDensity: stringCoerce,
+  pointOfView: z.enum(["first", "second", "third", "mixed"]).catch("third"),
+  realExamplesFrequency: stringCoerce.optional().default(""),
+  introStyle: stringCoerce,
+  ctaStyle: stringCoerce,
 });
 
 export const CompetitorHeadingsSchema = z.object({
-  url: z.string(),
-  h2s: z.array(z.string()),
-  h3s: z.array(z.string()),
+  url: stringCoerce,
+  h2s: stringArrayCoerce,
+  h3s: stringArrayCoerce,
 });
 
+/** A gap qualifies only with real reader demand, missing from most competitors, and a concrete actionable angle. */
 export const GapSchema = z.object({
-  topic: z.string(),
-  opportunity: z.string(),
-  recommendedApproach: z.string(),
+  topic: stringCoerce,
+  opportunity: stringCoerce,
+  recommendedApproach: stringCoerce,
+  /** Specific evidence: where competitors fall short (e.g. "URL X only mentions Y in one sentence; URL Z omits it"). No vague gaps. */
+  evidence: stringArrayCoerce.optional().default([]),
+  /** Why there is real reader demand (e.g. search volume, PAA question, intent). */
+  readerDemand: stringCoerce.optional().default(""),
+  /** Concrete angle we can take (actionable, not vague). */
+  actionableAngle: stringCoerce.optional().default(""),
 });
 
 /** Coerce string or array to string (AI may return strengths/weaknesses as bullet arrays). */
@@ -206,16 +267,25 @@ const stringOrArray = z.union([
 ]);
 
 export const CompetitorStrengthsSchema = z.object({
-  url: z.string(),
+  url: stringCoerce,
   strengths: stringOrArray,
   weaknesses: stringOrArray,
-  aiLikelihood: z.enum(["likely_human", "uncertain", "likely_ai"]),
+  aiLikelihood: z.enum(["likely_human", "uncertain", "likely_ai"]).catch("uncertain"),
 });
 
 export const WordCountNoteSchema = z.object({
   competitorAverage: numeric,
   recommended: numeric,
-  note: z.string(),
+  note: stringCoerce,
+});
+
+/** Per–PAA question: did competitors answer it and is it a gap candidate? */
+export const PaaAnalysisItemSchema = z.object({
+  question: stringCoerce,
+  answeredBy: stringArrayCoerce,
+  quality: z.enum(["full", "partial", "missing"]).catch("partial"),
+  gapCandidate: z.boolean().catch(false),
+  note: stringCoerce.optional(),
 });
 
 export const TopicExtractionResultSchema = z.object({
@@ -225,7 +295,10 @@ export const TopicExtractionResultSchema = z.object({
   competitorStrengths: z.array(CompetitorStrengthsSchema),
   editorialStyle: EditorialStyleSchema,
   wordCount: WordCountNoteSchema,
+  paaAnalysis: z.array(PaaAnalysisItemSchema).optional().default([]),
 });
+
+export type PaaAnalysisItem = z.infer<typeof PaaAnalysisItemSchema>;
 
 export type TopicExtractionResult = z.infer<typeof TopicExtractionResultSchema>;
 
@@ -303,6 +376,8 @@ export const ResearchBriefSchema = z.object({
   similaritySummary: z.string().optional(),
   extraValueThemes: z.array(z.string()).optional(),
   freshnessNote: z.string().optional(),
+  /** Patterns to avoid (from likely_ai competitors); passed to Step 4 as writing constraints. */
+  competitorDifferentiation: z.string().optional(),
 });
 
 /** Used when GPT returns brief without currentData (merged server-side). */
@@ -381,7 +456,7 @@ export type HallucinationFix = {
 export type TokenUsageRecord = {
   /** Call identifier (e.g. "extractTopicsAndStyle", "writeDraft"). */
   callName: string;
-  /** Model name (e.g. "gpt-4.1", "claude-sonnet-4-5"). */
+  /** Model name (e.g. "gpt-4.1", "gemini-3-flash-preview", "claude-sonnet-4-6", "claude-opus-4-6"). */
   model: string;
   promptTokens: number;
   completionTokens: number;

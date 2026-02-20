@@ -1,8 +1,11 @@
 /**
- * OpenAI API client — topic extraction (GPT-4.1) + strategic brief (GPT-4.1).
+ * OpenAI API client — Step 2 (topic extraction) + Step 3 (strategic brief), GPT-4.1.
  */
 
 import OpenAI from "openai";
+
+/** Model used for topic extraction and brief (Steps 2 & 3). */
+const OPENAI_MODEL = "gpt-4.1";
 import { SEO } from "@/lib/constants";
 import { getAuditRulesForPrompt } from "@/lib/seo/article-audit";
 import {
@@ -54,14 +57,28 @@ function normalizeContentMix(raw: unknown): { prose: number; lists: number; tabl
   return { prose, lists, tables: 0 };
 }
 
+/** Options for topic extraction (PAA from Serper, token usage tracking). */
+export type ExtractTopicsAndStyleOptions = {
+  tokenUsage?: TokenUsageRecord[];
+  paaQuestions?: string[];
+};
+
 /**
- * Extract topics, heading patterns, gaps, editorial style, and competitor analysis from competitors.
- * Uses GPT-4.1 for strong schema adherence and reasoning. EXTRACT only — outline is decided in buildResearchBrief.
+ * Step 2 — Topic extraction: topics, heading patterns, gaps, editorial style from competitors.
+ * EXTRACT only — outline is decided in buildResearchBrief (Step 3).
+ * When paaQuestions are provided, also analyze how well competitors answer each PAA (paaAnalysis).
  */
 export async function extractTopicsAndStyle(
   competitors: CompetitorArticle[],
-  tokenUsage?: TokenUsageRecord[]
+  tokenUsageOrOptions?: TokenUsageRecord[] | ExtractTopicsAndStyleOptions
 ): Promise<TopicExtractionResult> {
+  const options: ExtractTopicsAndStyleOptions = Array.isArray(tokenUsageOrOptions)
+    ? { tokenUsage: tokenUsageOrOptions }
+    : tokenUsageOrOptions ?? {};
+  const tokenUsage = options.tokenUsage;
+  const paaQuestions = options.paaQuestions ?? [];
+  const hasPaa = paaQuestions.length > 0;
+
   const openai = getClient();
   const startMs = Date.now();
   const successful = competitors.filter((c) => c.fetchSuccess && c.content.length > 0);
@@ -75,56 +92,51 @@ export async function extractTopicsAndStyle(
           .join("\n\n---\n\n")
       : "No competitor content provided. Generate expected topics and a default editorial style for a generic blog article.";
 
+  const rootKeys = hasPaa
+    ? "topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount, paaAnalysis"
+    : "topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount";
+
   const systemPrompt = `You are analyzing competitor articles for a content strategy. EXTRACT and REPORT the following. Do NOT decide the final outline — only report what you observe.
 
 A) TOPIC EXTRACTION
-- Extract 10-20 SEMANTIC TOPICS (concepts, not single keywords). Example: "budgeting and cost planning" not just "budget".
-- For each topic: importance = "essential" (4-5/5 cover it), "recommended" (2-3/5), "differentiator" (0-1/5).
-- coverageCount: e.g. "4/5".
-- keyTerms: array of terms.
-- exampleContent: brief description of what competitors say.
-- recommendedDepth: e.g. "200-300 words".
-- Identify GAPS: topics 0-1 competitors cover well (uniqueness opportunities).
+- Extract 15-25 SEMANTIC TOPICS (concepts, not single keywords).
+- Good: "budgeting and cost planning", "hiring and retention strategies", "compliance and legal considerations". Bad: "budget", "hiring", "compliance" (single keywords).
+- For each topic: importance = "essential" (4-5/5 cover it), "recommended" (2-3/5), "differentiator" (0-1/5). coverageCount, keyTerms, exampleContent, recommendedDepth.
 
-B) HEADING PATTERN EXTRACTION (raw data only)
-- For EACH competitor: list their H2 and H3 headings exactly as used.
-- competitorHeadings: array of { url, h2s: string[], h3s: string[] }.
-- Do NOT create a "recommended outline".
+B) GAP IDENTIFICATION
+- A gap qualifies ONLY if: (1) real reader demand, (2) missing from MOST competitors, (3) concrete actionable angle.
+- For EACH gap cite specific evidence: which URLs fall short and how (e.g. "URL X only mentions Y in one sentence"). Include evidence (array of strings), readerDemand, actionableAngle. No vague gaps.
 
-C) EDITORIAL STYLE ANALYSIS
-- Average sentence length (words) across competitors.
-- Sentence length distribution: % short (1-8), medium (9-17), long (18-30), veryLong (30+).
-- Average paragraph length (sentences).
-- Paragraph distribution: % single, standard (2-4), long (5-7), veryLong (8+).
-- Tone, reading level (e.g. "Grade 8-9"), contentMix (prose/lists % only — no tables; frontend does not format tables), dataDensity, introStyle, ctaStyle.
+C) HEADING PATTERN EXTRACTION (raw data only)
+- For EACH competitor: list their H2 and H3 headings exactly as used. competitorHeadings: array of { url, h2s: string[], h3s: string[] }. Do NOT create a "recommended outline".
 
-D) COMPETITOR ANALYSIS
-- Per competitor: url, strengths, weaknesses.
-- For EACH competitor assess AI-generated likelihood: "likely_human", "uncertain", or "likely_ai" based on: uniform sentence length, repetitive structure, AI-typical phrases (delve, landscape, crucial, comprehensive, leverage, seamless, robust), lack of personal voice.
+D) EDITORIAL STYLE ANALYSIS
+- sentenceLength (average, distribution %), paragraphLength (averageSentences, distribution %).
+- tone: MUST be specific (e.g. "authoritative but approachable with short how-to lists") — NOT generic like "professional" or "informative" alone.
+- readingLevel, contentMix (prose/lists %), dataDensity (how data-heavy — specific, not generic).
+- pointOfView: "first" | "second" | "third" | "mixed". realExamplesFrequency: how often competitors use real examples (specific, e.g. "one case study per article"). introStyle, ctaStyle.
 
-E) WORD COUNT
-- competitorAverage, recommended (avg + 15%), note. In the note field include this exact sentence: "STRICT — the target MUST be met within ±5%. Do not pad; do not fall short." This flows to the writer; missing it breaks the pipeline.
+E) COMPETITOR ANALYSIS
+- Per competitor: url, strengths, weaknesses, aiLikelihood: "likely_human" | "uncertain" | "likely_ai".
 
-Return ONLY valid JSON matching this EXACT top-level structure (no wrapper keys, no nesting under "extraction" or "data" or "result"):
-{
-  "topics": [{"name":"...","importance":"essential"|"recommended"|"differentiator","coverageCount":"4/5","keyTerms":["..."],"exampleContent":"...","recommendedDepth":"200-300 words"}],
-  "competitorHeadings": [{"url":"...","h2s":["..."],"h3s":["..."]}],
-  "gaps": [{"topic":"...","opportunity":"...","recommendedApproach":"..."}],
-  "competitorStrengths": [{"url":"...","strengths":"...","weaknesses":"...","aiLikelihood":"likely_human"|"uncertain"|"likely_ai"}],
-  "editorialStyle": {"sentenceLength":{"average":15,"distribution":{"short":20,"medium":40,"long":30,"veryLong":10}},"paragraphLength":{"averageSentences":3,"distribution":{"single":15,"standard":50,"long":30,"veryLong":5}},"tone":"...","readingLevel":"Grade 8-10","contentMix":{"prose":75,"lists":25},"dataDensity":"...","introStyle":"...","ctaStyle":"..."},
-  "wordCount": {"competitorAverage":1500,"recommended":1725,"note":"..."}
-}
+F) WORD COUNT
+- competitorAverage, recommended (avg + 15%), note including: "STRICT — the target MUST be met within ±5%. Do not pad; do not fall short."
+${hasPaa ? `
+G) PAA (PEOPLE ALSO ASK) ANALYSIS
+- For each PAA question provided, check if competitors answer it and how well. Output paaAnalysis: array of { question, answeredBy (URLs that address it), quality: "full"|"partial"|"missing", gapCandidate: true if missing or partial, note? }.` : ""}
 
-The JSON root must have exactly these 6 keys: topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount. No markdown fences.`;
+Return ONLY valid JSON. Root keys: ${rootKeys}. No wrapper keys, no markdown fences. Gaps must include evidence, readerDemand, actionableAngle. EditorialStyle must include pointOfView, realExamplesFrequency.`;
 
+  const paaBlock = hasPaa
+    ? `\n--- PAA QUESTIONS (analyze coverage for each) ---\n${paaQuestions.map((q) => `- ${q}`).join("\n")}\n\n`
+    : "";
   const userMessage = `Analyze these competitor articles and return the extraction JSON.
-
---- COMPETITOR ARTICLES ---
+${paaBlock}--- COMPETITOR ARTICLES ---
 
 ${payload}`;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4.1",
+    model: OPENAI_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -138,7 +150,7 @@ ${payload}`;
   if (tokenUsage && usage) {
     tokenUsage.push({
       callName: "extractTopicsAndStyle",
-      model: completion.model ?? "gpt-4.1",
+      model: completion.model ?? OPENAI_MODEL,
       promptTokens: usage.prompt_tokens ?? 0,
       completionTokens: usage.completion_tokens ?? 0,
       totalTokens: usage.total_tokens ?? 0,
@@ -160,7 +172,9 @@ ${payload}`;
 
   // GPT sometimes wraps the result in a single top-level key (e.g. "extraction", "data", "result").
   // Unwrap if the expected keys are missing at the top level but present one level down.
-  const EXPECTED_KEYS = ["topics", "competitorHeadings", "gaps", "competitorStrengths", "editorialStyle", "wordCount"];
+  const EXPECTED_KEYS = hasPaa
+    ? ["topics", "competitorHeadings", "gaps", "competitorStrengths", "editorialStyle", "wordCount", "paaAnalysis"]
+    : ["topics", "competitorHeadings", "gaps", "competitorStrengths", "editorialStyle", "wordCount"];
   if (parsed != null && typeof parsed === "object" && !Array.isArray(parsed)) {
     const obj = parsed as Record<string, unknown>;
     const hasExpected = EXPECTED_KEYS.every((k) => k in obj);
@@ -264,13 +278,19 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
   } else if (rawOutline != null && typeof rawOutline === "object" && Array.isArray((rawOutline as Record<string, unknown>).sections)) {
     sections = ((rawOutline as Record<string, unknown>).sections as unknown[]).map(normSection);
   }
+  const sectionTargetSum = sections.reduce(
+    (sum, s) => sum + (typeof (s as Record<string, unknown>).targetWords === "number" ? (s as Record<string, unknown>).targetWords as number : 0),
+    0
+  );
   const outline = {
     sections,
     totalSections: sections.length,
     estimatedWordCount:
-      typeof parsed.wordCount === "object" && parsed.wordCount != null && "target" in (parsed.wordCount as object)
-        ? Number((parsed.wordCount as Record<string, unknown>).target) || 1500
-        : 1500,
+      sectionTargetSum > 0
+        ? sectionTargetSum
+        : typeof parsed.wordCount === "object" && parsed.wordCount != null && "target" in (parsed.wordCount as object)
+          ? Number((parsed.wordCount as Record<string, unknown>).target) || 1500
+          : 1500,
   };
 
   const rawGaps = parsed.gaps;
@@ -331,6 +351,8 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
     readingLevel: "Grade 8-10",
     contentMix: { prose: 75, lists: 25, tables: 0 },
     dataDensity: "1 stat per 200 words, 1 example per 400 words",
+    pointOfView: "third" as const,
+    realExamplesFrequency: "Use where relevant",
     introStyle: "Direct answer or definition in first 1-2 sentences, then expand",
     ctaStyle: "Soft recommendation with next step suggestion",
   };
@@ -344,6 +366,10 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
           readingLevel: String((rawStyle as Record<string, unknown>).readingLevel ?? defaultEditorialStyle.readingLevel),
           contentMix: normalizeContentMix((rawStyle as Record<string, unknown>).contentMix) ?? defaultEditorialStyle.contentMix,
           dataDensity: String((rawStyle as Record<string, unknown>).dataDensity ?? defaultEditorialStyle.dataDensity),
+          pointOfView: (["first", "second", "third", "mixed"] as const).includes((rawStyle as Record<string, unknown>).pointOfView as "first" | "second" | "third" | "mixed")
+            ? (rawStyle as Record<string, unknown>).pointOfView
+            : defaultEditorialStyle.pointOfView,
+          realExamplesFrequency: String((rawStyle as Record<string, unknown>).realExamplesFrequency ?? defaultEditorialStyle.realExamplesFrequency),
           introStyle: String((rawStyle as Record<string, unknown>).introStyle ?? defaultEditorialStyle.introStyle),
           ctaStyle: String((rawStyle as Record<string, unknown>).ctaStyle ?? defaultEditorialStyle.ctaStyle),
         }
@@ -360,6 +386,10 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
     typeof parsed.freshnessNote === "string" && parsed.freshnessNote.trim().length > 0
       ? parsed.freshnessNote.trim()
       : undefined;
+  const competitorDifferentiation =
+    typeof parsed.competitorDifferentiation === "string" && parsed.competitorDifferentiation.trim().length > 0
+      ? parsed.competitorDifferentiation.trim()
+      : undefined;
 
   const out: Record<string, unknown> = {
     keyword,
@@ -374,6 +404,7 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
   if (similaritySummary != null) out.similaritySummary = similaritySummary;
   if (extraValueThemes != null && extraValueThemes.length > 0) out.extraValueThemes = extraValueThemes;
   if (freshnessNote != null) out.freshnessNote = freshnessNote;
+  if (competitorDifferentiation != null) out.competitorDifferentiation = competitorDifferentiation;
   return out;
 }
 
@@ -381,9 +412,8 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
 export type WordCountOverride = { target: number; note: string };
 
 /**
- * Build the strategic research brief: decide outline, editorial style, GEO/SEO.
- * Uses GPT-4.1. Validates with ResearchBriefSchema; retries once on schema failure.
- * When wordCountOverride is provided, it replaces the extraction-derived word count in the brief.
+ * Step 3 — Brief: build strategic research brief (outline, H2/H3, word count from intent, keyword rules).
+ * Validates with ResearchBriefSchema; retries once on schema failure.
  */
 export async function buildResearchBrief(
   topics: TopicExtractionResult,
@@ -399,10 +429,30 @@ export async function buildResearchBrief(
 
   const systemPrompt = `You are the strategist for a blog content pipeline. Your ONLY job is to produce a compact ResearchBrief as JSON. The writer (another model) will receive this brief as its ONLY input — no raw competitor content. So your brief must be self-contained and decisive.
 
+MANDATORY USE OF STEP 2 EXTRACTION — do not ignore any of these. The extraction provides: paaAnalysis (which PAA questions are gap candidates), gaps (with evidence, readerDemand, actionableAngle), topics (importance, recommendedDepth), competitorStrengths (aiLikelihood), editorialStyle (pointOfView, tone, realExamplesFrequency, dataDensity). You MUST use all of them when building the outline, word distribution, editorial style, and competitorDifferentiation.
+
 RULES:
 1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition → how-to → advanced → FAQ; commercial: overview → comparison → pros/cons → pricing → recommendation; transactional: value prop → features → pricing → CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't). Every outline section must have enough topics and targetWords so the writer can hit the total word count without padding.
-2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote. Include H3 subsections where competitors commonly do.
+2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote. Include H3 subsections where competitors commonly do. Where a PAA question is a gap candidate, either add an H3 for it under the relevant H2 or add an explicit "must answer: [question]" in that section's topics or geoNote.
 3. BEST-VERSION FIELDS (required in your JSON): (a) similaritySummary: 2-4 sentences summarizing what the top 5 competitors collectively cover and how they're similar. (b) extraValueThemes: array of 3-6 short strings, each 5-12 words, actionable (e.g. "Include 2025 pricing benchmarks from currentData" or "Add comparison table as bulleted lists" — not vague like "Be fresh"). These are concrete themes the writer must clearly cover. (c) freshnessNote: 1-2 sentences on how to position for freshness (e.g. "Lead with currentData numbers; avoid pre-2024 framing; mention [recent development] where relevant.").
+
+GAP PRIORITIZATION (use extraction.gaps: readerDemand + actionableAngle):
+- Strong reader demand AND strong actionable angle → give the gap its own H2.
+- Moderate (e.g. one of the two is weak) → fold into an existing section: add as H3 or as topics/geoNote under the closest H2; do not create a standalone H2.
+- Weak or vague readerDemand/actionableAngle → skip the gap; do not add a section for it.
+List in your output "gaps" only the gap topics you are actually addressing (own H2 or folded); the writer will use this list.
+
+PAA INTEGRATION INTO OUTLINE:
+- For each item in paaAnalysis where gapCandidate is true, the outline MUST account for it: either (a) an H3 heading that answers that question, or (b) in the section's topics or geoNote an explicit instruction like "Must answer: [exact PAA question]". No PAA gap candidate may be left unmapped to a section.
+
+WORD COUNT DISTRIBUTION (not a single target):
+- Total word count = extraction.wordCount.recommended (or override when provided). You MUST distribute this total across outline sections. Set each section's targetWords using: (1) topic importance from extraction (essential topics → more words; differentiator → fewer unless it's a gap H2), (2) recommendedDepth from extraction for topics in that section. Sum of all section targetWords must equal the total target. The writer will use these per-section targets to proportion content. Include in outline: estimatedWordCount = sum(section.targetWords).
+
+EDITORIAL STYLE ENFORCEMENT:
+- If 3+ competitors are rated "likely_ai", set editorialStyleFallback: true and use hardcoded human-like defaults. Otherwise set editorialStyleFallback: false and COPY the extraction's editorialStyle into your output unchanged: pointOfView, tone (use the specific tone from extraction, not generic "professional"), realExamplesFrequency, dataDensity. The writer (Step 4) will enforce these as writing constraints; do not dilute them.
+
+COMPETITOR DIFFERENTIATION:
+- From competitorStrengths, identify every competitor with aiLikelihood "likely_ai". Output competitorDifferentiation: 2-4 sentences or short bullet points instructing the writer to DELIBERATELY AVOID the patterns those competitors use — e.g. generic intros ("In today's world...", "When it comes to..."), specific AI-typical phrases they use, section structures or list styles that mirror those URLs. Be concrete so the writer can avoid them. If none are likely_ai, omit competitorDifferentiation or set to empty.
 
 CONTENT MIX — MANDATORY STRUCTURE (applies to every article). Do NOT use HTML table tags — the frontend does not format tables. Use only lists (ul/ol).
 1. SUMMARY ELEMENT (required, non-optional): Place a scannable summary section early, after the intro, before detailed sections. Format by article type: Analysis = key takeaways or pros/cons as bulleted list (5-7 items); Comparison = two bulleted lists (e.g. "Option A" vs "Option B") or side-by-side bullets; How-to = numbered key steps summary; Listicle = ranked list with one-line per item; Review = score/rating with top pros and cons as bullets; Informational = key takeaways bulleted list (5-7 items). Must render as actual HTML lists (ul/ol only). Not prose that describes a list.
@@ -414,10 +464,9 @@ Any H2 section that covers 3 or more distinct sub-points MUST break them into H3
 How this applies: H2 about strengths/advantages → H3 per strength; H2 about features → H3 per feature; H2 about process steps → H3 per phase; H2 about pros or cons → H3 per pro or con; H2 about list items → H3 per item; H2 about key factors → H3 per factor.
 Each H3 gets its own topics, word target, and optional geoNote in the OutlineSection. If an H2 covers 3+ things, subdivide it.
 
-3. EDITORIAL STYLE: If 3+ competitors are rated "likely_ai", set editorialStyleFallback: true and use hardcoded human-like defaults. Otherwise use the extracted editorialStyle from the extraction and set editorialStyleFallback: false.
 4. GEO: directAnswer — Intro opens with a direct factual answer (primary keyword + specific claim in first 30-40 words), then a hook (15-25 words). User value first; banned openings (e.g. 'In this article we will...'). statDensity, entities (1 primary + 3-6 supporting), qaBlocks, faqStrategy.
 5. SEO: keywordInTitle, keywordInFirst10Percent: true, keywordInSubheadings: true, maxParagraphWords: 120, faqCount: "5-8".
-6. wordCount: target from competitor recommended (or from override when provided). Note: STRICT — the target MUST be met within ±5%. The writer will be held to this.
+6. wordCount: target = total (from competitor recommended or override). Note: STRICT — the target MUST be met within ±5%. Section targetWords must sum to this total.
 
 POST-GENERATION VALIDATION AWARENESS — design the brief so the writer can pass these checks:
 
@@ -441,7 +490,7 @@ E-E-A-T QUALITY SCORING:
 - Readability variance: varied sentence patterns (no monotony).
 - Sentence start variety: no 3+ sentences starting the same way.
 
-Output ONLY valid JSON. Do NOT include "currentData" in your output — it will be merged server-side. Include: keyword, outline, gaps, editorialStyle, editorialStyleFallback, geoRequirements, seoRequirements, wordCount, similaritySummary, extraValueThemes, freshnessNote. No markdown fences.`;
+Output ONLY valid JSON. Do NOT include "currentData" in your output — it will be merged server-side. Include: keyword, outline, gaps, editorialStyle, editorialStyleFallback, geoRequirements, seoRequirements, wordCount, similaritySummary, extraValueThemes, freshnessNote, competitorDifferentiation (when applicable). No markdown fences.`;
 
   // Keep payload compact to avoid timeouts and token limits
   const MAX_TOPICS = 14;
@@ -463,6 +512,7 @@ Output ONLY valid JSON. Do NOT include "currentData" in your output — it will 
       competitorStrengths: topics.competitorStrengths.slice(0, 5),
       editorialStyle: topics.editorialStyle,
       wordCount: topics.wordCount,
+      paaAnalysis: topics.paaAnalysis ?? [],
     },
     currentData: {
       facts: currentData.facts.slice(0, MAX_FACTS),
@@ -494,7 +544,7 @@ Output ONLY valid JSON. Do NOT include "currentData" in your output — it will 
     try {
       const briefStartMs = Date.now();
       const completion = await openai.chat.completions.create({
-        model: "gpt-4.1",
+        model: OPENAI_MODEL,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -508,7 +558,7 @@ Output ONLY valid JSON. Do NOT include "currentData" in your output — it will 
       if (tokenUsage && usage) {
         tokenUsage.push({
           callName: "buildResearchBrief",
-          model: completion.model ?? "gpt-4.1",
+          model: completion.model ?? OPENAI_MODEL,
           promptTokens: usage.prompt_tokens ?? 0,
           completionTokens: usage.completion_tokens ?? 0,
           totalTokens: usage.total_tokens ?? 0,
@@ -674,7 +724,7 @@ ${fullExcerpt}
 Generate two distinct meta options (optionA and optionB). Each must satisfy all audit rules. Return JSON only.`;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4.1",
+    model: OPENAI_MODEL,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -688,7 +738,7 @@ Generate two distinct meta options (optionA and optionB). Each must satisfy all 
   if (tokenUsage && usage) {
     tokenUsage.push({
       callName: "generateTitleMetaSlugFromContent",
-      model: completion.model ?? "gpt-4.1",
+      model: completion.model ?? OPENAI_MODEL,
       promptTokens: usage.prompt_tokens ?? 0,
       completionTokens: usage.completion_tokens ?? 0,
       totalTokens: usage.total_tokens ?? 0,

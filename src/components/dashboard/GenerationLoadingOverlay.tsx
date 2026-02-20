@@ -31,13 +31,24 @@ type DemoChunkOutputs = {
   brief: unknown | null;
 };
 
-type StepKey = "competitors" | "research_brief" | "draft_validation";
+/** Each pipeline process shown clearly to the user. */
+type ProcessKey = "competitors" | "fetch_articles" | "brief" | "draft" | "validate";
 
-const STEPS: { key: StepKey; label: string }[] = [
-  { key: "competitors", label: "Competitors" },
-  { key: "research_brief", label: "Research & Brief" },
-  { key: "draft_validation", label: "Draft & Validation" },
+const PROCESSES: { key: ProcessKey; label: string; description: string }[] = [
+  { key: "competitors", label: "Finding competitors", description: "Searching for top results for your keyword" },
+  { key: "fetch_articles", label: "Fetching articles", description: "Reading content from selected competitor URLs" },
+  { key: "brief", label: "Building brief", description: "Creating research brief and outline" },
+  { key: "draft", label: "Writing draft", description: "Generating the article draft" },
+  { key: "validate", label: "Validating", description: "Running SEO and quality checks" },
 ];
+
+const DEMO_MESSAGES: Partial<Record<DemoStep, string>> = {
+  research: "Searching competitors…",
+  fetch: "Fetching selected articles…",
+  brief: "Building research brief…",
+  draft: "Writing article draft…",
+  validate: "Validating…",
+};
 
 function formatElapsed(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -84,19 +95,10 @@ export function GenerationLoadingOverlay({
   if (!visible) return null;
 
   const isDemo = demoRunning;
-  const message = isDemo
-    ? (["research", "fetch", "brief", "draft", "validate"].includes(demoStep)
-        ? demoStep === "research"
-          ? "Searching competitors…"
-          : demoStep === "fetch"
-            ? "Fetching selected articles…"
-            : demoStep === "brief"
-              ? "Building research brief…"
-              : demoStep === "draft"
-                ? "Writing article draft…"
-                : "Validating…"
-        : "Starting…")
-    : progress?.message ?? "Starting…";
+  const message =
+    isDemo
+      ? DEMO_MESSAGES[demoStep] ?? "Starting…"
+      : progress?.message ?? "Starting…";
 
   const elapsedSeconds = isDemo
     ? demoElapsedTick
@@ -108,95 +110,128 @@ export function GenerationLoadingOverlay({
 
   const progressPercent = isDemo ? demoProgress : progress?.progress ?? 0;
 
-  const getStepState = (key: StepKey) => {
-    const isCompetitors = key === "competitors";
-    const isResearchBrief = key === "research_brief";
-    const isDraftValidation = key === "draft_validation";
+  /** Map process key to done/current for both real and demo. */
+  const getProcessState = (key: ProcessKey) => {
+    const hasSerp = isDemo ? demoChunkOutputs.researchSerp != null : !!chunkOutputs.researchSerp;
+    const hasResearch = isDemo ? demoChunkOutputs.research != null : !!chunkOutputs.research;
+    const hasBrief = isDemo ? demoChunkOutputs.brief != null : !!chunkOutputs.brief;
 
     const done = isDemo
-      ? (isCompetitors &&
-          (demoChunkOutputs.researchSerp != null ||
-            demoChunkOutputs.research != null ||
-            ["select_done", "fetch", "brief", "brief_done", "draft", "validate"].includes(demoStep))) ||
-        (isResearchBrief &&
-          (demoChunkOutputs.brief != null || ["draft", "validate"].includes(demoStep))) ||
-        (isDraftValidation && demoStep === "validate")
-      : (isCompetitors && (!!chunkOutputs.researchSerp || !!chunkOutputs.research)) ||
-        (isResearchBrief && !!chunkOutputs.brief) ||
-        (isDraftValidation && !!chunkOutputs.validation);
+      ? key === "competitors"
+        ? hasSerp || ["fetch", "brief", "brief_done", "draft", "validate", "complete"].includes(demoStep)
+        : key === "fetch_articles"
+          ? hasResearch || ["brief", "brief_done", "draft", "validate", "complete"].includes(demoStep)
+          : key === "brief"
+            ? hasBrief || ["draft", "validate", "complete"].includes(demoStep)
+            : key === "draft"
+              ? ["validate", "complete"].includes(demoStep)
+              : demoStep === "complete"
+      : key === "competitors"
+        ? hasSerp
+        : key === "fetch_articles"
+          ? hasResearch
+          : key === "brief"
+            ? hasBrief
+            : key === "draft"
+              ? !!chunkOutputs.draft
+              : !!chunkOutputs.validation;
 
-    const step = progress?.step ?? "";
-    const isCompetitorsStep = step === "" || /serper|search/i.test(step);
+    const chunk = progress?.chunk;
     const current = isDemo
-      ? (isCompetitors && (demoStep === "research" || demoStep === "fetch")) ||
-        (isResearchBrief && demoStep === "brief") ||
-        (isDraftValidation && (demoStep === "draft" || demoStep === "validate"))
-      : (progress?.chunk === "research" &&
-          (isCompetitors ? isCompetitorsStep : !isCompetitorsStep)) ||
-        (progress?.chunk === "brief" && isResearchBrief) ||
-        ((progress?.chunk === "draft" || progress?.chunk === "validate") && isDraftValidation);
+      ? (key === "competitors" && demoStep === "research") ||
+        (key === "fetch_articles" && demoStep === "fetch") ||
+        (key === "brief" && demoStep === "brief") ||
+        (key === "draft" && demoStep === "draft") ||
+        (key === "validate" && demoStep === "validate")
+      : (key === "competitors" && chunk === "research" && !hasSerp) ||
+        (key === "fetch_articles" && chunk === "research" && hasSerp && !hasResearch) ||
+        (key === "brief" && chunk === "brief") ||
+        (key === "draft" && chunk === "draft") ||
+        (key === "validate" && chunk === "validate");
 
     return { done, current };
   };
+
+  /** Which process is active (for description). */
+  const currentProcess = PROCESSES.find(({ key }) => getProcessState(key).current);
 
   return (
     <div
       role="status"
       aria-live="polite"
       aria-label="Content generation in progress"
-      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-10 px-6 py-12 animate-in fade-in duration-300 bg-background/85 backdrop-blur-2xl"
+      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-8 px-6 py-10 animate-in fade-in duration-300 bg-background/90 backdrop-blur-2xl border border-border/40"
     >
-      {/* Status — centered, spacious */}
-      <div className="flex flex-col items-center gap-3">
+      {/* Current step: message + elapsed + % */}
+      <div className="flex flex-col items-center gap-2 text-center">
         <div className="flex items-center gap-3">
           <div className="generation-loading-spinner shrink-0" aria-hidden />
-          <p className="text-[17px] font-medium tracking-tight text-foreground">
+          <p className="text-[17px] font-semibold tracking-tight text-foreground">
             {message}
           </p>
         </div>
-        <p className="text-[13px] font-medium tabular-nums text-muted-foreground">
+        {currentProcess && (
+          <p className="text-[13px] text-muted-foreground max-w-[320px]">
+            {currentProcess.description}
+          </p>
+        )}
+        <p className="text-[12px] font-medium tabular-nums text-muted-foreground/90 rounded-full bg-muted/50 px-3 py-1">
           {elapsedSeconds > 0 ? formatElapsed(elapsedSeconds) : "—"} elapsed
-          <span className="mx-2 text-muted-foreground/50">·</span>
+          <span className="mx-2 text-muted-foreground/60">·</span>
           {Math.round(progressPercent)}%
         </p>
       </div>
 
-      {/* One-line stepper: Competitors – Research – Analyze – Draft – Validation */}
-      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-        {STEPS.map(({ key, label }, i) => {
-          const { done, current } = getStepState(key);
-          const isLast = i === STEPS.length - 1;
+      {/* Process list: each step clearly labeled */}
+      <div className="w-full max-w-[520px] space-y-2">
+        {PROCESSES.map(({ key, label, description }, i) => {
+          const { done, current } = getProcessState(key);
+          const stepNum = i + 1;
           return (
-            <span key={key} className="flex items-center gap-2">
+            <div
+              key={key}
+              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-all duration-300 ${
+                current
+                  ? "border-orange-500/60 bg-orange-500/10"
+                  : done
+                    ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10"
+                    : "border-border/50 bg-muted/20"
+              }`}
+            >
               <span
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium transition-all duration-300 ${
-                  current
-                    ? "bg-orange-500 text-white shadow-sm"
-                    : done
-                      ? "text-emerald-600 dark:text-emerald-400"
-                      : "text-muted-foreground/60"
+                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
+                  done ? "" : current ? "" : "bg-muted/50 text-muted-foreground"
                 }`}
+                aria-hidden
               >
                 {done ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} />
                 ) : current ? (
-                  <span className="generation-loading-spinner-sm generation-loading-spinner-on-orange h-3.5 w-3.5 shrink-0" aria-hidden />
-                ) : null}
-                {label}
+                  <span className="generation-loading-spinner-sm generation-loading-spinner-on-orange h-4 w-4" aria-hidden />
+                ) : (
+                  stepNum
+                )}
               </span>
-              {!isLast && (
-                <span className="text-muted-foreground/30 text-[10px] font-light" aria-hidden>
-                  –
-                </span>
-              )}
-            </span>
+              <div className="min-w-0 flex-1">
+                <p
+                  className={`text-[13px] font-medium ${
+                    current ? "text-foreground" : done ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"
+                  }`}
+                >
+                  {label}
+                </p>
+                {current && (
+                  <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
+                )}
+              </div>
+            </div>
           );
         })}
       </div>
 
-      {/* Progress bar — full width, max constrained */}
-      <div className="w-full max-w-[420px]">
-        <div className="h-1 w-full overflow-hidden rounded-full bg-muted/50 dark:bg-muted/30">
+      {/* Progress bar */}
+      <div className="w-full max-w-[420px]" role="progressbar" aria-valuenow={Math.round(progressPercent)} aria-valuemin={0} aria-valuemax={100} aria-label="Overall progress">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/50 dark:bg-muted/30">
           <div
             className="generation-loading-bar h-full rounded-full transition-all duration-700 ease-out"
             style={{ width: `${Math.max(2, progressPercent)}%` }}

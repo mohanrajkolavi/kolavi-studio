@@ -21,7 +21,7 @@ export default function TermsOfServicePage() {
 
         <h2>2. Description of Services</h2>
         <p>
-          Kolavi Studio provides digital marketing services, including but not limited to web design, SEO, content marketing, and paid advertising. Our Services are tailored for businesses in industries such as medical spas, dental practices, and law firms.
+          Kolavi Studio provides digital marketing services, including but not limited to web design, SEO, content marketing, and paid advertising. Our Services are tailored for medical spas and aesthetic practices.
         </p>
 
         <h2>3. Use of the Website</h2>
@@ -43,7 +43,7 @@ export default function TermsOfServicePage() {
 
         <h2>5. Intellectual Property</h2>
         <p>
-          All content on this website—including text, graphics, logos, and design—is owned by Kolavi Studio or our licensors. You may not copy, reproduce, or distribute our content without written permission. For client projects, intellectual property rights are governed by the applicable service agreement.
+          All content on this website, including text, graphics, logos, and design, is owned by Kolavi Studio or our licensors. You may not copy, reproduce, or distribute our content without written permission. For client projects, intellectual property rights are governed by the applicable service agreement.
         </p>
 
         <h2>6. User Content</h2>

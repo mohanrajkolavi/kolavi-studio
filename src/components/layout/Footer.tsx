@@ -2,105 +2,154 @@
 
 import Link from "next/link";
 import { RefLink } from "@/components/partner/RefLink";
-import { NAV_LINKS, LEGAL_LINKS } from "@/lib/constants";
+import { LEGAL_LINKS } from "@/lib/constants";
 import { Logo } from "./Logo";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-border bg-muted/20" role="contentinfo">
-      <div className="container mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-24">
-        {/* Main footer content - clean, premium design */}
-        <div className="grid grid-cols-1 gap-12 sm:gap-16 lg:grid-cols-12 lg:gap-8">
+    <footer className="bg-background relative z-10 overflow-hidden border-t border-border" role="contentinfo">
+      {/* Subtle top glow from primary color */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent" />
+      <div className="absolute -top-10 left-1/2 -translate-x-1/2 w-full max-w-3xl h-20 bg-primary/5 blur-3xl pointer-events-none" />
+
+      <div className="container mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-32 lg:px-8">
+        <div className="grid grid-cols-1 gap-16 lg:grid-cols-12 lg:gap-8">
+          
           {/* Brand block */}
-          <div className="lg:col-span-5">
+          <div className="lg:col-span-5 flex flex-col">
             <Link
               href="/"
-              className="inline-block text-2xl font-bold tracking-tight text-foreground transition-opacity hover:opacity-90 sm:text-3xl"
+              className="inline-block text-foreground transition-opacity hover:opacity-90 w-max"
             >
-              <Logo withPeriod />
+              <Logo className="text-2xl font-bold tracking-wide" withPeriod />
             </Link>
-            <p className="mt-4 max-w-sm text-base leading-relaxed text-muted-foreground">
-              Digital marketing agency specializing in medical spas, dental practices, and law firms.
+            <p className="mt-8 max-w-sm text-body leading-relaxed text-muted-foreground">
+              The high-performance marketing agency exclusively for luxury medical spas. Next.js speed, AI SEO, and premium design engineering.
             </p>
+            
+            <div className="mt-12 flex items-center gap-4">
+              <div className="flex h-12 items-center rounded-full bg-muted/50 border border-border px-4 backdrop-blur-sm">
+                <span className="flex h-2 w-2 rounded-full bg-green-500 mr-3 animate-pulse" aria-hidden />
+                <span className="text-small font-medium text-foreground">Accepting new partners</span>
+              </div>
+            </div>
           </div>
 
-          {/* Navigation links - 2 columns on larger screens */}
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:col-span-7 lg:grid-cols-2 lg:gap-12">
+          {/* Navigation links */}
+          <div className="grid grid-cols-2 gap-12 sm:grid-cols-3 lg:col-span-7 lg:gap-12">
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-foreground">
-                Site
+              <h3 className="text-label text-foreground mb-8">
+                Services
               </h3>
-              <ul className="mt-4 space-y-3">
-                {NAV_LINKS.map((link) => (
-                  <li key={link.href}>
-                    <RefLink
-                      href={link.href}
-                      className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
-                    >
-                      {link.name}
-                    </RefLink>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-foreground">
-                More
-              </h3>
-              <ul className="mt-4 space-y-3">
+              <ul className="space-y-5">
+                <li>
+                  <Link
+                    href="/services"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Services
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/pricing"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Pricing
+                  </Link>
+                </li>
                 <li>
                   <Link
                     href="/portfolio"
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Portfolio
                   </Link>
                 </li>
+              </ul>
+            </div>
+            
+            <div>
+              <h3 className="text-label text-foreground mb-8">
+                Company
+              </h3>
+              <ul className="space-y-5">
                 <li>
-                  <RefLink
-                    href="/contact"
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+                  <Link
+                    href="/about"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    Contact
-                  </RefLink>
+                    About
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/blog"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Blog
+                  </Link>
                 </li>
                 <li>
                   <RefLink
                     href="/partner"
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Partner Program
                   </RefLink>
+                </li>
+                <li>
+                  <RefLink
+                    href="/contact"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Contact
+                  </RefLink>
+                </li>
+              </ul>
+            </div>
+            
+            <div className="col-span-2 sm:col-span-1">
+              <h3 className="text-label text-foreground mb-8">
+                Tools
+              </h3>
+              <ul className="space-y-5">
+                <li>
+                  <Link
+                    href="/tools/speed-audit"
+                    className="text-body text-primary transition-colors hover:text-primary/80 font-medium"
+                  >
+                    Free Speed Audit &rarr;
+                  </Link>
                 </li>
               </ul>
             </div>
           </div>
         </div>
 
-        {/* Bottom bar - legal links + copyright */}
-        <div className="mt-8 flex flex-col items-center justify-between gap-4 sm:flex-row sm:gap-6">
+        {/* Bottom bar */}
+        <div className="mt-24 pt-8 border-t border-border flex flex-col items-center justify-between gap-6 sm:flex-row">
+          <p className="text-small text-muted-foreground">
+            &copy; {currentYear} Kolavi Studio. All rights reserved.
+          </p>
           <nav
-            className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-muted-foreground sm:gap-x-4"
+            className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-small text-muted-foreground"
             aria-label="Legal"
           >
             {LEGAL_LINKS.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded"
+                className="transition-colors hover:text-foreground"
               >
                 {link.name}
               </Link>
             ))}
           </nav>
-          <p className="text-xs text-muted-foreground">
-            © {currentYear} Kolavi Studio. All rights reserved.
-          </p>
         </div>
       </div>
-      {/* Safe area for devices with home indicator */}
       <div className="h-[env(safe-area-inset-bottom)]" aria-hidden />
     </footer>
   );

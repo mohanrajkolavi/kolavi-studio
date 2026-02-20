@@ -12,7 +12,7 @@ function getSiteUrl(): string {
   if (process.env.NODE_ENV === "production" && (!url || url.startsWith("http://localhost"))) {
     console.error(
       "[Kolavi Studio] NEXT_PUBLIC_SITE_URL should be set to your production URL in production (e.g. https://kolavistudio.com). " +
-        "Using fallback; set the env var and redeploy for correct canonical/OG URLs."
+      "Using fallback; set the env var and redeploy for correct canonical/OG URLs."
     );
   }
   return url || "http://localhost:3000";
@@ -35,7 +35,8 @@ export function getSitemapBuildDate(): Date | undefined {
 }
 
 export const SITE_NAME = "Kolavi Studio";
-export const SITE_DESCRIPTION = "Kolavi Studio: Expert digital marketing, web design & SEO for medical spas, dental practices, and law firms.";
+export const SITE_DESCRIPTION =
+  "Next.js med spa websites & AI-powered SEO. 95-100 PageSpeed guaranteed. The only agency built on Next.js, AI, and real results for medical spas.";
 
 // Rank Math 100/100 alignment (rankmath.com/kb/score-100-in-tests) + Google Search (developers.google.com/search/docs)
 export const SEO = {
@@ -48,8 +49,8 @@ export const SEO = {
 } as const;
 
 export const NAV_LINKS = [
-  { name: "Who We Serve", href: "/industries" },
   { name: "Services", href: "/services" },
+  { name: "Pricing", href: "/pricing" },
   { name: "Partners", href: "/partner" },
   { name: "Blog", href: "/blog" },
   { name: "About", href: "/about" },
@@ -61,13 +62,6 @@ export const LEGAL_LINKS = [
   { name: "Terms of Service", href: "/terms" },
   { name: "Cookie Policy", href: "/cookies" },
   { name: "Disclaimer", href: "/disclaimer" },
-];
-
-// Vertical landing pages - industries we specialize in
-export const VERTICAL_LINKS = [
-  { name: "Medical Spas", href: "/medical-spas", available: true },
-  { name: "Dental Practices", href: "/dental", available: false },
-  { name: "Law Firms", href: "/law-firms", available: false },
 ];
 
 /**

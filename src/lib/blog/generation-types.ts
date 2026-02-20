@@ -95,14 +95,18 @@ export function isPipelineResult(r: unknown): r is PipelineResult {
 }
 
 export type GenerationInput = {
+  /** First = primary keyword, rest = secondary (max 2). */
   keywords: string[];
-  peopleAlsoSearchFor: string[];
+  /** Not surfaced in UI; PAA from Serper feeds gap analysis in pipeline. Optional for backward compat. */
+  peopleAlsoSearchFor?: string[];
   intent: string[];
   competitorUrls: string[];
-  /** Word count guideline: "auto" | "concise" | "standard" | "in_depth" | "custom". */
-  wordCountPreset?: "auto" | "concise" | "standard" | "in_depth" | "custom";
+  /** "auto" = default by intent; "custom" = wordCountCustom. */
+  wordCountPreset?: "auto" | "custom";
   /** Target words when wordCountPreset is "custom". */
   wordCountCustom?: number;
+  /** Draft model: Opus 4.6 or Sonnet 4.6. */
+  draftModel?: "opus-4.6" | "sonnet-4.6";
 };
 
 // -----------------------------------------------------------------------------

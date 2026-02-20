@@ -5,6 +5,8 @@ import { jobStore } from "@/lib/pipeline/jobs";
 
 export const maxDuration = 30;
 
+/** Step 5 — Validate: FAQ enforcement, SEO audit, fact check vs current data, schema.
+ * Returns finalContent + audit report (faqEnforcement, auditResult, factCheck, schemaMarkup) for UI. */
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {

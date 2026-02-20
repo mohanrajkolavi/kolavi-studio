@@ -87,25 +87,31 @@ export function createDbJobStore(): JobStore {
         pipelineVersion: PIPELINE_VERSION,
         chunkRecords: initialChunkRecords(),
       };
-      const inputJson = JSON.stringify(job.input);
-      const chunkRecordsJson = JSON.stringify(job.chunkRecords);
+      // Ensure we never pass undefined to SQL (causes "could not determine data type of parameter $N")
+      const inputJson = JSON.stringify(job.input ?? {});
+      const chunkRecordsJson = JSON.stringify(job.chunkRecords ?? {});
       const errorMsg = job.errorMessage ?? null;
       const errorFragment = errorMsg !== null ? sql`${errorMsg}` : sql`NULL`;
-      // Explicit ::text::jsonb so PostgreSQL infers param type (avoids "could not determine data type of parameter $N")
-      await sql`
-        INSERT INTO pipeline_jobs (id, phase, input, created_at, updated_at, error_message, pipeline_version, chunk_records)
-        VALUES (
-          ${id},
-          ${job.phase},
-          (${inputJson}::text)::jsonb,
-          ${job.createdAt},
-          ${job.updatedAt},
-          ${errorFragment},
-          ${job.pipelineVersion},
-          (${chunkRecordsJson}::text)::jsonb
-        )
-        ON CONFLICT (id) DO NOTHING
-      `;
+      // Cast JSON strings to jsonb so stored columns contain proper JSONB objects
+      try {
+        await sql`
+          INSERT INTO pipeline_jobs (id, phase, input, created_at, updated_at, error_message, pipeline_version, chunk_records)
+          VALUES (
+            ${id},
+            ${job.phase},
+            ${inputJson}::jsonb,
+            ${job.createdAt},
+            ${job.updatedAt},
+            ${errorFragment},
+            ${job.pipelineVersion},
+            ${chunkRecordsJson}::jsonb
+          )
+          ON CONFLICT (id) DO NOTHING
+        `;
+      } catch (err) {
+        console.error("[pipeline/db-store] createJob failed", { jobId: id, error: err instanceof Error ? err.message : String(err) });
+        throw err;
+      }
       return job;
     },
 
@@ -141,30 +147,34 @@ export function createDbJobStore(): JobStore {
       cost?: ChunkCost
     ): Promise<void> {
       const completedAt = now();
-      const outputJson = JSON.stringify(output);
+      const outputJson = JSON.stringify(output ?? {});
       const completedAtJson = JSON.stringify(completedAt);
       const costJson = cost != null ? JSON.stringify(cost) : "null";
       const path = [kind] as string[];
-      // Explicit ::text::jsonb so PostgreSQL infers param type (avoids "could not determine data type of parameter $N")
-      await sql`
-        UPDATE pipeline_jobs
-        SET
-          chunk_records = jsonb_set(
-            CASE WHEN chunk_records IS NOT NULL AND jsonb_typeof(chunk_records) = 'object' THEN chunk_records ELSE '{}'::jsonb END,
-            ${textArray(path)},
-            jsonb_build_object(
-              'status', 'completed',
-              'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0) + 1,
-              'errorMessage', null,
-              'output', (${outputJson}::text)::jsonb,
-              'completedAt', (${completedAtJson}::text)::jsonb,
-              'cost', (${costJson}::text)::jsonb
-            )
-          ),
-          updated_at = ${completedAt},
-          phase = CASE WHEN ${kind} = 'postprocess' THEN 'completed' ELSE phase END
-        WHERE id = ${id}
-      `;
+      try {
+        await sql`
+          UPDATE pipeline_jobs
+          SET
+            chunk_records = jsonb_set(
+              CASE WHEN chunk_records IS NOT NULL AND jsonb_typeof(chunk_records) = 'object' THEN chunk_records ELSE '{}'::jsonb END,
+              ${textArray(path)},
+              jsonb_build_object(
+                'status', 'completed',
+                'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0) + 1,
+                'errorMessage', null,
+                'output', ${outputJson}::jsonb,
+                'completedAt', ${completedAtJson}::jsonb,
+                'cost', ${costJson}::jsonb
+              )
+            ),
+            updated_at = ${completedAt},
+            phase = CASE WHEN ${kind} = 'postprocess' THEN 'completed' ELSE phase END
+          WHERE id = ${id}
+        `;
+      } catch (err) {
+        console.error("[pipeline/db-store] saveChunkOutput failed", { jobId: id, kind, error: err instanceof Error ? err.message : String(err) });
+        throw err;
+      }
     },
 
     async getChunkOutput(id: string, kind: ChunkKind): Promise<ChunkOutput | undefined> {
@@ -182,44 +192,57 @@ export function createDbJobStore(): JobStore {
 
     async setChunkRunning(id: string, kind: ChunkKind): Promise<void> {
       const updatedAt = now();
-      const path = [kind] as string[];
-      await sql`
-        UPDATE pipeline_jobs
-        SET
-          chunk_records = jsonb_set(
-            CASE WHEN chunk_records IS NOT NULL AND jsonb_typeof(chunk_records) = 'object' THEN chunk_records ELSE '{}'::jsonb END,
-            ${textArray(path)},
-            jsonb_build_object(
-              'status', 'running',
-              'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0)
-            )
-          ),
-          updated_at = ${updatedAt}
-        WHERE id = ${id}
-      `;
+      const path = [kind ?? "unknown"] as string[];
+      try {
+        await sql`
+          UPDATE pipeline_jobs
+          SET
+            chunk_records = jsonb_set(
+              CASE WHEN chunk_records IS NOT NULL AND jsonb_typeof(chunk_records) = 'object' THEN chunk_records ELSE '{}'::jsonb END,
+              ${textArray(path)},
+              jsonb_build_object(
+                'status', 'running',
+                'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0)
+              )
+            ),
+            updated_at = ${updatedAt}
+          WHERE id = ${id}
+        `;
+      } catch (err) {
+        console.error("[pipeline/db-store] setChunkRunning failed", { jobId: id, kind, error: err instanceof Error ? err.message : String(err) });
+        throw err;
+      }
     },
 
     async setChunkFailed(id: string, kind: ChunkKind, errorMessage: string): Promise<void> {
       const updatedAt = now();
-      const path = [kind] as string[];
-      const errorFragment = optionalText(errorMessage);
-      await sql`
-        UPDATE pipeline_jobs
-        SET
-          chunk_records = jsonb_set(
-            CASE WHEN chunk_records IS NOT NULL AND jsonb_typeof(chunk_records) = 'object' THEN chunk_records ELSE '{}'::jsonb END,
-            ${textArray(path)},
-            jsonb_build_object(
-              'status', 'failed',
-              'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0) + 1,
-              'errorMessage', ${errorFragment}
-            )
-          ),
-          updated_at = ${updatedAt},
-          error_message = ${errorFragment},
-          phase = 'failed'
-        WHERE id = ${id}
-      `;
+      const path = [kind ?? "unknown"] as string[];
+      // Ensure we never pass undefined; coerce to string so Postgres can infer parameter type
+      const errorStr = typeof errorMessage === "string" ? errorMessage : String(errorMessage ?? "");
+      const errorFragment = optionalText(errorStr);
+      // to_jsonb($N::text) so Postgres infers param type for jsonb_build_object (avoids "parameter $3")
+      try {
+        await sql`
+          UPDATE pipeline_jobs
+          SET
+            chunk_records = jsonb_set(
+              CASE WHEN chunk_records IS NOT NULL AND jsonb_typeof(chunk_records) = 'object' THEN chunk_records ELSE '{}'::jsonb END,
+              ${textArray(path)},
+              jsonb_build_object(
+                'status', 'failed',
+                'attemptCount', COALESCE((chunk_records->${kind}->>'attemptCount')::int, 0) + 1,
+                'errorMessage', to_jsonb(${errorStr}::text)
+              )
+            ),
+            updated_at = ${updatedAt},
+            error_message = ${errorFragment},
+            phase = 'failed'
+          WHERE id = ${id}
+        `;
+      } catch (err) {
+        console.error("[pipeline/db-store] setChunkFailed failed", { jobId: id, kind, error: err instanceof Error ? err.message : String(err) });
+        throw err;
+      }
     },
 
     async cleanup(maxAgeMs: number): Promise<void> {

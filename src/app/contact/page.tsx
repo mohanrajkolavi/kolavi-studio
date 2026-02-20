@@ -1,40 +1,47 @@
-import Script from "next/script";
 import { headers } from "next/headers";
+import Link from "next/link";
+import { Suspense } from "react";
 import { getPageMetadata } from "@/lib/seo/metadata";
+import { FAQ, type FAQItem } from "@/components/sections/FAQ";
 import { getFAQSchema } from "@/lib/seo/jsonld/faq";
-import { FAQ } from "@/components/sections/FAQ";
-import { ContactForm } from "@/components/contact/ContactForm";
+import { SelectedTierBadge } from "@/components/contact/SelectedTierBadge";
+import { Mail, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export const metadata = getPageMetadata({
-  title: "Contact Us - Get Your Free Consultation",
-  description: "Ready to grow your business? Contact Kolavi Studio for a free consultation. We'll discuss your goals and create a custom digital marketing strategy.",
+  title: "Contact Us - Med Spa Marketing Consultation",
+  description: "Get in touch with Kolavi Studio. We are ready to help your medical spa grow with Next.js websites, multi-treatment SEO, and expert digital marketing.",
   path: "/contact",
-  keywords: "contact Kolavi Studio, free marketing consultation, digital marketing quote",
+  keywords: "contact med spa marketing agency, medical spa consultation, Kolavi Studio contact",
 });
 
-const CONTACT_FAQ_ITEMS = [
+const CONTACT_FAQ_ITEMS: FAQItem[] = [
   {
-    question: "How quickly can I expect to hear back after submitting the form?",
-    answer: "We respond to all inquiries within 24 hours during business days (Monday–Friday).",
+    question: "How quickly do you respond?",
+    answer: "Every inquiry gets a response within 24 hours. Most hear back the same business day.",
   },
   {
-    question: "Is the initial consultation really free?",
-    answer: "Yes. We offer a free consultation to discuss your goals and explore how we can help. There’s no obligation.",
+    question: "Do I need to be ready to sign up to contact you?",
+    answer: "No. Whether you're ready to start today or just exploring options, we're happy to talk. No pressure. No hard sell.",
   },
   {
-    question: "Which industries do you work with?",
-    answer: "We specialize in medical spas, dental practices, and law firms, but we also work with other service-based businesses.",
+    question: "What happens after I submit the form?",
+    answer: "You'll get a confirmation email immediately. Within 24 hours, a team member will follow up to schedule a call or answer your questions directly.",
+  },
+  {
+    question: "Can I just get the free SEO audit without a call?",
+    answer: "Yes. If you'd prefer to skip the conversation and go straight to the audit, mention that in your message. We'll deliver the audit report to your inbox.",
+  },
+  {
+    question: "Do you work with med spas outside the US?",
+    answer: "Currently we focus on US-based medical spas. If you're outside the US, reach out anyway. We evaluate international inquiries on a case-by-case basis.",
   },
 ];
-
-const TYPEFORM_EMBED_URL = process.env.NEXT_PUBLIC_TYPEFORM_EMBED_URL;
-const TALLY_EMBED_URL = process.env.NEXT_PUBLIC_TALLY_FORM_EMBED_URL;
-const GOOGLE_FORM_EMBED_URL = process.env.NEXT_PUBLIC_GOOGLE_FORM_EMBED_URL;
-const USE_THIRD_PARTY_FORM = TYPEFORM_EMBED_URL || TALLY_EMBED_URL || GOOGLE_FORM_EMBED_URL;
 
 export default async function ContactPage() {
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   const faqSchema = getFAQSchema(CONTACT_FAQ_ITEMS);
+
   return (
     <>
       <script
@@ -42,84 +49,140 @@ export default async function ContactPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         nonce={nonce}
       />
-      <section className="py-16 sm:py-24">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl">
-            <div className="text-center">
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-                Get in Touch
-              </h1>
-              <p className="mt-6 text-lg leading-8 text-muted-foreground">
-                Ready to transform your digital presence? Fill out the form below and we'll get back to you within 24 hours.
-              </p>
+      <main className="relative w-full">
+        {/* SECTION 1: HERO */}
+        <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden border-b border-border -mt-[72px] pt-[72px]">
+          <div className="absolute inset-0 w-full h-full bg-background" />
+          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-primary/5 via-background to-primary/10 dark:from-primary/10 dark:via-background dark:to-primary/20 pointer-events-none" />
+          <div
+            className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 bg-primary pointer-events-none -translate-y-1/2 -translate-x-1/2"
+            aria-hidden
+          />
+
+          <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center animate-reveal">
+            <div className="inline-flex items-center justify-center px-5 py-2.5 mb-8 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground gap-2">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+              </span>
+              CONTACT US
             </div>
 
-            {USE_THIRD_PARTY_FORM ? (
-              <div className="mt-12 min-h-[400px] w-full overflow-hidden rounded-lg border bg-muted/30 sm:min-h-[500px]">
-                {TYPEFORM_EMBED_URL ? (
-                  <>
-                    <div
-                      data-tf-widget={TYPEFORM_EMBED_URL}
-                      data-tf-live={TYPEFORM_EMBED_URL}
-                      data-tf-inline-on-mobile
-                      className="h-[450px] w-full sm:h-[600px]"
-                    />
-                    <Script
-                      src="https://embed.typeform.com/next/embed.js"
-                      strategy="afterInteractive"
-                      nonce={nonce}
-                    />
-                  </>
-                ) : TALLY_EMBED_URL ? (
-                  <>
-                    <Script
-                      src="https://tally.so/widgets/embed.js"
-                      strategy="lazyOnload"
-                      nonce={nonce}
-                    />
-                    <iframe
-                      data-tally-embed
-                      src={TALLY_EMBED_URL}
-                      title="Contact form"
-                      className="h-[450px] w-full border-0 sm:h-[600px]"
-                    />
-                  </>
-                ) : GOOGLE_FORM_EMBED_URL ? (
-                  <iframe
-                    src={GOOGLE_FORM_EMBED_URL}
-                    title="Contact form"
-                    className="h-[450px] w-full border-0 sm:h-[600px]"
-                    frameBorder={0}
-                  />
-                ) : null}
-              </div>
-            ) : (
-              <ContactForm />
-            )}
+            <h1 className="text-hero text-foreground max-w-[900px] mx-auto text-balance mb-8">
+              Let's Talk About Your Growth.
+            </h1>
 
-            <div className="mt-12 border-t pt-12">
-              <h2 className="text-2xl font-bold">Other Ways to Reach Us</h2>
-              <div className="mt-6 space-y-4 text-muted-foreground">
-                <p>
-                  <strong>Email:</strong> hello@kolavistudio.com
-                </p>
-                <p>
-                  <strong>Phone:</strong> (555) 123-4567
-                </p>
-                <p>
-                  <strong>Hours:</strong> Monday - Friday, 9am - 6pm EST
-                </p>
-              </div>
-            </div>
-
-            <FAQ
-              title="Frequently Asked Questions"
-              items={CONTACT_FAQ_ITEMS}
-              className="mt-16"
-            />
+            <p className="text-body text-muted-foreground max-w-[650px] mx-auto text-balance mb-12">
+              Whether you are ready to start or just exploring, we respond to every inquiry within 24 hours.
+            </p>
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* SECTION 2: Contact form + info */}
+        <section className="relative z-10 bg-background py-24 sm:py-32" aria-label="Contact form and info">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-6xl">
+              <div className="grid gap-12 lg:grid-cols-2 lg:gap-16 items-start">
+                
+                {/* Left Column: Info & CTA */}
+                <div className="space-y-8 animate-reveal">
+                  <div className="rounded-[32px] border border-border bg-card p-10 shadow-premium">
+                    <h3 className="text-h4 text-foreground mb-8">Contact Information</h3>
+                    <div className="space-y-8">
+                      <div className="flex items-start gap-5">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary border border-primary/20">
+                          <Mail className="h-6 w-6" aria-hidden />
+                        </div>
+                        <div className="flex flex-col justify-center min-h-[48px]">
+                          <p className="text-[14px] font-semibold text-foreground uppercase tracking-wider mb-1">Email Us</p>
+                          <a href="mailto:hello@kolavistudio.com" className="text-body text-muted-foreground hover:text-primary transition-colors">hello@kolavistudio.com</a>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-5">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary border border-primary/20">
+                          <Clock className="h-6 w-6" aria-hidden />
+                        </div>
+                        <div className="flex flex-col justify-center min-h-[48px]">
+                          <p className="text-[14px] font-semibold text-foreground uppercase tracking-wider mb-1">Response Time</p>
+                          <p className="text-body text-muted-foreground">Within 24 hours</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[32px] bg-card border border-primary/20 p-10 shadow-premium relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-full h-full bg-primary/5 rounded-full blur-[100px] translate-x-1/2 -translate-y-1/2 group-hover:bg-primary/10 transition-colors duration-500 pointer-events-none" />
+                    <h3 className="text-h4 text-foreground font-bold mb-4 relative z-10">Prefer to start with a free audit instead?</h3>
+                    <p className="text-body text-muted-foreground mb-8 leading-relaxed relative z-10">
+                      Get a free, comprehensive technical SEO audit of your current digital presence. We will uncover the hidden performance bottlenecks costing you premium patients.
+                    </p>
+                    <Button asChild className="w-full h-14 rounded-[48px] text-[16px] relative z-10">
+                      <Link href="/tools/speed-audit">Get Your Free SEO Audit</Link>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Right Column: Tally Form */}
+                <div className="animate-reveal lg:sticky lg:top-32" style={{ animationDelay: "100ms" }}>
+                  <Suspense fallback={null}>
+                    <SelectedTierBadge />
+                  </Suspense>
+                  <div className="rounded-[32px] border border-border shadow-premium bg-card overflow-hidden h-full min-h-[700px] relative">
+                    <div className="absolute inset-0 bg-background/50 flex items-center justify-center -z-10">
+                      <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                    </div>
+                    <iframe
+                      src={process.env.NEXT_PUBLIC_TALLY_FORM_EMBED_URL || "https://tally.so/embed/w7X9jW?alignLeft=1&hideTitle=1&transparentBackground=1&dynamicHeight=1"}
+                      width="100%"
+                      height="100%"
+                      frameBorder="0"
+                      title="Contact Form"
+                      className="bg-transparent w-full h-full min-h-[700px] relative z-10"
+                    />
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* SECTION 3: FAQ */}
+        <section className="relative z-10 bg-background pb-24 sm:pb-32" aria-labelledby="faqs-heading">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+            <div className="text-center mb-16 animate-reveal">
+              <div className="inline-flex items-center justify-center px-5 py-2.5 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
+                FAQ
+              </div>
+              <h2 id="faqs-heading" className="text-h2 text-foreground mb-6">
+                Before You Reach Out
+              </h2>
+            </div>
+            <FAQ title="" items={CONTACT_FAQ_ITEMS} className="bg-background animate-reveal py-0 sm:py-0" />
+          </div>
+        </section>
+
+        {/* SECTION 4: CTA */}
+        <section className="relative z-10 bg-background py-32 lg:py-[160px] overflow-hidden flex flex-col justify-center min-h-[50vh] border-t border-border">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] rounded-full blur-[120px] opacity-10 bg-primary pointer-events-none" />
+
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10 animate-reveal">
+            <h2 className="text-h2 text-foreground mb-8 text-balance">
+              Or Skip Straight to Your Free Audit
+            </h2>
+            <p className="text-body text-muted-foreground mb-12 max-w-2xl mx-auto text-balance">
+              No forms. No meetings. Just a comprehensive SEO audit of your medical spa's digital presence, delivered directly to your inbox.
+            </p>
+            <Button
+              asChild
+              size="lg"
+              className="h-14 px-10 rounded-[48px] bg-primary hover:bg-primary/90 text-primary-foreground text-button shadow-premium"
+            >
+              <Link href="/tools/speed-audit">Get Your Free SEO Audit</Link>
+            </Button>
+          </div>
+        </section>
+      </main>
     </>
   );
 }

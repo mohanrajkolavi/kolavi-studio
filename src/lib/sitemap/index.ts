@@ -113,12 +113,16 @@ export function buildUrlsetXml(entries: UrlEntry[], baseUrl: string): string {
 
 const STATIC_ROUTES: { path: string; priority: number; changeFrequency: UrlEntry["changeFrequency"] }[] = [
   { path: "", priority: SITEMAP.priority.home, changeFrequency: SITEMAP.changeFrequency.home },
-  { path: "/industries", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/medical-spas", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/services", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/pricing", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/portfolio", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/about", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/contact", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/tools/speed-audit", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/tools/treatment-analyzer", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/tools/roi-calculator", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/tools/treatment-visualizer", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/tools/competitor-comparison", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "/partner", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/partner/apply", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "/partner/terms", priority: 0.5, changeFrequency: "yearly" as const },

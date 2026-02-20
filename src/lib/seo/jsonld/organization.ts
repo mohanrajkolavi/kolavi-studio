@@ -20,7 +20,7 @@ export function getOrganizationSchema() {
     name: SITE_NAME,
     url: SITE_URL,
     logo: `${SITE_URL}/logo.png`,
-    description: "Digital marketing agency specializing in medical spas, dental practices, and law firms.",
+    description: "Med spa marketing agency specializing in Next.js websites, AI-driven strategies, and multi-treatment SEO. Focused on delivering high-performance digital experiences and GEO optimization for medical practices.",
     address: getOrgAddress(),
     sameAs: [
       // Add social media URLs here when available

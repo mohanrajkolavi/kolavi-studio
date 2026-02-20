@@ -29,13 +29,11 @@ function getCspWithNonce(nonce: string): string {
     "'sha256-n46vPwSWuMC0W703pBofImv82226xo4LXymvAE9caPk='",
     ...(isDev ? ["'unsafe-eval'"] : []),
   ].join(" ");
+  // Production: nonce-only for styles (inline styles must carry nonce). Dev: unsafe-inline for convenience.
   const styleSrc = [
     "'self'",
-    "'nonce-" + nonce + "'",
+    ...(isDev ? ["'unsafe-inline'"] : ["'nonce-" + nonce + "'"]),
     "https://fonts.googleapis.com",
-    // Framework/deps may inject inline styles without nonce on cached pages
-    "'unsafe-inline'",
-    ...(isDev ? [] : []),
   ].join(" ");
   return [
     "default-src 'self'",

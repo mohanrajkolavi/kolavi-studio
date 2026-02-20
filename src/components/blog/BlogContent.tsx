@@ -55,7 +55,10 @@ function sortPostsByDateNewestFirst(posts: WPPost[]): WPPost[] {
 export function BlogContent({ posts, categories }: BlogContentProps) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(9);
+
   const sortedAllPosts = useMemo(() => sortPostsByDateNewestFirst(posts), [posts]);
+
   // Category filter first, then search within that set
   const displayPosts = useMemo(() => {
     const byCategory =
@@ -64,267 +67,230 @@ export function BlogContent({ posts, categories }: BlogContentProps) {
         : sortPostsByDateNewestFirst(filterPostsByCategory(posts, selectedCategory));
     return filterPostsBySearch(byCategory, searchQuery);
   }, [posts, selectedCategory, sortedAllPosts, searchQuery]);
-  const isAllPosts = selectedCategory === null;
-  // Featured = always the latest post from ALL posts; independent of tab selection.
-  const featuredPost = sortedAllPosts.length > 0 ? sortedAllPosts[0] : null;
-  // Grid = posts for the selected tab only (All posts or category); no connection to Featured.
-  const gridPosts = displayPosts;
+
+  const visiblePosts = displayPosts.slice(0, visibleCount);
+  const hasMore = visibleCount < displayPosts.length;
 
   return (
     <>
-      {/* Featured */}
-      {featuredPost && (
-        <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-5xl">
-              <div className="mb-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-bold uppercase tracking-wider text-white">
-                    Featured
-                  </span>
-                  <span className="h-px flex-1 max-w-[60px] bg-gradient-to-r from-orange-400/60 to-transparent" aria-hidden />
+      <section className="py-14 sm:py-20 bg-background relative z-10">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-[1200px]">
+            {/* Filter & Search Bar */}
+            <div className="mb-12 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between animate-reveal">
+              {/* Category Pills (horizontally scrollable on mobile) */}
+              <div className="relative -mx-4 px-4 sm:mx-0 sm:px-0 overflow-hidden">
+                <div className="flex items-center gap-3 overflow-x-auto pb-4 sm:pb-0 hide-scrollbar" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(null);
+                      setVisibleCount(9);
+                    }}
+                    aria-pressed={selectedCategory === null}
+                    className={`shrink-0 rounded-[48px] px-5 py-2.5 text-[14px] font-semibold transition-all duration-300 ${
+                      selectedCategory === null
+                        ? "bg-primary text-primary-foreground shadow-md"
+                        : "bg-transparent border border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {[...categories]
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((cat) => {
+                      const count = getCategoryPostCount(posts, cat.slug);
+                      if (count === 0) return null;
+                      const isActive = selectedCategory === cat.slug;
+                      return (
+                        <button
+                          key={cat.slug}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategory(cat.slug);
+                            setVisibleCount(9);
+                          }}
+                          aria-pressed={isActive}
+                          className={`shrink-0 rounded-[48px] px-5 py-2.5 text-[14px] font-semibold transition-all duration-300 ${
+                            isActive
+                              ? "bg-primary text-primary-foreground shadow-md"
+                              : "bg-transparent border border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
+                        >
+                          {cat.name}
+                        </button>
+                      );
+                    })}
                 </div>
               </div>
 
-              <Link
-                href={`/blog/${featuredPost.slug}`}
-                className="group block overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all duration-300 hover:shadow-xl hover:border-orange-200/60 dark:hover:border-orange-800"
-              >
-                <article className="grid grid-cols-1 gap-0 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:items-stretch">
-                  {featuredPost.featuredImage && (
-                    <div className="img-hover-zoom relative min-w-0 h-56 w-full overflow-hidden bg-muted md:h-full md:min-h-[18rem]">
-                      <Image
-                        src={featuredPost.featuredImage.node.sourceUrl}
-                        alt={featuredPost.featuredImage.node.altText || featuredPost.title}
-                        fill
-                        className="object-cover object-center transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none"
-                        sizes="(max-width: 768px) 100vw, 50vw"
-                        priority
-                        placeholder="blur"
-                        blurDataURL={IMAGE_BLUR_PLACEHOLDER}
-                      />
-                    </div>
-                  )}
-                  <div className="flex flex-col justify-center p-6 sm:p-8 lg:p-10 bg-card">
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                      {featuredPost.categories?.nodes?.[0] && (
-                        <span className="rounded-full bg-orange-100 px-3 py-1 font-semibold text-orange-600">
-                          {featuredPost.categories.nodes[0].name}
-                        </span>
-                      )}
-                      <time>
-                        {new Date(featuredPost.date).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </time>
-                      {featuredPost.content && (
-                        <>
-                          <span className="text-muted-foreground/60">·</span>
-                          <span>{calculateReadingTime(featuredPost.content)} min read</span>
-                        </>
-                      )}
-                    </div>
-                    <h3 className="mt-5 text-2xl font-bold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400 sm:text-3xl lg:text-4xl">
-                      {featuredPost.title}
-                    </h3>
-                    <p className="mt-4 text-base leading-relaxed text-muted-foreground lg:text-lg">
-                      {truncateToWords(stripHtml(featuredPost.excerpt || ""), 20)}
-                    </p>
-                    <span className="mt-8 inline-flex items-center gap-2 text-sm font-semibold text-orange-600 transition-all group-hover:gap-4">
-                      Read article
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                      </svg>
-                    </span>
-                  </div>
-                </article>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Category + Articles - only when we have posts */}
-      {displayPosts.length > 0 && (
-      <section className="border-b border-border bg-muted/30 py-14 sm:py-20">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-6xl">
-            {/* Category tabs + Search */}
-            <div className="mb-10 flex flex-col gap-4 border-b border-border pb-6 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
-              <nav
-                className="flex flex-wrap items-center gap-3"
-                aria-label="Filter by category"
-              >
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory(null)}
-                  aria-pressed={selectedCategory === null}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    selectedCategory === null
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                >
-                  All posts
-                </button>
-                {[...categories]
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((cat) => {
-                  const count = getCategoryPostCount(posts, cat.slug);
-                  if (count === 0) return null;
-                  const isActive = selectedCategory === cat.slug;
-                  return (
-                    <button
-                      key={cat.slug}
-                      type="button"
-                      onClick={() => setSelectedCategory(cat.slug)}
-                      aria-pressed={isActive}
-                      className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                        isActive
-                          ? "bg-orange-500 text-white"
-                          : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      {cat.name} ({count})
-                    </button>
-                  );
-                })}
-              </nav>
-              {/* Search */}
-              <div className="relative flex-shrink-0 sm:min-w-[200px]">
+              {/* Search Bar */}
+              <div className="relative shrink-0 w-full lg:w-[320px]">
                 <Search
-                  className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none"
+                  className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-muted-foreground pointer-events-none"
                   aria-hidden
                 />
                 <input
                   type="search"
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search posts…"
-                  className={`w-full rounded-full border border-border bg-background py-2 pl-9 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-background ${searchQuery ? "pr-12" : "pr-4"}`}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setVisibleCount(9);
+                  }}
+                  placeholder="Search articles..."
+                  className="w-full rounded-full border border-border bg-background/50 backdrop-blur-sm py-3 pl-11 pr-10 text-[15px] text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
                   aria-label="Search blog posts"
                 />
                 {searchQuery && (
                   <button
                     type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setVisibleCount(9);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     aria-label="Clear search"
                   >
-                    Clear
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Articles - card grid */}
-            {gridPosts.length > 0 ? (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {gridPosts.map((post, index) => (
-                  <Link key={post.id} href={`/blog/${post.slug}`} className="group block">
-                    <article className="h-full overflow-hidden rounded-2xl border border-border bg-card transition-all duration-200 hover:border-orange-200 hover:shadow-md dark:hover:border-orange-800">
-                      {post.featuredImage && (
-                        <div className="img-hover-zoom relative aspect-[16/10] overflow-hidden">
-                          <Image
-                            src={post.featuredImage.node.sourceUrl}
-                            alt={post.featuredImage.node.altText || post.title}
-                            fill
-                            className="object-cover transition-transform duration-300 ease-out group-hover:scale-105 motion-reduce:transform-none"
-                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                            loading={index < IMAGE_EAGER_COUNT ? "eager" : "lazy"}
-                            placeholder="blur"
-                            blurDataURL={IMAGE_BLUR_PLACEHOLDER}
-                          />
-                          <div className="absolute left-3 top-3">
-                            {post.categories?.nodes?.[0] && (
-                              <span className="rounded-md bg-card px-2.5 py-1 text-xs font-semibold text-foreground shadow-sm ring-1 ring-border">
+            {/* Articles Grid */}
+            {visiblePosts.length > 0 ? (
+              <div className="grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                {visiblePosts.map((post, index) => {
+                  const isFeatured = index === 0 && selectedCategory === null && !searchQuery;
+                  
+                  return (
+                    <Link 
+                      key={post.id} 
+                      href={`/blog/${post.slug}`} 
+                      className={`group block animate-reveal ${
+                        isFeatured ? "sm:col-span-2 lg:col-span-2" : "col-span-1"
+                      }`}
+                      style={{ animationDelay: `${index * 100}ms` }}
+                    >
+                      <article className="flex flex-col h-full overflow-hidden rounded-[20px] border border-border bg-card hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:hover:shadow-[0_8px_30px_rgb(255,255,255,0.02)] transition-all duration-300 ease-out">
+                        
+                        {/* Image Container */}
+                        <div className={`relative w-full shrink-0 overflow-hidden bg-muted/30 ${
+                          isFeatured ? "aspect-[16/9] sm:aspect-[21/9]" : "aspect-[16/10]"
+                        }`}>
+                          {post.featuredImage ? (
+                            <Image
+                              src={post.featuredImage.node.sourceUrl}
+                              alt={post.featuredImage.node.altText || post.title}
+                              fill
+                              className="object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03] motion-reduce:transform-none"
+                              sizes={isFeatured ? "(max-width: 1024px) 100vw, 66vw" : "(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"}
+                              loading={index < IMAGE_EAGER_COUNT ? "eager" : "lazy"}
+                              placeholder="blur"
+                              blurDataURL={IMAGE_BLUR_PLACEHOLDER}
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-br from-muted to-muted/50" />
+                          )}
+                          
+                          {/* Category Pill on Image */}
+                          {post.categories?.nodes?.[0] && (
+                            <div className="absolute left-4 top-4 z-10">
+                              <span className="inline-flex items-center justify-center rounded-[48px] bg-background/95 backdrop-blur-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] text-foreground border border-border/50 shadow-sm">
                                 {post.categories.nodes[0].name}
                               </span>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      <div className="p-5">
-                        {!post.featuredImage && post.categories?.nodes?.[0] && (
-                          <span className="text-xs font-semibold text-orange-600">
-                            {post.categories.nodes[0].name}
-                          </span>
-                        )}
-                        <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                          <time>
-                            {new Date(post.date).toLocaleDateString("en-US", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </time>
-                          {post.content && (
-                            <span>· {calculateReadingTime(post.content)} min</span>
+                            </div>
                           )}
                         </div>
-                        <h3 className="mt-3 line-clamp-2 font-semibold text-foreground transition-colors group-hover:text-orange-600 dark:group-hover:text-orange-400">
-                          {post.title}
-                        </h3>
-                        <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-                          {truncateToWords(stripHtml(post.excerpt || ""), 20)}
-                        </p>
-                        <span className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 opacity-0 transition-opacity group-hover:opacity-100">
-                          Read article
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </span>
-                      </div>
-                    </article>
-                  </Link>
-                ))}
+
+                        {/* Content Container */}
+                        <div className="flex flex-col flex-1 p-6 sm:p-8">
+                          <div className="mb-3 flex items-center gap-2.5 text-[14px] text-muted-foreground font-medium">
+                            <time dateTime={new Date(post.date).toISOString()}>
+                              {new Date(post.date).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </time>
+                            {post.content && (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-border" />
+                                <span>{calculateReadingTime(post.content)} min read</span>
+                              </>
+                            )}
+                          </div>
+                          
+                          <h3 className={`font-semibold text-foreground transition-colors group-hover:text-primary mb-3 ${
+                            isFeatured ? "text-[28px] sm:text-[32px] leading-[1.2]" : "text-[22px] sm:text-[24px] leading-[1.3] line-clamp-2"
+                          }`}>
+                            {post.title}
+                          </h3>
+                          
+                          <p className={`text-[16px] sm:text-[17px] leading-relaxed text-muted-foreground mb-6 flex-1 ${
+                            isFeatured ? "line-clamp-3" : "line-clamp-2"
+                          }`}>
+                            {stripHtml(post.excerpt || "")}
+                          </p>
+
+                          <div className="mt-auto pt-2">
+                            <span className="inline-flex items-center gap-2 text-[15px] font-semibold text-primary transition-all group-hover:gap-3">
+                              Read article
+                              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                              </svg>
+                            </span>
+                          </div>
+                        </div>
+                      </article>
+                    </Link>
+                  );
+                })}
               </div>
-            ) : featuredPost ? (
-              <p className="py-12 text-center text-sm text-muted-foreground">
-                No other articles in this category
-              </p>
-            ) : null}
+            ) : (
+              /* Empty state */
+              <div className="py-20 text-center animate-reveal">
+                <div className="mx-auto max-w-md rounded-[24px] border border-dashed border-border bg-muted/30 p-10">
+                  <p className="text-[16px] text-foreground font-medium mb-4">
+                    {searchQuery.trim()
+                      ? "No articles match your search."
+                      : "No articles found in this category."}
+                  </p>
+                  {(searchQuery || selectedCategory) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setSelectedCategory(null);
+                        setVisibleCount(9);
+                      }}
+                      className="inline-flex items-center justify-center rounded-[48px] border border-border bg-background px-6 py-2.5 text-[14px] font-semibold text-foreground shadow-sm transition-all hover:bg-muted"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Load More Pagination */}
+            {hasMore && (
+              <div className="mt-16 text-center animate-reveal">
+                <button
+                  type="button"
+                  onClick={() => setVisibleCount((prev) => prev + 9)}
+                  className="inline-flex items-center justify-center rounded-[48px] border-2 border-border bg-transparent px-8 py-3.5 text-[15px] font-semibold text-foreground transition-all hover:bg-muted hover:border-foreground/10"
+                >
+                  Load More Articles
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </section>
-      )}
-
-      {/* Empty state when filtered or no search results */}
-      {displayPosts.length === 0 && (
-        <section className="border-b border-border bg-background py-12 sm:py-16">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-xl rounded-xl border border-dashed border-border bg-muted/30 py-12 text-center">
-              <p className="text-sm text-foreground">
-                {searchQuery.trim()
-                  ? "No posts match your search."
-                  : "No articles in this category yet"}
-              </p>
-              <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
-                  >
-                    Clear search
-                  </button>
-                )}
-                {selectedCategory !== null && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategory(null)}
-                    className="rounded-lg border border-foreground bg-foreground px-3 py-1.5 text-sm font-medium text-background transition-colors hover:bg-foreground/90"
-                  >
-                    View all posts
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
     </>
   );
 }
+

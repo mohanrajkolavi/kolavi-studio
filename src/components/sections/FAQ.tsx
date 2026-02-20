@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { Plus, Minus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface FAQItem {
+export interface FAQItem {
   question: string;
   answer: string;
 }
@@ -20,49 +20,61 @@ export function FAQ({
   items,
   className,
 }: FAQProps) {
-  const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
     <section className={cn("py-16 sm:py-24", className)}>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            {title}
-          </h2>
-        </div>
-        <div className="mx-auto mt-16 max-w-3xl">
-          <div className="space-y-4">
+        {title && (
+          <div className="mx-auto max-w-2xl text-center mb-16">
+            <h2 className="text-h2 text-foreground">
+              {title}
+            </h2>
+          </div>
+        )}
+        <div className="mx-auto max-w-3xl">
+          <div className="border-t border-border">
             {items.map((item, index) => {
               const answerId = `faq-answer-${index}`;
               const isOpen = openIndex === index;
               return (
-                <div key={index} className="border-b pb-4">
+                <div
+                  key={index}
+                  className={`border-b border-border transition-colors duration-300 animate-reveal ${
+                    isOpen ? "bg-muted/30" : "hover:bg-muted/10"
+                  }`}
+                  style={{ animationDelay: `${150 + index * 100}ms` }}
+                >
                   <button
-                    type="button"
-                    id={`${answerId}-button`}
-                    className="flex w-full items-center justify-between text-left"
                     onClick={() => setOpenIndex(isOpen ? null : index)}
                     aria-expanded={isOpen}
                     aria-controls={answerId}
+                    id={`${answerId}-button`}
+                    className="w-full py-8 px-4 sm:px-8 flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 group"
                   >
-                    <span className="text-lg font-semibold">{item.question}</span>
-                    <ChevronDown
-                      className={cn(
-                        "h-5 w-5 transition-transform",
-                        isOpen && "rotate-180"
-                      )}
-                      aria-hidden
-                    />
-                  </button>
-                  {isOpen && (
-                    <div
-                      id={answerId}
-                      role="region"
-                      aria-labelledby={`${answerId}-button`}
+                    <span className={`text-h4 transition-colors duration-300 pr-8 ${isOpen ? "text-primary" : "text-foreground group-hover:text-primary/80"}`}>
+                      {item.question}
+                    </span>
+                    <span 
+                      className={`flex-shrink-0 text-primary transition-transform duration-300 ease-in-out ${isOpen ? "rotate-180" : "rotate-0"}`}
                     >
-                      <p className="mt-4 text-muted-foreground">{item.answer}</p>
+                      {isOpen ? <Minus className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+                    </span>
+                  </button>
+                  <div
+                    id={answerId}
+                    role="region"
+                    aria-labelledby={`${answerId}-button`}
+                    className={`grid transition-all duration-300 ease-in-out ${
+                      isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+                    }`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="pb-8 px-4 sm:px-8 text-body text-muted-foreground max-w-3xl transform transition-transform duration-300 ease-in-out origin-top">
+                        {item.answer}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}

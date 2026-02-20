@@ -24,9 +24,9 @@ export default function PrivacyPolicyPage() {
           We may collect information that you provide directly to us, including:
         </p>
         <ul>
-          <li><strong>Contact information</strong> — Name, email address, phone number, and company name when you fill out our contact form or request a consultation</li>
-          <li><strong>Communication data</strong> — Messages and correspondence you send to us</li>
-          <li><strong>Technical data</strong> — IP address, browser type, device information, and pages visited (collected automatically via cookies and similar technologies)</li>
+          <li><strong>Contact information:</strong> Name, email address, phone number, and company name when you fill out our contact form or request a consultation</li>
+          <li><strong>Communication data:</strong> Messages and correspondence you send to us</li>
+          <li><strong>Technical data:</strong> IP address, browser type, device information, and pages visited (collected automatically via cookies and similar technologies)</li>
         </ul>
 
         <h2>3. How We Use Your Information</h2>
@@ -51,8 +51,8 @@ export default function PrivacyPolicyPage() {
           We do not sell your personal information. We may share your data with:
         </p>
         <ul>
-          <li><strong>Service providers</strong> — Third parties who assist us (e.g., hosting, analytics, email delivery) under strict confidentiality agreements</li>
-          <li><strong>Legal authorities</strong> — When required by law or to protect our rights</li>
+          <li><strong>Service providers:</strong> Third parties who assist us (e.g., hosting, analytics, email delivery) under strict confidentiality agreements</li>
+          <li><strong>Legal authorities:</strong> When required by law or to protect our rights</li>
         </ul>
 
         <h2>6. Data Retention</h2>

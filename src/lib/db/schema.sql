@@ -93,3 +93,5 @@ CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_genera
 -- Partner Program: Run src/lib/db/migrations/001_partner_program.sql to add:
 -- partner_applications, partners, lead_revenue, partner_payouts, admin_action_logs,
 -- partner_click_logs, and extend leads with partner_id, referral_code, paid_at, one_time_amount, recurring_amount
+
+-- prompt_versions table removed (Opus Writer System deleted)

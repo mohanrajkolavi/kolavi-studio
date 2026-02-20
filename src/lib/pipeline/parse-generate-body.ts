@@ -3,7 +3,7 @@
  * Returns PipelineInput or a single error string for 400 responses.
  */
 
-import type { PipelineInput, SearchIntent, WordCountPreset } from "./types";
+import type { PipelineInput, SearchIntent, WordCountPreset, DraftModel } from "./types";
 
 const ALLOWED_INTENTS = new Set<SearchIntent>([
   "informational",
@@ -12,13 +12,8 @@ const ALLOWED_INTENTS = new Set<SearchIntent>([
   "transactional",
 ]);
 
-const WORD_COUNT_PRESETS = new Set<WordCountPreset>([
-  "auto",
-  "concise",
-  "standard",
-  "in_depth",
-  "custom",
-]);
+const WORD_COUNT_PRESETS = new Set<WordCountPreset>(["auto", "custom"]);
+const DRAFT_MODELS = new Set<DraftModel>(["opus-4.6", "sonnet-4.6"]);
 const WORD_COUNT_CUSTOM_MIN = 500;
 const WORD_COUNT_CUSTOM_MAX = 6000;
 
@@ -31,17 +26,20 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
     return { error: "Request body must be a JSON object" };
   }
   const b = body as Record<string, unknown>;
-  const { keywords, peopleAlsoSearchFor, intent, wordCountPreset, wordCountCustom, autoFixHallucinations } = b;
+  const { keywords, peopleAlsoSearchFor, intent, wordCountPreset, wordCountCustom, draftModel, autoFixHallucinations } = b;
 
   const keywordTokens =
     typeof keywords === "string"
       ? keywords.split(",").map((k: string) => k.trim()).filter(Boolean)
-      : [];
+      : Array.isArray(keywords)
+        ? keywords.map((k: unknown) => String(k).trim()).filter(Boolean)
+        : [];
   const primaryKeyword = keywordTokens[0] ?? "";
   if (!primaryKeyword) {
     return { error: "Primary keyword is required" };
   }
-  const secondaryParts = keywordTokens.slice(1, 6);
+  /** Max 2 secondary keywords. */
+  const secondaryParts = keywordTokens.slice(1, 3);
   const secondaryKeywords = secondaryParts.length > 0 ? secondaryParts : undefined;
 
   const pasf =
@@ -95,6 +93,15 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
       ? true
       : Boolean(autoFixHallucinations);
 
+  const draftModelRaw =
+    draftModel != null && typeof draftModel === "string"
+      ? draftModel.trim().toLowerCase()
+      : undefined;
+  const resolvedDraftModel: DraftModel | undefined =
+    draftModelRaw && DRAFT_MODELS.has(draftModelRaw as DraftModel)
+      ? (draftModelRaw as DraftModel)
+      : undefined;
+
   const pipelineInput: PipelineInput = {
     primaryKeyword,
     secondaryKeywords: secondaryKeywords?.length ? secondaryKeywords : undefined,
@@ -102,6 +109,7 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
     intent: resolvedIntent,
     ...(resolvedPreset != null && { wordCountPreset: resolvedPreset }),
     ...(resolvedPreset === "custom" && resolvedCustom != null && { wordCountCustom: resolvedCustom }),
+    ...(resolvedDraftModel != null && { draftModel: resolvedDraftModel }),
     autoFixHallucinations: resolvedAutoFix,
   };
 
