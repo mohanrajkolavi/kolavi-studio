@@ -23,7 +23,8 @@ export function getOrganizationSchema() {
     description: "Med spa marketing agency specializing in Next.js websites, AI-driven strategies, and multi-treatment SEO. Focused on delivering high-performance digital experiences and GEO optimization for medical practices.",
     address: getOrgAddress(),
     sameAs: [
-      // Add social media URLs here when available
+      "https://www.instagram.com/mohanrajkolavi/",
+      "https://www.threads.com/@mohanrajkolavi/",
     ],
   };
 }

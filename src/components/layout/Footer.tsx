@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Instagram, AtSign, Rss } from "lucide-react";
 import { RefLink } from "@/components/partner/RefLink";
 import { LEGAL_LINKS } from "@/lib/constants";
 import { Logo } from "./Logo";
@@ -28,8 +29,35 @@ export function Footer() {
             <p className="mt-8 max-w-sm text-body leading-relaxed text-muted-foreground">
               The high-performance marketing agency exclusively for luxury medical spas. Next.js speed, AI SEO, and premium design engineering.
             </p>
-            
-            <div className="mt-12 flex items-center gap-4">
+
+            <nav className="mt-8 flex items-center gap-3" aria-label="Social and feeds">
+              <a
+                href="https://www.instagram.com/mohanrajkolavi/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Instagram"
+              >
+                <Instagram className="h-5 w-5" aria-hidden />
+              </a>
+              <a
+                href="https://www.threads.com/@mohanrajkolavi/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Threads"
+              >
+                <AtSign className="h-5 w-5" aria-hidden />
+              </a>
+              <Link
+                href="/blog/rss"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="Blog RSS feed"
+              >
+                <Rss className="h-5 w-5" aria-hidden />
+              </Link>
+            </nav>
+            <div className="mt-8 flex flex-wrap items-center gap-4">
               <div className="flex h-12 items-center rounded-full bg-muted/50 border border-border px-4 backdrop-blur-sm">
                 <span className="flex h-2 w-2 rounded-full bg-green-500 mr-3 animate-pulse" aria-hidden />
                 <span className="text-small font-medium text-foreground">Accepting new partners</span>
@@ -116,6 +144,14 @@ export function Footer() {
                 Tools
               </h3>
               <ul className="space-y-5">
+                <li>
+                  <Link
+                    href="/tools"
+                    className="text-body text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    All Tools
+                  </Link>
+                </li>
                 <li>
                   <Link
                     href="/tools/speed-audit"

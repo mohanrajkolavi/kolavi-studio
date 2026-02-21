@@ -118,6 +118,7 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: UrlEntry
   { path: "/portfolio", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/about", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/contact", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/tools", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/tools/speed-audit", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/tools/treatment-analyzer", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/tools/roi-calculator", priority: 0.8, changeFrequency: "monthly" as const },

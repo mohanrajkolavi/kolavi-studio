@@ -61,7 +61,7 @@ export function Header({ isAdmin = false }: HeaderProps) {
             href="/"
             className="flex items-center space-x-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-lg"
           >
-            <Logo className="text-xl font-semibold tracking-wide text-foreground sm:text-2xl" withPeriod />
+            <Logo className="text-xl font-bold tracking-wide text-foreground sm:text-2xl" withPeriod />
           </Link>
         </div>
 
