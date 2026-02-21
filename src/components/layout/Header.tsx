@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { RefLink } from "@/components/partner/RefLink";
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 
-import { MobileNav } from "./MobileNav";
 import { ThemeToggle } from "@/components/ThemeToggle";
+
+const MobileNav = dynamic(
+  () => import("./MobileNav").then((m) => ({ default: m.MobileNav })),
+  { ssr: false }
+);
 import { LogoutButton } from "@/components/dashboard/LogoutButton";
 import { Logo } from "./Logo";
 
@@ -56,7 +61,7 @@ export function Header({ isAdmin = false }: HeaderProps) {
             href="/"
             className="flex items-center space-x-2 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:rounded-lg"
           >
-            <Logo className="text-2xl font-extrabold tracking-wide text-foreground sm:text-3xl" withPeriod />
+            <Logo className="text-xl font-semibold tracking-wide text-foreground sm:text-2xl" withPeriod />
           </Link>
         </div>
 

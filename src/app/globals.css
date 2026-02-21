@@ -514,10 +514,32 @@
     }
   }
 
+  /* Hero-only: visible immediately for LCP, subtle slide-up only (no opacity delay) */
+  .animate-reveal-hero {
+    animation: reveal-up-hero 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 1;
+    transform: translateY(12px);
+    will-change: transform;
+  }
+
+  @keyframes reveal-up-hero {
+    from {
+      transform: translateY(12px);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-reveal {
       animation: none;
       opacity: 1;
+      transform: translateY(0);
+    }
+
+    .animate-reveal-hero {
+      animation: none;
       transform: translateY(0);
     }
   }

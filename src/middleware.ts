@@ -80,6 +80,7 @@ export async function middleware(request: NextRequest) {
 
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   requestHeaders.set("Content-Security-Policy", cspHeader);
   // Never trust client-supplied x-authenticated; strip it then set from server-side check only
   requestHeaders.delete("x-authenticated");

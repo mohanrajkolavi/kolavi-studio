@@ -30,12 +30,15 @@ export default async function RootLayout({
   const headersList = await headers();
   const nonce = headersList.get("x-nonce") ?? undefined;
   const isAdmin = headersList.get("x-authenticated") === "1";
+  const pathname = headersList.get("x-pathname") ?? "";
+  const isBlogRoute = pathname.startsWith("/blog");
 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Preconnect to image origin for faster LCP on blog/post pages */}
-        <link rel="preconnect" href="https://cms.kolavistudio.com" crossOrigin="anonymous" />
+        {isBlogRoute && (
+          <link rel="preconnect" href="https://cms.kolavistudio.com" crossOrigin="anonymous" />
+        )}
         <link rel="dns-prefetch" href="https://www.googletagmanager.com" />
         <script
           type="application/ld+json"

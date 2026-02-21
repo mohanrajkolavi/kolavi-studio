@@ -7,7 +7,7 @@ export function HeroRevamp() {
       {/* Background gradients */}
       <div className="absolute inset-0 w-full h-full bg-hero-atmosphere pointer-events-none transform-gpu" />
 
-      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center justify-center animate-reveal h-full my-auto">
+      <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center flex flex-col items-center justify-center animate-reveal-hero h-full my-auto">
         <div className="inline-flex items-center justify-center px-5 py-2.5 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>

@@ -1,11 +1,13 @@
-import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getPartnerIdFromCookies } from "@/lib/partner-auth";
+import { getPageMetadata } from "@/lib/seo/metadata";
 
-export const metadata: Metadata = {
+export const metadata = getPageMetadata({
   title: "Partner Dashboard",
-  robots: { index: false, follow: false },
-};
+  description: "Manage your referrals, commissions, and payouts in the Kolavi Studio Partner Portal.",
+  path: "/partner/dashboard",
+  noIndex: true,
+});
 
 export default async function PartnerDashboardLayout({
   children,
