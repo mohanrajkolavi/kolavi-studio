@@ -596,7 +596,10 @@ export default function BlogMakerPage() {
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
   const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("sonnet-4.6");
   /** Intent array sent to API (1 or 2; default informational if none selected). */
-  const intent = selectedIntents.length > 0 ? selectedIntents : ["informational"];
+  const intent = useMemo(
+    () => (selectedIntents.length > 0 ? selectedIntents : (["informational"] as IntentType[])),
+    [selectedIntents]
+  );
   const [sampleOutput, setSampleOutput] = useState<GeneratedContent | null>(null);
   const [sampleResult, setSampleResult] = useState<ResultState | null>(null);
   const [editing, setEditing] = useState<GeneratedContent | null>(null);

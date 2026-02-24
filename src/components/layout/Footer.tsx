@@ -6,7 +6,9 @@ import { RefLink } from "@/components/partner/RefLink";
 import { LEGAL_LINKS } from "@/lib/constants";
 import { Logo } from "./Logo";
 
-const FOOTER_SECTIONS = [
+type FooterLink = { href: string; label: string; ref?: boolean; primary?: boolean };
+
+const FOOTER_SECTIONS: { title: string; links: FooterLink[] }[] = [
   {
     title: "Why us",
     links: [
