@@ -5,188 +5,200 @@ import { Button } from "@/components/ui/button";
 import { Check, X } from "lucide-react";
 
 export const metadata = getPageMetadata({
-  title: "Pricing - Transparent Med Spa Marketing Packages",
-  description: "Transparent pricing for med spa marketing: Visibility, Growth, and Dominance tiers. Custom Next.js websites, GEO/AI SEO, programmatic SEO, and full automation.",
+  title: "Pricing and Complete Scope | Kolavi Studio",
+  description:
+    "Transparent tiers. No hidden retainers. A complete breakdown of the Kolavi Studio growth engine: Marketing, Growth, and Full System.",
   path: "/pricing",
   image: `${SITE_URL}/og-image.jpg`,
-  keywords: "med spa marketing pricing, medical spa agency cost, Kolavi Studio pricing, med spa SEO packages",
+  keywords: "Kolavi Studio pricing, growth agency pricing, SEO packages, marketing tiers",
 });
 
-const featuresList = [
-  "On-page SEO optimization",
-  "Blog posts",
-  "Lead gen funnel",
-  "Marketing automation",
-  "Email marketing",
-  "Account manager",
-  "Programmatic SEO",
-  "Google Ads management",
-  "AI chatbot",
-  "GLP-1 marketing funnel",
-  "Post-consultation email nurture",
-  "CRO + A/B testing",
-  "Video content editing",
-  "Meta Ads management",
-  "Membership upsell automation",
-  "Virtual consultation setup",
-  "Micro-influencer matching",
-];
-
+// SECTION 01: TIERS
 const tiers = [
   {
-    name: "Visibility",
-    setup: "$2,599",
-    monthly: "$1,299",
-    bestFor: "New or small single-location med spas",
+    name: "Marketing",
+    price: "$2,499 setup fee + $999 / mo",
+    bestFor: "Growing businesses ready to stop losing clients to competitors.",
+    included: [
+      "Custom Next.js website (up to 6 pages, 95+ PageSpeed guaranteed)",
+      "Local SEO including Google Business Profile management and 50+ directory citations",
+      "AI-powered SEO and Generative Engine Optimization (GEO)",
+      "Social media marketing (1 platform)",
+      "8 pages per month on-page optimization",
+      "6 SEO blog posts per month",
+      "Real-time performance dashboard",
+      "Shared account manager",
+    ],
+    notIncluded: [
+      "AI Chatbot for 24/7 lead capture",
+      "Lead generation funnel",
+      "Automated follow-up sequences",
+      "Reputation management and review automation",
+      "Google and Meta Ads Management",
+      "Video Content Editing",
+      "Conversion Rate Optimization (CRO) testing",
+      "Full automation suite",
+    ],
+    cta: "Book a Call for Marketing",
     popular: false,
-    features: {
-      "On-page SEO optimization": "Up to 8 pages per month",
-      "Blog posts": "6 posts per month, AI-assisted, human-edited, SEO-optimized",
-      "Lead gen funnel": "Landing page + form + confirmation page",
-      "Marketing automation": "Booking confirmations + appointment reminders",
-      "Email marketing": "1 email campaign per month (design, copywriting, sending, and performance tracking included)",
-      "Account manager": "Shared (1:5 ratio)\n48-hour response, 2 ad-hoc requests per month",
-      "Programmatic SEO": false,
-      "Google Ads management": false,
-      "AI chatbot": false,
-      "GLP-1 marketing funnel": false,
-      "Post-consultation email nurture": false,
-      "CRO + A/B testing": false,
-      "Video content editing": false,
-      "Meta Ads management": false,
-      "Membership upsell automation": false,
-      "Virtual consultation setup": false,
-      "Micro-influencer matching": false,
-    }
   },
   {
     name: "Growth",
-    setup: "$3,599",
-    monthly: "$1,699",
-    bestFor: "Established spas ready to dominate their city",
+    price: "$3,499 setup fee + $1,499 / mo",
+    bestFor: "Established businesses ready to own their local market.",
+    included: [
+      "Everything in Marketing, plus:",
+      "Custom Next.js website up to 12 pages (up from 6)",
+      "16 pages per month on-page optimization (up from 8)",
+      "16 SEO blog posts per month (up from 6)",
+      "AI chatbot for 24/7 lead capture",
+      "Lead generation funnel",
+      "Automated follow-up sequences",
+      "Reputation management and review automation",
+      "2 social media platforms (up from 1)",
+      "Dedicated account manager (up from shared)",
+      "Monthly strategy call (30 minutes)",
+    ],
+    notIncluded: [
+      "Google and Meta Ads Management",
+      "Video Content Editing",
+      "Conversion Rate Optimization (CRO) testing",
+      "Full automation suite",
+    ],
+    cta: "Book a Call for Growth",
     popular: true,
-    features: {
-      "On-page SEO optimization": "Unlimited pages per month",
-      "Blog posts": "16 posts per month, AI-assisted, human-edited, SEO-optimized",
-      "Lead gen funnel": "Full funnel: landing page + CRM integration + follow-up sequence",
-      "Marketing automation": "Confirmations, reminders, re-engagement, review requests",
-      "Email marketing": "2 email campaigns per month (design, copywriting, sending, and performance tracking included)",
-      "Account manager": "Shared (1:3 ratio)\nEmail + Slack/WhatsApp, 24-hour response, 5 ad-hoc requests per month, 30-minute monthly call",
-      "Programmatic SEO": "Up to 30 auto-generated pages targeting your treatments across your city and surrounding neighborhoods (e.g., 'Botox in [City]', 'Laser Hair Removal near [Neighborhood]')",
-      "Google Ads management": "Up to $5K ad spend managed",
-      "AI chatbot": "24/7 lead capture, FAQ handling, booking assistant",
-      "GLP-1 marketing funnel": "Dedicated landing page + email sequence for weight loss services",
-      "Post-consultation email nurture": "5-step sequence to convert consultations into bookings",
-      "CRO + A/B testing": "Ongoing page and booking flow optimization",
-      "Video content editing": false,
-      "Meta Ads management": false,
-      "Membership upsell automation": false,
-      "Virtual consultation setup": false,
-      "Micro-influencer matching": false,
-    }
   },
   {
-    name: "Dominance",
-    setup: "$5,599",
-    monthly: "$2,499",
-    bestFor: "Multi-location, $2M+ revenue, PE-backed groups",
+    name: "Full System",
+    price: "$5,999 setup fee + $2,499 / mo",
+    bestFor: "Multi-location operators who want total market ownership.",
+    included: [
+      "Everything in Growth, plus:",
+      "Custom Next.js website up to 18 pages (up from 12)",
+      "Up to 30 pages per month on-page optimization (up from 16)",
+      "30 SEO blog posts per month (up from 16)",
+      "Google and Meta Ads management (ad spend billed directly by client)",
+      "Conversion Rate Optimization (CRO) testing",
+      "Full automation suite (up from basic)",
+      "Video editing for Reels, Shorts, and TikTok (up to 8 videos per month)",
+      "4 social media platforms (up from 2)",
+      "Dedicated 1-on-1 account manager (up from dedicated)",
+      "Monthly strategy call (60 minutes, up from 30) & quarterly strategy session with founder",
+    ],
+    notIncluded: [] as string[],
+    cta: "Book a Call for Full System",
     popular: false,
-    features: {
-      "On-page SEO optimization": "Unlimited pages per month",
-      "Blog posts": "Up to 30 posts per month, AI-assisted, human-edited, SEO-optimized",
-      "Lead gen funnel": "Full funnel: landing page + CRM integration + follow-up sequence",
-      "Marketing automation": "Confirmations, reminders, re-engagement, review requests",
-      "Email marketing": "4 email campaigns per month (design, copywriting, sending, and performance tracking included)",
-      "Account manager": "Dedicated account manager (1:1)\nEmail + Slack/WhatsApp + phone, 4-hour response, unlimited requests, 60-minute monthly call, 90-minute quarterly strategy session, direct founder access",
-      "Programmatic SEO": "50 to 200+ auto-generated pages across all your locations and treatments. Ideal for multi-location groups where each location gets its own treatment pages, neighborhood pages, and service area pages.",
-      "Google Ads management": "Up to $10K ad spend managed",
-      "AI chatbot": "Free ($999 value), 24/7 lead capture, FAQ handling, booking assistant",
-      "GLP-1 marketing funnel": "Landing page + ads + full email sequence",
-      "Post-consultation email nurture": "5-step sequence to convert consultations into bookings",
-      "CRO + A/B testing": "Ongoing page and booking flow optimization",
-      "Video content editing": "4 videos per month for Instagram Reels, TikTok, YouTube Shorts",
-      "Meta Ads management": "Facebook + Instagram campaigns",
-      "Membership upsell automation": "Auto-promote membership plans to repeat clients",
-      "Virtual consultation setup": "Landing page + booking flow + pre-consult intake",
-      "Micro-influencer matching": "Local influencer outreach + campaign coordination",
-    }
-  }
+  },
 ];
 
+// SECTION 02: COMPARE ALL FEATURES (sticky header table)
+const compareTableRows: { section?: string; feature: string; marketing: string; growth: string; fullSystem: string }[] = [
+  { section: "Core Technology & Foundation", feature: "", marketing: "", growth: "", fullSystem: "" },
+  { feature: "Custom Next.js Website", marketing: "6 pages", growth: "12 pages", fullSystem: "18 pages" },
+  { feature: "PageSpeed Guarantee", marketing: "95+ (All Tiers)", growth: "95+ (All Tiers)", fullSystem: "95+ (All Tiers)" },
+  { feature: "Real-Time Revenue Dashboard", marketing: "Yes", growth: "Yes", fullSystem: "Yes" },
+  { section: "Traffic & SEO Engine", feature: "", marketing: "", growth: "", fullSystem: "" },
+  { feature: "On-Page Optimization", marketing: "8 pages/mo", growth: "16 pages/mo", fullSystem: "Up to 30 pages/mo" },
+  { feature: "SEO Blog Posts", marketing: "6/mo", growth: "16/mo", fullSystem: "30/mo" },
+  { feature: "Local Citation Building (50+ Directories)", marketing: "Setup Phase", growth: "Setup Phase", fullSystem: "Setup Phase" },
+  { feature: "Google Business Profile Management", marketing: "Yes", growth: "Yes", fullSystem: "Yes" },
+  { feature: "Generative Engine Optimization (GEO)", marketing: "Yes", growth: "Yes", fullSystem: "Yes" },
+  { feature: "AI-Powered SEO", marketing: "Yes", growth: "Yes", fullSystem: "Yes" },
+  { section: "Conversion & Automation", feature: "", marketing: "", growth: "", fullSystem: "" },
+  { feature: "AI Chatbot (24/7 Lead Capture)", marketing: "No", growth: "Yes", fullSystem: "Yes" },
+  { feature: "Lead Generation Funnel", marketing: "No", growth: "Yes", fullSystem: "Yes" },
+  { feature: "Automated Follow-Up Sequences", marketing: "No", growth: "Yes", fullSystem: "Yes" },
+  { feature: "Reputation Management & Reviews", marketing: "No", growth: "Yes", fullSystem: "Yes" },
+  { feature: "Automation Level", marketing: "No", growth: "Basic", fullSystem: "Full Automation Suite" },
+  { feature: "CRO Testing", marketing: "No", growth: "No", fullSystem: "Yes" },
+  { section: "Paid Media & Social", feature: "", marketing: "", growth: "", fullSystem: "" },
+  { feature: "Social Media Platforms", marketing: "1", growth: "2", fullSystem: "4" },
+  { feature: "Google and Meta Ads Management", marketing: "Add-on", growth: "Add-on", fullSystem: "Included" },
+  { feature: "Video Content Editing", marketing: "Add-on", growth: "Add-on", fullSystem: "Up to 8 videos/mo" },
+  { section: "Account Management & Access", feature: "", marketing: "", growth: "", fullSystem: "" },
+  { feature: "Account Manager", marketing: "Shared", growth: "Dedicated", fullSystem: "1-on-1 Dedicated" },
+  { feature: "Strategy Calls", marketing: "None", growth: "30-min monthly", fullSystem: "60-min monthly + Quarterly Founder Session" },
+];
+
+// SECTION 03: ONE-TIME & ADD-ONS
 const oneTimeProjects = [
-  { name: "SEO Audit + Roadmap", price: "Free" },
-  { name: "Virtual Consultation Setup", price: "$499" },
+  { name: "SEO Audit and Roadmap", price: "Free" },
   { name: "Custom AI Chatbot", price: "$999" },
-  { name: "Full Lead Gen Funnel Build", price: "$1,499 to $2,999" },
-  { name: "CRO Sprint (30-day)", price: "$1,499 to $2,499" },
-  { name: "GLP-1 Launch Package", price: "$2,499 to $3,999" },
-  { name: "Full Marketing Automation Build", price: "$2,499 to $4,999" },
+  { name: "Website Speed Overhaul", price: "$1,499" },
+  { name: "Full Lead Gen Funnel Build", price: "$1,499 to $2,499" },
+  { name: "CRO Sprint (30 days)", price: "$1,499 to $2,499" },
+  { name: "Programmatic SEO Sprint (100 Pages)", price: "$1,999" },
+  { name: "Custom Next.js Website (Standalone)", price: "$3,500" },
 ];
 
 const monthlyAddOns = [
-  { name: "Extra Email Campaign", price: "$199 / campaign" },
-  { name: "Extra Blog Posts", price: "$199 / post" },
-  { name: "Competitor Analysis Report", price: "$249 / mo" },
-  { name: "Extra Landing Page", price: "$299 / page" },
-  { name: "SMS Marketing", price: "$299 / mo" },
-  { name: "Micro-Influencer Matching", price: "$399 / mo" },
-  { name: "Social Media Calendar (8 posts)", price: "$499 / mo" },
-  { name: "Google Ads Standalone", price: "$599 / mo + spend (ad spend budget paid directly to platform, not included in fee)" },
-  { name: "Video Editing (4 videos)", price: "$599 / mo" },
-  { name: "Meta Ads Management", price: "$699 / mo + spend (ad spend budget paid directly to platform, not included in fee)" },
-  { name: "Additional Location", price: "60% of base retainer (e.g., Visibility = $779/mo, Growth = $1,019/mo, Dominance = $1,499/mo)" },
+  { name: "Google or Meta Ads Management", price: "$699 / mo" },
+  { name: "Social Media Video Editing (4 videos)", price: "$199 / mo" },
+  { name: "GEO Optimization Standalone", price: "$199 / mo" },
+  { name: "AI Chatbot Maintenance & Optimization", price: "$149 / mo" },
+  { name: "Extra Location SEO Page", price: "$99 / mo" },
+  { name: "Extra SEO Blog Post", price: "$69 / post" },
 ];
 
-const competitorComparison = [
+// SECTION 05: HOW WE COMPARE (2 columns: Kolavi vs Traditional Agency)
+const howWeCompare = [
   {
     feature: "Technology Stack",
-    kolavi: "Next.js (React)",
-    patientgain: "WordPress",
-    growth99: "Proprietary / WP",
-    sagapixel: "WordPress",
+    kolavi: "Custom Next.js & React",
+    traditional: "WordPress or drag-and-drop builders",
   },
   {
     feature: "PageSpeed Score",
-    kolavi: "95-100 Guaranteed",
-    patientgain: "Typically 40-60",
-    growth99: "Typically 50-70",
-    sagapixel: "Typically 60-80",
+    kolavi: "95+ Guaranteed",
+    traditional: "Typically 40 to 60",
   },
   {
-    feature: "Programmatic SEO",
-    kolavi: "Yes (Built-in)",
-    patientgain: "No",
-    growth99: "No",
-    sagapixel: "No",
+    feature: "Content Engine",
+    kolavi: "AI-Powered, Human-Edited (High volume, high quality)",
+    traditional: "Manual writing (Slow) or unedited AI (Spammy)",
   },
   {
-    feature: "AI Content Engine",
-    kolavi: "Yes",
-    patientgain: "No",
-    growth99: "Basic",
-    sagapixel: "Human only (Slower)",
+    feature: "Search Visibility",
+    kolavi: "Standard SEO + GEO (Generative Engine Optimization) included",
+    traditional: "Traditional search only",
   },
   {
-    feature: "GEO Optimization",
-    kolavi: "Yes",
-    patientgain: "No",
-    growth99: "No",
-    sagapixel: "No",
+    feature: "Local SEO & Reach",
+    kolavi: "Programmatic city-pages & automated 50+ directory citations",
+    traditional: "Basic profile updates & manual directory submissions",
+  },
+  {
+    feature: "Lead Generation",
+    kolavi: "24/7 AI chatbots & automated multi-step funnels",
+    traditional: "Static contact forms & \"we will call you\" pages",
+  },
+  {
+    feature: "Lead Nurture & Automation",
+    kolavi: "Automated follow-ups, review requests, & CRM syncing",
+    traditional: "Manual emails or fragmented third-party software",
   },
   {
     feature: "Design Quality",
-    kolavi: "Custom, Premium",
-    patientgain: "Template-based",
-    growth99: "Template-based",
-    sagapixel: "Custom",
+    kolavi: "Custom, conversion-engineered architecture",
+    traditional: "Modified off-the-shelf templates",
+  },
+  {
+    feature: "Reporting and Metrics",
+    kolavi: "Real-time revenue dashboards",
+    traditional: "Monthly PDF vanity metrics",
+  },
+  {
+    feature: "Pricing Structure",
+    kolavi: "Transparent flat-rate tiers. You own the assets.",
+    traditional: "Vague retainers, hourly billing, proprietary lock-ins.",
   },
 ];
 
 export default function PricingPage() {
   return (
     <main className="relative w-full">
-      {/* SECTION 1: HERO */}
-      <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden border-b border-border -mt-[72px] pt-[72px]">
+      {/* HERO */}
+      <section className="relative min-h-[100dvh] w-full flex flex-col items-center justify-center overflow-hidden -mt-[72px] pt-[72px]">
         <div className="absolute inset-0 w-full h-full bg-hero-atmosphere pointer-events-none" />
 
         <div className="relative z-10 container mx-auto px-4 sm:px-6 lg:px-8 text-center animate-reveal">
@@ -199,11 +211,11 @@ export default function PricingPage() {
           </div>
 
           <h1 className="text-hero text-foreground max-w-[900px] mx-auto text-balance mb-8">
-            Transparent Investment. Predictable Results.
+            Pricing and Complete Scope
           </h1>
 
           <p className="text-body text-muted-foreground max-w-[650px] mx-auto text-balance mb-12">
-            Three tiers built for three stages of growth. No hidden fees. No surprise invoices. Every deliverable spelled out.
+            Transparent tiers. No hidden retainers. A complete breakdown of the Kolavi Studio growth engine.
           </p>
 
           <Button
@@ -216,139 +228,131 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* SECTION 2: PRICING TIERS */}
-      <section className="relative z-10 bg-background py-24 sm:py-32">
+      {/* SECTION 01: THE TIERS */}
+      <section className="relative z-10 bg-background py-16 sm:py-20 md:py-24" aria-labelledby="tiers-heading">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+          <header className="text-center max-w-2xl mx-auto mb-12 sm:mb-14">
+            <span className="text-xs font-semibold text-primary uppercase tracking-widest">The Tiers</span>
+            <h2 id="tiers-heading" className="text-2xl sm:text-3xl font-bold text-foreground mt-2 mb-3 tracking-tight">
+              Marketing · Growth · Full System
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Choose the engine that matches your stage. Every tier is a complete system.
+            </p>
+          </header>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
             {tiers.map((tier, index) => (
-              <div
+              <article
                 key={tier.name}
-                className={`relative rounded-[32px] border bg-card p-8 sm:p-10 shadow-premium flex flex-col animate-reveal ${tier.popular
-                  ? "border-primary lg:-mt-8 lg:mb-8 ring-1 ring-primary/20"
-                  : "border-border mt-0"
-                  }`}
-                style={{ animationDelay: `${index * 150}ms` }}
+                className={`relative flex flex-col rounded-[28px] border bg-card overflow-hidden shadow-premium ${
+                  tier.popular ? "border-2 border-primary lg:scale-[1.02] z-10 ring-2 ring-primary/10" : "border-border"
+                }`}
               >
-                {tier.popular && (
-                  <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 inline-flex items-center justify-center px-4 py-1.5 rounded-full bg-primary text-[12px] font-bold tracking-wider uppercase text-primary-foreground shadow-sm">
-                    Most Popular
+                {/* Card header: tier number + name + badge */}
+                <div className="px-6 sm:px-7 pt-6 sm:pt-7 pb-4 border-b border-border/80">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
+                      Tier {String(index + 1).padStart(2, "0")}
+                    </span>
+                    {tier.popular && (
+                      <span className="px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider">
+                        Most Popular
+                      </span>
+                    )}
                   </div>
-                )}
+                  <h3 className="text-xl sm:text-2xl font-bold text-foreground mt-1.5">{tier.name}</h3>
+                </div>
 
-                <h3 className="text-h3 text-foreground mb-2">{tier.name}</h3>
-                <p className="text-small text-muted-foreground mb-6 min-h-[42px]">{tier.bestFor}</p>
-
-                <div className="mb-6 pb-6 border-b border-border">
-                  <div className="flex items-baseline mb-2">
-                    <span className="text-[48px] font-bold leading-none tracking-tight text-foreground">{tier.monthly}</span>
-                    <span className="text-body text-muted-foreground ml-2">/mo</span>
-                  </div>
-                  <p className="text-small text-muted-foreground">
-                    + {tier.setup} setup fee
+                {/* Price block */}
+                <div className="px-6 sm:px-7 py-5 bg-muted/30 border-b border-border/80">
+                  <p className="text-[13px] text-muted-foreground mb-1">Setup + monthly</p>
+                  <p className="text-lg sm:text-xl font-bold text-foreground leading-snug">
+                    {tier.price}
                   </p>
                 </div>
 
-                <div className="flex-1 mb-8">
-                  <h4 className="text-small font-semibold text-foreground uppercase tracking-wider mb-4">What is included</h4>
-                  <ul className="space-y-4">
-                    {Object.entries(tier.features).filter(([_, val]) => val !== false).map(([feature, val], i) => (
-                      <li key={i} className="flex items-start text-small text-muted-foreground">
-                        <Check className="w-5 h-5 text-primary mr-3 shrink-0" />
-                        <span className="mt-0.5 whitespace-pre-line">
-                          {val === true ? feature : <><strong className="text-foreground whitespace-pre-line">{val}</strong> {feature.includes('Pages/mo') || feature.includes('Posts/mo') ? '' : `- ${feature}`}</>}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  <h4 className="text-small font-semibold text-muted-foreground uppercase tracking-wider mb-4 mt-8">Not included</h4>
-                  <ul className="space-y-4">
-                    {Object.entries(tier.features).filter(([_, val]) => val === false).map(([feature], i) => (
-                      <li key={i} className="flex items-start text-small text-muted-foreground/60">
-                        <X className="w-5 h-5 mr-3 shrink-0" />
-                        <span className="mt-0.5">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                {/* Best for */}
+                <div className="px-6 sm:px-7 py-4 border-b border-border/80">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">Best for</p>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{tier.bestFor}</p>
                 </div>
 
-                <Button
-                  asChild
-                  size="lg"
-                  variant={tier.popular ? "default" : "outline"}
-                  className={`w-full h-14 rounded-[48px] text-[16px] ${!tier.popular && "bg-background hover:bg-muted"}`}
-                >
-                  <Link href="/contact">Get Started</Link>
-                </Button>
-              </div>
-            ))}
-          </div>
+                {/* What is included */}
+                <div className="px-6 sm:px-7 py-5 flex-1">
+                  <p className="text-[11px] font-semibold text-foreground uppercase tracking-wider mb-3">What is included</p>
+                  <ul className="space-y-2">
+                    {tier.included.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-[13px] text-muted-foreground leading-snug">
+                        <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" aria-hidden />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
 
-          <div className="mt-12 p-6 rounded-[24px] bg-muted/30 border border-border shadow-sm flex items-start gap-4 max-w-4xl mx-auto animate-reveal" style={{ animationDelay: "300ms" }}>
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 border border-primary/20">
-              <span className="text-primary font-bold">i</span>
-            </div>
-            <p className="text-body text-muted-foreground pt-1">
-              All advertising management fees (Google Ads, Meta Ads) cover our strategy, setup, optimization, and reporting. Ad spend budgets are separate and paid directly to the ad platforms by you. We manage your campaigns. You control your ad budget.
-            </p>
+                  {tier.notIncluded.length > 0 && (
+                    <>
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mt-6 mb-3">Not included</p>
+                      <ul className="space-y-2">
+                        {tier.notIncluded.map((item, i) => (
+                          <li key={i} className="flex items-start gap-2.5 text-[13px] text-muted-foreground/70 leading-snug">
+                            <X className="h-3.5 w-3.5 shrink-0 mt-0.5" aria-hidden />
+                            {item}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </div>
+
+                {/* CTA */}
+                <div className="px-6 sm:px-7 py-5 pt-4 border-t border-border/80 bg-muted/20">
+                  <Button
+                    asChild
+                    size="lg"
+                    variant={tier.popular ? "default" : "outline"}
+                    className="w-full rounded-full font-semibold"
+                  >
+                    <Link href="/contact">{tier.cta}</Link>
+                  </Button>
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* SECTION 3: FULL FEATURE COMPARISON TABLE */}
-      <section className="relative z-10 bg-background py-24 border-t border-border">
+      {/* SECTION 02: COMPARE ALL FEATURES (sticky header) */}
+      <section className="relative z-10 bg-muted/20 py-16 sm:py-20 md:py-24" aria-labelledby="compare-all-features-heading">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-          <div className="text-center mb-16 animate-reveal">
-            <h2 className="text-h2 text-foreground mb-6">Compare All Features</h2>
-            <p className="text-body text-muted-foreground max-w-2xl mx-auto">
-              A detailed breakdown of exactly what is included in each Kolavi Studio growth tier.
-            </p>
-          </div>
-
-          <div className="overflow-x-auto rounded-[24px] border border-border bg-card shadow-sm animate-reveal" style={{ animationDelay: "200ms" }}>
-            <table className="w-full text-left border-collapse min-w-[800px]">
-              <thead>
+          <h2 id="compare-all-features-heading" className="text-2xl sm:text-3xl font-bold text-foreground mb-3 text-center">Compare All Features</h2>
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh] rounded-[24px] border border-border bg-card shadow-sm -mx-4 sm:mx-0">
+            <table className="w-full min-w-[700px] text-left border-collapse">
+              <thead className="sticky top-0 z-20 bg-muted/95 backdrop-blur border-b border-border shadow-sm">
                 <tr>
-                  <th className="p-6 text-small font-semibold text-muted-foreground uppercase tracking-wider border-b border-border bg-muted/20 w-[40%] align-bottom">Feature</th>
-                  {tiers.map(t => (
-                    <th key={t.name} className={`p-6 border-b w-[20%] align-bottom ${t.popular ? 'bg-primary/5 border-x border-t border-primary text-primary border-b-primary relative' : 'border-border bg-muted/20 text-foreground'}`}>
-                      <div className="flex flex-col items-start gap-1">
-                        {t.popular && (
-                          <span className="px-2.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold uppercase tracking-wider rounded-full shadow-sm whitespace-nowrap mb-1">
-                            Most Popular
-                          </span>
-                        )}
-                        <span className="text-body font-semibold">
-                          {t.name}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
+                  <th className="p-4 sm:p-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[28%]">Feature</th>
+                  <th className="p-4 sm:p-6 text-sm font-semibold text-foreground w-[24%]">Marketing</th>
+                  <th className="p-4 sm:p-6 text-sm font-semibold text-foreground w-[24%]">Growth</th>
+                  <th className="p-4 sm:p-6 text-sm font-semibold text-foreground w-[24%]">Full System</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {featuresList.map((feature, i) => {
-                  const isLastRow = i === featuresList.length - 1;
+                {compareTableRows.map((row, i) => {
+                  if (row.section) {
+                    return (
+                      <tr key={i} className="bg-muted/30">
+                        <td colSpan={4} className="p-3 sm:p-4 text-sm font-semibold text-foreground">
+                          {row.section}
+                        </td>
+                      </tr>
+                    );
+                  }
                   return (
-                    <tr key={i} className="transition-colors hover:bg-muted/10">
-                      <td className={`p-6 text-body font-medium text-foreground ${isLastRow ? 'border-b border-border' : ''}`}>{feature}</td>
-                      {tiers.map(t => {
-                        const val = feature in t.features ? t.features[feature as keyof typeof t.features] : undefined;
-                        return (
-                          <td key={t.name} className={`p-6 text-body ${t.popular ? `bg-primary/5 border-x border-primary text-foreground ${isLastRow ? 'border-b' : ''}` : `text-muted-foreground ${isLastRow ? 'border-b border-border' : ''}`}`}>
-                            {val === true ? (
-                              <Check className="w-5 h-5 text-primary" />
-                            ) : val === false || val === undefined ? (
-                              <div className="flex items-center gap-2">
-                                <X className="w-5 h-5 text-muted-foreground/30" />
-                                <span className="text-muted-foreground/50 text-[14px]">Not included</span>
-                              </div>
-                            ) : (
-                              <span className="font-medium text-foreground whitespace-pre-line">{val as string}</span>
-                            )}
-                          </td>
-                        );
-                      })}
+                    <tr key={i} className="hover:bg-muted/10 transition-colors">
+                      <td className="p-4 sm:p-6 text-sm font-medium text-foreground">{row.feature}</td>
+                      <td className="p-4 sm:p-6 text-sm text-muted-foreground">{row.marketing}</td>
+                      <td className="p-4 sm:p-6 text-sm text-muted-foreground">{row.growth}</td>
+                      <td className="p-4 sm:p-6 text-sm text-muted-foreground">{row.fullSystem}</td>
                     </tr>
                   );
                 })}
@@ -358,93 +362,188 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* SECTION 4 & 5: A LA CARTE & ADD-ONS */}
-      <section className="relative z-10 bg-muted/30 py-24 sm:py-32 border-y border-border">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
-
-            {/* One-Time Projects */}
-            <div className="animate-reveal">
-              <h2 className="text-h3 text-foreground mb-8">One-Time Projects</h2>
-              <div className="flex flex-col gap-4">
-                {oneTimeProjects.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-6 rounded-[20px] bg-background border border-border shadow-sm hover:shadow-md transition-shadow">
-                    <span className="text-body font-medium text-foreground">{item.name}</span>
-                    <span className="text-body text-muted-foreground font-medium bg-muted/50 px-3 py-1 rounded-full">{item.price}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Monthly Add-Ons */}
-            <div className="animate-reveal" style={{ animationDelay: "150ms" }}>
-              <h2 className="text-h3 text-foreground mb-8">Monthly Add-Ons</h2>
-              <div className="flex flex-col gap-4">
-                {monthlyAddOns.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between p-6 rounded-[20px] bg-background border border-border shadow-sm hover:shadow-md transition-shadow">
-                    <span className="text-body font-medium text-foreground">{item.name}</span>
-                    <span className="text-body text-muted-foreground font-medium bg-muted/50 px-3 py-1 rounded-full">{item.price}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 6: DISCOUNTS */}
-      <section className="relative z-10 bg-background py-24">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-reveal">
-            <div className="p-8 rounded-[24px] bg-primary text-primary-foreground shadow-premium relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 blur-2xl rounded-full -translate-y-1/2 translate-x-1/2" />
-              <h3 className="text-[20px] font-bold mb-2 relative z-10">Annual Payment</h3>
-              <p className="text-primary-foreground/90 font-medium text-[16px] relative z-10">10% off total retainer</p>
-            </div>
-            <div className="p-8 rounded-[24px] bg-card border border-border shadow-sm">
-              <h3 className="text-[20px] font-bold text-foreground mb-2">Multi-Location</h3>
-              <p className="text-muted-foreground font-medium text-[16px]">60% of base retainer per additional location</p>
-            </div>
-            <div className="p-8 rounded-[24px] bg-card border border-border shadow-sm">
-              <h3 className="text-[20px] font-bold text-foreground mb-2">Add-On Bundle</h3>
-              <p className="text-muted-foreground font-medium text-[16px]">2+ add-ons: cheapest add-on at 50% off</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 7: COMPETITOR COMPARISON */}
-      <section className="relative z-10 bg-background py-24 sm:py-32 border-t border-border">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
-          <div className="text-center mb-16 animate-reveal">
-            <h2 className="text-h2 text-foreground mb-6">How We Compare</h2>
-            <p className="text-body text-muted-foreground max-w-2xl mx-auto">
-              We built Kolavi because the industry standard simply is not good enough. See how our technology and methodologies stack up.
+      {/* SECTION 03: ONE-TIME PROJECTS & MONTHLY ADD-ONS */}
+      <section className="relative z-10 bg-muted/20 py-16 sm:py-20 md:py-24" aria-labelledby="addons-heading">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
+          <header className="text-center max-w-2xl mx-auto mb-12 sm:mb-14">
+            <span className="text-xs font-semibold text-primary uppercase tracking-widest">Add-ons</span>
+            <h2 id="addons-heading" className="text-2xl sm:text-3xl font-bold text-foreground mt-2 mb-3 tracking-tight">
+              One-Time Projects & Monthly Add-Ons
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Need specific solutions instead of a full tier? We scope custom builds for your exact bottleneck.
             </p>
+          </header>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+            {/* One-Time Projects card */}
+            <div className="rounded-[24px] border border-border bg-card shadow-premium overflow-hidden">
+              <div className="px-6 sm:px-7 py-5 border-b border-border bg-muted/30">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Single delivery</span>
+                <h3 className="text-lg sm:text-xl font-bold text-foreground mt-1">One-Time Projects</h3>
+              </div>
+              <ul className="divide-y divide-border">
+                {oneTimeProjects.map((item, i) => (
+                  <li key={i} className="flex items-center justify-between gap-4 px-6 sm:px-7 py-4 sm:py-[1.125rem] hover:bg-muted/20 transition-colors">
+                    <span className="text-sm font-medium text-foreground leading-snug min-w-0">{item.name}</span>
+                    <span className={`shrink-0 text-sm font-semibold tabular-nums ${item.price === "Free" ? "text-primary" : "text-foreground"}`}>
+                      {item.price}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Monthly Add-Ons card */}
+            <div className="rounded-[24px] border border-border bg-card shadow-premium overflow-hidden">
+              <div className="px-6 sm:px-7 py-5 border-b border-primary/20 bg-primary/5">
+                <span className="text-[10px] font-bold text-primary uppercase tracking-widest">Recurring</span>
+                <h3 className="text-lg sm:text-xl font-bold text-foreground mt-1">Monthly Add-Ons</h3>
+              </div>
+              <ul className="divide-y divide-border">
+                {monthlyAddOns.map((item, i) => (
+                  <li key={i} className="flex items-center justify-between gap-4 px-6 sm:px-7 py-4 sm:py-[1.125rem] hover:bg-muted/20 transition-colors">
+                    <span className="text-sm font-medium text-foreground leading-snug min-w-0">{item.name}</span>
+                    <span className="shrink-0 text-sm font-semibold text-foreground tabular-nums">{item.price}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 04: UNIVERSAL PARAMETERS & GUARANTEES */}
+      <section className="relative z-10 bg-muted/20 py-16 sm:py-20 md:py-24" aria-labelledby="parameters-heading">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-6xl">
+          <header className="text-center max-w-2xl mx-auto mb-12 sm:mb-14">
+            <span className="text-xs font-semibold text-primary uppercase tracking-widest">Terms</span>
+            <h2 id="parameters-heading" className="text-2xl sm:text-3xl font-bold text-foreground mt-2 mb-3 tracking-tight">
+              Universal Parameters & Guarantees
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              By onboarding with Kolavi Studio, you are protected by clear, transparent operational guidelines.
+            </p>
+          </header>
+
+          {/* The Guarantees — 3 tier cards */}
+          <div className="mb-10 sm:mb-12">
+            <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-5 text-center">
+              The Guarantees
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 sm:gap-6">
+              <div className="rounded-[20px] border border-border bg-card p-5 sm:p-6 shadow-sm">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Marketing Tier</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  No ranking movement in 60 days? We keep working at no extra charge until there is.
+                </p>
+              </div>
+              <div className="rounded-[20px] border border-border bg-card p-5 sm:p-6 shadow-sm">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Growth Tier</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Not seeing measurable lead growth by month 3? We keep working until you do.
+                </p>
+              </div>
+              <div className="rounded-[20px] border border-primary/30 bg-card p-5 sm:p-6 shadow-sm ring-1 ring-primary/10">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Full System Tier</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Miss any agreed deliverable? That month is free. Every deliverable. Every month.
+                </p>
+              </div>
+            </div>
           </div>
 
-          <div className="overflow-x-auto rounded-[24px] border border-border bg-card shadow-sm animate-reveal" style={{ animationDelay: "200ms" }}>
-            <table className="w-full text-left border-collapse min-w-[900px]">
+          {/* Operational Terms — single card with term rows */}
+          <div className="rounded-[24px] border border-border bg-card shadow-premium overflow-hidden">
+            <div className="px-6 sm:px-7 py-5 border-b border-border bg-muted/30">
+              <h3 className="text-base sm:text-lg font-bold text-foreground">Operational Terms</h3>
+              <p className="text-xs text-muted-foreground mt-1">What we expect and what you can expect.</p>
+            </div>
+            <ul className="divide-y divide-border">
+              <li className="px-6 sm:px-7 py-5">
+                <p className="text-sm font-semibold text-foreground mb-1.5">Active Partnership</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  To keep your guarantee active, we ask that you provide tool access within 7 days of onboarding and
+                  approve content within 5 business days. Delays on your end push timelines accordingly.
+                </p>
+              </li>
+              <li className="px-6 sm:px-7 py-5">
+                <p className="text-sm font-semibold text-foreground mb-1.5">Ad Spend</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  All advertising budgets (Google, Meta) are separate from our management fees and paid directly to the
+                  ad platforms by the client. You maintain total control over your budget.
+                </p>
+              </li>
+              <li className="px-6 sm:px-7 py-5">
+                <p className="text-sm font-semibold text-foreground mb-1.5">Revisions & Timelines</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Content revisions are capped per tier to ensure ranking momentum. Unapproved content will be
+                  automatically published after 5 business days to maintain your growth timeline.
+                </p>
+              </li>
+              <li className="px-6 sm:px-7 py-5">
+                <p className="text-sm font-semibold text-foreground mb-1.5">External Factors</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  SEO timelines refer to overall ranking movement, not guaranteed specific positions. Search engine
+                  algorithm updates and third-party platform changes are outside our control.
+                </p>
+              </li>
+              <li className="px-6 sm:px-7 py-5">
+                <p className="text-sm font-semibold text-foreground mb-1.5">Refunds & Ownership</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  Setup fees and paid monthly retainers are non-refundable once onboarding commences. All assets and
+                  systems built remain yours in full upon completion of all outstanding payments.
+                </p>
+              </li>
+              <li className="px-6 sm:px-7 py-5">
+                <p className="text-sm font-semibold text-foreground mb-1.5">Cancellations</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  You may cancel any time with 30 days written notice. Standard billing applies during the final 30-day
+                  notice period to ensure a clean handover of all assets.
+                </p>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 05: HOW WE COMPARE (2-column feature table) */}
+      <section className="relative z-10 bg-background py-16 sm:py-20 md:py-24" aria-labelledby="compare-heading">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
+          <header className="text-center max-w-2xl mx-auto mb-12 sm:mb-14">
+            <h2 id="compare-heading" className="text-2xl sm:text-3xl font-bold text-foreground mb-3 tracking-tight">
+              How We Compare
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              We built Kolavi Studio because the industry standard simply is not good enough. See how our technology and
+              methodologies stack up against a traditional marketing agency.
+            </p>
+          </header>
+          <div className="overflow-x-auto rounded-[24px] border border-border bg-card shadow-premium">
+            <table className="w-full min-w-[500px] text-left border-collapse">
               <thead>
-                <tr>
-                  <th className="p-6 text-small font-semibold text-muted-foreground uppercase tracking-wider border-b border-border bg-muted/20 w-[20%]">Standard</th>
-                  <th className="p-6 text-body font-bold text-primary border-b border-border bg-primary/5 w-[20%]">Kolavi Studio</th>
-                  <th className="p-6 text-body font-semibold text-foreground border-b border-border bg-muted/20 w-[20%]">PatientGain</th>
-                  <th className="p-6 text-body font-semibold text-foreground border-b border-border bg-muted/20 w-[20%]">Growth99</th>
-                  <th className="p-6 text-body font-semibold text-foreground border-b border-border bg-muted/20 w-[20%]">Sagapixel</th>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="p-4 sm:p-6 text-xs font-semibold text-muted-foreground uppercase tracking-wider w-[22%]">
+                    Feature
+                  </th>
+                  <th className="p-4 sm:p-6 text-sm font-bold text-primary border-l border-border bg-primary/5 w-[39%]">
+                    Kolavi Studio
+                  </th>
+                  <th className="p-4 sm:p-6 text-sm font-semibold text-foreground border-l border-border bg-muted/20 w-[39%]">
+                    Traditional Agency
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {competitorComparison.map((row, i) => (
-                  <tr key={i} className="transition-colors hover:bg-muted/10">
-                    <td className="p-6 text-body font-medium text-foreground">{row.feature}</td>
-                    <td className="p-6 text-body font-semibold text-primary bg-primary/5 border-x border-primary/10">
+                {howWeCompare.map((row, i) => (
+                  <tr key={i} className="hover:bg-muted/5 transition-colors">
+                    <td className="p-4 sm:p-6 text-sm font-medium text-foreground">{row.feature}</td>
+                    <td className="p-4 sm:p-6 text-sm text-foreground leading-snug bg-primary/5 border-l border-primary/10">
                       {row.kolavi}
                     </td>
-                    <td className="p-6 text-body text-muted-foreground">{row.patientgain}</td>
-                    <td className="p-6 text-body text-muted-foreground">{row.growth99}</td>
-                    <td className="p-6 text-body text-muted-foreground">{row.sagapixel}</td>
+                    <td className="p-4 sm:p-6 text-sm text-muted-foreground leading-snug border-l border-border">
+                      {row.traditional}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -453,23 +552,18 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* SECTION 8: CTA */}
-      <section className="relative z-10 bg-background py-32 lg:py-[160px] overflow-hidden flex flex-col justify-center min-h-[50vh]">
+      {/* CTA */}
+      <section className="relative z-10 bg-background py-20 lg:py-24 overflow-hidden">
         <div className="absolute inset-0 w-full h-full bg-cta-atmosphere pointer-events-none" />
-
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center relative z-10 animate-reveal">
-          <h2 className="text-h2 text-foreground mb-8 text-balance">
-            Start With a Free SEO Audit
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl text-center relative z-10">
+          <h2 className="text-2xl sm:text-3xl font-bold text-foreground mb-6">
+            Start With a Free Audit
           </h2>
-          <p className="text-body text-muted-foreground mb-12 max-w-2xl mx-auto text-balance">
-            No contracts. No commitments. We will audit your current digital presence and show you exactly where the opportunities are.
+          <p className="text-muted-foreground mb-8 leading-relaxed">
+            No commitment. We will show you exactly where you are losing clients and the precise system to fix it.
           </p>
-          <Button
-            asChild
-            size="lg"
-            className="h-14 px-10 rounded-[48px] bg-primary hover:bg-primary/90 text-primary-foreground text-button shadow-premium"
-          >
-            <Link href="/tools/speed-audit">Get Your Free SEO Audit</Link>
+          <Button asChild size="lg" className="rounded-full shadow-premium">
+            <Link href="/tools/speed-audit">Get Your Free Audit</Link>
           </Button>
         </div>
       </section>

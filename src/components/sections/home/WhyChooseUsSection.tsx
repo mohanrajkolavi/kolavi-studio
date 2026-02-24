@@ -1,68 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useRevealOnScroll } from "@/hooks/useRevealOnScroll";
 
-const stats = [
+const differentiators = [
   {
-    target: 95,
-    suffix: "+",
-    label: "Google PageSpeed",
-    expanded: "Every site we ship hits 95+ on Google PageSpeed. Not after months of tweaking. On launch day. This directly impacts your Google rankings, your ad quality scores, and whether a patient stays or bounces in the first 3 seconds. Your competitors are running 50-60. You won't be.",
+    title: "Speed is a revenue variable, not a technical footnote.",
+    body: "A one-second delay drops conversions by 7 percent. Every site we ship loads in under one second on launch day. Your competitors are running 22-plugin WordPress installs sitting at PageSpeed 54. That gap compounds over every visitor, every day.",
+    proof: "95+ PageSpeed, every launch, no exceptions.",
   },
   {
-    target: 100,
-    suffix: "%",
-    label: "Med Spa Exclusive",
-    expanded: "We don't serve restaurants. We don't serve dentists. We don't do e-commerce. Every single workflow, automation, content template, and growth strategy we've built is for medical spas. Botox, fillers, body contouring, laser treatments, GLP-1. Your agency shouldn't need to \"learn your industry.\" We already live in it.",
+    title: "We do in days what takes other agencies months.",
+    body: "AI-powered workflows let us ship 30 SEO posts a month, build 200 programmatic pages, and run automated nurture sequences around the clock. The output scales. Your retainer does not have to.",
+    proof: "10x faster delivery than traditional agencies.",
   },
   {
-    target: 10,
-    suffix: "x",
-    label: "Faster Iteration",
-    expanded: "AI-powered workflows let us ship in days what traditional agencies deliver in weeks. 30 blog posts per month. Programmatic pages at scale. Automated nurture sequences. We move at the speed your growth demands, not the speed your agency's bandwidth allows.",
+    title: "We report in revenue, not impressions",
+    body: "Every dashboard connects campaign activity to booked clients. Call tracking. Conversion attribution. Revenue by source. If we cannot trace a dollar from campaign to client, we fix the tracking before the next report. No vanity metrics.",
+    proof: "Every client gets a live revenue dashboard from day one.",
   },
   {
-    target: 0,
-    suffix: "s",
-    label: "Template Code",
-    expanded: "No WordPress themes. No Squarespace. No drag-and-drop builders. Every pixel is custom-engineered in Next.js with a headless CMS. This is the reason your site loads faster, ranks higher, and converts better than anything built on the platforms your competitors are still using.",
+    title: "Your clients are searching on ChatGPT. We make sure they find you.",
+    body: "Google AI Overviews, ChatGPT, and Perplexity are already changing how people discover local businesses. Most agencies have never heard of Generative Engine Optimization. We have been building it into every site from day one. Your competitors are invisible there. You will not be.",
+    proof: "Your competitors are not there yet. You will be.",
   },
 ];
 
-function Counter({ target, isVisible }: { target: number; isVisible: boolean }) {
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    if (!isVisible) return;
-    
-    let rafId: number;
-    const duration = 2000;
-    const startTime = performance.now();
-    
-    const step = (currentTime: number) => {
-      const elapsed = currentTime - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // ease-out cubic
-      const easeProgress = 1 - Math.pow(1 - progress, 3);
-      
-      setCount(Math.floor(easeProgress * target));
-      
-      if (progress < 1) {
-        rafId = requestAnimationFrame(step);
-      } else {
-        setCount(target);
-      }
-    };
-    
-    rafId = requestAnimationFrame(step);
-
-    return () => cancelAnimationFrame(rafId);
-  }, [isVisible, target]);
-
-  return <span>{count}</span>;
-}
+const STATS = [
+  { value: "95+", label: "PageSpeed on every launch" },
+  { value: "31K", label: "Organic visitors built from zero" },
+  { value: "0", label: "Templates ever used" },
+  { value: "10x", label: "Faster delivery than traditional agencies" },
+];
 
 export function WhyChooseUsSection() {
   const [sectionRef, isVisible] = useRevealOnScroll({ threshold: 0.3 });
@@ -70,45 +38,66 @@ export function WhyChooseUsSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative z-10 bg-background py-24 sm:py-32"
+      className="relative z-10 bg-background py-20 sm:py-24 md:py-28"
       id="why-choose-us"
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div
-          className={`text-center max-w-3xl mx-auto mb-24 ${
+          className={`text-center max-w-3xl mx-auto mb-14 sm:mb-16 ${
             isVisible ? "animate-reveal" : "opacity-0"
           }`}
         >
-          <span className="text-label text-primary mb-6 block">THE KOLAVI ADVANTAGE</span>
-          <h2 className="text-h2 text-foreground mb-6">
-            Engineered to Dominate
+          <span className="inline-block text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest mb-4">
+            Why Kolavi
+          </span>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-foreground mb-5 leading-tight tracking-tight">
+            Built for 2026.
+            <br />
+            Not 2012.
           </h2>
-          <p className="text-body text-muted-foreground">
-            Purpose-built for medical spas from day one. Modern stack. AI-native workflows. Results that legacy agencies can't match at any price.
+          <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
+            Most agencies updated their website. Not their process. We built ours from scratch in 2026, AI-native from day one.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 lg:gap-16">
-          {stats.map((stat, index) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-14 sm:mb-16">
+          {differentiators.map((diff, index) => (
             <div
-              key={index}
-              className={`flex flex-col p-10 rounded-[20px] bg-muted/20 border border-border/50 backdrop-blur-sm ${
+              key={diff.title}
+              className={`flex flex-col p-7 sm:p-8 lg:p-9 rounded-[24px] border border-border bg-card shadow-sm hover:shadow-md transition-shadow ${
                 isVisible ? "animate-reveal" : "opacity-0"
               }`}
               style={{
                 animationDelay: isVisible ? `${150 + index * 100}ms` : "0ms",
               }}
             >
-              <div className="text-stat text-primary mb-6 flex items-baseline">
-                <Counter target={stat.target} isVisible={isVisible} />
-                <span className="text-h3 text-primary">{stat.suffix}</span>
-              </div>
-              <h4 className="text-h4 text-foreground mb-4">
-                {stat.label}
+              <h4 className="text-lg sm:text-xl font-bold text-foreground mb-4 leading-snug">
+                {diff.title}
               </h4>
-              <p className="text-body text-muted-foreground leading-relaxed">
-                {stat.expanded}
+              <p className="text-sm sm:text-base text-muted-foreground leading-[1.65] mb-5">
+                {diff.body}
               </p>
+              <p className="text-sm font-medium text-primary leading-snug">
+                {diff.proof}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        {/* Stats block */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {STATS.map((stat, index) => (
+            <div
+              key={stat.label}
+              className={`p-6 rounded-[20px] border border-border bg-card/50 text-center ${
+                isVisible ? "animate-reveal" : "opacity-0"
+              }`}
+              style={{
+                animationDelay: isVisible ? `${550 + index * 80}ms` : "0ms",
+              }}
+            >
+              <div className="text-h3 text-primary font-bold">{stat.value}</div>
+              <p className="text-small text-muted-foreground mt-2">{stat.label}</p>
             </div>
           ))}
         </div>

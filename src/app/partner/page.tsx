@@ -6,48 +6,44 @@ import { FAQ, type FAQItem } from "@/components/sections/FAQ";
 import { Button } from "@/components/ui/button";
 import {
   Users,
-  Wallet,
   TrendingUp,
-  Stethoscope,
   Building2,
-  Syringe,
-  GraduationCap,
   Scale,
   Laptop,
-  Network
+  Network,
 } from "lucide-react";
 
 export const metadata = getPageMetadata({
   title: "Partner Program - Earn Recurring Commissions",
-  description: "Join the Kolavi Studio Partner Program. Refer medical spas and earn 10% recurring commission for the life of the client.",
+  description: "Join the Kolavi Studio Partner Program. Refer local businesses and earn 10% on setup fees plus 5% recurring commission. Transparent payouts. No caps. No clawbacks after 90 days.",
   path: "/partner",
-  keywords: "agency partner program, med spa referral, marketing referral, reseller program",
+  keywords: "agency partner program, referral program, marketing referral, reseller program, local business",
 });
 
 const PARTNER_FAQ_ITEMS: FAQItem[] = [
   {
     question: "How much can I earn per referral?",
-    answer: "Commission details are shared upon approval. Expect competitive recurring payouts that reward long-term partnerships, not one-time finder's fees.",
+    answer: "You earn 10% of the one-time setup fee, plus 5% of the monthly retainer. There is no cap on how much you can earn or how many businesses you can refer.",
   },
   {
-    question: "Do I need to be in the med spa industry?",
-    answer: "You need to have relationships with or access to med spa owners. Consultants, software vendors, equipment suppliers, accountants, and attorneys in the aesthetics space are all great fits.",
+    question: "Do I need to be in a specific industry?",
+    answer: "No. As long as you have relationships with established, multi-location, or high-ticket local businesses that need more revenue and better digital systems, you are a fit.",
   },
   {
     question: "Do I need to handle the sales process?",
-    answer: "No. You make the introduction or share your referral link. We handle the audit, proposal, sales conversation, and close. You get credit for the referral.",
+    answer: "Not at all. Your only job is the introduction. Once you refer them, our team conducts the revenue audit, handles the technical scoping, and closes the deal.",
   },
   {
     question: "When do I get paid?",
-    answer: "Payouts are monthly. Once a referred client signs and pays, your commission begins. No caps on earnings.",
+    answer: "Setup fee commissions are paid out 30 days after the client clears their initial invoice. Recurring monthly commissions are paid out on the 15th of every month for active client retainers.",
   },
   {
-    question: "Is there a minimum commitment?",
-    answer: "No. Refer one client or fifty. There's no quota, no minimum activity requirement, and no penalty for inactivity.",
+    question: "Is there a minimum commitment or quota?",
+    answer: "No. Whether you send us one client a year or ten clients a month, you receive the exact same 10% and 5% commission structure.",
   },
   {
     question: "What happens if a referred client cancels?",
-    answer: "Commissions are earned for as long as the referred client remains active. No clawbacks after the first 90 days.",
+    answer: "If a client cancels their Kolavi Studio retainer, your recurring monthly commission for that specific client will stop. However, there are no clawbacks on past monthly payouts or setup fees after the initial 90-day period.",
   },
 ];
 
@@ -55,28 +51,27 @@ const steps = [
   {
     step: "01",
     title: "Apply",
-    description: "Fill out a short application. We review it within 48 hours. If you work with or know med spa owners, you are a fit.",
+    description: "Fill out a short application. We review it within 48 hours. If you work with, consult for, or know established local business owners, you are a fit.",
   },
   {
     step: "02",
     title: "Refer",
-    description: "Share your unique referral link or make a warm introduction. We handle the sales conversation, the audit, the proposal, and the close. You do not need to sell anything.",
+    description: "Share your unique referral link or make a warm email introduction. We handle the sales conversation, the technical audit, the proposal, and the close. You do not need to sell anything.",
   },
   {
     step: "03",
     title: "Earn",
-    description: "Earn a recurring commission for as long as the referred client stays with us. Payouts are monthly. No caps. No clawbacks after 90 days.",
+    description: "Earn a 10% commission on the upfront setup fee, plus a 5% recurring commission on the monthly retainer for as long as the referred client stays with us. Payouts are monthly. No caps. No clawbacks after 90 days.",
   },
 ];
 
 const partnerTypes = [
-  { icon: Stethoscope, title: "Med spa consultants and coaches" },
-  { icon: Building2, title: "Practice management software companies" },
-  { icon: Syringe, title: "Medical equipment suppliers and distributors" },
-  { icon: GraduationCap, title: "Aesthetic training and certification providers" },
-  { icon: Scale, title: "Accountants and attorneys serving the med spa industry" },
-  { icon: Laptop, title: "Web developers and designers who do not offer marketing" },
-  { icon: Network, title: "Anyone with relationships in the med spa space" },
+  { icon: Users, title: "Business consultants and growth coaches" },
+  { icon: Building2, title: "Field service and practice management software vendors" },
+  { icon: Scale, title: "Accountants, bookkeepers, and attorneys serving local businesses" },
+  { icon: Laptop, title: "Web developers and designers who do not offer advanced SEO or AI automation" },
+  { icon: Network, title: "B2B influencers with an audience of local operators" },
+  { icon: TrendingUp, title: "Anyone with strong relationships in the home service, legal, or high-ticket local space" },
 ];
 
 export default async function PartnerPage() {
@@ -110,7 +105,7 @@ export default async function PartnerPage() {
             </h1>
 
             <p className="text-body text-muted-foreground max-w-[650px] mx-auto text-balance mb-12">
-              Send med spa owners our way and earn recurring commissions on every client that signs. Simple terms. Transparent payouts. No fine print.
+              Refer established local businesses and earn 10% on setup plus 5% recurring. Simple terms. Transparent payouts. No fine print.
             </p>
 
             <Button
@@ -162,7 +157,7 @@ export default async function PartnerPage() {
                 Who This Is For
               </h2>
               <p className="text-body text-muted-foreground max-w-2xl mx-auto">
-                If you have an existing audience or client base of medical spa owners, aesthetic practitioners, or plastic surgeons, you are a perfect fit.
+                If you have an existing audience or client base of high-ticket local service providers, home service contractors, or professional firms, you are a perfect fit.
               </p>
             </div>
 
@@ -186,21 +181,48 @@ export default async function PartnerPage() {
 
         {/* SECTION 4: COMMISSION STRUCTURE */}
         <section className="relative z-10 bg-background py-24 sm:py-32" aria-labelledby="commission-heading">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl text-center">
-            <div className="p-12 md:p-16 rounded-[40px] border border-primary/20 bg-card shadow-premium relative overflow-hidden animate-reveal">
-              <div className="absolute top-1/2 left-1/2 w-full h-full bg-primary/5 rounded-full blur-[100px] -translate-y-1/2 -translate-x-1/2 pointer-events-none" />
-
-              <div className="relative z-10 flex flex-col items-center">
-                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-8 border border-primary/20">
-                  <Wallet className="w-10 h-10 text-primary" />
-                </div>
-                <h2 id="commission-heading" className="text-h2 text-foreground mb-6">
-                  Commission Structure
-                </h2>
-                <p className="text-[20px] leading-relaxed text-muted-foreground font-medium max-w-2xl mx-auto mb-8">
-                  Commission details shared upon approval. Expect highly competitive recurring payouts that actively reward long-term partnerships.
-                </p>
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+            <div className="text-center mb-12">
+              <div className="inline-flex items-center justify-center px-5 py-2.5 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
+                COMMISSION STRUCTURE
               </div>
+              <h2 id="commission-heading" className="text-h2 text-foreground mb-4">
+                Transparent, High-Yield Payouts
+              </h2>
+              <p className="text-body text-muted-foreground max-w-2xl mx-auto mb-10">
+                We pay 10% of the Setup Fee + 5% of the Monthly Retainer for every client you close.
+              </p>
+              <p className="text-sm font-medium text-foreground">Here is what that looks like in practice:</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+              <div className="rounded-[24px] border border-border bg-card p-6 shadow-sm text-center">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Tier 01 Marketing</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">You earn</p>
+                <p className="text-2xl font-bold text-foreground mb-1">$249</p>
+                <p className="text-sm text-muted-foreground mb-3">upfront</p>
+                <p className="text-lg font-semibold text-foreground">+ $49 <span className="text-sm font-normal text-muted-foreground">/ month</span></p>
+              </div>
+              <div className="rounded-[24px] border-2 border-primary bg-card p-6 shadow-sm text-center ring-2 ring-primary/10">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Tier 02 Growth</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">You earn</p>
+                <p className="text-2xl font-bold text-foreground mb-1">$349</p>
+                <p className="text-sm text-muted-foreground mb-3">upfront</p>
+                <p className="text-lg font-semibold text-foreground">+ $74 <span className="text-sm font-normal text-muted-foreground">/ month</span></p>
+              </div>
+              <div className="rounded-[24px] border border-border bg-card p-6 shadow-sm text-center">
+                <p className="text-xs font-bold text-primary uppercase tracking-widest mb-2">Tier 03 Full System</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1">You earn</p>
+                <p className="text-2xl font-bold text-foreground mb-1">$599</p>
+                <p className="text-sm text-muted-foreground mb-3">upfront</p>
+                <p className="text-lg font-semibold text-foreground">+ $124 <span className="text-sm font-normal text-muted-foreground">/ month</span></p>
+              </div>
+            </div>
+
+            <div className="rounded-[24px] border border-primary/20 bg-primary/5 p-6 sm:p-8 text-center">
+              <p className="text-base sm:text-lg text-foreground font-medium leading-relaxed">
+                Refer just four Tier 03 clients a year, and you build an extra <strong className="text-primary">$496</strong> in passive monthly recurring revenue, plus <strong className="text-primary">$2,396</strong> in upfront cash bonuses.
+              </p>
             </div>
           </div>
         </section>

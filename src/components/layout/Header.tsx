@@ -14,6 +14,7 @@ const MobileNav = dynamic(
 );
 import { LogoutButton } from "@/components/dashboard/LogoutButton";
 import { Logo } from "./Logo";
+import { NAV_LINKS } from "@/lib/constants";
 
 type HeaderProps = {
   isAdmin?: boolean;
@@ -43,15 +44,25 @@ export function Header({ isAdmin = false }: HeaderProps) {
                 Dashboard
               </Link>
             )}
-            <Link href="/about" className="rounded-[48px] px-3 py-1.5 text-nav text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              About
-            </Link>
-            <RefLink href="/partner" className="rounded-[48px] px-3 py-1.5 text-nav text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              Partner Program
-            </RefLink>
-            <Link href="/blog" className="rounded-[48px] px-3 py-1.5 text-nav text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-              Blog
-            </Link>
+            {NAV_LINKS.map((link) =>
+              link.href === "/partner" ? (
+                <RefLink
+                  key={link.name}
+                  href={link.href}
+                  className="rounded-[48px] px-3 py-1.5 text-nav text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {link.name}
+                </RefLink>
+              ) : (
+                <Link
+                  key={link.name}
+                  href={link.href}
+                  className="rounded-[48px] px-3 py-1.5 text-nav text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {link.name}
+                </Link>
+              )
+            )}
           </nav>
         </div>
 
@@ -71,12 +82,16 @@ export function Header({ isAdmin = false }: HeaderProps) {
           {isAdmin ? (
             <LogoutButton className="inline-flex h-9 items-center justify-center rounded-[48px] bg-primary px-4 text-button text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
           ) : (
-            <RefLink
-              href="/tools/speed-audit"
-              className="inline-flex h-9 items-center justify-center rounded-[48px] bg-primary px-4 text-button text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring shadow-premium"
-            >
-              Free SEO Audit
-            </RefLink>
+            <>
+              <span id="header-cta-desc" className="sr-only">We cap new clients monthly. Takes 5 minutes to apply.</span>
+              <RefLink
+                href="/tools/speed-audit"
+                className="inline-flex h-9 items-center justify-center rounded-[48px] bg-primary px-4 text-button text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring shadow-premium"
+                aria-describedby="header-cta-desc"
+              >
+                Get Free Audit
+              </RefLink>
+            </>
           )}
         </div>
 

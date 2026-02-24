@@ -496,7 +496,7 @@
 
   /* Default smooth entrance animation */
   .animate-reveal {
-    animation: reveal-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: reveal-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
     opacity: 0;
     transform: translateY(24px);
     will-change: opacity, transform;

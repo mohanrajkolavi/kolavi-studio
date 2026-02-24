@@ -5,16 +5,21 @@ export default function NotFound() {
   return (
     <div className="container mx-auto flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
       <h1 className="text-6xl font-bold text-foreground">404</h1>
-      <h2 className="mt-4 text-2xl font-semibold text-foreground">Page not found</h2>
-      <p className="mt-4 text-muted-foreground">
-        The page you're looking for doesn't exist or may have been moved.
+      <h2 className="mt-4 text-2xl font-semibold text-foreground">
+        This page is not ranking.
+      </h2>
+      <p className="mt-2 text-muted-foreground">
+        Neither is yours, probably.
+      </p>
+      <p className="mt-4 text-base text-muted-foreground">
+        Let us fix that.
       </p>
       <div className="mt-8 flex flex-wrap justify-center gap-4">
         <Button asChild>
-          <Link href="/">Go home</Link>
+          <Link href="/tools/speed-audit">Get Your Free Audit</Link>
         </Button>
         <Button asChild variant="outline">
-          <Link href="/blog">Blog</Link>
+          <Link href="/">Go home</Link>
         </Button>
       </div>
     </div>

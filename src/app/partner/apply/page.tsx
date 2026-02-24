@@ -38,7 +38,6 @@ export default function PartnerApplyPage() {
       phone: formData.get("phone"),
       company: formData.get("company"),
       role: formData.get("role"),
-      networkSize: formData.get("networkSize"),
       source: formData.get("source"),
       message: formData.get("message"),
     };
@@ -182,26 +181,6 @@ export default function PartnerApplyPage() {
                 <option value="professional">Accountant / Attorney</option>
                 <option value="agency">Web Developer / Designer</option>
                 <option value="other">Other</option>
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label htmlFor="networkSize" className="text-[14px] font-medium text-foreground">
-                Network Size <span className="text-destructive">*</span>
-              </label>
-              <select
-                id="networkSize"
-                name="networkSize"
-                className={selectClass}
-                required
-                disabled={isSubmitting}
-                defaultValue=""
-              >
-                <option value="" disabled className="text-muted-foreground">Med spa relationships</option>
-                <option value="1-5">1-5</option>
-                <option value="6-15">6-15</option>
-                <option value="16-50">16-50</option>
-                <option value="50+">50+</option>
               </select>
             </div>
 

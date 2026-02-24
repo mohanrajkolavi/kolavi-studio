@@ -36,7 +36,7 @@ export function getSitemapBuildDate(): Date | undefined {
 
 export const SITE_NAME = "Kolavi Studio";
 export const SITE_DESCRIPTION =
-  "Next.js med spa websites & AI-powered SEO. 95-100 PageSpeed guaranteed. The only agency built on Next.js, AI, and real results for medical spas.";
+  "The AI-native growth agency for businesses that refuse to blend in. 95+ PageSpeed, SEO, and revenue systems that compound.";
 
 // Rank Math 100/100 alignment (rankmath.com/kb/score-100-in-tests) + Google Search (developers.google.com/search/docs)
 export const SEO = {
@@ -49,11 +49,9 @@ export const SEO = {
 } as const;
 
 export const NAV_LINKS = [
-  { name: "Services", href: "/services" },
-  { name: "Pricing", href: "/pricing" },
-  { name: "Partners", href: "/partner" },
-  { name: "Blog", href: "/blog" },
   { name: "About", href: "/about" },
+  { name: "Partner Program", href: "/partner" },
+  { name: "Blog", href: "/blog" },
 ];
 
 // Legal pages - privacy, terms, cookies, disclaimer

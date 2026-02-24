@@ -28,9 +28,9 @@ function FAQItem({
       <button
         onClick={onClick}
         aria-expanded={isOpen}
-        className="w-full py-8 px-4 sm:px-8 flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 group"
+        className="w-full py-5 sm:py-6 px-5 sm:px-6 flex items-center justify-between text-left gap-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 group"
       >
-        <span className={`text-h4 transition-colors duration-300 pr-8 ${isOpen ? "text-primary" : "text-foreground group-hover:text-primary/80"}`}>
+        <span className={`text-h4 transition-colors duration-300 ${isOpen ? "text-primary" : "text-foreground group-hover:text-primary/80"}`}>
           {item.question}
         </span>
         <span 
@@ -45,7 +45,7 @@ function FAQItem({
         }`}
       >
         <div className="overflow-hidden">
-          <div className="pb-8 px-4 sm:px-8 text-body text-muted-foreground max-w-3xl transform transition-transform duration-300 ease-in-out origin-top">
+          <div className="pb-6 px-5 sm:px-6 text-sm sm:text-base text-muted-foreground leading-[1.65] transform transition-transform duration-300 ease-in-out origin-top">
             {item.answer}
           </div>
         </div>
@@ -61,22 +61,27 @@ export function FAQsSection() {
   return (
     <section
       ref={sectionRef}
-      className="relative z-10 bg-background py-24 sm:py-32"
+      className="relative z-10 bg-background py-20 sm:py-24 md:py-28"
       id="faqs"
     >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
         <div
-          className={`text-center mb-16 ${
+          className={`text-center mb-12 sm:mb-14 ${
             isVisible ? "animate-reveal" : "opacity-0"
           }`}
         >
-          <span className="text-label text-primary mb-6 block">FAQ</span>
-          <h2 className="text-h2 text-foreground mb-6">
-            Common Questions
+          <span className="inline-block text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest mb-4">
+            FAQ
+          </span>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground mb-5 leading-tight tracking-tight">
+            Questions worth asking.
           </h2>
+          <p className="text-base sm:text-lg text-muted-foreground max-w-xl mx-auto leading-relaxed">
+            Not finding what you need? Book a free audit call. We answer everything before you commit to anything.
+          </p>
         </div>
 
-        <div className="border-t border-border">
+        <div className="border-t border-border rounded-lg overflow-hidden">
           {HOMEPAGE_FAQ_ITEMS.map((item, index) => (
             <FAQItem
               key={index}

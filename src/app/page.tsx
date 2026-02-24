@@ -18,6 +18,10 @@ const PricingSection = dynamic(
   () => import("@/components/sections/home/PricingSection").then((m) => ({ default: m.PricingSection })),
   { ssr: true }
 );
+const TestimonialsSection = dynamic(
+  () => import("@/components/sections/home/TestimonialsSection").then((m) => ({ default: m.TestimonialsSection })),
+  { ssr: true }
+);
 const WhyChooseUsSection = dynamic(
   () => import("@/components/sections/home/WhyChooseUsSection").then((m) => ({ default: m.WhyChooseUsSection })),
   { ssr: true }
@@ -36,13 +40,13 @@ const CTASection = dynamic(
 );
 
 export const metadata = getPageMetadata({
-  title: "Kolavi Studio - Next.js Med Spa Websites & AI-Powered SEO | Fastest in the Industry",
+  title: "Kolavi Studio — AI-Native Growth Agency | PageSpeed & SEO",
   description:
-    "The only med spa marketing agency built on Next.js, AI, and real results. 95-100 PageSpeed scores guaranteed. Dominate every treatment, Botox, fillers, CoolSculpting, lasers, not just one or two.",
+    "Your site loads in 4 seconds. Every second costs you a booking. We build performance websites, AI-powered SEO, and automation that compounds. Free revenue audit.",
   path: "/",
   image: `${SITE_URL}/og-image.jpg`,
   keywords:
-    "med spa marketing agency, Next.js med spa websites, AI-powered SEO, medical spa SEO, PageSpeed optimization",
+    "growth agency, Next.js websites, AI-powered SEO, PageSpeed optimization, lead generation, revenue audit",
 });
 
 export default async function HomePage() {
@@ -56,9 +60,10 @@ export default async function HomePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         nonce={nonce}
       />
-      <main className="relative w-full">
+      <main id="main-content" className="relative w-full">
         <HeroRevamp />
         <ServicesSection />
+        <TestimonialsSection />
         <HowWeWorkSection />
         <PricingSection />
         <WhyChooseUsSection />

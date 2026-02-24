@@ -87,7 +87,6 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
       {/* Centered nav links - premium spacing and typography */}
       <nav className="flex flex-1 flex-col items-center justify-center px-6 py-8" aria-label="Main">
         <ul className="flex w-full max-w-sm flex-col gap-1 text-center">
-          {/* Navigation Links */}
           {isAdmin && (
             <li>
               <Link
@@ -99,50 +98,48 @@ export function MobileNav({ open, onOpenChange, isAdmin = false }: MobileNavProp
               </Link>
             </li>
           )}
-          <li>
-            <Link
-              href="/about"
-              className="block min-h-[48px] py-3 text-[17px] font-semibold leading-tight text-foreground transition-colors hover:text-primary active:opacity-80"
-              onClick={() => onOpenChange(false)}
-            >
-              About
-            </Link>
-          </li>
-          <li>
-            <RefLink
-              href="/partner"
-              className="block min-h-[48px] py-3 text-[17px] font-semibold leading-tight text-foreground transition-colors hover:text-primary active:opacity-80"
-              onClick={() => onOpenChange(false)}
-            >
-              Partner Program
-            </RefLink>
-          </li>
-          <li>
-            <Link
-              href="/blog"
-              className="block min-h-[48px] py-3 text-[17px] font-semibold leading-tight text-foreground transition-colors hover:text-primary active:opacity-80"
-              onClick={() => onOpenChange(false)}
-            >
-              Blog
-            </Link>
-          </li>
+          {NAV_LINKS.map((link) => (
+            <li key={link.name}>
+              {link.href === "/partner" ? (
+                <RefLink
+                  href={link.href}
+                  className="block min-h-[48px] py-3 text-[17px] font-semibold leading-tight text-foreground transition-colors hover:text-primary active:opacity-80"
+                  onClick={() => onOpenChange(false)}
+                >
+                  {link.name}
+                </RefLink>
+              ) : (
+                <Link
+                  href={link.href}
+                  className="block min-h-[48px] py-3 text-[17px] font-semibold leading-tight text-foreground transition-colors hover:text-primary active:opacity-80"
+                  onClick={() => onOpenChange(false)}
+                >
+                  {link.name}
+                </Link>
+              )}
+            </li>
+          ))}
         </ul>
 
-        {/* CTA or Logout - prominent, premium touch target */}
-        <div className="mt-10 w-full max-w-sm">
+        <div className="mt-10 w-full max-w-sm space-y-2">
           {isAdmin ? (
             <LogoutButton
               onClick={() => onOpenChange(false)}
               className="inline-flex min-h-[48px] w-full items-center justify-center rounded-[48px] bg-primary px-6 py-3 text-base font-semibold text-primary-foreground shadow-premium transition-colors hover:bg-primary/90 active:opacity-90"
             />
           ) : (
-            <RefLink
-              href="/tools/speed-audit"
-              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-[48px] bg-primary px-6 py-3 text-base font-semibold text-primary-foreground shadow-premium transition-colors hover:bg-primary/90 active:opacity-90"
-              onClick={() => onOpenChange(false)}
-            >
-              Free Speed Audit
-            </RefLink>
+            <>
+              <RefLink
+                href="/tools/speed-audit"
+                className="inline-flex min-h-[48px] w-full items-center justify-center rounded-[48px] bg-primary px-6 py-3 text-base font-semibold text-primary-foreground shadow-premium transition-colors hover:bg-primary/90 active:opacity-90"
+                onClick={() => onOpenChange(false)}
+              >
+                Get Free Audit
+              </RefLink>
+              <p className="text-xs text-muted-foreground text-center px-2">
+                We cap new clients monthly. Takes 5 minutes to apply.
+              </p>
+            </>
           )}
         </div>
       </nav>
