@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Instagram, AtSign, Rss } from "lucide-react";
+import { Instagram, AtSign, Rss, Linkedin } from "lucide-react";
 import { RefLink } from "@/components/partner/RefLink";
 import { LEGAL_LINKS } from "@/lib/constants";
 import { Logo } from "./Logo";
@@ -69,6 +69,15 @@ export function Footer() {
                 aria-label="Instagram"
               >
                 <Instagram className="h-4 w-4" aria-hidden />
+              </a>
+              <a
+                href="https://www.linkedin.com/in/mohan-kolavi-studio/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                aria-label="LinkedIn"
+              >
+                <Linkedin className="h-4 w-4" aria-hidden />
               </a>
               <a
                 href="https://www.threads.com/@mohanrajkolavi/"
