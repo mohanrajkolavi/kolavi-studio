@@ -78,9 +78,8 @@ export function ServicesSection() {
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         <div
-          className={`text-center max-w-3xl mx-auto mb-14 sm:mb-16 ${
-            isVisible ? "animate-reveal" : "opacity-0"
-          }`}
+          className={`text-center max-w-3xl mx-auto mb-14 sm:mb-16 ${isVisible ? "animate-reveal" : "opacity-0"
+            }`}
         >
           <span className="inline-block text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest mb-4">
             What We Build
@@ -99,9 +98,8 @@ export function ServicesSection() {
             return (
               <div
                 key={service.title}
-                className={`group relative flex flex-col ${service.colSpan} rounded-[32px] border border-border bg-card shadow-premium hover:shadow-xl transition-all duration-500 overflow-hidden p-6 sm:p-8 lg:p-10 ${
-                  isVisible ? "animate-reveal" : "opacity-0"
-                }`}
+                className={`group relative flex flex-col ${service.colSpan} rounded-[32px] border border-border bg-card shadow-premium hover:shadow-xl transition-all duration-500 overflow-hidden p-6 sm:p-8 lg:p-10 ${isVisible ? "animate-reveal" : "opacity-0"
+                  }`}
                 style={{
                   animationDelay: isVisible ? `${120 + index * 80}ms` : "0ms",
                 }}
@@ -112,20 +110,20 @@ export function ServicesSection() {
                     <Icon className="h-7 w-7 sm:h-8 sm:w-8 text-primary" />
                   </div>
                   <span className="inline-flex w-fit px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider mb-3 border border-primary/20">
-                  {service.badge}
-                </span>
-                <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2 leading-snug">
-                  {service.title}
-                </h3>
-                <p className="text-sm sm:text-base font-medium text-foreground/90 mb-3 leading-snug">
-                  {service.hook}
-                </p>
-                <p className="text-sm sm:text-base text-muted-foreground mb-4 leading-relaxed flex-1">
-                  {service.body}
-                </p>
-                <p className="text-xs sm:text-sm font-semibold text-primary leading-snug">
-                  {service.outcomeStat}
-                </p>
+                    {service.badge}
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-bold text-foreground mb-2 leading-snug">
+                    {service.title}
+                  </h3>
+                  <p className="text-sm sm:text-base font-medium text-foreground/90 mb-3 leading-snug">
+                    {service.hook}
+                  </p>
+                  <p className="text-sm sm:text-base text-muted-foreground mb-4 leading-relaxed flex-1">
+                    {service.body}
+                  </p>
+                  <p className="text-xs sm:text-sm font-semibold text-primary leading-snug">
+                    {service.outcomeStat}
+                  </p>
                 </div>
               </div>
             );

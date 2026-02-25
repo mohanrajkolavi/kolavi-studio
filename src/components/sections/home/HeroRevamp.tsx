@@ -5,11 +5,13 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 
 const TRUSTED_BRANDS = [
+  { name: "ICICI Bank", logo: "/logos/ICICI_Bank_Logo.svg.png" },
+  { name: "Citibank", logo: "/logos/Citi.svg.png" },
+  { name: "Angel One", logo: "/logos/Angel_One_Logo.svg.png" },
   { name: "Groww", logo: "/logos/Groww_app_logo.png" },
   { name: "Paytm", logo: "/logos/Paytm_Logo_(standalone).svg.png" },
-  { name: "Amazon", logo: "/logos/Amazon_logo.svg.png" },
   { name: "PayPal", logo: "/logos/PayPal.svg.png" },
-  { name: "Citibank", logo: "/logos/Citi.svg.png" },
+  { name: "Amazon", logo: "/logos/Amazon_logo.svg.png" },
 ] as const;
 
 export function HeroRevamp() {
@@ -71,23 +73,23 @@ export function HeroRevamp() {
         className="relative z-10 w-full mt-auto border-t border-white/10 dark:border-white/5 bg-white/40 dark:bg-zinc-950/40 backdrop-blur-xl"
         style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}
       >
-        <div className="max-w-4xl mx-auto px-6 sm:px-8 md:px-10 lg:px-12 py-6 sm:py-8 flex flex-col items-center justify-center gap-6 sm:gap-8">
+        <div className="max-w-5xl mx-auto px-6 sm:px-8 md:px-10 lg:px-12 py-6 sm:py-8 flex flex-col items-center justify-center gap-6 sm:gap-8">
           <p className="text-center text-[11px] sm:text-xs font-semibold text-muted-foreground tracking-wider sm:tracking-widest w-full">
             Trusted by leaders across finance, e-commerce, and payments
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-10 md:gap-12 lg:gap-14 w-full">
+          <div className="flex flex-wrap lg:flex-nowrap justify-center items-center gap-6 sm:gap-8 md:gap-8 lg:gap-10 w-full">
             {TRUSTED_BRANDS.map(({ name, logo }) => (
               <div
                 key={name}
-                className="flex items-center justify-center transition-opacity duration-300 hover:opacity-90"
+                className="flex items-center justify-center w-[88px] sm:w-[100px] md:w-[100px] lg:w-[112px] h-10 flex-shrink-0 transition-opacity duration-300 hover:opacity-90"
                 title={name}
               >
                 <Image
                   src={logo}
                   alt={name}
                   width={112}
-                  height={32}
-                  className="h-6 w-auto sm:h-7 md:h-8 object-contain object-center"
+                  height={40}
+                  className="w-full h-10 object-contain object-center"
                 />
               </div>
             ))}

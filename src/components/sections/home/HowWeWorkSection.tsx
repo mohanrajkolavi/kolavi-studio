@@ -49,9 +49,8 @@ export function HowWeWorkSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         {/* Header */}
         <div
-          className={`text-center max-w-3xl mx-auto mb-14 sm:mb-16 ${
-            isVisible ? "animate-reveal" : "opacity-0"
-          }`}
+          className={`text-center max-w-3xl mx-auto mb-14 sm:mb-16 ${isVisible ? "animate-reveal" : "opacity-0"
+            }`}
         >
           <span className="inline-block text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest mb-4">
             The Process
@@ -71,9 +70,8 @@ export function HowWeWorkSection() {
           {steps.map((step, index) => (
             <div
               key={step.number}
-              className={`group relative flex flex-col rounded-[24px] sm:rounded-[28px] border border-border bg-card shadow-premium hover:shadow-xl transition-all duration-500 overflow-hidden p-7 sm:p-8 lg:p-9 ${
-                isVisible ? "animate-reveal" : "opacity-0"
-              }`}
+              className={`group relative flex flex-col rounded-[24px] sm:rounded-[28px] border border-border bg-card shadow-premium hover:shadow-xl transition-all duration-500 overflow-hidden p-7 sm:p-8 lg:p-9 ${isVisible ? "animate-reveal" : "opacity-0"
+                }`}
               style={{
                 animationDelay: isVisible ? `${80 + index * 70}ms` : "0ms",
               }}

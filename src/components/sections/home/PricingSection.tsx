@@ -86,9 +86,8 @@ export function PricingSection() {
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl">
         {/* Header */}
         <div
-          className={`text-center max-w-3xl mx-auto mb-14 sm:mb-16 ${
-            isVisible ? "animate-reveal" : "opacity-0"
-          }`}
+          className={`text-center max-w-3xl mx-auto mb-14 sm:mb-16 ${isVisible ? "animate-reveal" : "opacity-0"
+            }`}
         >
           <span className="inline-block text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest mb-4">
             Investment
@@ -106,11 +105,10 @@ export function PricingSection() {
           {tiers.map((tier, index) => (
             <div
               key={tier.name}
-              className={`group relative flex flex-col rounded-[32px] border overflow-hidden transition-all duration-500 ${
-                tier.isPopular
+              className={`group relative flex flex-col rounded-[32px] border overflow-hidden transition-all duration-500 ${tier.isPopular
                   ? "bg-card border-2 border-primary shadow-premium lg:scale-105 z-10"
                   : "bg-card border-border shadow-premium hover:shadow-xl"
-              } ${isVisible ? "animate-reveal" : "opacity-0"}`}
+                } ${isVisible ? "animate-reveal" : "opacity-0"}`}
               style={{
                 animationDelay: isVisible ? `${120 + index * 80}ms` : "0ms",
               }}
