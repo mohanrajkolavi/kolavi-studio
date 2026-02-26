@@ -9,7 +9,6 @@ const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: [
       "lucide-react",
-      "framer-motion",
       "@radix-ui/react-accordion",
       "@radix-ui/react-checkbox",
       "@radix-ui/react-collapsible",

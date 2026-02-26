@@ -3,7 +3,7 @@ import type { Viewport } from "next";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import Script from "next/script";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LayoutShell } from "@/components/layout/LayoutShell";
 import { getBaseMetadata } from "@/lib/seo/metadata";
@@ -56,29 +56,14 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
-        {GA_MEASUREMENT_ID && (
-          <>
-            <Script
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-              strategy="afterInteractive"
-              nonce={nonce}
-            />
-            <Script id="google-analytics" strategy="afterInteractive" nonce={nonce}>
-              {`
-                window.dataLayer = window.dataLayer || [];
-                function gtag(){dataLayer.push(arguments);}
-                gtag('js', new Date());
-                gtag('config', '${GA_MEASUREMENT_ID}');
-              `}
-            </Script>
-          </>
-        )}
         <ThemeProvider>
           <LayoutShell isAdmin={isAdmin}>
             <main id="main-content" className="min-h-screen overflow-x-clip">{children}</main>
           </LayoutShell>
         </ThemeProvider>
       </body>
+      {GA_MEASUREMENT_ID && <GoogleAnalytics gaId={GA_MEASUREMENT_ID} />}
     </html>
   );
 }
+
