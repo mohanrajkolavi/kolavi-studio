@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-tabs",
       "@radix-ui/react-tooltip",
     ],
-    inlineCss: true,
+    inlineCss: false,
   },
   async redirects() {
     return [{ source: "/medical-spas", destination: "/", permanent: true }];
