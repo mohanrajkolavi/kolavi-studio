@@ -89,6 +89,7 @@ export function HeroRevamp() {
                   alt={name}
                   width={112}
                   height={40}
+                  quality={60}
                   className="w-full h-10 object-contain object-center"
                 />
               </div>

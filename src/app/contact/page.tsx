@@ -9,10 +9,10 @@ import { Mail, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const metadata = getPageMetadata({
-  title: "Contact Us - Med Spa Marketing Consultation",
-  description: "Get in touch with Kolavi Studio. We are ready to help your medical spa grow with Next.js websites, multi-treatment SEO, and expert digital marketing.",
+  title: "Contact Us",
+  description: "Get in touch with Kolavi Studio. We're ready to help your business grow with Next.js websites, SEO, and expert digital marketing.",
   path: "/contact",
-  keywords: "contact med spa marketing agency, medical spa consultation, Kolavi Studio contact",
+  keywords: "contact Kolavi Studio, digital marketing consultation, web design and SEO",
 });
 
 const CONTACT_FAQ_ITEMS: FAQItem[] = [
@@ -33,8 +33,8 @@ const CONTACT_FAQ_ITEMS: FAQItem[] = [
     answer: "Yes. If you'd prefer to skip the conversation and go straight to the audit, mention that in your message. We'll deliver the audit report to your inbox.",
   },
   {
-    question: "Do you work with med spas outside the US?",
-    answer: "Currently we focus on US-based medical spas. If you're outside the US, reach out anyway. We evaluate international inquiries on a case-by-case basis.",
+    question: "Do you work with businesses outside the US?",
+    answer: "Currently we focus on US-based clients. If you're outside the US, reach out anyway. We evaluate international inquiries on a case-by-case basis.",
   },
 ];
 
@@ -109,7 +109,7 @@ export default async function ContactPage() {
                     <div className="absolute top-0 right-0 w-full h-full bg-primary/5 rounded-full blur-[100px] translate-x-1/2 -translate-y-1/2 group-hover:bg-primary/10 transition-colors duration-500 pointer-events-none" />
                     <h3 className="text-h4 text-foreground font-bold mb-4 relative z-10">Prefer to start with a free audit instead?</h3>
                     <p className="text-body text-muted-foreground mb-8 leading-relaxed relative z-10">
-                      Get a free, comprehensive technical SEO audit of your current digital presence. We will uncover the hidden performance bottlenecks costing you premium patients.
+                      Get a free, comprehensive technical SEO audit of your current digital presence. We will uncover the hidden performance bottlenecks costing you potential customers.
                     </p>
                     <Button asChild className="w-full h-14 rounded-[48px] text-[16px] relative z-10">
                       <Link href="/tools/speed-audit">Get Your Free SEO Audit</Link>
@@ -166,7 +166,7 @@ export default async function ContactPage() {
               Or Skip Straight to Your Free Audit
             </h2>
             <p className="text-body text-muted-foreground mb-12 max-w-2xl mx-auto text-balance">
-              No forms. No meetings. Just a comprehensive SEO audit of your medical spa's digital presence, delivered directly to your inbox.
+              No forms. No meetings. Just a comprehensive SEO audit of your digital presence, delivered directly to your inbox.
             </p>
             <Button
               asChild

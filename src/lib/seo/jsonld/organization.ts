@@ -20,7 +20,7 @@ export function getOrganizationSchema() {
     name: SITE_NAME,
     url: SITE_URL,
     logo: `${SITE_URL}/logo.png`,
-    description: "Med spa marketing agency specializing in Next.js websites, AI-driven strategies, and multi-treatment SEO. Focused on delivering high-performance digital experiences and GEO optimization for medical practices.",
+    description: "Digital growth agency specializing in Next.js websites, AI-driven SEO, and high-performance digital experiences. We help businesses grow with expert web design, content strategy, and GEO optimization.",
     address: getOrgAddress(),
     sameAs: [
       "https://www.instagram.com/mohanrajkolavi/",
