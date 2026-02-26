@@ -35,21 +35,16 @@ See [INTEGRATIONS.md](../integrations/INTEGRATIONS.md) for full list and GTM not
 
 To inspect bundle size and route-based code splitting:
 
-1. Install the analyzer (one-time):
-   ```bash
-   npm install --save-dev @next/bundle-analyzer
-   ```
-2. In `next.config.ts`, wrap the config with the analyzer:
-   ```ts
-   import bundleAnalyzer from "@next/bundle-analyzer";
-   const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "true" });
-   export default withBundleAnalyzer(nextConfig);
-   ```
-3. Run:
+1. The analyzer is already installed and wired in `next.config.ts` (enabled when `ANALYZE=true`).
+2. Run:
    ```bash
    ANALYZE=true npm run build
    ```
    A browser window will open with the report.
+
+## CSS and performance
+
+- **Experimental inline CSS:** `experimental.inlineCss: true` in `next.config.ts` inlines CSS in the HTML for production builds, removing render-blocking stylesheet requests and improving FCP/LCP on first load. This only applies to production (`next build`); development does not use it. Trade-off: styles are not cached separately from HTML. See [Next.js inlineCss docs](https://nextjs.org/docs/app/api-reference/config/next-config-js/inlineCss).
 
 ## Error handling
 
