@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-tabs",
       "@radix-ui/react-tooltip",
     ],
+    // Keep false: inlineCss: true broke production (unstyled layout, broken mobile). Do not re-enable.
     inlineCss: false,
   },
   async redirects() {

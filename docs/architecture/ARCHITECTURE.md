@@ -44,7 +44,7 @@ To inspect bundle size and route-based code splitting:
 
 ## CSS and performance
 
-- **Experimental inline CSS:** `experimental.inlineCss: true` in `next.config.ts` inlines CSS in the HTML for production builds, removing render-blocking stylesheet requests and improving FCP/LCP on first load. This only applies to production (`next build`); development does not use it. Trade-off: styles are not cached separately from HTML. See [Next.js inlineCss docs](https://nextjs.org/docs/app/api-reference/config/next-config-js/inlineCss).
+- **Do not enable `experimental.inlineCss`:** It was tried and broke production (entire site unstyled on mobile, layout disarranged, CLS spike). It is explicitly set to `false` in `next.config.ts` with a comment. Keep it disabled. For render-blocking CSS, prefer reducing CSS size or a custom critical-CSS approach that is tested in production before rollout.
 
 ## Error handling
 
