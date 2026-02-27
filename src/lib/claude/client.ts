@@ -139,7 +139,7 @@ Every article you write must pass Google's Helpful Content self-assessment:
 ## E-E-A-T in your writing
 
 - **Experience:** Weave in 2-3 shared-experience references per article. "Anyone who's managed a PPC campaign knows..." or "The first thing you notice after switching is..."
-- **Expertise:** Be specific. Name tools, describe concrete scenarios, reference realistic timeframes. Never generic advice.
+- **Expertise (Qualitative Specificity):** Because you cannot invent quantitative data (numbers), you MUST invent highly specific qualitative scenarios. Avoid generic advice (WRONG: "Ensure your settings are configured correctly to avoid errors."). Write specific scenarios (RIGHT: "If you forget to uncheck the 'dynamic rendering' box in the advanced settings tab, Googlebot will crawl an empty JavaScript shell, tanking your indexing within 48 hours."). Describe the specific buttons to click, the common beginner mistakes, the exact friction points in a workflow, or the nuanced symptoms of a failing strategy.
 - **Authoritativeness:** Cite provided data with natural attribution. Reference industry sources by name.
 - **Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data is available, use qualitative language. Every factual claim must be backed by a currentData fact — no unsourced numbers.
 - **Unique value:** Every H2 must add unique value — do not restate the intro. Thin sections are flagged and rejected by validation; write substantial content per section.
@@ -158,8 +158,15 @@ Every article you write must pass Google's Helpful Content self-assessment:
 
 **6. PSEO consistency.** Keep intro, section, and CTA pattern consistent across the article. Entity mentions must be specific: named tools, named studies, named people where relevant.
 
+**7. The Contrarian Pivot (Enforced).** Standard AI writing gives the generic, expected advice. You must go further. In at least 3 of your H2 sections, use this exact structural framework:
+- Step 1: Briefly acknowledge the standard industry advice (e.g., "Most beginners are taught to...").
+- Step 2: Introduce the "practitioner's reality" or a contrarian pivot (e.g., "But in practice, this usually breaks because...").
+- Step 3: Provide the advanced, nuanced solution based on deep experience.
+Do not use those exact words, but rigorously apply this framework to demonstrate that you possess knowledge beyond the beginner level.
+
 ## Humanization (enforced)
 
+- **Ban the "Textbook Voice":** Never describe what a concept *is* like a dictionary. Describe how a concept *behaves* in the real world. Do not write: "Local SEO is the practice of optimizing your online presence." Write: "Local SEO is the difference between a fully booked service calendar and staring at a quiet phone."
 - Check every paragraph against the banned phrase list; avoid every listed phrase.
 - Vary sentence length deliberately — break the pattern after 3 or more similar-length sentences in a row.
 - At least one specific named example, tool, or scenario per H2 — no abstract-only sections.
@@ -181,6 +188,7 @@ Every article you write must pass Google's Helpful Content self-assessment:
 
 ## Structure (strict)
 - **Never output HTML table tags.** Do not use \`<table>\`, \`<tr>\`, \`<td>\`, or \`<th>\`. For any tabular or list-style content use \`<ul>\` or \`<ol>\` only. The frontend does not format tables.
+- **Design for CMS Media Insertion:** While you must NOT output literal image placeholders or link tags, you must write natural transitions when explaining complex workflows or data. Use phrases that allow the CMS to seamlessly insert screenshots or internal links later (e.g., "If you look at the dashboard workflow below...", "As the data shows...", "We dive deeper into this in our advanced guides").
 
 ## Human psychology (reader engagement)
 
@@ -206,25 +214,25 @@ function escapeControlCharactersInJsonStrings(jsonStr: string): string {
   let result = "";
   let inString = false;
   let escapeNext = false;
-  
+
   for (let i = 0; i < jsonStr.length; i++) {
     const char = jsonStr[i];
     const charCode = char.charCodeAt(0);
-    
+
     if (escapeNext) {
       // We're escaping the next character, so just add it as-is
       result += char;
       escapeNext = false;
       continue;
     }
-    
+
     if (char === "\\") {
       // Escape sequence - mark next char as escaped
       result += char;
       escapeNext = true;
       continue;
     }
-    
+
     if (!inString) {
       // Outside string — only track double-quoted strings (valid JSON).
       // Single quotes are not valid JSON string delimiters and tracking them
@@ -237,7 +245,7 @@ function escapeControlCharactersInJsonStrings(jsonStr: string): string {
       }
       continue;
     }
-    
+
     // Inside string
     if (char === '"') {
       // End of string
@@ -245,7 +253,7 @@ function escapeControlCharactersInJsonStrings(jsonStr: string): string {
       result += char;
       continue;
     }
-    
+
     // Check for control characters (0x00-0x1F except already-escaped ones)
     if (charCode >= 0x00 && charCode <= 0x1F) {
       // Map common control characters to their escape sequences
@@ -273,7 +281,7 @@ function escapeControlCharactersInJsonStrings(jsonStr: string): string {
       result += char;
     }
   }
-  
+
   return result;
 }
 
@@ -400,8 +408,8 @@ export async function generateBlogPost(
   const intentList = Array.isArray(input.intent)
     ? input.intent
     : input.intent
-    ? [input.intent]
-    : ["informational"];
+      ? [input.intent]
+      : ["informational"];
   const intentLabel = intentList.join(", ");
   const intentGuidesRaw = intentList.map((i) => INTENT_GUIDE[i as keyof typeof INTENT_GUIDE]).filter(Boolean);
   const intentGuides = intentGuidesRaw.length > 0 ? intentGuidesRaw : [INTENT_GUIDE.informational];
@@ -420,13 +428,13 @@ export async function generateBlogPost(
 - **Primary:** ${primaryKeyword}
 - **Secondary:** ${secondaryKeywords.length ? secondaryKeywords.join(", ") : "None"}
 - **People Also Search For:** ${((): string => {
-  const raw = input.peopleAlsoSearchFor?.trim();
-  if (!raw) return "None";
-  const phrases = raw.split(/[,;\n]+/).map((p) => p.trim()).filter(Boolean);
-  if (phrases.length === 0) return "None";
-  if (phrases.length === 1) return phrases[0];
-  return phrases.map((p) => `- ${p}`).join("\n") + "\nUse these as FAQ questions where they fit the topic.";
-})()}
+      const raw = input.peopleAlsoSearchFor?.trim();
+      if (!raw) return "None";
+      const phrases = raw.split(/[,;\n]+/).map((p) => p.trim()).filter(Boolean);
+      if (phrases.length === 0) return "None";
+      if (phrases.length === 1) return phrases[0];
+      return phrases.map((p) => `- ${p}`).join("\n") + "\nUse these as FAQ questions where they fit the topic.";
+    })()}
 - **Intent(s):** ${intentLabel}${intentList.length > 1 ? ". If multiple intents, balance them; lead with the first." : ""}
 ${intentGuides.map((g) => `  - ${g}`).join("\n")}
 
@@ -483,13 +491,13 @@ ${intentGuides.map((g) => `  - ${g}`).join("\n")}
 4. **Conclusion** — Direct CTA matching intent. End with something actionable.
 
 ${(() => {
-  const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
-  if (valid.length === 0) return "";
-  return `## COMPETITOR ARTICLES
+      const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
+      if (valid.length === 0) return "";
+      return `## COMPETITOR ARTICLES
 Create content that covers what competitors cover PLUS unique angles, specific examples, and opinions they don't have. This is how you "substantially add value" per Google Search Central.
 
 ${valid.map((c) => `### Competitor: ${c.url}\n\n${c.content}`).join("\n\n---\n\n")}`;
-})()}
+    })()}
 
 Generate the JSON now. Write like a practitioner, not a textbook.`;
 
@@ -571,10 +579,10 @@ Generate the JSON now. Write like a practitioner, not a textbook.`;
       typeof parsed.content === "string" && parsed.content.trim().length > 0
         ? parsed.content
         : (typeof (parsed as Record<string, unknown>).body === "string" &&
-            ((parsed as Record<string, unknown>).body as string).trim().length > 0
+          ((parsed as Record<string, unknown>).body as string).trim().length > 0
           ? ((parsed as Record<string, unknown>).body as string)
           : typeof (parsed as Record<string, unknown>).article === "string" &&
-              ((parsed as Record<string, unknown>).article as string).trim().length > 0
+            ((parsed as Record<string, unknown>).article as string).trim().length > 0
             ? ((parsed as Record<string, unknown>).article as string)
             : undefined);
     if (bodyContent !== undefined) parsed.content = bodyContent;
@@ -833,10 +841,10 @@ Treat each section's targetWords as a hard constraint, not a suggestion. Use the
 ## GAPS TO ADDRESS
 ${brief.gaps.length ? brief.gaps.join("\n") : "None"}
 ${(brief.extraValueThemes?.length ?? 0) > 0 || (brief.similaritySummary?.trim?.() ?? "") !== ""
-  ? `
+      ? `
 ## EXTRA VALUE (do not only repeat competitors)
 ${brief.similaritySummary?.trim() ? `Top results cover: ${brief.similaritySummary.trim()}\n` : ""}${(brief.extraValueThemes?.length ?? 0) > 0 ? `Themes to cover:\n${brief.extraValueThemes!.map((t) => `- ${t}`).join("\n")}\n` : ""}`
-  : `
+      : `
 ## DIFFERENTIATION
 Add clear value beyond the outline; lead with current data where provided.`}
 ${brief.freshnessNote?.trim() ? `## FRESHNESS\n${brief.freshnessNote.trim()}\n` : ""}
