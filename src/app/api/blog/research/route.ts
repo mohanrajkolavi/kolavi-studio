@@ -14,7 +14,7 @@ const SSE_HEADERS = {
   "X-Accel-Buffering": "no",
 } as const;
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /** Phase 1: Serper only. Returns top 10 results (position, title, url) for user to select up to 3.
  * Uses job store when available (DATABASE_URL set); if store fails, still returns SERP results

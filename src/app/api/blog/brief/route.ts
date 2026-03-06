@@ -12,7 +12,7 @@ const SSE_HEADERS = {
   "X-Accel-Buffering": "no",
 } as const;
 
-export const maxDuration = 95;
+export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {

@@ -3,7 +3,7 @@ import { isAuthenticated } from "@/lib/auth";
 import { runValidationChunk } from "@/lib/pipeline/chunks";
 import { jobStore } from "@/lib/pipeline/jobs";
 
-export const maxDuration = 30;
+export const maxDuration = 300;
 
 /** Step 5 — Validate: FAQ enforcement, SEO audit, fact check vs current data, schema.
  * Returns finalContent + audit report (faqEnforcement, auditResult, factCheck, schemaMarkup) for UI. */

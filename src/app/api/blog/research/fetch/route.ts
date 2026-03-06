@@ -11,7 +11,7 @@ const SSE_HEADERS = {
   "X-Accel-Buffering": "no",
 } as const;
 
-export const maxDuration = 90;
+export const maxDuration = 300;
 
 function logResearchFetchApi(level: "info" | "error", data: Record<string, unknown>) {
   const payload = { stage: "research_fetch_api", ...data };
