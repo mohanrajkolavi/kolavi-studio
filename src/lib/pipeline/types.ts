@@ -433,6 +433,11 @@ export const ResearchBriefSchema = z.object({
     pasf: z.array(z.string()),
   }),
   currentData: CurrentDataSchema,
+  knowledgeEngine: z.object({
+    topicGraph: z.any().optional(),
+    algorithmicInsights: z.array(z.any()).optional(),
+    proprietaryFramework: z.any().optional(),
+  }).optional(),
   outline: ResearchBriefOutlineSchema,
   gaps: z.array(z.string()),
   editorialStyle: EditorialStyleSchema,
@@ -593,6 +598,8 @@ export type PipelineOutput = {
   entitySchema?: object;
   /** Readability scores (Flesch-Kincaid Grade Level, Gunning Fog Index). */
   readabilityScores?: { fleschKincaid: number; gunningFog: number; grade: string };
+  /** EEAT heuristic assessment scores based on the Knowledge Engine outputs. */
+  eeatScoreFeedback?: import("@/lib/seo/article-audit").EEATScoreFeedback;
   /** Originality check — n-gram similarity against competitors. */
   originalityScore?: { score: number; flaggedParagraphs: { text: string; similarity: number; matchedUrl: string }[] };
   /** Competitive comparison score against top competitors. */

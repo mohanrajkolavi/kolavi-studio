@@ -1789,3 +1789,103 @@ export function compareWithCompetitors(
     },
   };
 }
+
+// =============================================================================
+// EEAT & Credibility Scoring (v4 Knowledge Engine Upgrade)
+// =============================================================================
+
+export interface EEATScoreFeedback {
+  totalScore: number;
+  experienceScore: number;
+  insightScore: number;
+  credibilityScore: number;
+  entityScore: number;
+  readabilityScore: number;
+  feedback: string[];
+}
+
+/**
+ * Heuristically evaluates the E-E-A-T score of an article based on the v4 Knowledge Engine parameters.
+ * Scoring Rubric (100 pts total):
+ *  - Experience (25%): 1st person practitioner language, "failure narratives", field context.
+ *  - Insight Originality (25%): Presence of newly generated algorithmic insight keywords.
+ *  - Source Credibility (20%): Proper attribution phrases connecting to `currentData`.
+ *  - Entity Signals (15%): Proper nouns, brands, and sources acting as nodes.
+ *  - Readability (15%): Variance in sentence length, usage of lists, scanability.
+ */
+export function evaluateEEATScore(
+  articleHtml: string,
+  insights?: any[],
+  currentDataFacts?: { source: string; fact: string }[]
+): EEATScoreFeedback {
+  const text = stripHtml(articleHtml).toLowerCase();
+  const feedback: string[] = [];
+
+  // 1. Experience (25 pts)
+  const experienceMarkers = ["i've", "we've", "in my experience", "in our experience", "our data", "our testing", "personally", "i noticed", "we noticed", "hard way", "mistake i", "mistake we"];
+  const expMatchCount = experienceMarkers.reduce((count, marker) => count + (text.split(marker).length - 1), 0);
+  const experienceScore = Math.min(25, expMatchCount * 8);
+  if (experienceScore < 15) feedback.push("Low Experience signals. Add more practitioner 1st-person narratives or real-world failure states.");
+
+  // 2. Insight Originality (25 pts)
+  let insightScore = 0;
+  if (insights && insights.length > 0) {
+    let matchedInsights = 0;
+    insights.forEach(insight => {
+      // Look for significant keywords from the insight headline
+      const keywords = (insight.headline || "").toLowerCase().split(/\s+/).filter((w: string) => w.length > 5);
+      const match = keywords.some((kw: string) => text.includes(kw));
+      if (match) matchedInsights++;
+    });
+    insightScore = Math.min(25, Math.round((matchedInsights / insights.length) * 25));
+    if (insightScore < 15) feedback.push("Low Insight Originality. The algorithmic contrarian/myth-busting insights are not strongly represented.");
+  } else {
+    // Graceful fallback if no insights provided
+    insightScore = 20;
+  }
+
+  // 3. Source Credibility (20 pts)
+  const credibilityMarkers = ["according to", "reported by", "data shows", "analysis by", "found that", "estimates", "study", "research"];
+  const credMatchCount = credibilityMarkers.reduce((count, marker) => count + (text.split(marker).length - 1), 0);
+  let credibilityScore = Math.min(20, credMatchCount * 5);
+
+  // Bonus: Cross-reference with actual currentData sources
+  if (currentDataFacts && currentDataFacts.length > 0) {
+    const sourceMentions = currentDataFacts.filter(f => f.source && text.includes(f.source.toLowerCase())).length;
+    credibilityScore = Math.min(20, credibilityScore + (sourceMentions * 5));
+    if (sourceMentions === 0) feedback.push("Missing Source Credibility. You provided statistics but didn't name the underlying entities or reports.");
+  } else if (credibilityScore < 10) {
+    feedback.push("Low Source Credibility. Expand attribution (e.g., 'according to X').");
+  }
+
+  // 4. Entity Signals (15 pts)
+  // Heuristic: Count capitalized words (not at the start of a sentence) to estimate Named Entities
+  const entityMatches = stripHtml(articleHtml).match(/(?<=\s)[A-Z][a-z]+/g) || [];
+  const entityScore = Math.min(15, entityMatches.length >= 15 ? 15 : entityMatches.length);
+  if (entityScore < 10) feedback.push("Low Entity Signals. Ensure proper nouns, tools, and brands are explicitly named rather than using pronouns.");
+
+  // 5. Readability (15 pts)
+  let readabilityScore = 15;
+  const listsCount = (articleHtml.match(/<ul|<ol/gi) || []).length;
+  if (listsCount === 0) {
+    readabilityScore -= 8;
+    feedback.push("Poor Readability. Zero lists detected. Data should be scannable.");
+  }
+  const longParagraphs = getParagraphs(articleHtml).filter(p => wordCount(p) > 100);
+  if (longParagraphs.length > 3) {
+    readabilityScore -= 5;
+    feedback.push("Poor Readability. Too many dense paragraphs. Break them up into 1-3-1 structures.");
+  }
+
+  const totalScore = experienceScore + insightScore + credibilityScore + entityScore + Math.max(0, readabilityScore);
+
+  return {
+    totalScore,
+    experienceScore,
+    insightScore,
+    credibilityScore,
+    entityScore,
+    readabilityScore,
+    feedback
+  };
+}

@@ -21,7 +21,7 @@ import {
 
 let _client: OpenAI | null = null;
 
-function getClient(): OpenAI {
+export function getClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error("OPENAI_API_KEY is not set. Get a key at https://platform.openai.com");
@@ -40,7 +40,7 @@ export function prewarmClient(): void {
   }
 }
 
-function stripJsonMarkdown(raw: string): string {
+export function stripJsonMarkdown(raw: string): string {
   let s = raw.trim();
   const backtick = "```";
   if (s.startsWith(backtick)) {
@@ -444,7 +444,10 @@ export async function buildResearchBrief(
   currentData: CurrentData,
   input: PipelineInput,
   wordCountOverride?: WordCountOverride,
-  tokenUsage?: TokenUsageRecord[]
+  tokenUsage?: TokenUsageRecord[],
+  topicGraph?: any,
+  algorithmicInsights?: any[],
+  proprietaryFramework?: any
 ): Promise<ResearchBrief> {
   const openai = getClient();
   const intent = Array.isArray(input.intent) ? input.intent[0] : input.intent ?? "informational";
@@ -499,8 +502,9 @@ POST-GENERATION VALIDATION AWARENESS — design the brief so the writer can pass
 
 POV / INFORMATION GAIN (Semantic Novelty):
 - Do not just disagree with competitors (e.g., "They say X is fast, but it's actually slow"). 
+- Incorporate the 'Algorithmic Insights' to guarantee real Information Gain. 
 - Introduce a completely new, parallel concept or cross-disciplinary metric that ZERO competitors mentioned. 
-- If competitors talk about "Local SEO backlinks", your contrarian angle must introduce a tangential practitioner metric like "Google Maps proximity decay rates" or "photo EXIF data scraping."
+- Specifically ensure that you construct an outline that incorporates the 'Proprietary Framework' if it is provided. This framework MUST be the core paradigm of the article. Do NOT rely strictly on competitor heading patterns if they conflict with the proprietary framework.
 - Output as povInsights: array of { topic, conventionalView, contrarian, source }. 
 - FATAL ERROR: Ensure contrarian angles are described using raw, declarative facts or bullet points. Do NOT use conversational framing like "One practitioner noted" or "Experts say". Output raw data only.
 
@@ -567,6 +571,11 @@ Constraint: You must limit the currentData.facts array to a MAXIMUM of 5 distinc
       peopleAlsoSearchFor: pasf,
       intent,
     },
+    knowledgeEngine: {
+      topicGraph,
+      algorithmicInsights,
+      proprietaryFramework
+    }
   });
 
   const userPromptBase = `Produce the ResearchBrief JSON for this extraction and input:\n\n${userPayload}`;
@@ -618,7 +627,7 @@ Constraint: You must limit the currentData.facts array to a MAXIMUM of 5 distinc
 
       const validated = ResearchBriefWithoutCurrentDataSchema.safeParse(normalized);
       if (validated.success) {
-        let brief = { ...validated.data, currentData } as ResearchBrief;
+        let brief = { ...validated.data, currentData, knowledgeEngine: { topicGraph, algorithmicInsights, proprietaryFramework } } as ResearchBrief;
 
         // When a wordCountOverride is provided (revise flow), align the per-section
         // targetWords with the new total target so the outline and UI stay in sync.

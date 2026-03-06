@@ -484,6 +484,17 @@ ${brief.similaritySummary?.trim() ? `Top results cover: ${brief.similaritySummar
 ## DIFFERENTIATION
 Add clear value beyond the outline; lead with current data where provided.`}
 ${brief.freshnessNote?.trim() ? `## FRESHNESS\n${brief.freshnessNote.trim()}\n` : ""}
+${brief.knowledgeEngine?.proprietaryFramework ? `## PROPRIETARY FRAMEWORK (Core thesis)
+Name: ${brief.knowledgeEngine.proprietaryFramework.name}
+Tagline: ${brief.knowledgeEngine.proprietaryFramework.tagline}
+How it beats standard SERP: ${brief.knowledgeEngine.proprietaryFramework.howItBeatsTheSerp}
+Pillars: ${brief.knowledgeEngine.proprietaryFramework.corePillars.map((p: any) => p.name).join(", ")}
+Introduce or reference this framework naturally to build authority.
+` : ""}
+${brief.knowledgeEngine?.algorithmicInsights?.length ? `## PRACTITIONER INSIGHTS (Information Gain)
+Weave these original observations in naturally if relevant to the outline:
+${brief.knowledgeEngine.algorithmicInsights.map((i: any) => `- [${i.type.toUpperCase()}] ${i.headline}: ${i.explanation}`).join("\n")}
+` : ""}
 ${brief.competitorDifferentiation?.trim() ? `## COMPETITOR DIFFERENTIATION (avoid these patterns)\n${brief.competitorDifferentiation.trim()}\n\nDeliberately avoid the phrases, section structures, and intro styles described above so the article does not read like AI-generated competitor content.\n` : ""}${(brief.povInsights?.length ?? 0) > 0 ? `## POV / INFORMATION GAIN (use these to differentiate)
 These are contrarian or nuanced angles that most competitors miss. Weave them naturally into the relevant sections to increase Information Gain.
 ${brief.povInsights!.map((p) => `- Topic: ${p.topic}. Most say: "${p.conventionalView}". But: "${p.contrarian}" (source: ${p.source}).`).join("\n")}
@@ -645,9 +656,19 @@ Enforce these in this specific section.`;
     ? `\n## PREVIOUS SECTIONS (Content written so far)\nDo not repeat information already covered here. Continue naturally from where this leaves off.\n\n${previousContent.slice(-4000)}\n`
     : "";
 
+  const frameworkBlock = brief.knowledgeEngine?.proprietaryFramework
+    ? `\n## PROPRIETARY FRAMEWORK (Core thesis)\nName: ${brief.knowledgeEngine.proprietaryFramework.name}\nTagline: ${brief.knowledgeEngine.proprietaryFramework.tagline}\nHow it beats standard SERP advice: ${brief.knowledgeEngine.proprietaryFramework.howItBeatsTheSerp}\nCore Pillars: ${brief.knowledgeEngine.proprietaryFramework.corePillars.map((p: any) => p.name).join(", ")}\nEmbed this framework naturally if it fits the section topics. Do NOT force it if irrelevant.\n`
+    : "";
+
+  const insightsBlock = brief.knowledgeEngine?.algorithmicInsights && brief.knowledgeEngine.algorithmicInsights.length > 0
+    ? `\n## PRACTITIONER INSIGHTS (Information Gain)\nThese are non-obvious insights generated to beat competitors. Weave them in if relevant to this section's topics:\n${brief.knowledgeEngine.algorithmicInsights.map((i: any) => `- [${i.type.toUpperCase()}] ${i.headline}: ${i.explanation}`).join("\n")}\n`
+    : "";
+
   const userPrompt = `Write the content for ONE specific section of a blog post.
 Do NOT write the HTML heading tag for the section title itself (e.g. do not write \`<h2>${section.heading}</h2>\`) — the system will inject the heading. Just write the content that goes *under* the heading.
 ${contextBlock}
+${frameworkBlock}
+${insightsBlock}
 ${styleChecklist}
 
 ## SECTION ASSIGNMENT

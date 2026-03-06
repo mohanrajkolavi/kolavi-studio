@@ -47,6 +47,10 @@ import {
   verifyFactsAgainstSource,
 } from "@/lib/seo/article-audit";
 
+import { buildTopicGraph } from "@/lib/knowledge/topic-graph";
+import { generateAlgorithmicInsights } from "@/lib/knowledge/insight-generator";
+import { synthesizeProprietaryFramework } from "@/lib/knowledge/framework-generator";
+
 /** Thrown when topic extraction fails after store updates; catch should not re-call store.setChunkFailed/updatePhase. */
 class TopicExtractionError extends Error {
   constructor(message: string) {
@@ -655,7 +659,13 @@ export async function runBriefChunk(
     .sort()
     .join("|");
   const cachedTopic = await store.getChunkOutput(jobId, "topic_extraction") as
-    | { competitorUrlHash?: string; extraction?: TopicExtractionResult }
+    | {
+      competitorUrlHash?: string;
+      extraction?: TopicExtractionResult;
+      topicGraph?: any;
+      algorithmicInsights?: any[];
+      proprietaryFramework?: any;
+    }
     | undefined;
 
   let topicExtraction: TopicExtractionResult;
@@ -706,9 +716,24 @@ export async function runBriefChunk(
         `${topicExtraction.topics.length} topics, ${topicExtraction.gaps.length} gaps`,
         30
       );
+
+      emit("topic-extraction", "started", "Building unified Topic Graph (Information Gain)...", 26);
+      const paaQuestionsSerp = (research as ResearchChunkOutput).paaQuestions ?? [];
+      const topicGraph = await buildTopicGraph(input.primaryKeyword!, competitors, paaQuestionsSerp, (research as ResearchChunkOutput).redditThreads);
+
+      emit("topic-extraction", "started", "Deriving highly contrarian Algorithmic Insights...", 28);
+      const factsStrings = currentData.facts.map(f => f.fact || JSON.stringify(f));
+      const algorithmicInsights = await generateAlgorithmicInsights(input.primaryKeyword!, topicGraph, factsStrings);
+
+      emit("topic-extraction", "started", "Synthesizing Proprietary Framework...", 30);
+      const proprietaryFramework = await synthesizeProprietaryFramework(input.primaryKeyword!, topicGraph, algorithmicInsights);
+
       await store.saveChunkOutput(jobId, "topic_extraction", {
         competitorUrlHash,
         extraction: topicExtraction,
+        topicGraph,
+        algorithmicInsights,
+        proprietaryFramework
       } as Record<string, unknown>);
     } catch (err) {
       if (err instanceof TopicExtractionError) {
@@ -750,7 +775,16 @@ export async function runBriefChunk(
     // Step 3 — Brief: GPT-4.1 builds outline, H2/H3; word count from extraction (user can change in brief section)
     emit("gpt-brief", "started", options?.revise ? "Revising brief with new word count..." : "Building strategic research brief...", 30);
     const briefResult = await withRetry(
-      async () => buildResearchBrief(topicExtraction, currentData, input, wordCountOverride, tokenUsage),
+      async () => buildResearchBrief(
+        topicExtraction,
+        currentData,
+        input,
+        wordCountOverride,
+        tokenUsage,
+        cachedTopic?.topicGraph,
+        cachedTopic?.algorithmicInsights,
+        cachedTopic?.proprietaryFramework
+      ),
       { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
       "gpt-brief"
     );
@@ -1017,6 +1051,7 @@ export async function runDraftChunk(
 export type ValidationChunkOutput = {
   faqEnforcement: { passed: boolean; violations: { question: string; answer?: string; charCount: number }[] };
   auditResult: import("@/lib/seo/article-audit").ArticleAuditResult;
+  eeatScoreFeedback?: import("@/lib/seo/article-audit").EEATScoreFeedback;
   factCheck: {
     verified: boolean;
     hallucinations: string[];
@@ -1087,6 +1122,14 @@ export async function runValidationChunk(
       focusKeyword: primaryKeyword,
       extraValueThemes: brief?.extraValueThemes?.length ? brief.extraValueThemes : undefined,
     });
+
+    const { evaluateEEATScore } = await import("@/lib/seo/article-audit");
+    const eeatScoreFeedback = evaluateEEATScore(
+      finalContent,
+      brief?.knowledgeEngine?.algorithmicInsights,
+      currentData.facts
+    );
+
 
     // Auto-fix loop for editorial/SEO failures
     let autoFixAttempts = 0;
@@ -1171,6 +1214,7 @@ export async function runValidationChunk(
         violations: faqEnforcement.violations,
       },
       auditResult,
+      eeatScoreFeedback,
       factCheck: {
         verified: factCheck.verified,
         hallucinations: factCheck.hallucinations,
@@ -1274,6 +1318,7 @@ export async function buildPipelineOutputFromChunks(
     schemaMarkup: validation.schemaMarkup,
     faqEnforcement: validation.faqEnforcement,
     factCheck: validation.factCheck,
+    eeatScoreFeedback: validation.eeatScoreFeedback,
     publishTracking: { keyword: primaryKeyword },
     generationTimeMs,
     briefSummary: briefSummary ?? undefined,
