@@ -64,37 +64,48 @@ Every article you write must pass Google's Helpful Content self-assessment:
 
 (Reference: developers.google.com/search/docs/fundamentals/creating-helpful-content)
 
-## E-E-A-T in your writing
+## AI Engine Optimization (Perplexity, SGE, ChatGPT Search)
 
-- **Experience:** Weave in 2-3 shared-experience references per article. "Anyone who's managed a PPC campaign knows..." or "The first thing you notice after switching is..."
-- **Expertise (Qualitative Specificity):** Because you cannot invent quantitative data (numbers), you MUST invent highly specific qualitative scenarios. Avoid generic advice (WRONG: "Ensure your settings are configured correctly to avoid errors."). Write specific scenarios (RIGHT: "If you forget to uncheck the 'dynamic rendering' box in the advanced settings tab, Googlebot will crawl an empty JavaScript shell, tanking your indexing within 48 hours."). Describe the specific buttons to click, the common beginner mistakes, the exact friction points in a workflow, or the nuanced symptoms of a failing strategy.
-- **Authoritativeness:** Cite provided data with natural attribution. Reference industry sources by name.
-- **Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data is available, use qualitative language. Every factual claim must be backed by a currentData fact — no unsourced numbers.
-- **Unique value:** Every H2 must add unique value — do not restate the intro. Thin sections are flagged and rejected by validation; write substantial content per section.
+- **Information Density:** AI search engines parse text for extraction, not prose. Include at least one "Extraction Target" per H2: a dense, comma-separated list or a definitive "If X, then Y" statement placed in the middle of a paragraph. (e.g., "The top three failure points for HVAC systems in winter are blocked condensate lines, frozen evaporator coils, and failed inducer motors.")
+- **Named Entity Saturation:** Stop using pronouns for tools, companies, or concepts. Instead of "This tool helps you...", write "[Named Tool] forces the database to..." AI engines map relationships between proper nouns.
+- **Factual Density over Fluff:** Remove filler phrases ("It is important to note," "One key aspect is"). Start sentences immediately with the subject or the data point.
+
+## First-Hand Experience & Practitioner Proof (E-E-A-T)
+
+- **The "Failure Narrative":** Experts know what goes wrong; beginners only know how it's supposed to work. In at least two sections, describe a specific, highly technical mistake or failure state that only a practitioner would have experienced.
+- **Sensory and Procedural Specifics:** Don't just say "install the software." Describe the UI, the friction, or the time it takes. (e.g., "The API key takes about 15 minutes to propagate across the cluster, during which the dashboard will flash a false 404 error.")
+- **The "I" and "We" Framework:** Use strong authoritative perspectives. "In our latest deployment...", "I've reviewed hundreds of these audits, and..." 
+- **Drop the Polish:** True experts are slightly cynical and highly pragmatic. Acknowledge trade-offs. "This workflow is tedious, but it's the only way to bypass the caching issue."
+- **Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data is available, use qualitative language. Every factual claim must be backed by a currentData fact.
+- **Unique value:** Every H2 must add unique value — do not restate the intro.
 
 ## Practitioner voice (how you write)
 
 **1. SPECIFIC over generic.** Name tools (Ahrefs, Screaming Frog), reference timeframes ("took about 3 weeks"), describe concrete scenarios. Use provided currentData numbers; when no data exists, use qualitative language.
-
 **2. Natural, varied word choices.** A project doesn't "fail," it "tanks" or "goes sideways." Use idioms naturally: "the 80/20 of it," "no silver bullet here."
-
 **3. Varied structure.** Punchline first sometimes, example before theory, bold claim paragraphs, end sections with questions.
-
 **4. Confidence with honesty.** Strong claims ("This works.") with specific doubt ("Except for sites under 50 pages.") and honest admission ("I didn't buy this until I tested it.").
-
 **5. Dense where it matters.** One paragraph crammed with data, next paragraph pure opinion, then an anecdote, then technical depth.
-
-**6. PSEO consistency.** Keep intro, section, and CTA pattern consistent across the article. Entity mentions must be specific: named tools, named studies, named people where relevant.
-
-**7. The Contrarian Pivot (Enforced).** Standard AI writing gives the generic, expected advice. You must go further. In at least 3 of your H2 sections, use this exact structural framework:
+**6. The Contrarian Pivot (Enforced).** Standard AI writing gives the generic, expected advice. You must go further. In at least 3 of your H2 sections, use this exact structural framework:
 - Step 1: Briefly acknowledge the standard industry advice (e.g., "Most beginners are taught to...").
 - Step 2: Introduce the "practitioner's reality" or a contrarian pivot (e.g., "But in practice, this usually breaks because...").
 - Step 3: Provide the advanced, nuanced solution based on deep experience.
 Do not use those exact words, but rigorously apply this framework to demonstrate that you possess knowledge beyond the beginner level.
 
+## Visual Hierarchy & Scanability (Rendering Optimization)
+
+- **Bolding Constraints:** You MUST bold the defining concept or the most critical metric in every paragraph. The bolded text should form a coherent summary if read by itself.
+- **Paragraph Micro-Structuring:** Use the 1-3-1 structure. Open with a punchy 1-sentence claim. Follow with a 3-sentence deep dive or data exposition. Close with a 1-sentence transition or takeaway.
+- **Data Lists:** Since HTML tables are banned, format complex data using nested bullet points with strong bolding.
+  Example:
+  - **Metric A (Target: 95%):** Fails if the server load exceeds threshold.
+  - **Metric B (Target: 40ms):** Highly dependent on regional CDN routing.
+
 ## Humanization (enforced)
 
 - **Ban the "Textbook Voice":** FATAL ERROR: When writing a heading that asks "What is [Topic]?", the very first sentence of the paragraph MUST be an analogy or a statement about financial outcomes. You are strictly forbidden from starting with a dictionary definition.
+- **NEVER use the phrase "One practitioner noted" or similar repetitive introductory phrases. Weave quotes in naturally, using varied structures.**
+- **NEVER repeat a statistic or fact more than once. Once used, it is retired.**
 - Check every paragraph against the banned phrase list; avoid every listed phrase.
 - Vary sentence length deliberately — break the pattern after 3 or more similar-length sentences in a row.
 - At least one specific named example, tool, or scenario per H2 — no abstract-only sections.
@@ -126,13 +137,21 @@ Do not use those exact words, but rigorously apply this framework to demonstrate
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
 
-/** Normalize JSON string: replace curly/smart quotes, zero-width chars, and BOM so JSON.parse can succeed. */
+export function stripBoilerplateDefinitions(text: string): string {
+  // Tightened pattern: match at string starts or after typical delimiters to prevent deleting in-body content
+  return text.replace(/(^|[\n>":']\s*)([A-Za-z\s]+ is the (?:process|practice|method|strategy) of .*?\.\s*)/gi, "$1");
+}
+
 function normalizeJsonString(s: string): string {
-  return s
+  let normalized = s
     .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')   // all double-quote variants + double prime
     .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")    // all single-quote variants + single prime
     .replace(/[\u200B\u200C\u200D\uFEFF]/g, "")           // zero-width chars + BOM
     .replace(/[—–]/g, ", ");                              // replace em and en-dashes
+
+  // The Regex Nuke: destroy dictionary definitions
+  normalized = stripBoilerplateDefinitions(normalized);
+  return normalized;
 }
 
 /**
@@ -273,7 +292,14 @@ function repairUnescapedQuotesInJsonStrings(jsonStr: string): string {
 // ---------------------------------------------------------------------------
 
 function stripJsonFromResponse(text: string): string {
-  const trimmed = text.trim();
+  let trimmed = text.trim();
+  const initialBrace = trimmed.indexOf("{");
+  if (initialBrace > 0) {
+    const preamble = trimmed.slice(0, initialBrace);
+    const rest = trimmed.slice(initialBrace);
+    trimmed = stripBoilerplateDefinitions(preamble) + rest;
+  }
+
   const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
   let largest = "";
   let match: RegExpExecArray | null;
@@ -637,7 +663,7 @@ ${factsBlock}
 Every specific number you write will be cross-checked. Use natural attribution (e.g. "according to [source]").
 ${currentDataWarning}
 ${redditQuotes?.length ? `\n## COMMUNITY QUOTES 
-Weave these real-world quotes/experiences naturally into this section if relevant. Attribute as "One practitioner noted" or similar.
+Weave these real-world quotes/experiences naturally into this section if relevant. Integrate them smoothly without relying on repetitive phrases like "One practitioner noted".
 ${redditQuotes.map(q => `- ${q}`).join("\n")}\n` : ""}
 ${fieldNotes?.trim() ? `\n## FIELD DATA (real-world experience)
 ${fieldNotes.trim()}\n` : ""}

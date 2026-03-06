@@ -131,23 +131,22 @@ RULES (strict):
 - If no facts are found, return: {"facts": [], "recentDevelopments": [], "lastUpdated": "No recent data found"}.
 - Output ONLY valid JSON. No markdown code fences, no explanation before or after. The response must parse as JSON.`;
 
+  const currentYear = new Date().getFullYear();
   const mainPrompt = `Search for current, up-to-date information about "${primaryKeyword}"${keywordContext}. Find:
-1) Latest statistics, financial data, or metrics
-2) Recent developments or news from the past 6 months
-3) Current market data, pricing, or benchmarks
+1) Latest statistics, financial data, or metrics (with specific numbers)
+2) Specific Case Studies: Find at least one specific company or individual who achieved a specific outcome using this.
+3) Industry benchmarks and pricing changes in the past 6 months
 
 Return as structured JSON with this exact format (no other text):
 {
   "facts": [{"fact": "string", "source": "full URL", "date": "optional date"}],
   "recentDevelopments": ["string"],
-  "lastUpdated": "string e.g. January 2026"
+  "lastUpdated": "string e.g. January ${currentYear}"
 }`;
-
-  const currentYear = new Date().getFullYear();
   const statsPrompt = `Search for the latest statistics and data about "${primaryKeyword}" in ${currentYear}. Focus on:
 1) Market size, revenue, or growth statistics for ${currentYear}
-2) Industry benchmarks and trends
-3) Recent survey results or research findings
+2) Industry benchmarks, pricing changes, and practitioner friction points.
+3) Recent survey results or research findings (first-party data)
 
 Return as structured JSON with this exact format (no other text):
 {
@@ -338,11 +337,13 @@ OUTPUT RULES (strict):
   const topicExamples = `SEMANTIC TOPICS (good): "budgeting and cost planning", "hiring and retention strategies", "compliance and legal considerations", "ROI measurement and KPIs".
 SINGLE KEYWORDS (bad — do not use): "budget", "hiring", "compliance", "ROI".`;
 
+  const currentYear = new Date().getFullYear();
+
   const gapRules = `GAP RULES (strict). A gap qualifies ONLY if all three are true:
 1) Real reader demand (search intent, PAA question, or clear need).
-2) Missing from MOST competitors (not just one).
+2) Missing from MOST competitors OR the competitors' information is fundamentally outdated for ${currentYear} workflows (Intent Shifts).
 3) Concrete actionable angle (specific angle we can take, not vague).
-For EACH gap you MUST cite specific evidence: which competitor URLs fall short and how (e.g. "URL X only mentions Y in one sentence; URL Z omits it entirely"). No vague gaps. Include evidence (array of strings), readerDemand (string), and actionableAngle (string) for every gap.`;
+For EACH gap you MUST cite specific evidence: which competitor URLs fall short and how (e.g. "URL X only mentions Y in one sentence; URL Z omits it entirely" or "URL Y's guide relies on legacy methods that don't apply"). No vague gaps. Include evidence (array of strings), readerDemand (string), and actionableAngle (string) for every gap.`;
 
   const paaSection = hasPaa
     ? `F) PAA (PEOPLE ALSO ASK) ANALYSIS
@@ -492,12 +493,14 @@ export async function extractQuotesFromReddit(
   const ai = getClient();
   const threadText = threads.map(t => `TITLE: ${t.title}\nSNIPPET: ${t.snippet}`).join("\n\n");
 
-  const prompt = `You are a researcher gathering community insights for an article about "${keyword}".
+  const prompt = `You are an expert researcher gathering community insights for an article about "${keyword}".
 Extract 3 to 5 distinct, high-quality, real-world quotes or tips from the following Reddit discussion snippets.
+
 Rules:
-- Keep quotes concise (1-2 sentences).
-- Focus on practical advice, contrarian opinions, or common mistakes.
-- Format each quote as a simple string in a JSON array.
+1. Target "Friction": Prioritize quotes that describe a painful, annoying, or highly specific problem the user experienced while trying to implement this. (e.g. "We spent 3 days trying to debug the API rate limit...")
+2. Target "Hidden Workarounds": Look for hacky or unofficial solutions that aren't in official documentation.
+3. Remove generic praise or basic definitions. Focus strictly on experiential grit.
+4. Format each quote as a simple string in a JSON array.
 
 Snippets:
 ${threadText}

@@ -479,7 +479,10 @@ COMPETITOR DIFFERENTIATION:
 - From competitorStrengths, identify every competitor with aiLikelihood "likely_ai". Output competitorDifferentiation: 2-4 sentences or short bullet points instructing the writer to DELIBERATELY AVOID the patterns those competitors use — e.g. generic intros ("In today's world...", "When it comes to..."), specific AI-typical phrases they use, section structures or list styles that mirror those URLs. Be concrete so the writer can avoid them. If none are likely_ai, omit competitorDifferentiation or set to empty.
 
 CONTENT MIX — MANDATORY STRUCTURE (applies to every article). Do NOT use HTML table tags — the frontend does not format tables. Use only lists (ul/ol).
-1. SUMMARY ELEMENT (required, non-optional): Place a scannable summary section early, after the intro, before detailed sections. Format by article type: Analysis = key takeaways or pros/cons as bulleted list (5-7 items); Comparison = two bulleted lists (e.g. "Option A" vs "Option B") or side-by-side bullets; How-to = numbered key steps summary; Listicle = ranked list with one-line per item; Review = score/rating with top pros and cons as bullets; Informational = key takeaways bulleted list (5-7 items). Must render as actual HTML lists (ul/ol only). Not prose that describes a list.
+1. SUMMARY ELEMENT (required, non-optional): Place a scannable "Bottom Line Up Front" (BLUF) section immediately after the intro. This MUST consist of two H3s:
+  - H3: "The Short Version" (A 3-bullet list of the exact answer/takeaway)
+  - H3: "Why It Matters in 2026" (A 2-sentence explanation of the market shift or primary benefit).
+Must render as actual HTML lists (ul/ol only). This satisfies Search Engine "Quick Answer" intent before the deep dive begins.
 2. INLINE LISTS IN EVERY H2 SECTION: Every H2 section that exceeds 200 words MUST contain at least one of: bulleted list (3-7 items) or numbered list. Place after the section makes its main argument. Pattern: 2-3 paragraphs of prose, then bulleted list of key data points or takeaways, then 1 closing paragraph.
 3. TARGET MIX: ~75% prose, ~25% lists. Minimum 3-4 bulleted or numbered lists spread across H2 sections. No tables — use lists only.
 
@@ -494,13 +497,18 @@ Each H3 gets its own topics, word target, and optional geoNote in the OutlineSec
 
 POST-GENERATION VALIDATION AWARENESS — design the brief so the writer can pass these checks:
 
-POV / INFORMATION GAIN (required — produces "povInsights"):
-- For 3-5 key topics from the extraction, identify: (a) what most competitors say about it (conventionalView), (b) a contrarian or nuanced angle that practitioners, Reddit threads, niche forums, or experts would know (contrarian), (c) the source of that insight (e.g. "common practitioner knowledge", "Reddit r/SEO consensus", "niche forum discussion", "expert disagreement").
-- Output as povInsights: array of { topic, conventionalView, contrarian, source }.
-- These will be passed to the writer so the article adds unique Information Gain beyond competitors.
+POV / INFORMATION GAIN (Semantic Novelty):
+- Do not just disagree with competitors (e.g., "They say X is fast, but it's actually slow"). 
+- Introduce a completely new, parallel concept or cross-disciplinary metric that ZERO competitors mentioned. 
+- If competitors talk about "Local SEO backlinks", your contrarian angle must introduce a tangential practitioner metric like "Google Maps proximity decay rates" or "photo EXIF data scraping."
+- Output as povInsights: array of { topic, conventionalView, contrarian, source }. 
+- FATAL ERROR: Ensure contrarian angles are described using raw, declarative facts or bullet points. Do NOT use conversational framing like "One practitioner noted" or "Experts say". Output raw data only.
 
 GEO / AI OVERVIEW TARGETS (required — per-H2 aiOverviewTarget):
-- For each H2 section in the outline, also generate aiOverviewTarget: a 2-3 sentence "featured snippet" answer that directly and factually answers the heading's implied question. This snippet should be self-contained, unambiguous, and extractable by AI engines (Google AI Overviews, Perplexity, ChatGPT). The writer will use it to lead each section with an "answer-first" structure.
+- For every H2, generate a 40-50 word "Information Payload" as the aiOverviewTarget.
+- This payload MUST start with a direct definition, followed immediately by a specific statistic from 'currentData', and ending with a definitive rule or mechanism.
+- Example format: "[Concept] is a [category] that achieves [outcome]. According to [Source], it accounts for [Stat]. It functions by [Mechanism 1] and [Mechanism 2]."
+- This is what AI Overviews will scrape. It must be brutally efficient and completely devoid of marketing language.
 
 GOOGLE SEARCH CENTRAL ALIGNMENT:
 - The article must pass Google's Helpful Content self-assessment: original analysis, substantial value beyond competitors, complete intent satisfaction, would-be-bookmarked quality.
