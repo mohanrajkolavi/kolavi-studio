@@ -8,7 +8,7 @@ import type { CompetitorArticle } from "@/lib/pipeline/types";
 
 const JINA_READER_BASE = "https://r.jina.ai";
 /** Stagger between starting each URL fetch (ms) to be respectful to rate limits. */
-const JINA_STAGGER_MS = 400;
+const JINA_STAGGER_MS = process.env.JINA_API_KEY ? 100 : 400;
 
 export type FetchResult = {
   url: string;

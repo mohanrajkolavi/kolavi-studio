@@ -36,9 +36,42 @@ function jaccardSimilarity(setA: Set<string>, setB: Set<string>): number {
     return union > 0 ? intersection / union : 0;
 }
 
-/** Strip HTML tags for plain text comparison. */
+/** Decode a small set of common HTML entities. */
+function decodeHtmlEntities(text: string): string {
+    const entities: Record<string, string> = {
+        "&nbsp;": " ",
+        "&amp;": "&",
+        "&lt;": "<",
+        "&gt;": ">",
+        "&quot;": "\"",
+        "&#39;": "'",
+    };
+    return text.replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (m) => entities[m] ?? m);
+}
+
+/** Strip HTML tags while preserving paragraph/newline boundaries for originality checks. */
 function stripHtml(html: string): string {
-    return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    // Normalize newlines
+    let text = html.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+    // Insert breaks around block-level elements so we keep paragraph structure
+    text = text
+        .replace(/<(\/?(?:p|div|section|article|blockquote|ul|ol|li|h[1-6]))[^>]*>/gi, "\n")
+        .replace(/<br\s*\/?>/gi, "\n");
+
+    // Strip remaining tags
+    text = text.replace(/<[^>]+>/g, "");
+
+    // Decode entities before whitespace normalization
+    text = decodeHtmlEntities(text);
+
+    // Collapse horizontal whitespace but preserve newlines
+    text = text.replace(/[ \t\f\v]+/g, " ");
+
+    // Normalize multiple blank lines
+    text = text.replace(/\n{3,}/g, "\n\n");
+
+    return text.trim();
 }
 
 /**

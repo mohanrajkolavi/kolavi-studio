@@ -32,8 +32,10 @@ export function assessContentDecay(
     const ageMs = Date.now() - date.getTime();
     const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30);
 
-    // Fast-moving topics decay quicker (tech, news, SEO)
-    const volatilityMultiplier = /tech|news|seo|marketing|ai/i.test(topicCategory) ? 1.5 : 1.0;
+    // Fast-moving topics decay quicker (tech, news, SEO, marketing, AI)
+    const volatilityMultiplier = /\b(?:tech|technology|news|seo|marketing|ai)\b/i.test(topicCategory)
+        ? 1.5
+        : 1.0;
     const adjustedAge = ageMonths * volatilityMultiplier;
 
     let decayRisk: "Low" | "Medium" | "High" = "Low";

@@ -32,6 +32,14 @@ function getClient(): OpenAI {
   return _client;
 }
 
+export function prewarmClient(): void {
+  try {
+    getClient();
+  } catch {
+    // ignore if no key during warmup
+  }
+}
+
 function stripJsonMarkdown(raw: string): string {
   let s = raw.trim();
   const backtick = "```";

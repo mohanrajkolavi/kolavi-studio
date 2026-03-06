@@ -75,7 +75,35 @@ export type ArticleAuditResult = {
 // --- Helpers ---
 
 export function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  // Normalize newlines first so downstream consumers can reliably split on \n
+  let text = html.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+
+  // Insert line breaks around common block-level elements so paragraph boundaries are preserved
+  text = text
+    .replace(/<(\/?(?:p|div|section|article|blockquote|ul|ol|li|h[1-6]))[^>]*>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n");
+
+  // Strip remaining tags
+  text = text.replace(/<[^>]*>/g, "");
+
+  // Decode a small set of common HTML entities
+  const entityMap: Record<string, string> = {
+    "&nbsp;": " ",
+    "&amp;": "&",
+    "&lt;": "<",
+    "&gt;": ">",
+    "&quot;": '"',
+    "&#39;": "'",
+  };
+  text = text.replace(/&(nbsp|amp|lt|gt|quot|#39);/g, (m) => entityMap[m] ?? m);
+
+  // Collapse horizontal whitespace but keep newlines for paragraph detection
+  text = text.replace(/[ \t\f\v]+/g, " ");
+
+  // Normalize multiple blank lines
+  text = text.replace(/\n{3,}/g, "\n\n");
+
+  return text.trim();
 }
 
 function wordCount(text: string): number {
@@ -1638,8 +1666,17 @@ export function auditReadability(plainText: string): {
   const sentences = splitSentences(plainText);
   const totalWords = words.length;
   const totalSentences = sentences.length || 1;
+
+  if (totalWords === 0) {
+    return {
+      fleschKincaid: 0,
+      gunningFog: 0,
+      grade: "Easy (Grade 6-8) — excellent for web",
+    };
+  }
+
   const totalSyllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
-  const complexWords = words.filter(w => countSyllables(w) >= 3).length;
+  const complexWords = words.filter((w) => countSyllables(w) >= 3).length;
 
   // Flesch-Kincaid Grade Level
   const fk = 0.39 * (totalWords / totalSentences) + 11.8 * (totalSyllables / totalWords) - 15.59;
@@ -1722,8 +1759,14 @@ export function compareWithCompetitors(
 
   // Heading depth score
   const articleHeadings = (articleHtml.match(/<h[23][^>]*>/gi) || []).length;
-  const compHeadings = successfulComps.map(c => (c.content.match(/^#{2,3}\s/gm) || []).length);
-  const avgCompHeadings = compHeadings.reduce((a, b) => a + b, 0) / compHeadings.length;
+  const compHeadingsCounts = successfulComps.map((c) => {
+    const htmlHeadings = (c.content.match(/<h[23][^>]*>/gi) || []).length;
+    const markdownHeadings = (c.content.match(/^#{2,3}\s/gm) || []).length;
+    return htmlHeadings + markdownHeadings;
+  });
+  const totalCompHeadings = compHeadingsCounts.reduce((a, b) => a + b, 0);
+  const avgCompHeadings =
+    compHeadingsCounts.length > 0 ? totalCompHeadings / compHeadingsCounts.length : 0;
   let headingDepthScore: number;
   if (avgCompHeadings === 0) headingDepthScore = articleHeadings > 0 ? 100 : 75;
   else {

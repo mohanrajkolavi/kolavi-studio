@@ -66,6 +66,7 @@ type BlogGenerationContextValue = {
   startDraft: (jobId: string, briefOverrides?: BriefOverridesForDraft) => void;
   startValidate: (jobId: string) => void;
   retryFromChunk: (chunk: ChunkName) => void;
+  abortGeneration: () => void;
 };
 
 const BlogGenerationContext = createContext<BlogGenerationContextValue | null>(
@@ -172,6 +173,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         if (!res.ok || !mountedRef.current) return;
         const job = (await res.json()) as {
           phase?: string;
+          chunkOutputs?: Record<string, unknown>;
           serpResults?: Array<{ position: number; title: string; url: string }>;
           paaQuestions?: string[];
           paaItems?: Array<{ question: string; snippet?: string; title?: string; link?: string }>;
@@ -179,22 +181,61 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
           intentValidation?: object;
           redditThreads?: Array<{ url: string; title: string; snippet?: string }>;
         };
-        if (job.phase !== "waiting_for_review" || !Array.isArray(job.serpResults) || job.serpResults.length === 0) return;
+
         if (!mountedRef.current) return;
         setJobIdState(stored);
-        setChunkOutputs((prev) => ({
-          ...prev,
-          researchSerp: {
-            results: job.serpResults!,
+
+        // Map DB chunk names to frontend state names if present
+        const dbChunks = job.chunkOutputs ?? {};
+        const newChunks: ChunkOutputsState = {
+          researchSerp: null,
+          research: null,
+          brief: null,
+          draft: null,
+          validation: null,
+        };
+
+        if (dbChunks.researchSerp) {
+          newChunks.researchSerp = dbChunks.researchSerp as any;
+        } else if (Array.isArray(job.serpResults) && job.serpResults.length > 0) {
+          // Fallback legacy support
+          newChunks.researchSerp = {
+            results: job.serpResults,
             ...(job.paaQuestions?.length ? { paaQuestions: job.paaQuestions } : {}),
             ...(job.paaItems?.length ? { paaItems: job.paaItems } : {}),
             ...(job.serpFeatures ? { serpFeatures: job.serpFeatures } : {}),
             ...(job.intentValidation ? { intentValidation: job.intentValidation } : {}),
-            ...(job.redditThreads?.length ? { redditThreads: job.redditThreads } : {}),
-          },
-          research: null,
-        }));
-        setPhase("reviewing");
+            ...(job.redditThreads?.length ? { redditThreads: job.redditThreads } : {})
+          } as any;
+        }
+
+        if (dbChunks.research) newChunks.research = dbChunks.research as any;
+        if (dbChunks.brief || dbChunks.analysis) newChunks.brief = (dbChunks.brief || dbChunks.analysis) as any;
+        if (dbChunks.draft) newChunks.draft = dbChunks.draft as any;
+        if (dbChunks.validation || dbChunks.postprocess) newChunks.validation = (dbChunks.validation || dbChunks.postprocess) as any;
+
+        setChunkOutputs(newChunks);
+
+        if (job.phase) {
+          // Translate DB phase to frontend phase
+          const phaseMap: Record<string, Phase> = {
+            "waiting_for_review": "reviewing",
+            "completed": "completed",
+            "analyzing": "analyzing",
+            "drafting": "drafting",
+            "validating": "validating",
+            "researching": "researching",
+            "error": "error",
+            "idle": "idle"
+          };
+          const mappedPhase = phaseMap[job.phase];
+          if (mappedPhase) {
+            setPhase(mappedPhase);
+          } else {
+            setPhase((prev) => prev);
+          }
+        }
+
         setStatus("idle");
       } catch {
         // ignore restore errors
@@ -302,6 +343,16 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     }
     setChunkOutputs({ research: null, researchSerp: null, brief: null, draft: null, validation: null });
     setErrorChunk(null);
+  }, []);
+
+  const abortGeneration = useCallback(() => {
+    abortControllerRef.current?.abort();
+    if (mountedRef.current) {
+      setStatus("idle");
+      // Keep phase, chunkOutputs, and jobId intact so user can click "Resume"
+      setGenerationStartedAt(null);
+      setProgress(null);
+    }
   }, []);
 
   const clearError = useCallback(() => {
@@ -612,6 +663,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     startDraft,
     startValidate,
     retryFromChunk,
+    abortGeneration,
   };
 
   return (
@@ -735,9 +787,9 @@ async function processResearchSSE(
           results: serpResults,
           ...(r.paaQuestions?.length ? { paaQuestions: r.paaQuestions } : {}),
           ...(r.paaItems?.length ? { paaItems: r.paaItems } : {}),
-          ...(r.serpFeatures ? { serpFeatures: r.serpFeatures } : {}),
-          ...(r.intentValidation ? { intentValidation: r.intentValidation } : {}),
-          ...(r.redditThreads?.length ? { redditThreads: r.redditThreads } : {}),
+          ...(r.serpFeatures ? { serpFeatures: r.serpFeatures as any } : {}),
+          ...(r.intentValidation ? { intentValidation: r.intentValidation as any } : {}),
+          ...(r.redditThreads?.length ? { redditThreads: r.redditThreads as any } : {}),
         },
         research: null,
       }));
@@ -801,7 +853,7 @@ async function processResearchFetchSSE(
             competitorTitles: competitorTitles.length > 0 ? competitorTitles : undefined,
             ...(r.paaQuestions?.length ? { paaQuestions: r.paaQuestions } : {}),
             ...(r.paaItems?.length ? { paaItems: r.paaItems } : {}),
-            ...(r.serpFeatures ? { serpFeatures: r.serpFeatures } : {}),
+            ...(r.serpFeatures ? { serpFeatures: r.serpFeatures as any } : {}),
             ...(r.redditQuotes?.length ? { redditQuotes: r.redditQuotes } : {}),
             ...(r.redditThreads?.length ? { redditThreads: r.redditThreads } : {}),
           }

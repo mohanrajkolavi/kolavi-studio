@@ -33,7 +33,7 @@ export function computeSemanticSimilarity(
     for (const comp of competitors) {
         if (!comp.content) continue;
 
-        const compTokens = new Set(tokenize(comp.content));
+        const compTokens = new Set(tokenize(stripHtml(comp.content)));
         let intersection = 0;
 
         for (const token of articleTokens) {

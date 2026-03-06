@@ -141,7 +141,8 @@ export async function POST(request: NextRequest) {
 
       const keepAlive = setInterval(() => {
         try {
-          controller.enqueue(encoder.encode(`:\\n\\n`));
+          // SSE comment heartbeat to keep connection alive
+          controller.enqueue(encoder.encode(":\n\n"));
         } catch { }
       }, 10_000);
 

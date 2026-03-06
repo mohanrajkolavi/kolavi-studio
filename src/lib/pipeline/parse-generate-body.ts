@@ -42,7 +42,10 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
   const pasf =
     peopleAlsoSearchFor != null
       ? (Array.isArray(peopleAlsoSearchFor)
-        ? peopleAlsoSearchFor.slice(0, 5).map((p: unknown) => String(p).trim()).filter(Boolean)
+        ? peopleAlsoSearchFor
+          .map((p: unknown) => String(p).trim())
+          .filter(Boolean)
+          .slice(0, 5)
         : String(peopleAlsoSearchFor)
           .split(/[,;\n]+/)
           .map((p: string) => p.trim())

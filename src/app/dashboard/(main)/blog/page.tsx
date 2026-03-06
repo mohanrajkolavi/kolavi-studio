@@ -642,6 +642,7 @@ export default function BlogMakerPage() {
     startDraft,
     startValidate,
     retryFromChunk,
+    abortGeneration,
   } = useBlogGeneration();
 
   const [primaryKeyword, setPrimaryKeyword] = useState<string>("");
@@ -1837,6 +1838,7 @@ export default function BlogMakerPage() {
             demoStartedAt={demoStartedAt}
             demoElapsedTick={demoElapsedTick}
             demoChunkOutputs={demoChunkOutputs}
+            onAbort={abortGeneration}
           />
 
           <div className="space-y-0">
@@ -2060,34 +2062,34 @@ export default function BlogMakerPage() {
                               <ul className="space-y-3">
                                 {paaItems.length > 0
                                   ? paaItems.slice(0, 8).map((item, i) => (
-                                      <li key={i}>
-                                        <div className="rounded-lg border border-border/60 bg-background px-3 py-2.5 hover:border-orange-400/70 hover:bg-orange-50/40 dark:hover:bg-orange-500/5 transition-colors">
-                                          <p className="text-[13px] font-medium text-foreground">{item.question}</p>
-                                          {item.snippet && (
-                                            <p className="mt-1 text-[12px] text-muted-foreground leading-snug line-clamp-3">
-                                              {item.snippet}
-                                            </p>
-                                          )}
-                                          {item.link && (
-                                            <a
-                                              href={item.link}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-orange-600 dark:text-orange-400 hover:underline"
-                                            >
-                                              {item.title || "Source"}
-                                              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
-                                            </a>
-                                          )}
-                                        </div>
-                                      </li>
-                                    ))
+                                    <li key={i}>
+                                      <div className="rounded-lg border border-border/60 bg-background px-3 py-2.5 hover:border-orange-400/70 hover:bg-orange-50/40 dark:hover:bg-orange-500/5 transition-colors">
+                                        <p className="text-[13px] font-medium text-foreground">{item.question}</p>
+                                        {item.snippet && (
+                                          <p className="mt-1 text-[12px] text-muted-foreground leading-snug line-clamp-3">
+                                            {item.snippet}
+                                          </p>
+                                        )}
+                                        {item.link && (
+                                          <a
+                                            href={item.link}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-orange-600 dark:text-orange-400 hover:underline"
+                                          >
+                                            {item.title || "Source"}
+                                            <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+                                          </a>
+                                        )}
+                                      </div>
+                                    </li>
+                                  ))
                                   : paa.slice(0, 8).map((q, i) => (
-                                      <li key={i}>
-                                        <div className="rounded-lg border border-dashed border-orange-300/70 bg-background px-3 py-2.5">
-                                          <p className="text-[13px] font-medium text-foreground">{q}</p>
-                                        </div>
-                                      </li>
+                                    <li key={i}>
+                                      <div className="rounded-lg border border-dashed border-orange-300/70 bg-background px-3 py-2.5">
+                                        <p className="text-[13px] font-medium text-foreground">{q}</p>
+                                      </div>
+                                    </li>
                                   ))}
                               </ul>
                             ) : (
@@ -2141,11 +2143,6 @@ export default function BlogMakerPage() {
                                               {t.title || t.url}
                                               <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
                                             </a>
-                                            {t.subreddit && (
-                                              <p className="text-[11px] text-muted-foreground">
-                                                {t.subreddit}
-                                              </p>
-                                            )}
                                           </div>
                                         </div>
                                       </li>
@@ -2641,11 +2638,16 @@ export default function BlogMakerPage() {
                   {/* Primary keyword */}
                   <div className="space-y-2.5 sm:pr-8">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-semibold text-foreground tracking-tight">Primary keyword</label>
+                      <label htmlFor="primary-keyword" className="text-sm font-semibold text-foreground tracking-tight">
+                        Primary keyword
+                      </label>
                       <span className="text-[11px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full">Required</span>
                     </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">The main topic your article will target and rank for.</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      The main topic your article will target and rank for.
+                    </p>
                     <Input
+                      id="primary-keyword"
                       value={primaryKeyword}
                       onChange={(e) => setPrimaryKeyword(e.target.value)}
                       placeholder="e.g. medical spa SEO"
@@ -2657,7 +2659,7 @@ export default function BlogMakerPage() {
                   {/* Secondary keywords */}
                   <div className="space-y-2.5 sm:pl-8">
                     <div className="flex items-center justify-between">
-                      <label className="text-sm font-semibold text-foreground tracking-tight">Secondary keywords</label>
+                      <p className="text-sm font-semibold text-foreground tracking-tight">Secondary keywords</p>
                       <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
                         {secondaryKeywords.length}/4
                       </span>
@@ -2681,7 +2683,7 @@ export default function BlogMakerPage() {
                   {/* Search intent */}
                   <div className="space-y-2.5 sm:pr-8">
                     <div className="flex items-baseline justify-between">
-                      <label className="text-sm font-semibold text-foreground tracking-tight">Search intent</label>
+                      <p className="text-sm font-semibold text-foreground tracking-tight">Search intent</p>
                       <span className="text-[11px] text-muted-foreground">Pick 1 or 2</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">Word count is auto-calculated from your selection.</p>
@@ -2722,7 +2724,7 @@ export default function BlogMakerPage() {
                   {/* Draft model */}
                   <div className="space-y-2.5 sm:pl-8">
                     <div className="flex items-baseline justify-between">
-                      <label className="text-sm font-semibold text-foreground tracking-tight">Draft model</label>
+                      <p className="text-sm font-semibold text-foreground tracking-tight">Draft model</p>
                       <span className="text-[11px] text-muted-foreground">Claude</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">The Claude model used to write the article draft.</p>

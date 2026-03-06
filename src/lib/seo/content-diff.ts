@@ -57,9 +57,13 @@ export function generateContentDiff(
         const compText = competitors.map(c => c.content.toLowerCase()).join(" ");
         const uniqueToUs = coveredByUs.filter(t => !compText.includes(t.toLowerCase()));
 
+        const coveredByCompetitorsOnly = missedByUs.filter(t =>
+            compText.includes(t.toLowerCase())
+        );
+
         return {
             coveredByUs,
-            coveredByCompetitorsOnly: missedByUs,
+            coveredByCompetitorsOnly,
             uniqueToUs
         };
     }
@@ -72,7 +76,7 @@ export function generateContentDiff(
         for (const phrase of p) compPhrases.add(phrase);
     }
 
-    // Top phrases by frequency (simplified)
+    // Sample phrases from sets (no guaranteed order or frequency ranking)
     const covered = Array.from(ourPhrases).filter(p => compPhrases.has(p)).slice(0, 10);
     const compOnly = Array.from(compPhrases).filter(p => !ourPhrases.has(p)).slice(0, 5);
     const unique = Array.from(ourPhrases).filter(p => !compPhrases.has(p)).slice(0, 5);

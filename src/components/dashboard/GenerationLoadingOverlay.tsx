@@ -78,6 +78,8 @@ export type GenerationLoadingOverlayProps = {
   demoElapsedTick: number;
   /** Demo mode: chunk outputs */
   demoChunkOutputs: DemoChunkOutputs;
+  /** Callback to stop generation */
+  onAbort?: () => void;
 };
 
 export function GenerationLoadingOverlay({
@@ -91,6 +93,7 @@ export function GenerationLoadingOverlay({
   demoStartedAt,
   demoElapsedTick,
   demoChunkOutputs,
+  onAbort,
 }: GenerationLoadingOverlayProps) {
   if (!visible) return null;
 
@@ -160,25 +163,25 @@ export function GenerationLoadingOverlay({
       role="status"
       aria-live="polite"
       aria-label="Content generation in progress"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 bg-background/80 backdrop-blur-3xl"
+      className="fixed bottom-6 right-6 z-50 w-[380px] rounded-[40px] bg-background border border-border/40 shadow-2xl overflow-hidden backdrop-blur-3xl animate-in slide-in-from-bottom-8 fade-in-0 zoom-in-95 duration-500"
     >
-      <div className="flex flex-col items-center w-full max-w-md gap-10">
+      <div className="flex flex-col items-center w-full px-6 pt-8 pb-6 gap-6 relative">
 
         {/* Main Status Text */}
-        <div className="flex flex-col items-center gap-3 text-center animate-reveal-hero">
-          <div className="generation-loading-spinner mb-4 shrink-0" aria-hidden />
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+        <div className="flex flex-col items-center gap-2 text-center animate-reveal-hero w-full">
+          <div className="generation-loading-spinner h-8 w-8 mb-2 shrink-0" aria-hidden />
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">
             {message}
           </h2>
           {currentProcess && (
-            <p className="text-base text-muted-foreground/80 max-w-[280px]">
+            <p className="text-sm text-muted-foreground/80">
               {currentProcess.description}
             </p>
           )}
         </div>
 
         {/* Minimalist Process List */}
-        <div className="w-full space-y-4 px-4 animate-reveal" style={{ animationDelay: "150ms" }}>
+        <div className="w-full space-y-3 px-2 animate-reveal" style={{ animationDelay: "150ms" }}>
           {PROCESSES.map(({ key, label }) => {
             const { done, current } = getProcessState(key);
 
@@ -186,27 +189,27 @@ export function GenerationLoadingOverlay({
               <div
                 key={key}
                 className={`flex items-center gap-4 transition-all duration-500 ease-out ${current
-                    ? "opacity-100 scale-100"
-                    : done
-                      ? "opacity-60 scale-95"
-                      : "opacity-30 scale-95"
+                  ? "opacity-100 scale-100"
+                  : done
+                    ? "opacity-60 scale-95"
+                    : "opacity-30 scale-95"
                   }`}
               >
-                <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                <div className="flex h-5 w-5 shrink-0 items-center justify-center">
                   {done ? (
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" strokeWidth={2.5} />
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" strokeWidth={2.5} />
                   ) : current ? (
-                    <span className="generation-loading-spinner-sm h-4 w-4" aria-hidden />
+                    <span className="generation-loading-spinner-sm h-3.5 w-3.5" aria-hidden />
                   ) : (
                     <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
                   )}
                 </div>
                 <p
-                  className={`text-[15px] font-medium transition-colors duration-500 ${current
-                      ? "text-foreground"
-                      : done
-                        ? "text-foreground/80"
-                        : "text-muted-foreground"
+                  className={`text-[14px] font-medium transition-colors duration-500 ${current
+                    ? "text-foreground"
+                    : done
+                      ? "text-foreground/80"
+                      : "text-muted-foreground"
                     }`}
                 >
                   {label}
@@ -216,15 +219,37 @@ export function GenerationLoadingOverlay({
           })}
         </div>
 
-        {/* Floating Metrics Pill */}
-        <div className="mt-4 flex items-center gap-3 rounded-full bg-background/50 border border-border/40 px-5 py-2 text-[13px] font-medium tabular-nums text-muted-foreground shadow-sm backdrop-blur-md animate-reveal" style={{ animationDelay: "300ms" }}>
-          <span>{elapsedSeconds > 0 ? formatElapsed(elapsedSeconds) : "0s"} elapsed</span>
-          <div className="h-3 w-[1px] bg-border" />
-          <span className="text-foreground">{Math.round(progressPercent)}%</span>
+        {/* Bottom Actions Row */}
+        <div className="mt-2 flex w-full items-center justify-between animate-reveal" style={{ animationDelay: "300ms" }}>
+
+          {/* Floating Metrics Pill */}
+          <div className="flex items-center gap-2.5 rounded-full bg-muted/50 border border-border/40 px-3.5 py-1.5 text-[12px] font-medium tabular-nums text-muted-foreground shadow-sm">
+            <span>{elapsedSeconds > 0 ? formatElapsed(elapsedSeconds) : "0s"}</span>
+            <div className="h-3 w-[1px] bg-border" />
+            <span className="text-foreground">{Math.round(progressPercent)}%</span>
+          </div>
+
+          {/* End Process Button */}
+          {onAbort ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onAbort();
+              }}
+              className="text-[12px] font-medium text-destructive hover:text-destructive/90 transition-colors px-3.5 py-1.5 rounded-full hover:bg-destructive/10 active:scale-95"
+            >
+              End Process
+            </button>
+          ) : (
+            <div />
+          )}
+
         </div>
 
-        {/* Ultra-thin Progress Bar - Positioned Fixed at Bottom */}
-        <div className="fixed bottom-0 left-0 w-full h-1 bg-transparent" role="progressbar" aria-valuenow={Math.round(progressPercent)} aria-valuemin={0} aria-valuemax={100}>
+        {/* Ultra-thin Progress Bar - Positioned at Bottom of Card */}
+        <div className="absolute bottom-0 left-0 w-full h-1 bg-transparent overflow-hidden" role="progressbar" aria-valuenow={Math.round(progressPercent)} aria-valuemin={0} aria-valuemax={100}>
           <div
             className="h-full bg-primary transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,100,0,0.4)]"
             style={{ width: `${Math.max(1, progressPercent)}%` }}

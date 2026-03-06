@@ -25,6 +25,19 @@ function getClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey: API_KEY });
 }
 
+export function prewarmClient(): void {
+  try {
+    getClient();
+  } catch {
+    // ignore if no key during warmup
+  }
+}
+
+// Simple in-memory cache for CurrentData (1 hour TTL)
+const currentDataCache = new Map<string, { data: CurrentData; timestamp: number }>();
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_CACHE_SIZE = 100;
+
 /** Strip markdown code fences from JSON string. */
 function stripJsonMarkdown(raw: string): string {
   let s = raw.trim();
@@ -93,6 +106,16 @@ export async function fetchCurrentData(
   primaryKeyword: string,
   secondaryKeywords: string[] = []
 ): Promise<CurrentData> {
+  const serializedSecondary = secondaryKeywords.length > 0 ? [...secondaryKeywords].sort().join("|").toLowerCase().trim() : "";
+  const cacheKey = `${primaryKeyword.toLowerCase().trim()}:${serializedSecondary}`;
+  const cached = currentDataCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    if (process.env.NODE_ENV !== "test") {
+      console.log(`[gemini] Cache hit for current data: "${cacheKey}"`);
+    }
+    return cached.data;
+  }
+
   const ai = getClient();
   const keywordContext =
     secondaryKeywords.length > 0
@@ -243,13 +266,24 @@ Return as structured JSON with this exact format (no other text):
     return dateB - dateA; // newest first
   });
 
-  return {
+  const finalData: CurrentData = {
     facts: sortedFacts,
     recentDevelopments: validated.data.recentDevelopments,
     lastUpdated: validated.data.lastUpdated,
     groundingVerified,
     sourceUrlValidation: { total, accessible, inaccessible },
   };
+
+  currentDataCache.set(cacheKey, { data: finalData, timestamp: Date.now() });
+
+  if (currentDataCache.size > MAX_CACHE_SIZE) {
+    const oldestKey = currentDataCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      currentDataCache.delete(oldestKey);
+    }
+  }
+
+  return finalData;
 }
 
 
@@ -364,9 +398,52 @@ Return JSON with exactly: ${rootKeys}.`;
       `\n\n--- PAA QUESTIONS (from Serper; analyze coverage for each) ---\n${paaQuestions.map((q) => `- ${q}`).join("\n")}\n`
       : "";
 
+  const sanitizeRedditSummary = (summary: string): string => {
+    let s = summary.trim();
+    if (!s) return "";
+    // Trim to a reasonable length to avoid prompt bloat or prompt-injection payloads
+    s = s.slice(0, 500);
+
+    // Remove code fences and horizontal rules that could affect prompt structure
+    s = s.replace(/```[\s\S]*?```/g, "");
+    s = s.replace(/^---+$/gm, "-");
+
+    // Drop lines that look like instructions or meta-commands
+    const instructionPatterns = [
+      /ignore previous/i,
+      /ignore above/i,
+      /stop following/i,
+      // Tightened to only catch explicit imperative instructions (typically prompt injection),
+      // not ordinary Reddit comments using "do not" or "don't" in the middle of a sentence.
+      /^\s*(?:please\s+)?(?:do not|don't)\s+(?:follow|obey|respond|use)\b/i,
+      /please ignore/i,
+      /forget this/i,
+      /forget above/i,
+      /override instructions/i,
+      /disregard/i,
+      /system:/i,
+      /^\/\w+/i, // commands like /reset
+    ];
+
+    const lines = s.split(/\r?\n/).filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return false;
+      return !instructionPatterns.some((re) => re.test(trimmed));
+    });
+
+    s = lines.join(" ");
+
+    // Collapse excessive whitespace
+    s = s.replace(/\s+/g, " ").trim();
+    return s;
+  };
+
+  const sanitizedRedditSummaries =
+    hasReddit ? redditSummaries.map(sanitizeRedditSummary).filter(Boolean) : [];
+
   const redditBlock =
-    hasReddit ?
-      `\n\n--- REDDIT / COMMUNITY INSIGHTS ---\nThe following are summaries from Reddit discussions about this topic. Use these to identify practitioner-level topics, common mistakes, and real-world tips that competitors may have missed:\n${redditSummaries.map((s, i) => `Thread ${i + 1}: ${s}`).join("\n")}\n`
+    sanitizedRedditSummaries.length > 0
+      ? `\n\n--- REDDIT / COMMUNITY INSIGHTS ---\nThe following are summaries from Reddit discussions about this topic. Use these to identify practitioner-level topics, common mistakes, and real-world tips that competitors may have missed:\n${sanitizedRedditSummaries.map((s, i) => `Thread ${i + 1}: ${s}`).join("\n")}\n`
       : "";
 
   const response = await ai.models.generateContent({

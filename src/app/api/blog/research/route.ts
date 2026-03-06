@@ -3,6 +3,9 @@ import { isAuthenticated } from "@/lib/auth";
 import { parseGenerateBody } from "@/lib/pipeline/parse-generate-body";
 import { runResearchSerpOnly } from "@/lib/pipeline/chunks";
 import { jobStore } from "@/lib/pipeline/jobs";
+import { prewarmClient as prewarmClaude } from "@/lib/claude/client";
+import { prewarmClient as prewarmOpenAI } from "@/lib/openai/client";
+import { prewarmClient as prewarmGemini } from "@/lib/gemini/client";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
@@ -23,6 +26,13 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  // Fire and forget prewarming to remove lazy-init penalty for later steps
+  Promise.allSettled([
+    (async () => prewarmClaude())(),
+    (async () => prewarmOpenAI())(),
+    (async () => prewarmGemini())()
+  ]).catch(() => { });
 
   let body: unknown;
   try {
@@ -57,7 +67,8 @@ export async function POST(request: NextRequest) {
 
       const keepAlive = setInterval(() => {
         try {
-          controller.enqueue(encoder.encode(`:\\n\\n`));
+          // SSE comment heartbeat to keep connection alive
+          controller.enqueue(encoder.encode(":\n\n"));
         } catch { }
       }, 10_000);
 

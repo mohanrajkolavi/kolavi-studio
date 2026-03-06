@@ -157,7 +157,8 @@ function detectSerpIntent(data: SerperResponse, declaredIntent?: string): Intent
     else informationalCount++;
   }
 
-  const total = organic.length || 1;
+  const sampled = organic.slice(0, 10);
+  const total = sampled.length || 1;
   let detectedIntent = "informational";
   let confidence = 0.5;
 

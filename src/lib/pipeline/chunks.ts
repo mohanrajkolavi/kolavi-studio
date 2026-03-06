@@ -348,7 +348,14 @@ export async function runResearchFetch(
       return r;
     })(),
     (async () => {
-      return await searchRedditDiscussions(primaryKeyword, 3);
+      try {
+        return await searchRedditDiscussions(primaryKeyword, 3);
+      } catch (err) {
+        if (process.env.NODE_ENV !== "test") {
+          console.warn("[pipeline] Reddit search failed during research_fetch; continuing without Reddit data", err);
+        }
+        return [];
+      }
     })(),
   ]);
   metrics?.recordApiCall("jina", jinaDurationMs, { endpoint: "fetch" });
@@ -357,7 +364,14 @@ export async function runResearchFetch(
   let redditQuotes: string[] = [];
   if (redditThreads.length > 0) {
     emit("gemini-grounding", "started", "Extracting Reddit quotes...", 40);
-    redditQuotes = await extractQuotesFromReddit(primaryKeyword, redditThreads);
+    try {
+      redditQuotes = await extractQuotesFromReddit(primaryKeyword, redditThreads);
+    } catch (err) {
+      if (process.env.NODE_ENV !== "test") {
+        console.warn("[pipeline] extractQuotesFromReddit failed; continuing without Reddit quotes", err);
+      }
+      redditQuotes = [];
+    }
   }
 
   const competitors: CompetitorArticle[] =
@@ -980,7 +994,10 @@ export async function runDraftChunk(
     };
     const durationMs = Date.now() - draftStartMs;
     // Approximation for cost since we did multiple calls
-    const cost = buildChunkCost({ anthropic: { calls: brief.outline.sections.length + 1, durationMs }, openai: { calls: 1 } }, durationMs);
+    const cost = buildChunkCost(
+      { anthropic: { calls: brief.outline.sections.length + 1, durationMs } },
+      durationMs
+    );
     await store.saveChunkOutput(jobId, "draft", draftOutput as unknown as Record<string, unknown>, cost);
     await store.updatePhase(jobId, "post_processing");
     return {
@@ -1077,16 +1094,23 @@ export async function runValidationChunk(
 
     while (autoFixAttempts < MAX_FIX_ATTEMPTS && auditResult.summary.fail > 0) {
       const fixableFailures = auditResult.items
-        .filter(item => item.severity === "fail" && item.level !== 3)
-        .map(item => item.message);
+        .filter((item) => item.severity === "fail" && item.level !== 3)
+        .map((item) => item.message);
 
       if (fixableFailures.length === 0) break;
 
       autoFixAttempts++;
-      // Provide tokenUsage tracking if we had it in scope (passing undefined for now since runValidationChunk signature doesn't take it)
-      finalContent = await fixAuditIssues(finalContent, fixableFailures);
 
-      // Re-audit
+      try {
+        // Provide tokenUsage tracking if we had it in scope (passing undefined for now since runValidationChunk signature doesn't take it)
+        finalContent = await fixAuditIssues(finalContent, fixableFailures);
+      } catch (err) {
+        if (process.env.NODE_ENV !== "test") {
+          console.warn("[pipeline] fixAuditIssues failed during validation; continuing with existing content", err);
+        }
+      }
+
+      // Re-audit (even if fix failed, to keep loop conditions consistent)
       auditResult = auditArticle({
         title: draft.title ?? primaryKeyword,
         metaDescription: draft.metaDescription ?? "",
@@ -1097,29 +1121,49 @@ export async function runValidationChunk(
       });
     }
 
-    const schemaMarkup: SchemaMarkup =
-      auditResult.schemaMarkup ??
-      generateSchemaMarkup(
+    // Compute semantic competitor diff dependencies
+    const competitors = (research?.competitors as { url: string; content: string }[]) ?? [];
+    const extractedTopics = brief?.outline?.sections?.flatMap(s => s.topics) ?? [];
+
+    // Compute independent outputs in parallel
+    const [
+      schemaMarkup,
+      contentDiff,
+      semanticSimilarity,
+      contentDecayRisk
+    ] = await Promise.all([
+      // 1. Schema Generation
+      Promise.resolve(auditResult.schemaMarkup ?? generateSchemaMarkup(
         finalContent,
         draft.title ?? primaryKeyword,
         draft.metaDescription ?? "",
         draft.suggestedSlug,
         primaryKeyword
-      );
+      )),
 
-    // Compute semantic competitor diff
-    const competitors = (research?.competitors as { url: string; content: string }[]) ?? [];
-    const extractedTopics = brief?.outline?.sections?.flatMap(s => s.topics) ?? [];
-    let contentDiff: ContentDiffResult | undefined;
-    let semanticSimilarity: { highestSimilarity: number; mostSimilarUrl: string; isTooDerivative: boolean } | undefined;
+      // 2. Content Diff
+      Promise.resolve().then(() => {
+        const competitorsWithContent = competitors.filter(
+          (c) => typeof c.content === "string" && c.content.trim().length > 0
+        );
+        return competitorsWithContent.length > 0
+          ? generateContentDiff(finalContent, competitorsWithContent, extractedTopics)
+          : undefined;
+      }),
 
-    if (competitors.length > 0) {
-      contentDiff = generateContentDiff(finalContent, competitors, extractedTopics);
-      semanticSimilarity = computeSemanticSimilarity(finalContent, competitors);
-    }
+      // 3. Semantic Similarity
+      Promise.resolve().then(() => {
+        const competitorsWithContent = competitors.filter(
+          (c) => typeof c.content === "string" && c.content.trim().length > 0
+        );
+        return competitorsWithContent.length > 0
+          ? computeSemanticSimilarity(finalContent, competitorsWithContent)
+          : undefined;
+      }),
 
-    // Assess content decay risk based on the primary keyword (simulating topic category)
-    const contentDecayRisk = assessContentDecay(new Date().toISOString(), primaryKeyword);
+      // 4. Content Decay Risk
+      Promise.resolve(assessContentDecay(new Date().toISOString(), primaryKeyword))
+    ]);
 
     const output: ValidationChunkOutput = {
       faqEnforcement: {

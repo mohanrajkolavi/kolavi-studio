@@ -35,6 +35,14 @@ function getAnthropicClient(): Anthropic {
   return _client;
 }
 
+export function prewarmClient(): void {
+  try {
+    getAnthropicClient();
+  } catch {
+    // ignore if no key during warmup
+  }
+}
+
 /**
  * Pipeline system prompt for writeDraft.
  * Framed around Google Search Central helpful content guidelines and Rank Math SEO.
@@ -566,8 +574,8 @@ If you approach the response limit, prioritize completing the final H2 and FAQ; 
 
   return {
     content: (parsed.content as string) ?? "",
-    suggestedCategories: Array.isArray(parsed.suggestedCategories) ? parsed.suggestedCategories.filter((c): c is string => typeof c === "string") : [],
-    suggestedTags: Array.isArray(parsed.suggestedTags) ? parsed.suggestedTags.filter((t): t is string => typeof t === "string") : [],
+    suggestedCategories: Array.isArray(parsed.suggestedCategories) ? parsed.suggestedCategories.filter((c: unknown): c is string => typeof c === "string") : [],
+    suggestedTags: Array.isArray(parsed.suggestedTags) ? parsed.suggestedTags.filter((t: unknown): t is string => typeof t === "string") : [],
   };
 }
 
@@ -678,20 +686,72 @@ Example output:
   }
 
   const rawExtracted = stripJsonFromResponse(contentBlock.text);
-  const jsonText = repairUnescapedQuotesInJsonStrings(escapeControlCharactersInJsonStrings(normalizeJsonString(rawExtracted)));
+  const jsonText = repairUnescapedQuotesInJsonStrings(
+    escapeControlCharactersInJsonStrings(normalizeJsonString(rawExtracted))
+  );
 
   try {
     const parsed = JSON.parse(jsonText) as { content: string };
     if (!parsed.content) return "";
     return parsed.content;
   } catch (err) {
-    // If repair fails, fall back to regex extraction for content property
-    const match = jsonText.match(/"content"\s*:\s*"([\s\S]*?)"\s*\}/);
-    if (match && match[1]) {
-      // Un-escape the string
-      return String(match[1]).replace(/\\n/g, "\n").replace(/\\"/g, '"');
+    // If repair fails, fall back to tolerant extraction of the "content" string
+    console.error("[writeDraftSection] JSON parse failed, attempting tolerant content extraction", err);
+
+    // Use a safer search that specifically targets the JSON key pattern `"content":`
+    const contentKeyMatch = /"content"\s*:/g.exec(jsonText);
+    const keyIndex = contentKeyMatch ? contentKeyMatch.index : -1;
+    if (keyIndex === -1) {
+      throw new Error(`Claude writeDraftSection JSON parse failed (no "content" key): ${err}`);
     }
-    throw new Error(`Claude writeDraftSection JSON parse failed: ${err}`);
+
+    const colonIndex = jsonText.indexOf(":", keyIndex);
+    if (colonIndex === -1) {
+      throw new Error(`Claude writeDraftSection JSON parse failed (no colon after "content"): ${err}`);
+    }
+
+    // Find the opening quote for the content string
+    let i = colonIndex + 1;
+    while (i < jsonText.length && /\s/.test(jsonText[i])) i++;
+    if (jsonText[i] !== '"') {
+      throw new Error(`Claude writeDraftSection JSON parse failed (content is not a JSON string): ${err}`);
+    }
+    i++; // move past opening quote
+
+    let extracted = "";
+    let escapeNext = false;
+    for (; i < jsonText.length; i++) {
+      const ch = jsonText[i];
+      if (escapeNext) {
+        // Preserve the full escape sequence (backslash + character) so that subsequent
+        // unescape logic can correctly decode sequences like \" or \n.
+        extracted += "\\" + ch;
+        escapeNext = false;
+        continue;
+      }
+      if (ch === "\\") {
+        escapeNext = true;
+        continue;
+      }
+      if (ch === '"') {
+        // End of string
+        break;
+      }
+      extracted += ch;
+    }
+
+    const unescaped = extracted
+      // First collapse double-backslashes into a single backslash
+      .replace(/\\\\/g, "\\")
+      // Then decode common escape sequences
+      .replace(/\\n/g, "\n")
+      .replace(/\\r/g, "\r")
+      .replace(/\\t/g, "\t")
+      .replace(/\\u2028/g, "\u2028")
+      .replace(/\\u2029/g, "\u2029")
+      .replace(/\\"/g, '"');
+
+    return unescaped;
   }
 }
 
@@ -923,7 +983,20 @@ Return valid JSON only:
     raw = stripJsonFromResponse(raw);
     const parsed = JSON.parse(raw);
     if (!parsed.titles || !Array.isArray(parsed.titles)) return [];
-    return parsed.titles;
+
+    const titles = parsed.titles
+      .filter((t: unknown) => t && typeof t === "object")
+      .map((t: any) => {
+        const title = typeof t.title === "string" ? t.title : "";
+        const approach = typeof t.approach === "string" ? t.approach : "";
+        const rawCtr = t.ctrSignal;
+        const ctr: "High" | "Medium" =
+          rawCtr === "High" || rawCtr === "Medium" ? rawCtr : "Medium";
+        return { title, approach, ctrSignal: ctr };
+      })
+      .filter((t: { title: string; approach: string; ctrSignal: "High" | "Medium" }) => t.title && t.approach);
+
+    return titles;
   } catch (err) {
     console.error("[generateTitleVariations] Parse error:", err);
     return [];

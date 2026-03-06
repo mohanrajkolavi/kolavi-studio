@@ -247,6 +247,9 @@ export async function runPipeline(
     throw new Error("primaryKeyword is required");
   }
 
+  const escapeRegex = (value: string): string =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   // --- Step 1: SERP research (Serper + PAA for gap analysis) ---
   metrics.startChunk("serper");
   emit("serper", "started", "Searching competitors...", 0);
@@ -444,8 +447,17 @@ export async function runPipeline(
 
   // Regex Nuke for Textbook Definitions (Claude habit)
   finalContent = finalContent
-    .replace(/Local SEO is the process of optimizing your business'?s? online presence/gi, "If you want to dominate your neighborhood market, you have to master local search.")
-    .replace(new RegExp(`(?:<p>)?(?:<strong>)?${primaryKeyword}(?:<\\/strong>)?\\s+is the process of\\s+[^<]+(?:<\\/p>)?`, 'gi'), "");
+    .replace(
+      /Local SEO is the process of optimizing your business'?s? online presence/gi,
+      "If you want to dominate your neighborhood market, you have to master local search."
+    )
+    .replace(
+      new RegExp(
+        `(?:<p>)?(?:<strong>)?${escapeRegex(primaryKeyword)}(?:<\\/strong>)?\\s+is the process of\\s+[^<]+(?:<\\/p>)?`,
+        "gi"
+      ),
+      ""
+    );
 
   const faqEnforcement = enforceFaqCharacterLimit(finalContent, 300);
   if (!faqEnforcement.passed) {
