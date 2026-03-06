@@ -59,10 +59,28 @@ export async function GET(
   }
 
   let serpResults: Array<{ position: number; title: string; url: string }> | undefined;
+  let paaQuestions: string[] | undefined;
+  let paaItems: Array<{ question: string; snippet?: string; title?: string; link?: string }> | undefined;
+  let serpFeatures: object | undefined;
+  let intentValidation: object | undefined;
+  let redditThreads: Array<{ url: string; title: string; snippet?: string }> | undefined;
   if (job.phase === "waiting_for_review") {
     const serpOutput = await jobStore.getChunkOutput(jobId, "research_serp");
     if (serpOutput && typeof serpOutput === "object" && "results" in serpOutput && Array.isArray((serpOutput as { results: unknown }).results)) {
-      serpResults = (serpOutput as { results: Array<{ position: number; title: string; url: string }> }).results;
+      const so = serpOutput as {
+        results: Array<{ position: number; title: string; url: string }>;
+        paaQuestions?: string[];
+        paaItems?: Array<{ question: string; snippet?: string; title?: string; link?: string }>;
+        serpFeatures?: object;
+        intentValidation?: object;
+        redditThreads?: Array<{ url: string; title: string; snippet?: string }>;
+      };
+      serpResults = so.results;
+      if (so.paaQuestions?.length) paaQuestions = so.paaQuestions;
+      if (so.paaItems?.length) paaItems = so.paaItems;
+      if (so.serpFeatures) serpFeatures = so.serpFeatures;
+      if (so.intentValidation) intentValidation = so.intentValidation;
+      if (so.redditThreads?.length) redditThreads = so.redditThreads;
     }
   }
 
@@ -78,6 +96,11 @@ export async function GET(
       errorMessage: job.errorMessage,
       ...(validationSummary && { validationSummary }),
       ...(serpResults && { serpResults }),
+      ...(paaQuestions && { paaQuestions }),
+      ...(paaItems && { paaItems }),
+      ...(serpFeatures && { serpFeatures }),
+      ...(intentValidation && { intentValidation }),
+      ...(redditThreads && { redditThreads }),
     }),
     {
       status: 200,

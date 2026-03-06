@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import type React from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TagInput } from "@/components/dashboard/TagInput";
 import { useBlogGeneration } from "@/components/dashboard/BlogGenerationProvider";
 import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown, ChevronUp, GripVertical, Trash2, Plus, Save, Search, PenLine } from "lucide-react";
@@ -18,10 +20,13 @@ import type {
   GeneratedContent,
   GenerationInput,
   OutlineSectionForEditor,
+  PaaItemForUI,
   PipelineResult,
   ResearchChunkResult,
   ResearchSerpItem,
   ResearchSerpResult,
+  RedditThreadForUI,
+  SerpFeaturesForUI,
 } from "@/lib/blog/generation-types";
 import { pipelineToGenerated } from "@/lib/blog/generation-types";
 
@@ -101,145 +106,145 @@ function EeatResultsDisplay({
     isProblematic?: (r: unknown) => boolean;
     isSkipped?: (r: unknown) => boolean;
   }> = [
-    {
-      key: "experience_signals",
-      label: "Experience signals",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : `${(r as { score: number }).score}/100`,
-      detail: (r: unknown) =>
-        isEeatError(r) ? null : (r as { experience_sentences: string[] }).experience_sentences?.length
-          ? `Sentences: ${(r as { experience_sentences: string[] }).experience_sentences.length}`
-          : "No experience signal sentences detected",
-      isProblematic: (r) => !isEeatError(r) && (r as { score: number }).score < 1,
-    },
-    {
-      key: "title_hyperbole",
-      label: "Title hyperbole",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : (r as { is_clickbait: boolean }).is_clickbait ? "Clickbait" : "OK",
-      detail: (r: unknown) =>
-        isEeatError(r) ? null : (r as { trigger_word?: string }).trigger_word
-          ? `Trigger: ${(r as { trigger_word: string }).trigger_word}`
-          : null,
-      isProblematic: (r) => !isEeatError(r) && (r as { is_clickbait: boolean }).is_clickbait,
-    },
-    {
-      key: "data_density",
-      label: "Data density",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : `${(r as { density_score: number }).density_score} per 100 words`,
-      detail: (r: unknown) =>
-        isEeatError(r) ? null : `${(r as { data_point_count: number }).data_point_count} data points`,
-      isProblematic: (r) => !isEeatError(r) && (r as { density_score: number }).density_score < 1,
-    },
-    {
-      key: "skimmability",
-      label: "Skimmability",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : (r as { pass_fail: string }).pass_fail === "pass" ? "Pass" : "Issues",
-      detail: (r: unknown) =>
-        isEeatError(r) ? null : (r as { problematic_sections: { section_label: string; issue: string }[] }).problematic_sections?.length
-          ? (r as { problematic_sections: { section_label: string; issue: string }[] }).problematic_sections.map((s) => `${s.section_label}: ${s.issue}`).join("; ")
-          : null,
-      isProblematic: (r) => !isEeatError(r) && (r as { pass_fail: string }).pass_fail !== "pass",
-    },
-    {
-      key: "temporal_consistency",
-      label: "Temporal consistency",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : (r as { consistency_score: string }).consistency_score === "pass" ? "Pass" : "Stale refs",
-      detail: (r: unknown) =>
-        isEeatError(r) ? null : (r as { stale_year_references: string[] }).stale_year_references?.length
-          ? (r as { stale_year_references: string[] }).stale_year_references.join(", ")
-          : null,
-      isProblematic: (r) => !isEeatError(r) && (r as { consistency_score: string }).consistency_score !== "pass",
-    },
-    {
-      key: "answer_first_structure",
-      label: "Answer-first",
-      summary: (r: unknown) => {
-        if (isEeatError(r)) return (r as { error: string }).error;
-        const d = r as { direct_answer_ratio: number; total_questions: number };
-        if ((d.total_questions ?? 0) === 0) return "No question headings";
-        return `${d.direct_answer_ratio}% direct`;
+      {
+        key: "experience_signals",
+        label: "Experience signals",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : `${(r as { score: number }).score}/100`,
+        detail: (r: unknown) =>
+          isEeatError(r) ? null : (r as { experience_sentences: string[] }).experience_sentences?.length
+            ? `Sentences: ${(r as { experience_sentences: string[] }).experience_sentences.length}`
+            : "No experience signal sentences detected",
+        isProblematic: (r) => !isEeatError(r) && (r as { score: number }).score < 1,
       },
-      detail: (r: unknown) => {
-        if (isEeatError(r)) return null;
-        const d = r as { buried_answers: unknown[]; total_questions: number };
-        if ((d.total_questions ?? 0) === 0)
-          return "No H2/H3 starting with What/How/Who/Why/Where found";
-        return d.buried_answers?.length
-          ? `${d.buried_answers.length} buried answer(s)`
-          : null;
-      },
-      isProblematic: (r) => {
-        if (isEeatError(r)) return false;
-        const d = r as { direct_answer_ratio: number; total_questions: number; buried_answers: unknown[] };
-        // Flag when there are question headings but most answers are buried
-        return (d.total_questions ?? 0) > 0 && d.direct_answer_ratio < 50;
-      },
-      isSkipped: (r) => !isEeatError(r) && ((r as { total_questions: number }).total_questions ?? 0) === 0,
-    },
-    {
-      key: "entity_density",
-      label: "Entity density",
-      summary: (r: unknown) =>
-        isEeatError(r)
-          ? (r as { error: string }).error
-          : (r as { skipped_reason?: string }).skipped_reason
-            ? "Skipped (spacy not installed)"
-            : `${(r as { density_percent: number }).density_percent}%`,
-      detail: (r: unknown) =>
-        isEeatError(r)
-          ? null
-          : (r as { skipped_reason?: string }).skipped_reason
-            ? (r as { skipped_reason: string }).skipped_reason
-            : (r as { top_entities: [string, string][] }).top_entities?.length
-              ? (r as { top_entities: [string, string][] }).top_entities.map((e) => e[0]).slice(0, 5).join(", ")
-              : null,
-      isSkipped: (r) => !isEeatError(r) && !!(r as { skipped_reason?: string }).skipped_reason,
-    },
-    {
-      key: "readability_variance",
-      label: "Readability variance",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : (r as { variance_score: string }).variance_score === "pass" ? "Pass" : "Issues",
-      detail: (r: unknown) =>
-        isEeatError(r) ? null : (r as { monotony_detected: boolean; fatigue_sentences: string[] }).monotony_detected
-          ? "Monotony"
-          : (r as { fatigue_sentences: string[] }).fatigue_sentences?.length
-            ? `${(r as { fatigue_sentences: string[] }).fatigue_sentences.length} long sentences`
+      {
+        key: "title_hyperbole",
+        label: "Title hyperbole",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : (r as { is_clickbait: boolean }).is_clickbait ? "Clickbait" : "OK",
+        detail: (r: unknown) =>
+          isEeatError(r) ? null : (r as { trigger_word?: string }).trigger_word
+            ? `Trigger: ${(r as { trigger_word: string }).trigger_word}`
             : null,
-      isProblematic: (r) => !isEeatError(r) && (r as { variance_score: string }).variance_score !== "pass",
-    },
-    {
-      key: "lazy_phrasing",
-      label: "Generic phrasing",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : `${(r as { score: number }).score}% filler`,
-      detail: (r: unknown) => {
-        if (isEeatError(r)) return null;
-        const x = r as { found_transitions: string[]; found_hype: string[]; found_tells: string[] };
-        const parts: string[] = [];
-        if (x.found_transitions?.length) parts.push(`Transitions: ${[...new Set(x.found_transitions)].join(", ")}`);
-        if (x.found_hype?.length) parts.push(`Hype: ${[...new Set(x.found_hype)].join(", ")}`);
-        if (x.found_tells?.length) parts.push(`Generic: ${[...new Set(x.found_tells)].join(", ")}`);
-        return parts.length ? parts.join(" · ") : null;
+        isProblematic: (r) => !isEeatError(r) && (r as { is_clickbait: boolean }).is_clickbait,
       },
-      isProblematic: (r) => !isEeatError(r) && (r as { score: number }).score >= 1,
-    },
-    {
-      key: "sentence_starts",
-      label: "Sentence variety",
-      summary: (r: unknown) =>
-        isEeatError(r) ? (r as { error: string }).error : (r as { is_repetitive: boolean }).is_repetitive ? "Repetitive" : "Pass",
-      detail: (r: unknown) =>
-        isEeatError(r) ? null : (r as { repeating_word: string | null }).repeating_word
-          ? `Repeating: "${(r as { repeating_word: string }).repeating_word}"`
-          : null,
-      isProblematic: (r) => !isEeatError(r) && (r as { is_repetitive: boolean }).is_repetitive,
-    },
-  ];
+      {
+        key: "data_density",
+        label: "Data density",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : `${(r as { density_score: number }).density_score} per 100 words`,
+        detail: (r: unknown) =>
+          isEeatError(r) ? null : `${(r as { data_point_count: number }).data_point_count} data points`,
+        isProblematic: (r) => !isEeatError(r) && (r as { density_score: number }).density_score < 1,
+      },
+      {
+        key: "skimmability",
+        label: "Skimmability",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : (r as { pass_fail: string }).pass_fail === "pass" ? "Pass" : "Issues",
+        detail: (r: unknown) =>
+          isEeatError(r) ? null : (r as { problematic_sections: { section_label: string; issue: string }[] }).problematic_sections?.length
+            ? (r as { problematic_sections: { section_label: string; issue: string }[] }).problematic_sections.map((s) => `${s.section_label}: ${s.issue}`).join("; ")
+            : null,
+        isProblematic: (r) => !isEeatError(r) && (r as { pass_fail: string }).pass_fail !== "pass",
+      },
+      {
+        key: "temporal_consistency",
+        label: "Temporal consistency",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : (r as { consistency_score: string }).consistency_score === "pass" ? "Pass" : "Stale refs",
+        detail: (r: unknown) =>
+          isEeatError(r) ? null : (r as { stale_year_references: string[] }).stale_year_references?.length
+            ? (r as { stale_year_references: string[] }).stale_year_references.join(", ")
+            : null,
+        isProblematic: (r) => !isEeatError(r) && (r as { consistency_score: string }).consistency_score !== "pass",
+      },
+      {
+        key: "answer_first_structure",
+        label: "Answer-first",
+        summary: (r: unknown) => {
+          if (isEeatError(r)) return (r as { error: string }).error;
+          const d = r as { direct_answer_ratio: number; total_questions: number };
+          if ((d.total_questions ?? 0) === 0) return "No question headings";
+          return `${d.direct_answer_ratio}% direct`;
+        },
+        detail: (r: unknown) => {
+          if (isEeatError(r)) return null;
+          const d = r as { buried_answers: unknown[]; total_questions: number };
+          if ((d.total_questions ?? 0) === 0)
+            return "No H2/H3 starting with What/How/Who/Why/Where found";
+          return d.buried_answers?.length
+            ? `${d.buried_answers.length} buried answer(s)`
+            : null;
+        },
+        isProblematic: (r) => {
+          if (isEeatError(r)) return false;
+          const d = r as { direct_answer_ratio: number; total_questions: number; buried_answers: unknown[] };
+          // Flag when there are question headings but most answers are buried
+          return (d.total_questions ?? 0) > 0 && d.direct_answer_ratio < 50;
+        },
+        isSkipped: (r) => !isEeatError(r) && ((r as { total_questions: number }).total_questions ?? 0) === 0,
+      },
+      {
+        key: "entity_density",
+        label: "Entity density",
+        summary: (r: unknown) =>
+          isEeatError(r)
+            ? (r as { error: string }).error
+            : (r as { skipped_reason?: string }).skipped_reason
+              ? "Skipped (spacy not installed)"
+              : `${(r as { density_percent: number }).density_percent}%`,
+        detail: (r: unknown) =>
+          isEeatError(r)
+            ? null
+            : (r as { skipped_reason?: string }).skipped_reason
+              ? (r as { skipped_reason: string }).skipped_reason
+              : (r as { top_entities: [string, string][] }).top_entities?.length
+                ? (r as { top_entities: [string, string][] }).top_entities.map((e) => e[0]).slice(0, 5).join(", ")
+                : null,
+        isSkipped: (r) => !isEeatError(r) && !!(r as { skipped_reason?: string }).skipped_reason,
+      },
+      {
+        key: "readability_variance",
+        label: "Readability variance",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : (r as { variance_score: string }).variance_score === "pass" ? "Pass" : "Issues",
+        detail: (r: unknown) =>
+          isEeatError(r) ? null : (r as { monotony_detected: boolean; fatigue_sentences: string[] }).monotony_detected
+            ? "Monotony"
+            : (r as { fatigue_sentences: string[] }).fatigue_sentences?.length
+              ? `${(r as { fatigue_sentences: string[] }).fatigue_sentences.length} long sentences`
+              : null,
+        isProblematic: (r) => !isEeatError(r) && (r as { variance_score: string }).variance_score !== "pass",
+      },
+      {
+        key: "lazy_phrasing",
+        label: "Generic phrasing",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : `${(r as { score: number }).score}% filler`,
+        detail: (r: unknown) => {
+          if (isEeatError(r)) return null;
+          const x = r as { found_transitions: string[]; found_hype: string[]; found_tells: string[] };
+          const parts: string[] = [];
+          if (x.found_transitions?.length) parts.push(`Transitions: ${[...new Set(x.found_transitions)].join(", ")}`);
+          if (x.found_hype?.length) parts.push(`Hype: ${[...new Set(x.found_hype)].join(", ")}`);
+          if (x.found_tells?.length) parts.push(`Generic: ${[...new Set(x.found_tells)].join(", ")}`);
+          return parts.length ? parts.join(" · ") : null;
+        },
+        isProblematic: (r) => !isEeatError(r) && (r as { score: number }).score >= 1,
+      },
+      {
+        key: "sentence_starts",
+        label: "Sentence variety",
+        summary: (r: unknown) =>
+          isEeatError(r) ? (r as { error: string }).error : (r as { is_repetitive: boolean }).is_repetitive ? "Repetitive" : "Pass",
+        detail: (r: unknown) =>
+          isEeatError(r) ? null : (r as { repeating_word: string | null }).repeating_word
+            ? `Repeating: "${(r as { repeating_word: string }).repeating_word}"`
+            : null,
+        isProblematic: (r) => !isEeatError(r) && (r as { is_repetitive: boolean }).is_repetitive,
+      },
+    ];
 
   const qualityKeys = ["experience_signals", "title_hyperbole", "data_density", "skimmability"];
   const structureKeys = ["temporal_consistency", "answer_first_structure", "entity_density", "readability_variance"];
@@ -287,9 +292,8 @@ function EeatResultsDisplay({
               return (
                 <div
                   key={key}
-                  className={`flex gap-3 rounded-xl px-3 py-2.5 ${
-                    isIssue ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
-                  }`}
+                  className={`flex gap-3 rounded-xl px-3 py-2.5 ${isIssue ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
+                    }`}
                 >
                   {ok ? (
                     <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -414,6 +418,36 @@ const SAMPLE_RESEARCH_SERP: ResearchSerpResult = {
     { position: 8, title: "Content Strategy for Med Spa SEO", url: "https://example.com/med-spa-content-strategy" },
     { position: 9, title: "Medical Spa Keywords and Search Intent", url: "https://example.com/med-spa-keywords" },
   ],
+  paaQuestions: [
+    "What is the best SEO strategy for medical spas?",
+    "How do I get my med spa on the first page of Google?",
+    "What are the most important local SEO factors for medical spas?",
+  ],
+  paaItems: [
+    {
+      question: "What is the best SEO strategy for medical spas?",
+      snippet: "Focus on local SEO, Google Business Profile, and location-specific content. Consistent blogging can boost local rankings and AI search appearances.",
+      title: "Local SEO: Guide and 7 Expert Tips - Squarespace",
+      link: "https://www.squarespace.com/blog/what-is-local-seo",
+    },
+    {
+      question: "How do I get my med spa on the first page of Google?",
+      snippet: "Optimize your Google Business Profile, build NAP citations, and create locally relevant content.",
+      title: "Local SEO: The Definitive Guide - Backlinko",
+      link: "https://backlinko.com/local-seo-guide",
+    },
+  ],
+  serpFeatures: {
+    hasKnowledgeGraph: false,
+    hasAnswerBox: true,
+    hasFeaturedSnippet: true,
+    hasVideoCarousel: false,
+    hasTopStories: false,
+    relatedSearches: ["medical spa marketing", "med spa SEO services", "local SEO for aesthetic practices"],
+  },
+  redditThreads: [
+    { url: "https://reddit.com/r/SEO/comments/example", title: "Med spa owners: what SEO actually moved the needle?", snippet: "Discussion about what worked for local visibility." },
+  ],
 };
 
 /** Sample research chunk for demo — matches production Research summary UI. */
@@ -431,6 +465,10 @@ const SAMPLE_RESEARCH: ResearchChunkResult = {
     "Medical Spa Marketing: Aesthetic Practice SEO",
     "Local SEO for Medical Spas and Med Spas",
   ],
+  paaQuestions: SAMPLE_RESEARCH_SERP.paaQuestions,
+  serpFeatures: SAMPLE_RESEARCH_SERP.serpFeatures,
+  redditQuotes: ["Focus on GBP and local citations first—that's where we saw the biggest lift.", "Don't sleep on schema for local business; it helped us get the map pack."],
+  redditThreads: SAMPLE_RESEARCH_SERP.redditThreads,
 };
 
 /** Sample brief chunk for demo — outline editable before draft (matches SAMPLE_OUTPUT outline). Target words sum to 2000. */
@@ -550,13 +588,29 @@ const SAMPLE_PIPELINE_RESULT: PipelineResult = {
     missing: [],
     extra: ["Frequently Asked Questions"],
   },
+  contentDiff: {
+    coveredByUs: ["medical spa SEO", "keyword research", "local SEO", "Google Business Profile"],
+    coveredByCompetitorsOnly: ["pricing strategies", "before and after photos"],
+    uniqueToUs: ["Core Web Vitals for 2026", "AI Overview impact"],
+  },
+  semanticSimilarity: {
+    highestSimilarity: 0.65,
+    mostSimilarUrl: "https://example.com/medical-spa-seo-guide",
+    isTooDerivative: false,
+  },
+  contentDecayRisk: {
+    decayRisk: "Medium",
+    ageMonths: 12,
+    recommendation: "SEO competitive landscape changes yearly. A 2026 targeted article should be refreshed by Q4 2026.",
+    refreshPriority: "Standard",
+  },
 };
 
 const SAMPLE_INPUT: GenerationInput = {
   keywords: ["medical spa SEO", "aesthetic practice marketing"],
   intent: ["informational"],
   competitorUrls: [],
-  draftModel: "sonnet-4.6",
+  draftModel: "opus-4.6",
 };
 
 const SAMPLE_RESULT: ResultState = {
@@ -590,11 +644,17 @@ export default function BlogMakerPage() {
     retryFromChunk,
   } = useBlogGeneration();
 
-  const [keywords, setKeywords] = useState<string[]>([]);
+  const [primaryKeyword, setPrimaryKeyword] = useState<string>("");
+  const [secondaryKeywords, setSecondaryKeywords] = useState<string[]>([]);
+  /** Combined keywords array for API: primary first, then up to 2 secondary. */
+  const keywords = useMemo(
+    () => [primaryKeyword, ...secondaryKeywords].filter(Boolean),
+    [primaryKeyword, secondaryKeywords]
+  );
   /** Selected intents (1 or 2). Word count is auto-calculated in backend from this. */
   const [selectedIntents, setSelectedIntents] = useState<IntentType[]>(["informational"]);
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
-  const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("sonnet-4.6");
+  const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("opus-4.6");
   /** Intent array sent to API (1 or 2; default informational if none selected). */
   const intent = useMemo(
     () => (selectedIntents.length > 0 ? selectedIntents : (["informational"] as IntentType[])),
@@ -617,7 +677,7 @@ export default function BlogMakerPage() {
     researchSerp: ResearchSerpResult | null;
     brief: BriefChunkResult | null;
   }>({ research: null, researchSerp: null, brief: null });
-  /** Selected competitor URLs (max 3) for Select competitors step. */
+  /** Selected competitor URLs (max 4) for Select competitors step. */
   const [selectedSerpUrls, setSelectedSerpUrls] = useState<string[]>([]);
   /** Custom competitor URL (max 1) — user can add one custom URL instead of picking from SERP. */
   const [customCompetitorUrl, setCustomCompetitorUrl] = useState("");
@@ -625,6 +685,7 @@ export default function BlogMakerPage() {
   const [jumpToStage, setJumpToStage] = useState<string>("");
   /** Step mode: editable outline (with originalIndex for briefOverrides). */
   const [editedOutline, setEditedOutline] = useState<Array<OutlineSectionForEditor & { originalIndex: number }>>([]);
+  const [draggingSectionIndex, setDraggingSectionIndex] = useState<number | null>(null);
   /** Target total words for outline; used by Redistribute and Revise Brief. */
   const [targetTotal, setTargetTotal] = useState<number>(0);
   /** Which step to show when in step mode (1=Select competitors, 2=Research summary, 3=Outline). null = show latest. */
@@ -641,10 +702,11 @@ export default function BlogMakerPage() {
     setEditing(null);
     setSelectedSerpUrls([]);
     setCustomCompetitorUrl("");
-    setKeywords(SAMPLE_INPUT.keywords);
+    setPrimaryKeyword(SAMPLE_INPUT.keywords[0] ?? "");
+    setSecondaryKeywords(SAMPLE_INPUT.keywords.slice(1));
     setSelectedIntents(["informational"]);
     setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
-    setDraftModel(SAMPLE_INPUT.draftModel ?? "sonnet-4.6");
+    setDraftModel(SAMPLE_INPUT.draftModel ?? "opus-4.6");
     lastResearchSerpRef.current = SAMPLE_RESEARCH_SERP;
 
     if (stage === "select") {
@@ -693,7 +755,7 @@ export default function BlogMakerPage() {
       keywords: [],
       intent: [] as string[],
       competitorUrls: [],
-      draftModel: "sonnet-4.6" as const,
+      draftModel: "opus-4.6" as const,
     }),
     []
   );
@@ -753,6 +815,30 @@ export default function BlogMakerPage() {
 
   // Pre-select first 3 SERP results in production when SERP first arrives (do not overwrite user's later changes)
   const serpPreSelectDoneRef = useRef(false);
+
+  const handleSectionDragStart = useCallback((index: number) => {
+    setDraggingSectionIndex(index);
+  }, []);
+
+  const handleSectionDragOver = useCallback(
+    (event: React.DragEvent<HTMLElement>, index: number) => {
+      event.preventDefault();
+      setEditedOutline((prev) => {
+        if (draggingSectionIndex === null || draggingSectionIndex === index) return prev;
+        if (draggingSectionIndex < 0 || draggingSectionIndex >= prev.length) return prev;
+        const next = [...prev];
+        const [moved] = next.splice(draggingSectionIndex, 1);
+        next.splice(index, 0, moved);
+        return next;
+      });
+      setDraggingSectionIndex(index);
+    },
+    [draggingSectionIndex, setEditedOutline]
+  );
+
+  const handleSectionDragEnd = useCallback(() => {
+    setDraggingSectionIndex(null);
+  }, []);
   useEffect(() => {
     const serp = chunkOutputs.researchSerp;
     if (!serp?.results?.length || demoRunning) {
@@ -761,10 +847,10 @@ export default function BlogMakerPage() {
     }
     if (serpPreSelectDoneRef.current) return;
     serpPreSelectDoneRef.current = true;
-    setSelectedSerpUrls(serp.results.slice(0, 3).map((r) => r.url));
+    setSelectedSerpUrls(serp.results.slice(0, 4).map((r) => r.url));
   }, [chunkOutputs.researchSerp, demoRunning]);
 
-  // Pre-select first 3 in demo when Select competitors step is shown (same as production)
+  // Pre-select first 4 in demo when Select competitors step is shown (same as production)
   const demoSerpPreSelectDoneRef = useRef(false);
   useEffect(() => {
     if (!demoRunning) {
@@ -1034,9 +1120,10 @@ export default function BlogMakerPage() {
           setCurrentHistoryId(data.id);
           currentHistoryIdRef.current = data.id;
         }
-        // Set keywords state so primary keyword is available when saving
+        // Set primary keyword state so it is available when saving
         if (data.focus_keyword) {
-          setKeywords([data.focus_keyword]);
+          setPrimaryKeyword(data.focus_keyword);
+          setSecondaryKeywords([]);
         }
         setSampleResult({
           pipelineResult: null,
@@ -1255,11 +1342,11 @@ export default function BlogMakerPage() {
         setEditing((prev) =>
           prev
             ? {
-                ...prev,
-                title: SAMPLE_OUTPUT.title,
-                metaDescription: SAMPLE_OUTPUT.metaDescription,
-                suggestedSlug: SAMPLE_OUTPUT.suggestedSlug ?? prev.suggestedSlug,
-              }
+              ...prev,
+              title: SAMPLE_OUTPUT.title,
+              metaDescription: SAMPLE_OUTPUT.metaDescription,
+              suggestedSlug: SAMPLE_OUTPUT.suggestedSlug ?? prev.suggestedSlug,
+            }
             : prev
         );
         setStatus({ type: "success", message: "Meta generated from draft" });
@@ -1273,6 +1360,7 @@ export default function BlogMakerPage() {
             content,
             primaryKeyword,
             intent: generationInput.intent?.[0] || intent[0] || "informational",
+            draftModel,
           }),
         });
         const data = await res.json();
@@ -1299,11 +1387,11 @@ export default function BlogMakerPage() {
     setEditing((prev) =>
       prev
         ? {
-            ...prev,
-            title: opt.title,
-            metaDescription: opt.metaDescription,
-            suggestedSlug: opt.suggestedSlug ?? prev.suggestedSlug,
-          }
+          ...prev,
+          title: opt.title,
+          metaDescription: opt.metaDescription,
+          suggestedSlug: opt.suggestedSlug ?? prev.suggestedSlug,
+        }
         : prev
     );
     setMetaOptions(null);
@@ -1463,12 +1551,12 @@ export default function BlogMakerPage() {
         });
         const addedSections: BriefOverridesForDraft["addedSections"] = added.length
           ? added.map((e) => ({
-              heading: e.heading,
-              level: e.level,
-              targetWords: e.targetWords,
-              topics: e.topics,
-              geoNote: e.geoNote,
-            }))
+            heading: e.heading,
+            level: e.level,
+            targetWords: e.targetWords,
+            topics: e.topics,
+            geoNote: e.geoNote,
+          }))
           : undefined;
         startDraft(jobId, {
           sections,
@@ -1502,6 +1590,7 @@ export default function BlogMakerPage() {
             content: current.content,
             primaryKeyword,
             intent: generationInput.intent?.[0] || intent[0] || "informational",
+            draftModel,
           }),
         });
         const data = await res.json();
@@ -1512,11 +1601,11 @@ export default function BlogMakerPage() {
           setEditing((prev) =>
             prev
               ? {
-                  ...prev,
-                  title: best.title,
-                  metaDescription: best.metaDescription,
-                  suggestedSlug: best.suggestedSlug ?? prev.suggestedSlug,
-                }
+                ...prev,
+                title: best.title,
+                metaDescription: best.metaDescription,
+                suggestedSlug: best.suggestedSlug ?? prev.suggestedSlug,
+              }
               : prev
           );
           const currentKw = keywords[0]?.trim();
@@ -1541,7 +1630,7 @@ export default function BlogMakerPage() {
       }
     }, AUTO_ADVANCE_MS);
     return () => clearTimeout(t);
-  }, [editing, generating, saveInProgress, generateMetaLoading, sampleResult, keywords, generationInput, intent, pipelineResult, saveToHistory]);
+  }, [editing, generating, saveInProgress, generateMetaLoading, sampleResult, keywords, generationInput, intent, draftModel, pipelineResult, saveToHistory]);
 
   return (
     <div className="min-w-0 space-y-12 overflow-x-clip">
@@ -1557,74 +1646,74 @@ export default function BlogMakerPage() {
         </div>
         <div className="shrink-0 flex items-center gap-2">
           {generated ? (
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={saveInProgress}
-              onClick={async () => {
-                if (!editing) return;
-                const currentKw = keywords[0]?.trim();
-                const genKw = generationInput.keywords[0]?.trim();
-                const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
-                await saveToHistory({
-                  ...editing,
-                  focusKeyword,
-                  ...(typeof pipelineResult?.generationTimeMs === "number" && { generationTimeMs: pipelineResult.generationTimeMs }),
-                });
-              }}
-              className="shrink-0 border-border text-muted-foreground hover:text-foreground"
-            >
-              {saveInProgress ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-              Save
-            </Button>
-            {saveStatus === "saved" && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <Check className="h-3.5 w-3.5" /> Saved to Recent
-              </span>
-            )}
-            {saveStatus === "error" && (
-              <span className="text-xs text-destructive" title={saveErrorMessage ?? undefined}>
-                {saveErrorMessage ?? "Save failed"}
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                const current = editing;
-                const wasSample = sampleResult != null;
-                clearResult();
-                setSampleOutput(null);
-                setSampleResult(null);
-                setEditing(null);
-                setCurrentHistoryId(null);
-                currentHistoryIdRef.current = null;
-                if (current && !wasSample && current.title !== SAMPLE_OUTPUT.title) {
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={saveInProgress}
+                onClick={async () => {
+                  if (!editing) return;
                   const currentKw = keywords[0]?.trim();
                   const genKw = generationInput.keywords[0]?.trim();
                   const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
-                  const generationTimeMs = pipelineResult?.generationTimeMs;
-                  fetch("/api/blog/history", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      ...current,
-                      focusKeyword,
-                      ...(typeof generationTimeMs === "number" && { generationTimeMs }),
-                    }),
-                    credentials: "include",
-                  }).catch(() => {});
-                }
-              }}
-              className="shrink-0 border-border text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Start over
-            </Button>
-          </>
+                  await saveToHistory({
+                    ...editing,
+                    focusKeyword,
+                    ...(typeof pipelineResult?.generationTimeMs === "number" && { generationTimeMs: pipelineResult.generationTimeMs }),
+                  });
+                }}
+                className="shrink-0 border-border text-muted-foreground hover:text-foreground"
+              >
+                {saveInProgress ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+                Save
+              </Button>
+              {saveStatus === "saved" && (
+                <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <Check className="h-3.5 w-3.5" /> Saved to Recent
+                </span>
+              )}
+              {saveStatus === "error" && (
+                <span className="text-xs text-destructive" title={saveErrorMessage ?? undefined}>
+                  {saveErrorMessage ?? "Save failed"}
+                </span>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const current = editing;
+                  const wasSample = sampleResult != null;
+                  clearResult();
+                  setSampleOutput(null);
+                  setSampleResult(null);
+                  setEditing(null);
+                  setCurrentHistoryId(null);
+                  currentHistoryIdRef.current = null;
+                  if (current && !wasSample && current.title !== SAMPLE_OUTPUT.title) {
+                    const currentKw = keywords[0]?.trim();
+                    const genKw = generationInput.keywords[0]?.trim();
+                    const focusKeyword = (currentKw && currentKw.length > 0) ? currentKw : (genKw && genKw.length > 0 ? genKw : undefined);
+                    const generationTimeMs = pipelineResult?.generationTimeMs;
+                    fetch("/api/blog/history", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        ...current,
+                        focusKeyword,
+                        ...(typeof generationTimeMs === "number" && { generationTimeMs }),
+                      }),
+                      credentials: "include",
+                    }).catch(() => { });
+                  }
+                }}
+                className="shrink-0 border-border text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="mr-1.5 h-4 w-4" />
+                Start over
+              </Button>
+            </>
           ) : inStepMode && displayStep >= 1 ? (
             <Button
               type="button"
@@ -1644,11 +1733,10 @@ export default function BlogMakerPage() {
         <div
           id="generation-error-banner"
           role="alert"
-          className={`flex items-start justify-between gap-4 rounded-2xl px-5 py-4 text-sm ${
-            status.type === "success"
-              ? "bg-emerald-50/90 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
-              : "bg-red-50/90 text-red-800 dark:bg-red-950/50 dark:text-red-200"
-          }`}
+          className={`flex items-start justify-between gap-4 rounded-2xl px-5 py-4 text-sm ${status.type === "success"
+            ? "bg-emerald-50/90 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200"
+            : "bg-red-50/90 text-red-800 dark:bg-red-950/50 dark:text-red-200"
+            }`}
         >
           <div className="min-w-0 flex-1">
             <p>
@@ -1733,11 +1821,10 @@ export default function BlogMakerPage() {
       {!generated ? (
         <form
           onSubmit={handleGenerate}
-          className={`relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${
-            (generating && phase !== "reviewing") || (demoRunning && ["research", "fetch", "brief", "draft", "validate"].includes(demoStep))
-              ? "h-[420px]"
-              : ""
-          }`}
+          className={`relative rounded-2xl border border-border bg-card shadow-sm overflow-y-auto ${(generating && phase !== "reviewing") || (demoRunning && ["research", "fetch", "brief", "draft", "validate"].includes(demoStep))
+            ? "h-[420px]"
+            : ""
+            }`}
         >
           <GenerationLoadingOverlay
             visible={(generating && phase !== "reviewing") || (demoRunning && ["research", "fetch", "brief", "draft", "validate"].includes(demoStep))}
@@ -1755,7 +1842,7 @@ export default function BlogMakerPage() {
           <div className="space-y-0">
             {/* Step mode: select competitors — 3x3 grid, improved card layout and UX */}
             {showStep1Content && (
-              <section className="flex min-h-0 max-h-[100dvh] flex-col px-5 py-6 sm:px-8 sm:py-10">
+              <section className="flex min-h-0 max-h-[100dvh] flex-col px-5 pt-6 pb-10 sm:px-8 sm:pt-10 sm:pb-16">
                 <div className="mx-auto flex w-full max-w-5xl flex-1 min-h-0 flex-col">
                   {/* Header */}
                   <header className="shrink-0 mb-8">
@@ -1785,7 +1872,7 @@ export default function BlogMakerPage() {
                       </button>
                     </div>
                     <p className="mt-2.5 text-[15px] text-muted-foreground leading-relaxed whitespace-nowrap overflow-x-auto">
-                      Pick up to 3 sources. We&apos;ll use them to build your outline and draft. Up to 1 can be a custom URL.
+                      Pick at least 3 sources (up to 4). We&apos;ll use them to build your outline and draft. 1 of them can be a custom URL.
                     </p>
                   </header>
 
@@ -1823,63 +1910,61 @@ export default function BlogMakerPage() {
                     </div>
                   </div>
 
-                  {/* Grid: 3x3, equal-height cards; pt avoids first row being clipped by scroll */}
-                  <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pt-3 pb-4 content-start">
+                  {/* Grid: 3x3, equal-height cards; page scroll (no inner scroll) */}
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 pt-3 pb-4 content-start">
                     {((demoChunkOutputs.researchSerp ?? serpForStep1)!.results).slice(0, 9).map((item: ResearchSerpItem) => {
-                        const selected = selectedSerpUrls.includes(item.url);
-                        const hasValidCustom = (() => {
-                          const t = customCompetitorUrl.trim();
-                          if (!t) return false;
-                          try {
-                            const u = new URL(t);
-                            return u.protocol === "http:" || u.protocol === "https:";
-                          } catch {
-                            return false;
-                          }
-                        })();
-                        const serpMax = hasValidCustom ? 2 : 3;
-                        const atMax = selectedSerpUrls.length >= serpMax && !selected;
-                        const selectionIndex = selected ? selectedSerpUrls.indexOf(item.url) + 1 : 0;
-                        let domain = "";
+                      const selected = selectedSerpUrls.includes(item.url);
+                      const hasValidCustom = (() => {
+                        const t = customCompetitorUrl.trim();
+                        if (!t) return false;
                         try {
-                          domain = new URL(item.url).hostname;
+                          const u = new URL(t);
+                          return u.protocol === "http:" || u.protocol === "https:";
                         } catch {
-                          domain = item.url;
+                          return false;
                         }
-                        const toggleSelection = () => {
-                          if (atMax) return;
-                          setSelectedSerpUrls((prev) =>
-                            selected ? prev.filter((u) => u !== item.url) : prev.length >= serpMax ? prev : [...prev, item.url]
-                          );
-                        };
-                        return (
-                          <li
-                            key={item.url}
-                            className={`group relative flex h-full min-h-[140px] flex-col rounded-xl border-2 text-left select-none ${
-                              atMax ? "cursor-not-allowed border-border/30 bg-muted/10 opacity-60" : "cursor-pointer border-border/40 bg-card"
+                      })();
+                      const serpMax = hasValidCustom ? 3 : 4;
+                      const atMax = selectedSerpUrls.length >= serpMax && !selected;
+                      const selectionIndex = selected ? selectedSerpUrls.indexOf(item.url) + 1 : 0;
+                      let domain = "";
+                      try {
+                        domain = new URL(item.url).hostname;
+                      } catch {
+                        domain = item.url;
+                      }
+                      const toggleSelection = () => {
+                        if (atMax) return;
+                        setSelectedSerpUrls((prev) =>
+                          selected ? prev.filter((u) => u !== item.url) : prev.length >= serpMax ? prev : [...prev, item.url]
+                        );
+                      };
+                      return (
+                        <li
+                          key={item.url}
+                          className={`group relative flex h-full min-h-[140px] flex-col rounded-xl border-2 text-left select-none ${atMax ? "cursor-not-allowed border-border/30 bg-muted/10 opacity-60" : "cursor-pointer border-border/40 bg-card"
                             } ${selected ? "border-orange-500 bg-orange-500/5 shadow-md ring-2 ring-orange-500/20" : ""}`}
+                        >
+                          <button
+                            type="button"
+                            tabIndex={atMax ? -1 : 0}
+                            aria-pressed={selected}
+                            disabled={atMax}
+                            title={atMax ? "Maximum 4 selected. Deselect one to change." : selected ? "Click to deselect" : "Click to select"}
+                            onClick={toggleSelection}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                toggleSelection();
+                              }
+                            }}
+                            className="flex min-h-0 flex-1 flex-col rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           >
-                            <button
-                              type="button"
-                              tabIndex={atMax ? -1 : 0}
-                              aria-pressed={selected}
-                              disabled={atMax}
-                              title={atMax ? "Maximum 3 selected. Deselect one to change." : selected ? "Click to deselect" : "Click to select"}
-                              onClick={toggleSelection}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter" || e.key === " ") {
-                                  e.preventDefault();
-                                  toggleSelection();
-                                }
-                              }}
-                              className="flex min-h-0 flex-1 flex-col rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            >
                             {/* Top row: position + selection check */}
                             <div className="flex items-start justify-between gap-2 p-3 pb-1 sm:p-4 sm:pb-2">
                               <span
-                                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums transition-colors ${
-                                  selected ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"
-                                }`}
+                                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold tabular-nums transition-colors ${selected ? "bg-orange-500 text-white" : "bg-muted text-muted-foreground"
+                                  }`}
                               >
                                 {selected ? selectionIndex : item.position}
                               </span>
@@ -1896,54 +1981,199 @@ export default function BlogMakerPage() {
                                 {item.title || "Untitled"}
                               </p>
                             </div>
-                            </button>
+                          </button>
 
-                            {/* Bottom: domain + open link as badges (click opens URL only, does not toggle card) */}
-                            <div className="flex flex-wrap items-center gap-2 px-3 pb-3 sm:px-4 sm:pb-4">
-                              {domain && (
-                                <a
-                                  href={item.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  title={item.url}
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] sm:text-xs font-medium text-emerald-700 dark:text-emerald-400/90 truncate max-w-full"
-                                >
-                                  {domain}
-                                </a>
-                              )}
+                          {/* Bottom: domain + open link as badges (click opens URL only, does not toggle card) */}
+                          <div className="flex flex-wrap items-center gap-2 px-3 pb-3 sm:px-4 sm:pb-4">
+                            {domain && (
                               <a
                                 href={item.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={`Open: ${item.url}`}
+                                title={item.url}
                                 onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1 text-[11px] sm:text-xs font-medium text-muted-foreground shrink-0"
+                                className="inline-flex items-center rounded-md bg-emerald-500/10 px-2 py-1 text-[11px] sm:text-xs font-medium text-emerald-700 dark:text-emerald-400/90 truncate max-w-full"
                               >
-                                Open
-                                <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                                {domain}
                               </a>
-                            </div>
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              disabled={atMax}
-                              onChange={() => {
-                                setSelectedSerpUrls((prev) =>
-                                  selected ? prev.filter((u) => u !== item.url) : prev.length >= serpMax ? prev : [...prev, item.url]
-                                );
-                              }}
+                            )}
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={`Open: ${item.url}`}
                               onClick={(e) => e.stopPropagation()}
-                              className="sr-only"
-                              aria-label={selected ? `Deselect ${item.title || item.url}` : `Select ${item.title || item.url}`}
-                            />
-                          </li>
-                        );
+                              className="inline-flex items-center gap-1 rounded-md bg-muted/60 px-2 py-1 text-[11px] sm:text-xs font-medium text-muted-foreground shrink-0"
+                            >
+                              Open
+                              <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                            </a>
+                          </div>
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            disabled={atMax}
+                            onChange={() => {
+                              setSelectedSerpUrls((prev) =>
+                                selected ? prev.filter((u) => u !== item.url) : prev.length >= serpMax ? prev : [...prev, item.url]
+                              );
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="sr-only"
+                            aria-label={selected ? `Deselect ${item.title || item.url}` : `Select ${item.title || item.url}`}
+                          />
+                        </li>
+                      );
                     })}
                   </ul>
 
+                  {/* Research insights: PAA, SERP features, Reddit (when available) */}
+                  {(() => {
+                    const serp = (demoChunkOutputs.researchSerp ?? serpForStep1) as (ResearchSerpResult & { paaItems?: PaaItemForUI[]; intentValidation?: { declaredIntent?: string; detectedIntent?: string; warning?: string } }) | null | undefined;
+                    const research = chunkOutputs.research ?? demoChunkOutputs.research;
+                    const paaItems = (serp?.paaItems ?? research?.paaItems ?? []) as PaaItemForUI[];
+                    const paa = serp?.paaQuestions ?? research?.paaQuestions ?? [];
+                    const features = serp?.serpFeatures ?? research?.serpFeatures;
+                    const intentValidation = serp?.intentValidation;
+                    const redditThreads = serp?.redditThreads ?? research?.redditThreads ?? [];
+                    const redditQuotes = research?.redditQuotes ?? [];
+                    const hasPaa = paaItems.length > 0 || paa.length > 0;
+                    const hasFeatures = features && (features.hasKnowledgeGraph || features.hasAnswerBox || features.hasFeaturedSnippet || features.hasVideoCarousel || features.hasTopStories || (features.relatedSearches?.length ?? 0) > 0);
+                    const hasReddit = redditThreads.length > 0 || redditQuotes.length > 0;
+                    if (!hasPaa && !hasFeatures && !hasReddit) return null;
+                    return (
+                      <div className="shrink-0 mt-20 pt-8 border-t border-border/40">
+                        <Tabs defaultValue={hasPaa ? "paa" : hasFeatures ? "features" : "reddit"} className="rounded-xl border border-border/60 bg-muted/20 overflow-hidden">
+                          <TabsList className="grid w-full grid-cols-3 h-auto rounded-none border-b border-border/40 bg-transparent p-0">
+                            <TabsTrigger value="paa" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
+                              People Also Ask
+                            </TabsTrigger>
+                            <TabsTrigger value="features" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
+                              SERP Features
+                            </TabsTrigger>
+                            <TabsTrigger value="reddit" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
+                              Reddit & Community
+                            </TabsTrigger>
+                          </TabsList>
+                          <TabsContent value="paa" className="p-4 pt-3 space-y-3">
+                            {hasPaa ? (
+                              <ul className="space-y-3">
+                                {paaItems.length > 0
+                                  ? paaItems.slice(0, 8).map((item, i) => (
+                                      <li key={i}>
+                                        <div className="rounded-lg border border-border/60 bg-background px-3 py-2.5 hover:border-orange-400/70 hover:bg-orange-50/40 dark:hover:bg-orange-500/5 transition-colors">
+                                          <p className="text-[13px] font-medium text-foreground">{item.question}</p>
+                                          {item.snippet && (
+                                            <p className="mt-1 text-[12px] text-muted-foreground leading-snug line-clamp-3">
+                                              {item.snippet}
+                                            </p>
+                                          )}
+                                          {item.link && (
+                                            <a
+                                              href={item.link}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-orange-600 dark:text-orange-400 hover:underline"
+                                            >
+                                              {item.title || "Source"}
+                                              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+                                            </a>
+                                          )}
+                                        </div>
+                                      </li>
+                                    ))
+                                  : paa.slice(0, 8).map((q, i) => (
+                                      <li key={i}>
+                                        <div className="rounded-lg border border-dashed border-orange-300/70 bg-background px-3 py-2.5">
+                                          <p className="text-[13px] font-medium text-foreground">{q}</p>
+                                        </div>
+                                      </li>
+                                  ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No People Also Ask questions found for this keyword.</p>
+                            )}
+                          </TabsContent>
+                          <TabsContent value="features" className="p-4 pt-3 space-y-4">
+                            {hasFeatures ? (
+                              <>
+                                <div className="flex flex-wrap gap-2">
+                                  {features!.hasKnowledgeGraph && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">Knowledge panel</span>}
+                                  {features!.hasAnswerBox && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">Answer box</span>}
+                                  {features!.hasFeaturedSnippet && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">Featured snippet</span>}
+                                  {features!.hasVideoCarousel && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">Videos</span>}
+                                  {features!.hasTopStories && <span className="rounded-md bg-muted px-2 py-1 text-xs font-medium text-foreground">Top stories</span>}
+                                </div>
+                                {intentValidation?.warning && (
+                                  <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">{intentValidation.warning}</p>
+                                )}
+                                {(features!.relatedSearches?.length ?? 0) > 0 && (
+                                  <div className="mt-2">
+                                    <p className="text-[11px] font-medium text-muted-foreground mb-1">Related searches</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {(features!.relatedSearches ?? []).slice(0, 6).map((s, i) => (
+                                        <span key={i} className="rounded bg-muted/60 px-2 py-0.5 text-[12px] text-foreground/80">{s}</span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No significant SERP features found for this keyword.</p>
+                            )}
+                          </TabsContent>
+                          <TabsContent value="reddit" className="p-4 pt-3 space-y-4">
+                            {hasReddit ? (
+                              <>
+                                {redditThreads.length > 0 && (
+                                  <ul className="space-y-2 mb-2">
+                                    {redditThreads.slice(0, 5).map((t, i) => (
+                                      <li key={i}>
+                                        <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-background px-3 py-2.5 hover:border-orange-400/70 hover:bg-orange-50/40 dark:hover:bg-orange-500/5 transition-colors">
+                                          <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-orange-500 shrink-0" aria-hidden />
+                                          <div className="space-y-1">
+                                            <a
+                                              href={t.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="text-[13px] font-medium text-orange-600 dark:text-orange-400 hover:underline inline-flex items-center gap-1"
+                                            >
+                                              {t.title || t.url}
+                                              <ExternalLink className="h-3 w-3 shrink-0" aria-hidden />
+                                            </a>
+                                            {t.subreddit && (
+                                              <p className="text-[11px] text-muted-foreground">
+                                                {t.subreddit}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                                {redditQuotes.length > 0 && (
+                                  <div>
+                                    <p className="text-[11px] font-medium text-muted-foreground mb-1">Quotes used in draft</p>
+                                    <ul className="space-y-1">
+                                      {redditQuotes.slice(0, 5).map((q, i) => (
+                                        <li key={i} className="text-[12px] text-foreground/80 italic pl-2 border-l-2 border-muted">"{q}"</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">No relevant Reddit or community discussions found for this keyword.</p>
+                            )}
+                          </TabsContent>
+                        </Tabs>
+                      </div>
+                    );
+                  })()}
+
                   {/* Footer: sticky feel with clear CTA */}
-                  <div className="shrink-0 flex flex-col gap-3 pt-6 mt-2">
+                  <div className="shrink-0 flex flex-col gap-3 pt-6 pb-10 mt-2">
                     {(() => {
                       const isValidCustom = (() => {
                         const t = customCompetitorUrl.trim();
@@ -1959,12 +2189,12 @@ export default function BlogMakerPage() {
                       const urlsToFetch = isValidCustom ? [...selectedSerpUrls, customCompetitorUrl.trim()] : selectedSerpUrls;
                       return (
                         <>
-                          {totalSelected === 0 && (
+                          {totalSelected < 3 && (
                             <p className="text-[13px] text-muted-foreground">
-                              Select at least one source to continue.
+                              Select at least three sources to continue.
                             </p>
                           )}
-                          {totalSelected >= 3 && (
+                          {totalSelected >= 4 && (
                             <p className="text-[13px] text-muted-foreground">
                               Maximum reached. Deselect a card or clear the custom URL to change.
                             </p>
@@ -1972,56 +2202,56 @@ export default function BlogMakerPage() {
                           <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4">
                             <span className="text-[13px] text-muted-foreground">
                               <span className="font-semibold text-foreground tabular-nums">{totalSelected}</span>
-                              <span> / 3 selected</span>
+                              <span> / 4 selected</span>
                               {isValidCustom && <span className="ml-1 text-muted-foreground/70">(1 custom)</span>}
                             </span>
                             <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={saveInProgress}
-                          onClick={async () => {
-                            const title = keywords.length ? `${keywords.join(", ")} (in progress)` : "Draft (in progress)";
-                            await saveToHistory({
-                              title,
-                              metaDescription: "",
-                              outline: [],
-                              content: "",
-                              focusKeyword: keywords[0]?.trim() || undefined,
-                            });
-                          }}
-                          className="h-11 rounded-full px-8 text-[15px] font-medium border-border"
-                        >
-                          {saveInProgress ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
-                          Save
-                        </Button>
-                        {saveStatus === "error" && (
-                          <span className="text-xs text-destructive" title={saveErrorMessage ?? undefined}>
-                            {saveErrorMessage ?? "Save failed"}
-                          </span>
-                        )}
-                        <Button
-                          type="button"
-                          disabled={totalSelected === 0}
-                          onClick={() => {
-                            if (demoRunning && demoChunkOutputs.researchSerp) {
-                              setDemoStep("fetch");
-                              setDemoStartedAt(Date.now());
-                              setDemoElapsedTick(0);
-                              return;
-                            }
-                            setStepView(null);
-                            if (jobId && urlsToFetch.length >= 1 && urlsToFetch.length <= 3) {
-                              startResearchFetch(jobId, urlsToFetch);
-                            }
-                          }}
-                          className="w-full sm:w-auto h-11 rounded-full bg-foreground px-8 text-[15px] font-medium text-background shadow-sm hover:bg-foreground/90 hover:shadow transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100"
-                        >
-                          {totalSelected === 0 ? "Select at least one" : "Continue"}
-                        </Button>
-                      </div>
-                    </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={saveInProgress}
+                                onClick={async () => {
+                                  const title = keywords.length ? `${keywords.join(", ")} (in progress)` : "Draft (in progress)";
+                                  await saveToHistory({
+                                    title,
+                                    metaDescription: "",
+                                    outline: [],
+                                    content: "",
+                                    focusKeyword: keywords[0]?.trim() || undefined,
+                                  });
+                                }}
+                                className="h-11 rounded-full px-8 text-[15px] font-medium border-border"
+                              >
+                                {saveInProgress ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Save className="mr-1.5 h-4 w-4" />}
+                                Save
+                              </Button>
+                              {saveStatus === "error" && (
+                                <span className="text-xs text-destructive" title={saveErrorMessage ?? undefined}>
+                                  {saveErrorMessage ?? "Save failed"}
+                                </span>
+                              )}
+                              <Button
+                                type="button"
+                                disabled={totalSelected < 3}
+                                onClick={() => {
+                                  if (demoRunning && demoChunkOutputs.researchSerp) {
+                                    setDemoStep("fetch");
+                                    setDemoStartedAt(Date.now());
+                                    setDemoElapsedTick(0);
+                                    return;
+                                  }
+                                  setStepView(null);
+                                  if (jobId && urlsToFetch.length >= 3 && urlsToFetch.length <= 4) {
+                                    startResearchFetch(jobId, urlsToFetch);
+                                  }
+                                }}
+                                className="w-full sm:w-auto h-11 rounded-full bg-foreground px-8 text-[15px] font-medium text-background shadow-sm hover:bg-foreground/90 hover:shadow transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100"
+                              >
+                                {totalSelected < 3 ? "Select at least 3" : "Continue"}
+                              </Button>
+                            </div>
+                          </div>
                         </>
                       );
                     })()}
@@ -2034,7 +2264,7 @@ export default function BlogMakerPage() {
             {inStepMode && (chunkOutputs.brief || demoChunkOutputs.brief) && displayStep === 2 && (
               <section className="flex min-h-0 max-h-[100dvh] flex-col w-full bg-background">
                 <div className="flex w-full flex-1 min-h-0 flex-col px-8 sm:px-12 lg:px-20 xl:px-24">
-                  {/* Header — spacious, minimal, excellent */}
+                  {/* Header — spacious, minimal */}
                   <header className="shrink-0 pt-14 pb-10">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -2157,125 +2387,128 @@ export default function BlogMakerPage() {
                       </div>
                     ) : (
                       <div className="divide-y divide-border/50">
-                          {editedOutline.map((section, idx) => (
-                            <article
-                              key={`${section.originalIndex}-${idx}`}
-                              className={`group outline-section-row flex items-start gap-5 py-5 px-5 -mx-4 rounded-xl first:pt-5 border border-border/30
+                        {editedOutline.map((section, idx) => (
+                          <article
+                            key={`${section.originalIndex}-${idx}`}
+                            draggable
+                            onDragStart={() => handleSectionDragStart(idx)}
+                            onDragOver={(e) => handleSectionDragOver(e, idx)}
+                            onDragEnd={handleSectionDragEnd}
+                            className={`group outline-section-row flex items-start gap-5 py-5 px-5 -mx-4 rounded-xl first:pt-5 border border-border/30
                                 ${section.level === "h3" ? "ml-4 pl-5 border-l-2 border-l-orange-500/50" : ""}`}
-                            >
-                              <div className="flex shrink-0 items-center gap-2 pt-1">
-                                <span
-                                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums transition-colors duration-200
+                          >
+                            <div className="flex shrink-0 items-center gap-2 pt-1">
+                              <span
+                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums transition-colors duration-200
                                     ${section.level === "h2"
-                                      ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
-                                      : "bg-muted/50 text-muted-foreground"
-                                    }`}
-                                  aria-hidden
-                                >
-                                  {idx + 1}
-                                </span>
-                                <span className="cursor-grab active:cursor-grabbing p-2 rounded-lg text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/40 transition-colors duration-200 -ml-1" aria-hidden title="Drag to reorder">
-                                  <GripVertical className="h-4 w-4" />
-                                </span>
-                              </div>
+                                    ? "bg-orange-500/10 text-orange-600 dark:text-orange-400"
+                                    : "bg-muted/50 text-muted-foreground"
+                                  }`}
+                                aria-hidden
+                              >
+                                {idx + 1}
+                              </span>
+                              <span className="cursor-grab active:cursor-grabbing p-2 rounded-lg text-muted-foreground/40 hover:text-muted-foreground hover:bg-muted/40 transition-colors duration-200 -ml-1" aria-hidden title="Drag to reorder">
+                                <GripVertical className="h-4 w-4" />
+                              </span>
+                            </div>
 
-                              <div className="flex-1 min-w-0 flex flex-col gap-3.5">
-                                <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex-1 min-w-0 flex flex-col gap-3.5">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <Input
+                                  value={section.heading}
+                                  onChange={(e) =>
+                                    setEditedOutline((prev) =>
+                                      prev.map((s, i) => (i === idx ? { ...s, heading: e.target.value } : s))
+                                    )
+                                  }
+                                  className={`flex-1 min-w-[200px] h-10 rounded-lg border-0 bg-muted/30 px-4 text-[15px] font-medium placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 hover:bg-muted/35 transition-all duration-200 ${section.level === "h3" ? "text-[14px] font-normal" : ""
+                                    }`}
+                                  placeholder="Section heading"
+                                />
+                                <select
+                                  value={section.level}
+                                  onChange={(e) =>
+                                    setEditedOutline((prev) =>
+                                      prev.map((s, i) => (i === idx ? { ...s, level: e.target.value as "h2" | "h3" } : s))
+                                    )
+                                  }
+                                  className="h-10 w-[68px] rounded-lg border-0 bg-muted/30 px-3 text-[13px] font-medium text-muted-foreground focus:ring-2 focus:ring-orange-500/25 focus:outline-none hover:bg-muted/35 transition-all duration-200"
+                                  aria-label="Heading level"
+                                >
+                                  <option value="h2">H2</option>
+                                  <option value="h3">H3</option>
+                                </select>
+                                <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 min-w-[88px] hover:bg-muted/35 transition-colors duration-200">
                                   <Input
-                                    value={section.heading}
+                                    type="number"
+                                    min={0}
+                                    max={2000}
+                                    value={section.targetWords}
                                     onChange={(e) =>
                                       setEditedOutline((prev) =>
-                                        prev.map((s, i) => (i === idx ? { ...s, heading: e.target.value } : s))
+                                        prev.map((s, i) => (i === idx ? { ...s, targetWords: Number(e.target.value) || 0 } : s))
                                       )
                                     }
-                                    className={`flex-1 min-w-[200px] h-10 rounded-lg border-0 bg-muted/30 px-4 text-[15px] font-medium placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 hover:bg-muted/35 transition-all duration-200 ${
-                                      section.level === "h3" ? "text-[14px] font-normal" : ""
-                                    }`}
-                                    placeholder="Section heading"
+                                    className="h-7 w-14 border-0 bg-transparent p-0 text-center text-[13px] font-medium tabular-nums text-foreground focus-visible:ring-0"
                                   />
-                                  <select
-                                    value={section.level}
-                                    onChange={(e) =>
-                                      setEditedOutline((prev) =>
-                                        prev.map((s, i) => (i === idx ? { ...s, level: e.target.value as "h2" | "h3" } : s))
-                                      )
-                                    }
-                                    className="h-10 w-[68px] rounded-lg border-0 bg-muted/30 px-3 text-[13px] font-medium text-muted-foreground focus:ring-2 focus:ring-orange-500/25 focus:outline-none hover:bg-muted/35 transition-all duration-200"
-                                    aria-label="Heading level"
-                                  >
-                                    <option value="h2">H2</option>
-                                    <option value="h3">H3</option>
-                                  </select>
-                                  <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 min-w-[88px] hover:bg-muted/35 transition-colors duration-200">
-                                    <Input
-                                      type="number"
-                                      min={0}
-                                      max={2000}
-                                      value={section.targetWords}
-                                      onChange={(e) =>
-                                        setEditedOutline((prev) =>
-                                          prev.map((s, i) => (i === idx ? { ...s, targetWords: Number(e.target.value) || 0 } : s))
-                                        )
-                                      }
-                                      className="h-7 w-14 border-0 bg-transparent p-0 text-center text-[13px] font-medium tabular-nums text-foreground focus-visible:ring-0"
-                                    />
-                                    <span className="text-[12px] text-muted-foreground">words</span>
-                                  </div>
+                                  <span className="text-[12px] text-muted-foreground">words</span>
                                 </div>
-                                {section.topics?.length > 0 && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {section.topics.map((topic, ti) => (
-                                      <span key={ti} className="inline-flex rounded-full bg-muted/35 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
-                                        {topic}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
                               </div>
+                              {section.topics?.length > 0 && (
+                                <div className="flex flex-wrap gap-2">
+                                  {section.topics.map((topic, ti) => (
+                                    <span key={ti} className="inline-flex rounded-full bg-muted/35 px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
+                                      {topic}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
 
-                              <div className="flex shrink-0 items-center gap-1 pt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
-                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" disabled={idx === 0} aria-label="Move up"
-                                  onClick={() => setEditedOutline((prev) => {
-                                    if (idx <= 0) return prev;
-                                    const next = [...prev];
-                                    [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
-                                    return next;
-                                  })}
-                                >
-                                  <ChevronUp className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" disabled={idx === editedOutline.length - 1} aria-label="Move down"
-                                  onClick={() => setEditedOutline((prev) => {
-                                    if (idx >= prev.length - 1) return prev;
-                                    const next = [...prev];
-                                    [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
-                                    return next;
-                                  })}
-                                >
-                                  <ChevronDown className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-500/10" aria-label="Remove section"
-                                  onClick={() => setEditedOutline((prev) => prev.filter((_, i) => i !== idx))}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </article>
-                          ))}
-                          <div className="pt-4">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const nextId = -1 - editedOutline.filter((e) => e.originalIndex < 0).length;
-                                setEditedOutline((prev) => [...prev, { heading: "New section", level: "h2" as const, targetWords: 150, topics: [], reason: "", originalIndex: nextId }]);
-                              }}
-                              className="outline-add-btn flex w-full min-h-[80px] items-center justify-center gap-2.5 py-5 px-5 -mx-4 rounded-xl border border-dashed border-border/50 bg-muted/20 text-[15px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-orange-500/40 transition-all duration-200"
-                            >
-                              <Plus className="h-5 w-5" />
-                              Add section
-                            </button>
-                          </div>
+                            <div className="flex shrink-0 items-center gap-1 pt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" disabled={idx === 0} aria-label="Move up"
+                                onClick={() => setEditedOutline((prev) => {
+                                  if (idx <= 0) return prev;
+                                  const next = [...prev];
+                                  [next[idx - 1], next[idx]] = [next[idx], next[idx - 1]];
+                                  return next;
+                                })}
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" disabled={idx === editedOutline.length - 1} aria-label="Move down"
+                                onClick={() => setEditedOutline((prev) => {
+                                  if (idx >= prev.length - 1) return prev;
+                                  const next = [...prev];
+                                  [next[idx], next[idx + 1]] = [next[idx + 1], next[idx]];
+                                  return next;
+                                })}
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-muted-foreground hover:text-red-600 hover:bg-red-500/10" aria-label="Remove section"
+                                onClick={() => setEditedOutline((prev) => prev.filter((_, i) => i !== idx))}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </article>
+                        ))}
+                        <div className="pt-4">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const nextId = -1 - editedOutline.filter((e) => e.originalIndex < 0).length;
+                              setEditedOutline((prev) => [...prev, { heading: "New section", level: "h2" as const, targetWords: 150, topics: [], reason: "", originalIndex: nextId }]);
+                            }}
+                            className="outline-add-btn flex w-full min-h-[80px] items-center justify-center gap-2.5 py-5 px-5 -mx-4 rounded-xl border border-dashed border-border/50 bg-muted/20 text-[15px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 hover:border-orange-500/40 transition-all duration-200"
+                          >
+                            <Plus className="h-5 w-5" />
+                            Add section
+                          </button>
                         </div>
+                      </div>
                     )}
                   </div>
 
@@ -2374,12 +2607,12 @@ export default function BlogMakerPage() {
                           });
                           const addedSections: BriefOverridesForDraft["addedSections"] = added.length
                             ? added.map((e) => ({
-                                heading: e.heading,
-                                level: e.level,
-                                targetWords: e.targetWords,
-                                topics: e.topics,
-                                geoNote: e.geoNote,
-                              }))
+                              heading: e.heading,
+                              level: e.level,
+                              targetWords: e.targetWords,
+                              topics: e.topics,
+                              geoNote: e.geoNote,
+                            }))
                             : undefined;
                           startDraft(jobId, {
                             sections,
@@ -2398,170 +2631,218 @@ export default function BlogMakerPage() {
               </section>
             )}
 
-            {/* Keywords, Search intent, Word count, Draft model — single flat section (hidden when reviewing or demo review) */}
+            {/* Step 1 — Keywords, Intent, Model */}
             {showInputSections && (
-            <section className="p-8 sm:p-10 space-y-10">
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-foreground">Primary keyword</h3>
-                <p className="text-sm text-muted-foreground">Required. Add up to 2 secondary keywords in the next field.</p>
-                <TagInput
-                  tags={keywords}
-                  onTagsChange={(tags) => setKeywords(tags.slice(0, 3))}
-                  placeholder="Primary keyword, then add up to 2 secondary (press Enter)"
-                  maxTags={3}
-                  disabled={generating || demoRunning}
-                  className="min-h-11 rounded-xl border border-border bg-background px-4 py-2.5 text-sm"
-                />
-              </div>
+              <section className="divide-y divide-border/50">
 
-              <div className="space-y-3 pt-2">
-                <h3 className="text-sm font-medium text-foreground">Search intent</h3>
-                <p className="text-sm text-muted-foreground">Pick 1 or 2. Word count is set automatically from your selection.</p>
-                <div className="flex flex-wrap gap-2">
-                  {BASE_INTENTS.map((opt) => {
-                    const selected = selectedIntents.includes(opt.value);
-                    const atMax = selectedIntents.length >= 2 && !selected;
-                    const toggle = () => {
-                      if (selected) {
-                        setSelectedIntents((prev) => prev.filter((i) => i !== opt.value));
-                      } else if (selectedIntents.length < 2) {
-                        setSelectedIntents((prev) => [...prev, opt.value].sort());
-                      }
-                    };
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={toggle}
-                        disabled={generating || demoRunning || atMax}
-                        aria-pressed={selected}
-                        aria-label={atMax ? "Maximum 2 intents selected" : selected ? `Deselect ${opt.label}` : `Select ${opt.label}`}
-                        className={`inline-flex items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                          selected
-                            ? "bg-orange-600 text-white dark:bg-orange-500"
-                            : atMax
-                              ? "cursor-not-allowed bg-muted/40 text-muted-foreground opacity-60"
-                              : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                        } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
+                {/* Primary + Secondary keywords — combined */}
+                <div className="p-8 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-0 sm:divide-x sm:divide-border/50">
+
+                  {/* Primary keyword */}
+                  <div className="space-y-2.5 sm:pr-8">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-semibold text-foreground tracking-tight">Primary keyword</label>
+                      <span className="text-[11px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 px-2 py-0.5 rounded-full">Required</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">The main topic your article will target and rank for.</p>
+                    <Input
+                      value={primaryKeyword}
+                      onChange={(e) => setPrimaryKeyword(e.target.value)}
+                      placeholder="e.g. medical spa SEO"
+                      disabled={generating || demoRunning}
+                      className="h-11 w-full rounded-xl border border-border bg-background/60 px-4 text-sm placeholder:text-muted-foreground/60 focus-visible:ring-orange-500/30 focus-visible:border-orange-400 transition-colors"
+                    />
+                  </div>
+
+                  {/* Secondary keywords */}
+                  <div className="space-y-2.5 sm:pl-8">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-semibold text-foreground tracking-tight">Secondary keywords</label>
+                      <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 px-2 py-0.5 rounded-full">
+                        {secondaryKeywords.length}/4
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Optional. Up to 4. Shapes headings in the research brief.</p>
+                    <TagInput
+                      tags={secondaryKeywords}
+                      onTagsChange={(tags) => setSecondaryKeywords(tags.slice(0, 4))}
+                      placeholder={secondaryKeywords.length < 4 ? "Type a keyword and press Enter" : ""}
+                      maxTags={4}
+                      disabled={generating || demoRunning}
+                      className="w-full rounded-xl border border-border bg-background/60 px-4 py-2 text-sm transition-colors focus-within:ring-2 focus-within:ring-orange-500/30 focus-within:border-orange-400"
+                    />
+                  </div>
+
                 </div>
-              </div>
 
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-foreground">Draft model</h3>
-                <p className="text-sm text-muted-foreground">Claude model used to write the article draft.</p>
-                <div className="flex flex-wrap gap-3">
-                  {(["sonnet-4.6", "opus-4.6"] as const).map((model) => (
-                    <label
-                      key={model}
-                      className={`inline-flex cursor-pointer items-center rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                        draftModel === model
-                          ? "bg-orange-600 text-white dark:bg-orange-500"
-                          : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
-                    >
-                      <input
-                        type="radio"
-                        name="draftModel"
-                        value={model}
-                        checked={draftModel === model}
-                        onChange={() => setDraftModel(model)}
-                        className="sr-only"
-                      />
-                      {model === "opus-4.6" ? "Opus 4.6" : "Sonnet 4.6"}
-                    </label>
-                  ))}
+                {/* Search intent + Draft model — combined */}
+                <div className="p-8 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-0 sm:divide-x sm:divide-border/50">
+
+                  {/* Search intent */}
+                  <div className="space-y-2.5 sm:pr-8">
+                    <div className="flex items-baseline justify-between">
+                      <label className="text-sm font-semibold text-foreground tracking-tight">Search intent</label>
+                      <span className="text-[11px] text-muted-foreground">Pick 1 or 2</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Word count is auto-calculated from your selection.</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {BASE_INTENTS.map((opt) => {
+                        const selected = selectedIntents.includes(opt.value);
+                        const atMax = selectedIntents.length >= 2 && !selected;
+                        const toggle = () => {
+                          if (selected) {
+                            setSelectedIntents((prev) => prev.filter((i) => i !== opt.value));
+                          } else if (selectedIntents.length < 2) {
+                            setSelectedIntents((prev) => [...prev, opt.value].sort());
+                          }
+                        };
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={toggle}
+                            disabled={generating || demoRunning || atMax}
+                            aria-pressed={selected}
+                            aria-label={atMax ? "Maximum 2 intents selected" : selected ? `Deselect ${opt.label}` : `Select ${opt.label}`}
+                            className={`inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-all duration-150 ${selected
+                              ? "bg-orange-600 text-white shadow-sm shadow-orange-500/25 dark:bg-orange-500"
+                              : atMax
+                                ? "cursor-not-allowed bg-muted/30 text-muted-foreground/50 opacity-60"
+                                : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                              } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
+                          >
+                            {selected && <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/70" />}
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Draft model */}
+                  <div className="space-y-2.5 sm:pl-8">
+                    <div className="flex items-baseline justify-between">
+                      <label className="text-sm font-semibold text-foreground tracking-tight">Draft model</label>
+                      <span className="text-[11px] text-muted-foreground">Claude</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">The Claude model used to write the article draft.</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {([
+                        { value: "opus-4.6", label: "Opus 4.6", badge: "Best quality" },
+                        { value: "sonnet-4.6", label: "Sonnet 4.6", badge: "Faster" },
+                      ] as const).map(({ value: model, label, badge }) => (
+                        <label
+                          key={model}
+                          className={`inline-flex h-9 cursor-pointer items-center gap-2 rounded-full px-4 text-sm font-medium transition-all duration-150 ${draftModel === model
+                            ? "bg-orange-600 text-white shadow-sm shadow-orange-500/25 dark:bg-orange-500"
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
+                        >
+                          <input
+                            type="radio"
+                            name="draftModel"
+                            value={model}
+                            checked={draftModel === model}
+                            onChange={() => setDraftModel(model)}
+                            className="sr-only"
+                          />
+                          {draftModel === model && <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/70" />}
+                          <span className="leading-none">{label}</span>
+                          <span className={`text-[10px] leading-none font-semibold tracking-wide px-1.5 py-1 rounded-full ${draftModel === model ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"}`}>
+                            {badge}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
                 </div>
-              </div>
 
-            </section>
+              </section>
             )}
 
             {/* Submit: Run demo, Generate. Sticky when refining demo so Refine dropdown stays visible. */}
             {showInputSections && (
-            <section className={`flex flex-wrap items-center justify-between gap-6 border-t border-border/50 p-6 sm:p-8 ${hasDemoChunks ? "sticky bottom-0 z-10 bg-card" : ""}`}>
-              {inStepMode && displayStep === 0 && (
-                <div className="w-full mb-2">
+              <section className={`flex flex-wrap items-center justify-between gap-6 border-t border-border/50 p-6 sm:p-8 ${hasDemoChunks ? "sticky bottom-0 z-10 bg-card" : ""}`}>
+                {inStepMode && displayStep === 0 && (
+                  <div className="w-full mb-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-[13px] text-muted-foreground hover:text-foreground"
+                      onClick={() => setStepView(1)}
+                    >
+                      Continue to Select competitors →
+                    </Button>
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-3">
                   <Button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="text-[13px] text-muted-foreground hover:text-foreground"
-                    onClick={() => setStepView(1)}
+                    variant="outline"
+                    disabled={generating || demoRunning}
+                    onClick={() => {
+                      setStatus({ type: null, message: "" });
+                      clearResult();
+                      setSampleResult(null);
+                      setSampleOutput(null);
+                      setEditing(null);
+                      setPrimaryKeyword(SAMPLE_INPUT.keywords[0] ?? "");
+                      setSecondaryKeywords(SAMPLE_INPUT.keywords.slice(1));
+                      setSelectedIntents(["informational"]);
+                      setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
+                      setDraftModel(SAMPLE_INPUT.draftModel ?? "opus-4.6");
+                      setDemoRunning(true);
+                      setDemoStep("research");
+                      setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
+                      setDemoProgress(0);
+                      setDemoStartedAt(Date.now());
+                      setDemoElapsedTick(0);
+                      setStepView(null);
+                    }}
+                    className="h-12 shrink-0 rounded-full border-2 border-border px-8 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
                   >
-                    Continue to Select competitors →
+                    {demoRunning ? "Running demo…" : "Run demo (25s)"}
                   </Button>
+                  <span className="text-sm text-muted-foreground">Refine:</span>
+                  <select
+                    value={jumpToStage}
+                    onChange={(e) => {
+                      const v = e.target.value as "" | "select" | "outline" | "result";
+                      if (v) {
+                        jumpDemoTo(v);
+                        setJumpToStage("");
+                      }
+                    }}
+                    disabled={generating || demoRunning}
+                    className="h-12 min-w-[160px] cursor-pointer rounded-full border border-border bg-background px-4 pr-10 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Jump to stage"
+                  >
+                    <option value="">Jump to stage…</option>
+                    <option value="select">Select competitors</option>
+                    <option value="outline">Outline</option>
+                    <option value="result">Result</option>
+                  </select>
                 </div>
-              )}
-              <div className="flex flex-wrap items-center gap-3">
                 <Button
-                  type="button"
-                  variant="outline"
-                  disabled={generating || demoRunning}
-                  onClick={() => {
-                    setStatus({ type: null, message: "" });
-                    clearResult();
-                    setSampleResult(null);
-                    setSampleOutput(null);
-                    setEditing(null);
-                    setKeywords(SAMPLE_INPUT.keywords);
-                    setSelectedIntents(["informational"]);
-                    setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
-                    setDraftModel(SAMPLE_INPUT.draftModel ?? "sonnet-4.6");
-                    setDemoRunning(true);
-                    setDemoStep("research");
-                    setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
-                    setDemoProgress(0);
-                    setDemoStartedAt(Date.now());
-                    setDemoElapsedTick(0);
-                    setStepView(null);
-                  }}
-                  className="h-12 shrink-0 rounded-full border-2 border-border px-8 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
+                  type="submit"
+                  disabled={generating || demoRunning || !primaryKeyword.trim()}
+                  className="h-12 shrink-0 rounded-full bg-orange-600 px-8 text-base font-medium text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/25 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600 disabled:shadow-none"
                 >
-                  {demoRunning ? "Running demo…" : "Run demo (25s)"}
+                  {(generating || demoRunning) ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      Generate post
+                    </>
+                  )}
                 </Button>
-                <span className="text-sm text-muted-foreground">Refine:</span>
-                <select
-                  value={jumpToStage}
-                  onChange={(e) => {
-                    const v = e.target.value as "" | "select" | "outline" | "result";
-                    if (v) {
-                      jumpDemoTo(v);
-                      setJumpToStage("");
-                    }
-                  }}
-                  disabled={generating || demoRunning}
-                  className="h-10 min-w-[160px] cursor-pointer rounded-lg border border-border bg-background px-4 pr-10 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
-                  aria-label="Jump to stage"
-                >
-                  <option value="">Jump to stage…</option>
-                  <option value="select">Select competitors</option>
-                  <option value="outline">Outline</option>
-                  <option value="result">Result</option>
-                </select>
-              </div>
-              <Button
-                type="submit"
-                disabled={generating || demoRunning || keywords.length === 0}
-                className="h-12 shrink-0 rounded-full bg-orange-600 px-8 text-base font-medium text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/25 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600 disabled:shadow-none"
-              >
-                {(generating || demoRunning) ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Generate post
-                  </>
-                )}
-              </Button>
-            </section>
+              </section>
             )}
           </div>
         </form>
@@ -2599,13 +2880,12 @@ export default function BlogMakerPage() {
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                       <span
-                        className={`text-2xl font-bold tabular-nums ${
-                          seoAudit.publishable
-                            ? "text-emerald-600 dark:text-emerald-400"
-                            : seoAudit.score >= 50
-                              ? "text-amber-600 dark:text-amber-400"
-                              : "text-red-600 dark:text-red-400"
-                        }`}
+                        className={`text-2xl font-bold tabular-nums ${seoAudit.publishable
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : seoAudit.score >= 50
+                            ? "text-amber-600 dark:text-amber-400"
+                            : "text-red-600 dark:text-red-400"
+                          }`}
                       >
                         {seoAudit.score}%
                       </span>
@@ -2632,11 +2912,10 @@ export default function BlogMakerPage() {
                           key={f}
                           type="button"
                           onClick={() => setAuditListFilter(f)}
-                          className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                            auditListFilter === f
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${auditListFilter === f
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
                         >
                           {f === "all" ? "All" : f === "correct" ? "Correct" : "Issues"}
                         </button>
@@ -2644,87 +2923,86 @@ export default function BlogMakerPage() {
                     </div>
                   </div>
                   {(() => {
-                      const SEO_CATEGORY_ORDER = ["google", "rankmath", "editorial", "other"] as const;
-                      const SEO_CATEGORY_LABELS: Record<string, string> = {
-                        google: "Google",
-                        rankmath: "Rank Math",
-                        editorial: "Writing Quality",
-                        other: "Others",
-                      };
-                      const getCategory = (item: AuditItem): string =>
-                        item.source === "google" || item.source === "rankmath" || item.source === "editorial"
-                          ? item.source
-                          : "other";
-                      const filtered = [...seoAudit.items].filter((item) => {
-                        if (auditListFilter === "correct") return item.severity === "pass";
-                        if (auditListFilter === "issues") return item.severity === "warn" || item.severity === "fail";
-                        return true;
-                      });
-                      const byCategory = new Map<string, AuditItem[]>();
-                      for (const item of filtered) {
-                        const cat = getCategory(item);
-                        if (!byCategory.has(cat)) byCategory.set(cat, []);
-                        byCategory.get(cat)!.push(item);
-                      }
-                      return (
-                        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-5">
-                          {SEO_CATEGORY_ORDER.filter((cat) => (byCategory.get(cat)?.length ?? 0) > 0).map((cat) => (
-                            <div key={cat} className="space-y-1.5">
-                              <p className="sticky top-0 z-20 -mt-px bg-card py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                {SEO_CATEGORY_LABELS[cat]}
-                              </p>
-                              <ul className="space-y-3">
-                                {byCategory.get(cat)!.map((item, idx) => {
-                                  const Icon =
-                                    item.severity === "pass"
-                                      ? CheckCircle2
-                                      : item.severity === "warn"
-                                        ? AlertTriangle
-                                        : XCircle;
-                                  const iconClass =
-                                    item.severity === "pass"
-                                      ? "text-emerald-600 dark:text-emerald-400"
-                                      : item.severity === "warn"
-                                        ? "text-amber-600 dark:text-amber-400"
-                                        : "text-red-600 dark:text-red-400";
-                                  const isIssue = item.severity === "warn" || item.severity === "fail";
-                                  const isAllView = auditListFilter === "all";
-                                  const showCorrective = auditListFilter === "issues" && isIssue;
-                                  const allViewIssueOnly = isAllView && isIssue;
-                                  return (
-                                    <li
-                                      key={`${cat}-${item.id}-${idx}`}
-                                      className={`flex gap-3 rounded-xl px-3 py-2.5 ${
-                                        isIssue
-                                          ? "bg-amber-50/60 dark:bg-amber-950/20"
-                                          : "bg-muted/30 dark:bg-muted/20"
+                    const SEO_CATEGORY_ORDER = ["google", "rankmath", "editorial", "other"] as const;
+                    const SEO_CATEGORY_LABELS: Record<string, string> = {
+                      google: "Google",
+                      rankmath: "Rank Math",
+                      editorial: "Writing Quality",
+                      other: "Others",
+                    };
+                    const getCategory = (item: AuditItem): string =>
+                      item.source === "google" || item.source === "rankmath" || item.source === "editorial"
+                        ? item.source
+                        : "other";
+                    const filtered = [...seoAudit.items].filter((item) => {
+                      if (auditListFilter === "correct") return item.severity === "pass";
+                      if (auditListFilter === "issues") return item.severity === "warn" || item.severity === "fail";
+                      return true;
+                    });
+                    const byCategory = new Map<string, AuditItem[]>();
+                    for (const item of filtered) {
+                      const cat = getCategory(item);
+                      if (!byCategory.has(cat)) byCategory.set(cat, []);
+                      byCategory.get(cat)!.push(item);
+                    }
+                    return (
+                      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 pr-5">
+                        {SEO_CATEGORY_ORDER.filter((cat) => (byCategory.get(cat)?.length ?? 0) > 0).map((cat) => (
+                          <div key={cat} className="space-y-1.5">
+                            <p className="sticky top-0 z-20 -mt-px bg-card py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                              {SEO_CATEGORY_LABELS[cat]}
+                            </p>
+                            <ul className="space-y-3">
+                              {byCategory.get(cat)!.map((item, idx) => {
+                                const Icon =
+                                  item.severity === "pass"
+                                    ? CheckCircle2
+                                    : item.severity === "warn"
+                                      ? AlertTriangle
+                                      : XCircle;
+                                const iconClass =
+                                  item.severity === "pass"
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : item.severity === "warn"
+                                      ? "text-amber-600 dark:text-amber-400"
+                                      : "text-red-600 dark:text-red-400";
+                                const isIssue = item.severity === "warn" || item.severity === "fail";
+                                const isAllView = auditListFilter === "all";
+                                const showCorrective = auditListFilter === "issues" && isIssue;
+                                const allViewIssueOnly = isAllView && isIssue;
+                                return (
+                                  <li
+                                    key={`${cat}-${item.id}-${idx}`}
+                                    className={`flex gap-3 rounded-xl px-3 py-2.5 ${isIssue
+                                      ? "bg-amber-50/60 dark:bg-amber-950/20"
+                                      : "bg-muted/30 dark:bg-muted/20"
                                       }`}
-                                    >
-                                      <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconClass}`} />
-                                      <div className="min-w-0 flex-1">
-                                        <p className="text-xs font-semibold text-foreground">{item.label}</p>
-                                        {!allViewIssueOnly && (
-                                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{item.message}</p>
-                                        )}
-                                        {showCorrective && (item.guideline || item.message) && (
-                                          <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
-                                            <span className="font-medium text-amber-900 dark:text-amber-100">What to correct: </span>
-                                            {item.guideline ?? item.message}
-                                          </p>
-                                        )}
-                                        {!showCorrective && !isAllView && item.guideline && (
-                                          <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{item.guideline}</p>
-                                        )}
-                                      </div>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    })()}
+                                  >
+                                    <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${iconClass}`} />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-xs font-semibold text-foreground">{item.label}</p>
+                                      {!allViewIssueOnly && (
+                                        <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">{item.message}</p>
+                                      )}
+                                      {showCorrective && (item.guideline || item.message) && (
+                                        <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">
+                                          <span className="font-medium text-amber-900 dark:text-amber-100">What to correct: </span>
+                                          {item.guideline ?? item.message}
+                                        </p>
+                                      )}
+                                      {!showCorrective && !isAllView && item.guideline && (
+                                        <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground">{item.guideline}</p>
+                                      )}
+                                    </div>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -2741,11 +3019,10 @@ export default function BlogMakerPage() {
                           key={f}
                           type="button"
                           onClick={() => setQualityListFilter(f)}
-                          className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                            qualityListFilter === f
-                              ? "bg-background text-foreground shadow-sm"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${qualityListFilter === f
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                            }`}
                         >
                           {f === "all" ? "All" : f === "correct" ? "Correct" : "Issues"}
                         </button>
@@ -2756,62 +3033,60 @@ export default function BlogMakerPage() {
                     {pipelineResult.faqEnforcement && (qualityListFilter === "all" ||
                       (qualityListFilter === "correct" && pipelineResult.faqEnforcement.passed) ||
                       (qualityListFilter === "issues" && !pipelineResult.faqEnforcement.passed)) && (
-                      <div
-                        className={`flex gap-3 rounded-xl px-3 py-2.5 ${
-                          !pipelineResult.faqEnforcement.passed ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
-                        }`}
-                      >
-                        {pipelineResult.faqEnforcement.passed ? (
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-foreground">FAQ character limit (300)</p>
-                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                            {pipelineResult.faqEnforcement.passed ? "All answers within limit." : `${pipelineResult.faqEnforcement.violations.length} answer(s) truncated.`}
-                          </p>
-                          {qualityListFilter === "issues" && pipelineResult.faqEnforcement.violations.length > 0 && (
-                            <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
-                              {pipelineResult.faqEnforcement.violations.map((v, i) => (
-                                <li key={i}>{v.question?.slice(0, 50)}… ({v.charCount} chars)</li>
-                              ))}
-                            </ul>
+                        <div
+                          className={`flex gap-3 rounded-xl px-3 py-2.5 ${!pipelineResult.faqEnforcement.passed ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
+                            }`}
+                        >
+                          {pipelineResult.faqEnforcement.passed ? (
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                           )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-foreground">FAQ character limit (300)</p>
+                            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                              {pipelineResult.faqEnforcement.passed ? "All answers within limit." : `${pipelineResult.faqEnforcement.violations.length} answer(s) truncated.`}
+                            </p>
+                            {qualityListFilter === "issues" && pipelineResult.faqEnforcement.violations.length > 0 && (
+                              <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
+                                {pipelineResult.faqEnforcement.violations.map((v, i) => (
+                                  <li key={i}>{v.question?.slice(0, 50)}… ({v.charCount} chars)</li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     {pipelineResult.factCheck && (qualityListFilter === "all" ||
                       (qualityListFilter === "correct" && pipelineResult.factCheck.verified) ||
                       (qualityListFilter === "issues" && !pipelineResult.factCheck.verified)) && (
-                      <div
-                        className={`flex gap-3 rounded-xl px-3 py-2.5 ${
-                          !pipelineResult.factCheck.verified ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
-                        }`}
-                      >
-                        {pipelineResult.factCheck.verified ? (
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-                        ) : (
-                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold text-foreground">Fact check vs sources</p>
-                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                            {pipelineResult.factCheck.verified ? "Verified against sources." : `${pipelineResult.factCheck.hallucinations.length} potential hallucination(s).`}
-                          </p>
-                          {qualityListFilter === "issues" && pipelineResult.factCheck.hallucinations.length > 0 && (
-                            <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
-                              {pipelineResult.factCheck.hallucinations.map((h, i) => (
-                                <li key={i}>{h}</li>
-                              ))}
-                            </ul>
+                        <div
+                          className={`flex gap-3 rounded-xl px-3 py-2.5 ${!pipelineResult.factCheck.verified ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"
+                            }`}
+                        >
+                          {pipelineResult.factCheck.verified ? (
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                          ) : (
+                            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                           )}
-                          {qualityListFilter === "issues" && (pipelineResult.factCheck.skippedRhetorical?.length ?? 0) > 0 && (
-                            <p className="mt-1 text-[10px] text-muted-foreground">Skipped (rhetorical): {pipelineResult.factCheck.skippedRhetorical!.slice(0, 3).join(", ")}{pipelineResult.factCheck.skippedRhetorical!.length > 3 ? "…" : ""}</p>
-                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-semibold text-foreground">Fact check vs sources</p>
+                            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                              {pipelineResult.factCheck.verified ? "Verified against sources." : `${pipelineResult.factCheck.hallucinations.length} potential hallucination(s).`}
+                            </p>
+                            {qualityListFilter === "issues" && pipelineResult.factCheck.hallucinations.length > 0 && (
+                              <ul className="mt-1.5 space-y-0.5 text-[11px] text-muted-foreground list-disc list-inside">
+                                {pipelineResult.factCheck.hallucinations.map((h, i) => (
+                                  <li key={i}>{h}</li>
+                                ))}
+                              </ul>
+                            )}
+                            {qualityListFilter === "issues" && (pipelineResult.factCheck.skippedRhetorical?.length ?? 0) > 0 && (
+                              <p className="mt-1 text-[10px] text-muted-foreground">Skipped (rhetorical): {pipelineResult.factCheck.skippedRhetorical!.slice(0, 3).join(", ")}{pipelineResult.factCheck.skippedRhetorical!.length > 3 ? "…" : ""}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                     {pipelineResult.hallucinationFixes && pipelineResult.hallucinationFixes.length > 0 && (
                       <div className="flex gap-3 rounded-xl px-3 py-2.5 bg-emerald-50/60 dark:bg-emerald-950/20">
                         <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -2841,9 +3116,8 @@ export default function BlogMakerPage() {
               {/* E-E-A-T & Content Quality — Google quality rater guidelines */}
               {editing?.content && (
                 <div
-                  className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${
-                    eeatResult?.results || eeatError || eeatLoading ? "h-[440px]" : "h-[200px]"
-                  }`}
+                  className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${eeatResult?.results || eeatError || eeatLoading ? "h-[440px]" : "h-[200px]"
+                    }`}
                 >
                   <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
                     <h3 className="text-sm font-semibold text-foreground">E-E-A-T &amp; Content Quality</h3>
@@ -2855,11 +3129,10 @@ export default function BlogMakerPage() {
                             key={f}
                             type="button"
                             onClick={() => setEeatListFilter(f)}
-                            className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${
-                              eeatListFilter === f
-                                ? "bg-background text-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
+                            className={`flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors ${eeatListFilter === f
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                              }`}
                           >
                             {f === "all" ? "All" : f === "correct" ? "Correct" : "Issues"}
                           </button>
@@ -2892,6 +3165,26 @@ export default function BlogMakerPage() {
                     )}
                     {eeatResult?.results && (
                       <EeatResultsDisplay results={eeatResult.results} open={eeatListFilter === "issues"} filter={eeatListFilter} />
+                    )}
+                    {pipelineResult?.semanticSimilarity && (
+                      <div className={`mt-3 flex gap-3 rounded-xl px-3 py-2.5 ${pipelineResult.semanticSimilarity.isTooDerivative ? "bg-amber-50/60 dark:bg-amber-950/20" : "bg-muted/30 dark:bg-muted/20"}`}>
+                        {pipelineResult.semanticSimilarity.isTooDerivative ? (
+                          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                        ) : (
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold text-foreground">Semantic Similarity</p>
+                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                            Similarity to leading competitor is {Math.round(pipelineResult.semanticSimilarity.highestSimilarity * 100)}%.
+                          </p>
+                          {pipelineResult.semanticSimilarity.isTooDerivative && (
+                            <p className="mt-1 text-[10px] leading-snug text-amber-800 dark:text-amber-200">
+                              Warning: Content is highly derivative of <a href={pipelineResult.semanticSimilarity.mostSimilarUrl} target="_blank" rel="noreferrer" className="underline">this competitor</a>. Consider adding more unique insights.
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     )}
                     {!eeatResult && !eeatError && !eeatLoading && (
                       <p className="text-[11px] text-muted-foreground">Click &quot;Run audit&quot; to analyze this article against Google quality rater guidelines.</p>
@@ -2950,6 +3243,52 @@ export default function BlogMakerPage() {
                         <div className="rounded-lg bg-amber-50/60 px-3 py-2 dark:bg-amber-950/20">
                           <p className="text-[11px] font-medium text-amber-800 dark:text-amber-200">Outline drift (non-blocking)</p>
                           <p className="mt-0.5 text-[11px] text-muted-foreground">Expected H2(s) not in draft: {pipelineResult.outlineDrift.missing.join(", ")}</p>
+                        </div>
+                      )}
+
+                      {/* Competitor Content Diff */}
+                      {pipelineResult.contentDiff && (
+                        <div className="mt-4 border-t border-border/50 pt-3">
+                          <h4 className="text-[11px] font-semibold text-foreground">Competitor Content Diff</h4>
+                          <div className="mt-2 space-y-2">
+                            {pipelineResult.contentDiff.uniqueToUs.length > 0 && (
+                              <div className="rounded-lg bg-emerald-50/60 p-2 dark:bg-emerald-950/20">
+                                <p className="text-[10px] font-medium text-emerald-800 dark:text-emerald-300">Unique to your article +</p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground">{pipelineResult.contentDiff.uniqueToUs.join(", ")}</p>
+                              </div>
+                            )}
+                            {pipelineResult.contentDiff.coveredByCompetitorsOnly.length > 0 && (
+                              <div className="rounded-lg bg-red-50/60 p-2 dark:bg-red-950/20">
+                                <p className="text-[10px] font-medium text-red-800 dark:text-red-300">Missed (Competitors Only) -</p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground">{pipelineResult.contentDiff.coveredByCompetitorsOnly.join(", ")}</p>
+                              </div>
+                            )}
+                            {pipelineResult.contentDiff.coveredByUs.length > 0 && (
+                              <div className="rounded-lg bg-muted/40 p-2">
+                                <p className="text-[10px] font-medium text-muted-foreground">Overlap =</p>
+                                <p className="mt-0.5 text-[11px] text-muted-foreground line-clamp-2" title={pipelineResult.contentDiff.coveredByUs.join(", ")}>
+                                  {pipelineResult.contentDiff.coveredByUs.join(", ")}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Content Decay Risk */}
+                      {pipelineResult.contentDecayRisk && (
+                        <div className="mt-4 border-t border-border/50 pt-3">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-[11px] font-semibold text-foreground">Content Decay Risk</h4>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${pipelineResult.contentDecayRisk.decayRisk === "Low" ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200" :
+                              pipelineResult.contentDecayRisk.decayRisk === "Medium" ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200" :
+                                "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200"
+                              }`}>
+                              {pipelineResult.contentDecayRisk.decayRisk}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">{pipelineResult.contentDecayRisk.recommendation}</p>
+                          <p className="mt-1 text-[10px] font-medium text-muted-foreground">Priority: {pipelineResult.contentDecayRisk.refreshPriority}</p>
                         </div>
                       )}
                     </div>
@@ -3071,191 +3410,188 @@ export default function BlogMakerPage() {
             {/* Right: Content panel – absolute wrapper so row height = outline only; content box ends exactly where outline ends */}
             <div className="order-2 relative min-h-0 min-w-0 lg:order-none">
               <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              {/* Meta – editable title, meta description, slug */}
-              <div className="shrink-0 border-t border-border/60 px-4 pt-4 pb-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">Meta</h3>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">Edit and copy title, meta description, and URL slug.</p>
+                {/* Meta – editable title, meta description, slug */}
+                <div className="shrink-0 border-t border-border/60 px-4 pt-4 pb-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">Meta</h3>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">Edit and copy title, meta description, and URL slug.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={generateMetaLoading || !editing?.content}
+                      onClick={handleGenerateMeta}
+                      className="h-8 shrink-0 rounded-lg border-orange-300 bg-orange-50 px-3 text-[11px] font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:hover:bg-orange-950/50"
+                    >
+                      {generateMetaLoading ? (
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                      )}
+                      Generate meta
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={generateMetaLoading || !editing?.content}
-                    onClick={handleGenerateMeta}
-                    className="h-8 shrink-0 rounded-lg border-orange-300 bg-orange-50 px-3 text-[11px] font-medium text-orange-700 hover:bg-orange-100 dark:border-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:hover:bg-orange-950/50"
-                  >
-                    {generateMetaLoading ? (
-                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    )}
-                    Generate meta
-                  </Button>
-                </div>
-                {metaOptions && metaOptions.length >= 2 ? (
-                  <div className="mt-3 space-y-2">
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {metaOptions.map((opt, idx) => (
-                        <div
-                          key={idx}
-                          className="flex flex-col gap-2 rounded-xl border border-orange-200 px-3 py-2.5 dark:border-orange-800/50"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[11px] text-muted-foreground">Option {idx + 1}</span>
-                            <span
-                              className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                                opt.audit.publishable
+                  {metaOptions && metaOptions.length >= 2 ? (
+                    <div className="mt-3 space-y-2">
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {metaOptions.map((opt, idx) => (
+                          <div
+                            key={idx}
+                            className="flex flex-col gap-2 rounded-xl border border-orange-200 px-3 py-2.5 dark:border-orange-800/50"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[11px] text-muted-foreground">Option {idx + 1}</span>
+                              <span
+                                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${opt.audit.publishable
                                   ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-200"
                                   : opt.audit.score >= 60
                                     ? "bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200"
                                     : "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-200"
-                              }`}
+                                  }`}
+                              >
+                                {opt.audit.score}%
+                              </span>
+                            </div>
+                            <p className="text-xs font-medium leading-tight line-clamp-1">{opt.title}</p>
+                            <p className="text-[11px] text-muted-foreground leading-tight line-clamp-1">{opt.metaDescription}</p>
+                            <p className="text-[10px] font-mono text-muted-foreground/80 truncate">{opt.suggestedSlug}</p>
+                            <Button
+                              type="button"
+                              size="sm"
+                              onClick={() => handleUseMetaOption(opt)}
+                              className="h-8 w-full rounded-lg bg-orange-600 px-2 text-xs hover:bg-orange-700"
                             >
-                              {opt.audit.score}%
+                              Use this option
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setMetaOptions(null)}
+                        className="text-[11px] text-muted-foreground hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-4 space-y-4">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
+                        {/* Title */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <label htmlFor="edit-title" className="text-xs font-medium text-foreground">Title</label>
+                            <span
+                              className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums ${editing.title.length > SEO.TITLE_MAX_CHARS
+                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                                : "text-muted-foreground"
+                                }`}
+                            >
+                              {editing.title.length}/{SEO.TITLE_MAX_CHARS}
                             </span>
                           </div>
-                          <p className="text-xs font-medium leading-tight line-clamp-1">{opt.title}</p>
-                          <p className="text-[11px] text-muted-foreground leading-tight line-clamp-1">{opt.metaDescription}</p>
-                          <p className="text-[10px] font-mono text-muted-foreground/80 truncate">{opt.suggestedSlug}</p>
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleUseMetaOption(opt)}
-                            className="h-8 w-full rounded-lg bg-orange-600 px-2 text-xs hover:bg-orange-700"
-                          >
-                            Use this option
-                          </Button>
+                          <div className="relative">
+                            <Input
+                              id="edit-title"
+                              value={editing.title}
+                              onChange={(e) => setEditing((prev) => (prev ? { ...prev, title: e.target.value } : null))}
+                              className="h-10 rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopyMetaField("title")}
+                              className="absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                              title="Copy title"
+                            >
+                              {metaCopyField === "title" ? (
+                                <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setMetaOptions(null)}
-                      className="text-[11px] text-muted-foreground hover:text-foreground"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                ) : (
-                <div className="mt-4 space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-4">
-                      {/* Title */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <label htmlFor="edit-title" className="text-xs font-medium text-foreground">Title</label>
-                          <span
-                            className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums ${
-                              editing.title.length > SEO.TITLE_MAX_CHARS
+
+                        {/* URL slug – same row as Title on md */}
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <label htmlFor="edit-slug" className="text-xs font-medium text-foreground">URL slug</label>
+                            <span className="shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
+                              {(editing.suggestedSlug ?? "").length}/75
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <Input
+                              id="edit-slug"
+                              value={editing.suggestedSlug ?? ""}
+                              onChange={(e) => setEditing((prev) => (prev ? { ...prev, suggestedSlug: e.target.value } : null))}
+                              className="h-10 rounded-xl border-border bg-muted/20 font-mono text-sm pr-10 focus:bg-background"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopyMetaField("slug")}
+                              className="absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                              title="Copy URL slug"
+                            >
+                              {metaCopyField === "slug" ? (
+                                <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Meta description – full width */}
+                        <div className="space-y-1.5 md:col-span-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <label htmlFor="edit-meta" className="text-xs font-medium text-foreground">Meta description</label>
+                            <span
+                              className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums ${editing.metaDescription.length > SEO.META_DESCRIPTION_MAX_CHARS
                                 ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
                                 : "text-muted-foreground"
-                            }`}
-                          >
-                            {editing.title.length}/{SEO.TITLE_MAX_CHARS}
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <Input
-                            id="edit-title"
-                            value={editing.title}
-                            onChange={(e) => setEditing((prev) => (prev ? { ...prev, title: e.target.value } : null))}
-                            className="h-10 rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopyMetaField("title")}
-                            className="absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg p-0 text-muted-foreground hover:text-foreground"
-                            title="Copy title"
-                          >
-                            {metaCopyField === "title" ? (
-                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* URL slug – same row as Title on md */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <label htmlFor="edit-slug" className="text-xs font-medium text-foreground">URL slug</label>
-                          <span className="shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">
-                            {(editing.suggestedSlug ?? "").length}/75
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <Input
-                            id="edit-slug"
-                            value={editing.suggestedSlug ?? ""}
-                            onChange={(e) => setEditing((prev) => (prev ? { ...prev, suggestedSlug: e.target.value } : null))}
-                            className="h-10 rounded-xl border-border bg-muted/20 font-mono text-sm pr-10 focus:bg-background"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopyMetaField("slug")}
-                            className="absolute right-1.5 top-1/2 h-8 w-8 -translate-y-1/2 rounded-lg p-0 text-muted-foreground hover:text-foreground"
-                            title="Copy URL slug"
-                          >
-                            {metaCopyField === "slug" ? (
-                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-
-                      {/* Meta description – full width */}
-                      <div className="space-y-1.5 md:col-span-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <label htmlFor="edit-meta" className="text-xs font-medium text-foreground">Meta description</label>
-                          <span
-                            className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-medium tabular-nums ${
-                              editing.metaDescription.length > SEO.META_DESCRIPTION_MAX_CHARS
-                                ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {editing.metaDescription.length}/{SEO.META_DESCRIPTION_MAX_CHARS}
-                          </span>
-                        </div>
-                        <div className="relative">
-                          <Textarea
-                            id="edit-meta"
-                            value={editing.metaDescription}
-                            onChange={(e) => setEditing((prev) => (prev ? { ...prev, metaDescription: e.target.value } : null))}
-                            rows={2}
-                            className="min-h-[3.25rem] resize-y rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
-                          />
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopyMetaField("metaDescription")}
-                            className="absolute right-2 top-2.5 h-8 w-8 rounded-lg p-0 text-muted-foreground hover:text-foreground"
-                            title="Copy meta description"
-                          >
-                            {metaCopyField === "metaDescription" ? (
-                              <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
+                                }`}
+                            >
+                              {editing.metaDescription.length}/{SEO.META_DESCRIPTION_MAX_CHARS}
+                            </span>
+                          </div>
+                          <div className="relative">
+                            <Textarea
+                              id="edit-meta"
+                              value={editing.metaDescription}
+                              onChange={(e) => setEditing((prev) => (prev ? { ...prev, metaDescription: e.target.value } : null))}
+                              rows={2}
+                              className="min-h-[3.25rem] resize-y rounded-xl border-border bg-muted/20 pr-10 text-sm focus:bg-background"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleCopyMetaField("metaDescription")}
+                              className="absolute right-2 top-2.5 h-8 w-8 rounded-lg p-0 text-muted-foreground hover:text-foreground"
+                              title="Copy meta description"
+                            >
+                              {metaCopyField === "metaDescription" ? (
+                                <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                              ) : (
+                                <Copy className="h-4 w-4" />
+                              )}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  )}
                 </div>
-                )}
-              </div>
 
-              {/* Content – tabs + preview/outline box */}
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border/60 px-4 py-4">
+                {/* Content – tabs + preview/outline box */}
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border/60 px-4 py-4">
                   <div className="shrink-0 flex flex-col gap-3 pb-3">
                     <h3 className="text-sm font-semibold text-foreground">Content</h3>
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -3268,11 +3604,10 @@ export default function BlogMakerPage() {
                             key={id}
                             type="button"
                             onClick={() => setContentView(id)}
-                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors ${
-                              contentView === id
-                                ? "bg-background text-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground"
-                            }`}
+                            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors ${contentView === id
+                              ? "bg-background text-foreground shadow-sm"
+                              : "text-muted-foreground hover:text-foreground"
+                              }`}
                           >
                             <Icon className="h-3.5 w-3.5" />
                             {label}
@@ -3352,11 +3687,11 @@ export default function BlogMakerPage() {
                       </div>
                     )}
                   </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
       ) : null}
     </div>
   );

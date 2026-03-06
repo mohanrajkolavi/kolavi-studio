@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { SEO } from "@/lib/constants";
 import { getBannedPhrasesForPrompt } from "@/lib/constants/banned-phrases";
-import { extractH2sFromHtml } from "@/lib/seo/article-audit";
+import { extractH2sFromHtml, getAuditRulesForPrompt } from "@/lib/seo/article-audit";
 import type {
   CurrentData,
   HallucinationFix,
@@ -9,7 +9,17 @@ import type {
   TokenUsageRecord,
 } from "@/lib/pipeline/types";
 import { ClaudeDraftOutputSchema } from "@/lib/pipeline/types";
-import type { TitleMetaSlugOption } from "@/lib/openai/client";
+import type {
+  TitleMetaSlugOption,
+  TitleMetaSlugResult,
+} from "@/lib/openai/client";
+import {
+  getIntentGuidanceForMeta,
+  normalizeMetaOption,
+} from "@/lib/openai/client";
+
+// Import OutlineSection
+import type { OutlineSection } from "@/lib/pipeline/types";
 
 let _client: Anthropic | null = null;
 
@@ -25,99 +35,9 @@ function getAnthropicClient(): Anthropic {
   return _client;
 }
 
-export type CompetitorContent = {
-  url: string;
-  content: string;
-  success: boolean;
-};
-
-/** @deprecated Use pipeline writeDraft(ResearchBrief) instead. */
-export type BlogGenerationInput = {
-  keywords: string;
-  peopleAlsoSearchFor?: string;
-  intent?: string | string[];
-  competitorContent?: CompetitorContent[];
-};
-
-export type BlogGenerationOutput = {
-  title: string;
-  metaDescription: string;
-  outline: string[];
-  content: string;
-  suggestedSlug?: string;
-  suggestedCategories?: string[];
-  suggestedTags?: string[];
-};
-
-const INTENT_GUIDE = {
-  informational:
-    "How-to, guides, educational. No hard sell. Focus on teaching and answering questions. Use clear H2/H3 structure. Include an FAQ section (3-5 Q&As) for rich snippets.",
-  navigational:
-    "Direct users to a specific resource. Include clear navigation links and signposts.",
-  commercial:
-    "Compare options, soft sell, reviews. Include 'best of' lists, comparisons, pros/cons.",
-  transactional:
-    "Strong CTA. Focus on pricing, signup, or conversion. Clear next steps.",
-};
-
-// ---------------------------------------------------------------------------
-// SYSTEM PROMPT
-//
-// Framed around Google Search Central's quality guidelines:
-//   1. People-first content: demonstrate E-E-A-T (Experience, Expertise,
-//      Authoritativeness, Trustworthiness)
-//   2. Helpful Content: satisfy search intent completely; provide
-//      substantial value beyond competitors
-//   3. Rank Math 100/100: technical SEO compliance
-//   4. Natural writing: practitioner voice, not generic summaries
-//
-// Reference: developers.google.com/search/docs/fundamentals/creating-helpful-content
-// ---------------------------------------------------------------------------
-
-/** @deprecated System prompt for legacy generateBlogPost — allows inventing plausible specifics. */
-const SYSTEM_PROMPT_LEGACY = `You are a senior content writer producing helpful, people-first content per Google Search Central guidelines. You write from personal experience: opinionated, specific, grounded in real details.
-
-## Google Search Central: Quality Standards
-
-Your content must pass Google's Helpful Content self-assessment (developers.google.com/search/docs/fundamentals/creating-helpful-content):
-- Would a real person with expertise write this? YES: provide original analysis, firsthand knowledge, concrete specifics.
-- Does this substantially add value beyond what's already ranking? YES: unique angles, practitioner insights, specific examples competitors miss.
-- Does this satisfy search intent completely? YES: answer the query, then go deeper.
-
-## How you write (practitioner voice)
-
-**1. SPECIFIC over generic — always.**
-Never write "businesses can improve their performance." Write "we cut our client's CPA from $38 to $12 in six weeks." Invent plausible specifics: names of tools (Ahrefs, Screaming Frog, Surfer SEO), dollar amounts ($500-800/mo), timeframes (took us about 3 weeks), percentages (saw a 34% lift). Every section needs 2-3 concrete details.
-
-**2. Natural, varied word choices.**
-A project doesn't "fail," it "tanks" or "goes sideways." You don't "implement a strategy," you "put it to work" or "roll it out." Use idioms naturally: "the 80/20 of it," "no silver bullet here."
-
-**3. Varied structure.**
-Mix it up: punchline first sometimes, example before theory, a single bold claim paragraph, end sections with questions. Vary paragraph length: some 1 sentence, some 5-6.
-
-**4. Confidence with honesty.**
-Strong claims ("This works. Full stop.") followed by specific doubt ("The one exception is sites under 50 pages.") and honest admission ("I didn't buy this until I tested it.").
-
-**5. Dense where it matters, light where it doesn't.**
-One paragraph crammed with data, next paragraph pure opinion, then an anecdote, then back to technical depth.
-
-## Typography (strict)
-
-- No em-dash (—), en-dash (–), or curly quotes. Straight quotes and apostrophes only.
-- Don't start more than 2 sentences in a row the same way.
-- Vary paragraph length patterns.
-
-## SEO Priorities (non-negotiable)
-
-**PRIORITY 1: Google Search Central.** People-first, E-E-A-T, satisfy intent fully, no keyword stuffing.
-**PRIORITY 2: Rank Math 100/100.** Keyword in title (first 50%), meta, slug, first 10%, subheadings. Paragraphs <=120 words. FAQ for informational intent.
-
-**Output:** Return only valid JSON. No markdown outside the JSON block.`;
-
 /**
  * Pipeline system prompt for writeDraft.
  * Framed around Google Search Central helpful content guidelines and Rank Math SEO.
- * Key difference from legacy: NO "invent plausible specifics" instruction.
  * All statistics must come from the provided currentData.
  */
 // Banned AI phrases (shared constant — single source of truth in src/lib/constants/banned-phrases.ts)
@@ -166,7 +86,7 @@ Do not use those exact words, but rigorously apply this framework to demonstrate
 
 ## Humanization (enforced)
 
-- **Ban the "Textbook Voice":** Never describe what a concept *is* like a dictionary. Describe how a concept *behaves* in the real world. Do not write: "Local SEO is the practice of optimizing your online presence." Write: "Local SEO is the difference between a fully booked service calendar and staring at a quiet phone."
+- **Ban the "Textbook Voice":** FATAL ERROR: When writing a heading that asks "What is [Topic]?", the very first sentence of the paragraph MUST be an analogy or a statement about financial outcomes. You are strictly forbidden from starting with a dictionary definition.
 - Check every paragraph against the banned phrase list; avoid every listed phrase.
 - Vary sentence length deliberately — break the pattern after 3 or more similar-length sentences in a row.
 - At least one specific named example, tool, or scenario per H2 — no abstract-only sections.
@@ -203,7 +123,8 @@ function normalizeJsonString(s: string): string {
   return s
     .replace(/[\u201C\u201D\u201E\u201F\u2033]/g, '"')   // all double-quote variants + double prime
     .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")    // all single-quote variants + single prime
-    .replace(/[\u200B\u200C\u200D\uFEFF]/g, "");           // zero-width chars + BOM
+    .replace(/[\u200B\u200C\u200D\uFEFF]/g, "")           // zero-width chars + BOM
+    .replace(/[—–]/g, ", ");                              // replace em and en-dashes
 }
 
 /**
@@ -339,327 +260,6 @@ function repairUnescapedQuotesInJsonStrings(jsonStr: string): string {
   return result;
 }
 
-/**
- * Attempts to repair JSON that was truncated mid-response (e.g. max_tokens).
- * Tries closing incomplete strings, the outline array, and adding minimal required fields.
- */
-function tryRepairTruncatedBlogJson(
-  raw: string
-): (Record<string, unknown> & BlogGenerationOutput) | null {
-  raw = raw.trim();
-  if (!raw || raw.length < 10) return null;
-
-  const requiredSuffix = (content: string) =>
-    `, "content": ${JSON.stringify(content)}, "suggestedSlug": "", "suggestedCategories": [], "suggestedTags": []}`;
-
-  const strategies: (() => string)[] = [
-    // Truncated inside outline array (e.g. ..., "Thr): close string, close array, add rest
-    () => raw + '"' + "]" + requiredSuffix(""),
-    // Truncated after comma before next outline item: ..., "Last Item",
-    () => (/\,\s*$/.test(raw) ? raw.replace(/,\s*$/, "]") + requiredSuffix("") : raw),
-    // Truncated right after "outline": [ (no elements yet)
-    () => (raw.endsWith("[") ? raw + "]" + requiredSuffix("") : raw),
-  ];
-
-  // If we have "content": " then we're truncated inside the HTML
-  if (/"content"\s*:\s*"/.test(raw)) {
-    strategies.push(
-      () => raw + '"' + ', "suggestedSlug": "", "suggestedCategories": [], "suggestedTags": []}'
-    );
-  }
-
-  // Try closing only brackets (generic repair)
-  const openBraces = (raw.match(/{/g) ?? []).length - (raw.match(/}/g) ?? []).length;
-  const openBrackets = (raw.match(/\[/g) ?? []).length - (raw.match(/]/g) ?? []).length;
-  if (openBraces > 0 || openBrackets > 0) {
-    const end = raw;
-    const endsInsideString = (end.match(/"([^"]|\\")*$/g) ?? []).length % 2 === 1;
-    if (endsInsideString) strategies.push(() => raw + '"' + "]".repeat(openBrackets) + "}".repeat(openBraces));
-    else strategies.push(() => raw + "]".repeat(openBrackets) + "}".repeat(openBraces));
-  }
-
-  for (const build of strategies) {
-    try {
-      const candidate = build();
-      const parsed = JSON.parse(candidate) as Record<string, unknown> & BlogGenerationOutput;
-      if (parsed && typeof parsed.title === "string" && Array.isArray(parsed.outline)) return parsed;
-    } catch {
-      // continue
-    }
-  }
-  return null;
-}
-
-/** @deprecated Use pipeline writeDraft(ResearchBrief) instead. */
-export async function generateBlogPost(
-  input: BlogGenerationInput
-): Promise<BlogGenerationOutput> {
-  const anthropic = getAnthropicClient();
-
-  if (typeof input.keywords !== "string") {
-    throw new Error("keywords must be a string");
-  }
-  const keywordParts = input.keywords.split(",").map((k) => k.trim()).filter(Boolean);
-  if (keywordParts.length === 0) {
-    throw new Error("Keywords must contain at least one valid keyword");
-  }
-  const primaryKeyword = keywordParts[0];
-  const secondaryKeywords = keywordParts.slice(1, 6);
-  const intentList = Array.isArray(input.intent)
-    ? input.intent
-    : input.intent
-      ? [input.intent]
-      : ["informational"];
-  const intentLabel = intentList.join(", ");
-  const intentGuidesRaw = intentList.map((i) => INTENT_GUIDE[i as keyof typeof INTENT_GUIDE]).filter(Boolean);
-  const intentGuides = intentGuidesRaw.length > 0 ? intentGuidesRaw : [INTENT_GUIDE.informational];
-
-  const prompt = `Write a blog post on "${primaryKeyword}" as a seasoned practitioner writing from experience. Not a summary. Not an overview. A practitioner's take with opinions, specifics, and the kind of detail only someone who's done this work would include.
-
-**Do NOT include:** image placeholders, internal links, external links, Table of Contents, or HTML table tags (frontend does not format tables — use bulleted or numbered lists instead). Those are added in the CMS. Author byline is added by the CMS.
-
-## GOOGLE SEARCH CENTRAL — HELPFUL CONTENT
-- Does this provide original analysis and firsthand knowledge? → YES.
-- Does this substantially add value beyond existing results? → YES.
-- Does this fully satisfy search intent for "${primaryKeyword}"? → YES.
-- Would a reader feel they learned enough to achieve their goal? → YES.
-
-## KEYWORDS & INTENT
-- **Primary:** ${primaryKeyword}
-- **Secondary:** ${secondaryKeywords.length ? secondaryKeywords.join(", ") : "None"}
-- **People Also Search For:** ${((): string => {
-      const raw = input.peopleAlsoSearchFor?.trim();
-      if (!raw) return "None";
-      const phrases = raw.split(/[,;\n]+/).map((p) => p.trim()).filter(Boolean);
-      if (phrases.length === 0) return "None";
-      if (phrases.length === 1) return phrases[0];
-      return phrases.map((p) => `- ${p}`).join("\n") + "\nUse these as FAQ questions where they fit the topic.";
-    })()}
-- **Intent(s):** ${intentLabel}${intentList.length > 1 ? ". If multiple intents, balance them; lead with the first." : ""}
-${intentGuides.map((g) => `  - ${g}`).join("\n")}
-
-## RANK MATH SEO (non-negotiable)
-- **Title:** Primary keyword in first 50%. Number when natural. Max 60 chars.
-- **Meta:** Primary keyword present. 120-160 chars. A pitch, not a summary.
-- **Slug:** Primary keyword. Lowercase hyphens. Max 75 chars.
-- **Keyword in intro:** Primary keyword in FIRST 2-3 sentences (first ~10% of content).
-- **Subheadings:** Primary + secondary keywords in some H2/H3 naturally.
-- **Paragraphs:** None over 120 words.
-- **Heading hierarchy:** H2-H6 only (no H1 in body). Sequential.
-- **FAQ:** For informational intent, H2 "Frequently Asked Questions" with 3-5 Q&As.
-
-## WRITING QUALITY (Google ranking signals)
-
-**Readability & user experience (dwell time, engagement):**
-- Vary sentence length: mix 4-word punchy lines with 25-word analytical ones.
-- Vary paragraph length: some 1 sentence, some 5-6 sentences. No rhythm.
-- Be specific. Not "improve your marketing" but "we A/B tested 14 landing pages and the variant with social proof bumped conversions by 23%." Invent plausible specifics: tool names, dollar amounts, timeframes.
-- Use natural idioms: "this is where most people drop the ball," "no silver bullet here."
-
-**E-E-A-T signals:**
-- Experience: 2-3 firsthand references. "Anyone who's managed a PPC campaign knows..." or "The first thing you notice is..."
-- Expertise: name tools, describe scenarios, reference timeframes.
-- Authoritativeness: cite sources naturally.
-- Trustworthiness: qualify uncertain claims honestly.
-
-**Content structure for engagement:**
-- Front-load value: start some sections with the conclusion, then explain.
-- Don't transition uniformly. No "Additionally," "Furthermore," "Moreover" patterns.
-- Confidence with honesty: strong claims followed by specific doubt.
-
-## TYPOGRAPHY (strict — any violation fails audit)
-- ZERO em-dashes (—) or en-dashes (–). At any cost use comma, colon, period, or rewrite. No exceptions.
-- ZERO curly/smart quotes. Straight quotes (") and apostrophes (') only.
-- No excessive symbols: no repeated ellipses (...), no !! or !!!, no decorative symbol runs. Single punctuation only.
-
-## OUTPUT FORMAT (valid JSON only)
-- Straight double quotes (") for JSON. Keep outline to 6-8 H2 headings.
-{
-  "title": "...",
-  "metaDescription": "...",
-  "outline": ["H2 1", "H2 2", ...],
-  "content": "<p>...</p><h2>...</h2>...",
-  "suggestedSlug": "lowercase-hyphenated-slug",
-  "suggestedCategories": ["cat1", "cat2"],
-  "suggestedTags": ["tag1", "tag2", "tag3"]
-}
-
-## CONTENT STRUCTURE
-1. **Intro** — Hook with a specific claim, stat, or experience. Primary keyword in first 10%.
-2. **Body sections** — H2/H3 with keywords. Mix of theory, examples, opinion, data.
-3. **FAQ** — 3-5 Q&As for informational intent. Direct, helpful answers.
-4. **Conclusion** — Direct CTA matching intent. End with something actionable.
-
-${(() => {
-      const valid = input.competitorContent?.filter((c) => c.success && c.content) ?? [];
-      if (valid.length === 0) return "";
-      return `## COMPETITOR ARTICLES
-Create content that covers what competitors cover PLUS unique angles, specific examples, and opinions they don't have. This is how you "substantially add value" per Google Search Central.
-
-${valid.map((c) => `### Competitor: ${c.url}\n\n${c.content}`).join("\n\n---\n\n")}`;
-    })()}
-
-Generate the JSON now. Write like a practitioner, not a textbook.`;
-
-  try {
-    const stream = anthropic.messages.stream({
-      model: CLAUDE_DEFAULT_MODEL,
-      max_tokens: 64000,
-      temperature: 0.5,
-      system: SYSTEM_PROMPT_LEGACY,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
-    });
-    const message = await stream.finalMessage();
-
-    if (!message.content?.length) {
-      throw new Error("Claude returned an empty response");
-    }
-    const content = message.content[0];
-    if (content.type !== "text") {
-      throw new Error("Unexpected response format from Claude");
-    }
-
-    const text = content.text.trim();
-    const jsonBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
-    let jsonText = text;
-    let match: RegExpExecArray | null;
-    let largest = "";
-    while ((match = jsonBlockRegex.exec(text)) !== null) {
-      const block = match[1].trim();
-      if (block.length > largest.length) largest = block;
-    }
-    if (largest.length > 0) jsonText = largest;
-    else {
-      const singleMatch = text.match(/```json\s*([\s\S]*?)\s*```/) || text.match(/```\s*([\s\S]*?)\s*```/);
-      if (singleMatch) jsonText = singleMatch[1].trim();
-    }
-    // Normalize so JSON can parse: curly/smart quotes -> straight quotes
-    jsonText = normalizeJsonString(jsonText);
-    jsonText = escapeControlCharactersInJsonStrings(jsonText);
-
-    const stopReason = (message as { stop_reason?: string }).stop_reason;
-    const truncated = stopReason === "max_tokens";
-    const truncationHint = truncated
-      ? " Response was cut off (token limit). Try fewer keywords or less competitor content."
-      : "";
-
-    let parsed: Record<string, unknown> & BlogGenerationOutput;
-    try {
-      parsed = JSON.parse(jsonText.trim()) as Record<string, unknown> & BlogGenerationOutput;
-    } catch {
-      // Attempt to repair truncated JSON (common when response hits max_tokens mid-output)
-      const repaired = tryRepairTruncatedBlogJson(jsonText.trim());
-      if (repaired) {
-        parsed = repaired;
-        if (!parsed.content || typeof parsed.content !== "string" || parsed.content.trim().length === 0) {
-          throw new Error(
-            "Blog response was cut off (token limit). Try again with fewer keywords, fewer competitor URLs, or a narrower topic."
-          );
-        }
-      } else {
-        const snippet = jsonText.slice(0, 500);
-        const looksTruncated =
-          !/}\s*$/.test(jsonText.trim()) || stopReason === "max_tokens";
-        const hint = looksTruncated
-          ? " Response may have been cut off. Try fewer keywords or less competitor content."
-          : truncationHint;
-        throw new Error(
-          `Claude returned invalid JSON.${hint} Raw output (first 500 chars): ${snippet}`
-        );
-      }
-    }
-
-    // Resolve content field: accept "body" or "article" as fallback
-    let bodyContent =
-      typeof parsed.content === "string" && parsed.content.trim().length > 0
-        ? parsed.content
-        : (typeof (parsed as Record<string, unknown>).body === "string" &&
-          ((parsed as Record<string, unknown>).body as string).trim().length > 0
-          ? ((parsed as Record<string, unknown>).body as string)
-          : typeof (parsed as Record<string, unknown>).article === "string" &&
-            ((parsed as Record<string, unknown>).article as string).trim().length > 0
-            ? ((parsed as Record<string, unknown>).article as string)
-            : undefined);
-    if (bodyContent !== undefined) parsed.content = bodyContent;
-
-    const hint = truncated
-      ? " Response was cut off (token limit). Try fewer keywords or a narrower topic."
-      : " Try again or use fewer keywords.";
-
-    if (!parsed.title || typeof parsed.title !== "string" || parsed.title.trim().length === 0) {
-      throw new Error("Invalid response from Claude: title is required and must be non-empty." + hint);
-    }
-    if (!parsed.content || typeof parsed.content !== "string" || parsed.content.trim().length === 0) {
-      const keys = Object.keys(parsed).join(", ");
-      console.error(
-        "Claude blog response missing content. stop_reason=%s, parsed keys: [%s], content length=%s",
-        stopReason ?? "unknown",
-        keys,
-        typeof parsed.content === "string" ? parsed.content.length : "not a string"
-      );
-      throw new Error("Invalid response from Claude: content is required and must be non-empty." + hint);
-    }
-
-    const title = parsed.title;
-
-    const metaDescRaw = typeof parsed.metaDescription === "string" ? parsed.metaDescription : "";
-    const metaDescChars = [...metaDescRaw];
-    const metaDescription =
-      metaDescChars.length > SEO.META_DESCRIPTION_MAX_CHARS
-        ? metaDescChars.slice(0, SEO.META_DESCRIPTION_MAX_CHARS - 3).join("").trim() + "..."
-        : metaDescRaw;
-
-    const slugRaw =
-      typeof parsed.suggestedSlug === "string" && parsed.suggestedSlug.trim().length > 0
-        ? parsed.suggestedSlug.trim()
-        : "";
-    const slug =
-      slugRaw ||
-      primaryKeyword
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "")
-        .replace(/-+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
-    const finalSlug =
-      slug.length > SEO.URL_SLUG_MAX_CHARS
-        ? slug.slice(0, SEO.URL_SLUG_MAX_CHARS).replace(/-+$/, "")
-        : slug;
-
-    const outline = Array.isArray(parsed.outline) ? parsed.outline.filter((h): h is string => typeof h === "string") : [];
-    const suggestedCategories = Array.isArray(parsed.suggestedCategories)
-      ? parsed.suggestedCategories.filter((c): c is string => typeof c === "string")
-      : undefined;
-    const suggestedTags = Array.isArray(parsed.suggestedTags)
-      ? parsed.suggestedTags.filter((t): t is string => typeof t === "string")
-      : undefined;
-
-    return {
-      title,
-      metaDescription,
-      outline,
-      content: parsed.content,
-      suggestedSlug: finalSlug,
-      suggestedCategories: suggestedCategories?.length ? suggestedCategories : undefined,
-      suggestedTags: suggestedTags?.length ? suggestedTags : undefined,
-    };
-  } catch (error) {
-    console.error("Claude API error:", error);
-    throw new Error(
-      error instanceof Error
-        ? `Failed to generate blog post: ${error.message}`
-        : "Failed to generate blog post"
-    );
-  }
-}
-
 // ---------------------------------------------------------------------------
 // PIPELINE v3: writeDraft (brief-only)
 // ---------------------------------------------------------------------------
@@ -740,7 +340,7 @@ const DRAFT_MODEL_IDS: Record<string, string> = {
   "sonnet-4.6": "claude-sonnet-4-6",
 };
 
-/** Default Claude model for legacy flows (generateBlogPost, fixHallucinations). */
+/** Default Claude model for fixHallucinations and other non-draft flows. */
 const CLAUDE_DEFAULT_MODEL = "claude-sonnet-4-6";
 
 /**
@@ -751,7 +351,9 @@ export async function writeDraft(
   brief: ResearchBrief,
   titleMetaSlug: TitleMetaSlugOption,
   tokenUsage?: TokenUsageRecord[],
-  draftModel: "opus-4.6" | "sonnet-4.6" = "sonnet-4.6"
+  draftModel: "opus-4.6" | "sonnet-4.6" = "opus-4.6",
+  fieldNotes?: string,
+  toneExamples?: string
 ): Promise<{
   content: string;
   suggestedCategories: string[];
@@ -762,7 +364,7 @@ export async function writeDraft(
   const outlineBlock = brief.outline.sections
     .map(
       (s) =>
-        `- ${s.heading} (${s.level}): ${s.targetWords} words. Topics: ${s.topics.join(", ")}${s.geoNote ? `. GEO: ${s.geoNote}` : ""}`
+        `- ${s.heading} (${s.level}): ${s.targetWords} words. Topics: ${s.topics.join(", ")}${s.geoNote ? `. GEO: ${s.geoNote}` : ""}${s.aiOverviewTarget ? `. AI Overview target: "${s.aiOverviewTarget}"` : ""}`
     )
     .join("\n");
 
@@ -848,12 +450,24 @@ ${brief.similaritySummary?.trim() ? `Top results cover: ${brief.similaritySummar
 ## DIFFERENTIATION
 Add clear value beyond the outline; lead with current data where provided.`}
 ${brief.freshnessNote?.trim() ? `## FRESHNESS\n${brief.freshnessNote.trim()}\n` : ""}
-${brief.competitorDifferentiation?.trim() ? `## COMPETITOR DIFFERENTIATION (avoid these patterns)\n${brief.competitorDifferentiation.trim()}\n\nDeliberately avoid the phrases, section structures, and intro styles described above so the article does not read like AI-generated competitor content.\n` : ""}
-## CURRENT DATA — ZERO HALLUCINATION
+${brief.competitorDifferentiation?.trim() ? `## COMPETITOR DIFFERENTIATION (avoid these patterns)\n${brief.competitorDifferentiation.trim()}\n\nDeliberately avoid the phrases, section structures, and intro styles described above so the article does not read like AI-generated competitor content.\n` : ""}${(brief.povInsights?.length ?? 0) > 0 ? `## POV / INFORMATION GAIN (use these to differentiate)
+These are contrarian or nuanced angles that most competitors miss. Weave them naturally into the relevant sections to increase Information Gain.
+${brief.povInsights!.map((p) => `- Topic: ${p.topic}. Most say: "${p.conventionalView}". But: "${p.contrarian}" (source: ${p.source}).`).join("\n")}
+` : ""}${fieldNotes?.trim() ? `## FIELD DATA (real-world experience, integrate naturally for E-E-A-T)
+The following are raw notes/quotes from the author. Weave these "I did this" moments into relevant sections. Do not use them as block quotes; rephrase naturally to match the article voice. Attribute to the author's experience when appropriate. These real-world signals are the strongest E-E-A-T differentiator.
+
+${fieldNotes.trim()}
+` : ""}## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
 
 ## EDITORIAL STYLE
 ${styleBlock}
+${toneExamples?.trim() ? `
+## TONE CALIBRATION (match this voice)
+The following is a sample of the client's existing writing. Match the tone, vocabulary level, sentence rhythm, and personality. Do NOT copy the content — only calibrate your voice to sound like this author:
+
+"""${toneExamples.trim()}"""
+` : ""}
 
 Intro: Mirror the best-performing intro pattern or subvert the weakest; follow the pattern provided. Open with a problem the reader recognizes in themselves — not a definition or statistic. CTA: Address a reader fear or desire — not just a click request.
 
@@ -862,6 +476,7 @@ Vary sentence and paragraph length and openings. E-E-A-T: 2-3 experience signals
 
 ## GEO & FAQ
 - Every major section must open with a 2-3 sentence Answer Capsule (direct, unambiguous answer) before expanding. Use clear, unambiguous factual statements — no hedged language. Use definition-style sentences and numbered steps where appropriate.
+- ANSWER-FIRST STRUCTURE (enforced): For every H2, the first 2-3 sentences MUST directly answer the heading's implied question. This is the "AI Overview target" — a self-contained snippet that AI engines can extract verbatim. Follow the answer with nuance, details, and supporting evidence. If an AI Overview target is provided in the outline, use it as the basis for those opening sentences.
 - Direct answer: ${brief.geoRequirements.directAnswer}
 - Stats: ${brief.geoRequirements.statDensity}
 - Entities: ${brief.geoRequirements.entities}
@@ -883,6 +498,7 @@ Output only the JSON object below. No text before or after the JSON. Do NOT incl
 }
 
 If you approach the response limit, prioritize completing the final H2 and FAQ; you may shorten middle sections. Write to pass the automated SEO, typography, and fact-check audits. No em-dashes, en-dashes, or curly quotes; no excessive symbols (..., !!, !!!). Never use HTML table tags — use ul/ol only.`;
+
 
   const modelId = DRAFT_MODEL_IDS[draftModel] ?? CLAUDE_DEFAULT_MODEL;
   const writeDraftStartMs = Date.now();
@@ -948,11 +564,6 @@ If you approach the response limit, prioritize completing the final H2 and FAQ; 
     };
   }
 
-  const contentOnly = typeof parsed.content === "string" && parsed.content.trim().length > 0;
-  if (!contentOnly) {
-    console.error("[claude] writeDraft Zod errors:", validated.error.flatten());
-    throw new Error("Claude writeDraft response missing or empty content");
-  }
   return {
     content: (parsed.content as string) ?? "",
     suggestedCategories: Array.isArray(parsed.suggestedCategories) ? parsed.suggestedCategories.filter((c): c is string => typeof c === "string") : [],
@@ -960,6 +571,364 @@ If you approach the response limit, prioritize completing the final H2 and FAQ; 
   };
 }
 
+/**
+ * Step 4 (Section-by-Section) — Draft a single outline section.
+ * Much better for quality and word count adherence than drafting 2000 words at once.
+ */
+export async function writeDraftSection(
+  brief: ResearchBrief,
+  section: OutlineSection,
+  previousContent: string,
+  tokenUsage?: TokenUsageRecord[],
+  draftModel: "opus-4.6" | "sonnet-4.6" = "opus-4.6",
+  fieldNotes?: string,
+  toneExamples?: string,
+  redditQuotes?: string[],
+  isFirstSection: boolean = false,
+  primaryKeyword?: string
+): Promise<string> {
+  const anthropic = getAnthropicClient();
+
+  const currentDataWarning = brief.currentData.groundingVerified
+    ? ""
+    : "\nWARNING: Current data may not be verified (no grounding sources). Use with caution and avoid stating these as confirmed facts.\n";
+
+  const styleChecklist = brief.editorialStyleFallback
+    ? `Tone, POV, data density, and example frequency from the editorial style below are pipeline constraints — not optional.`
+    : `## CHECKLIST (pipeline constraints — not optional)
+- Tone: ${brief.editorialStyle.tone}
+- POV: ${brief.editorialStyle.pointOfView ?? "third"}
+- Data density: ${brief.editorialStyle.dataDensity}
+- Real examples frequency: ${brief.editorialStyle.realExamplesFrequency || "use where relevant"}
+Enforce these in this specific section.`;
+
+  const factsBlock = brief.currentData.facts.length > 0
+    ? `Current data (use ONLY these for statistics; do NOT invent numbers):\n${brief.currentData.facts.map((f) => `- ${f.fact} (Source: ${f.source})`).join("\n")}`
+    : "No current data provided. Do not invent specific statistics; use general language where needed.";
+
+  // Only pass previous content if it exists to establish context, but limit it so we don't blow up context size
+  const contextBlock = previousContent.trim().length > 0
+    ? `\n## PREVIOUS SECTIONS (Content written so far)\nDo not repeat information already covered here. Continue naturally from where this leaves off.\n\n${previousContent.slice(-4000)}\n`
+    : "";
+
+  const userPrompt = `Write the content for ONE specific section of a blog post.
+Do NOT write the HTML heading tag for the section title itself (e.g. do not write \`<h2>${section.heading}</h2>\`) — the system will inject the heading. Just write the content that goes *under* the heading.
+${contextBlock}
+${styleChecklist}
+
+## SECTION ASSIGNMENT
+You are writing the section: "${section.heading}"
+- Target word count: ${section.targetWords} words. You MUST hit this target (±10%).
+- Topics to cover: ${section.topics.join(", ")}
+${section.geoNote ? `- GEO Constraint: ${section.geoNote}` : ""}
+${section.aiOverviewTarget ? `- AI Overview target: "${section.aiOverviewTarget}" (Directly answer this in the first 2-3 sentences of this section)` : ""}
+${isFirstSection && primaryKeyword ? `\nFATAL ERROR: You MUST include the exact phrase "${primaryKeyword}" within the first 2 paragraphs of this section to establish SEO relevance.` : ""}
+
+## CURRENT DATA — ZERO HALLUCINATION
+${factsBlock}
+Every specific number you write will be cross-checked. Use natural attribution (e.g. "according to [source]").
+${currentDataWarning}
+${redditQuotes?.length ? `\n## COMMUNITY QUOTES 
+Weave these real-world quotes/experiences naturally into this section if relevant. Attribute as "One practitioner noted" or similar.
+${redditQuotes.map(q => `- ${q}`).join("\n")}\n` : ""}
+${fieldNotes?.trim() ? `\n## FIELD DATA (real-world experience)
+${fieldNotes.trim()}\n` : ""}
+${toneExamples?.trim() ? `\n## TONE CALIBRATION
+Match this voice:\n"""${toneExamples.trim()}"""\n` : ""}
+
+## OUTPUT FORMAT
+Return ONLY valid JSON containing the section HTML content, NO markdown formatting outside the JSON block. Do not include the H2 tag for the section title itself.
+
+FINAL INSTRUCTIONS: You MUST wrap all headings in proper <h2> and <h3> HTML tags. Do not output plain text headings. You MUST use straight quotes and commas instead of em-dashes.
+
+Example output:
+{
+  "content": "<p>...</p><h3>...</h3><p>...</p>"
+}
+`;
+
+  const modelId = DRAFT_MODEL_IDS[draftModel] ?? CLAUDE_DEFAULT_MODEL;
+  const startMs = Date.now();
+
+  const stream = anthropic.messages.stream({
+    model: modelId,
+    max_tokens: 4000,
+    temperature: 0.5,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) {
+    tokenUsage.push({
+      callName: "writeDraftSection",
+      model: modelId,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.promptTokens + usage.completionTokens,
+      durationMs,
+    });
+  }
+
+  const contentBlock = message.content?.[0];
+  if (!contentBlock || contentBlock.type !== "text") {
+    throw new Error("Claude writeDraftSection returned an empty or non-text response");
+  }
+
+  const rawExtracted = stripJsonFromResponse(contentBlock.text);
+  const jsonText = repairUnescapedQuotesInJsonStrings(escapeControlCharactersInJsonStrings(normalizeJsonString(rawExtracted)));
+
+  try {
+    const parsed = JSON.parse(jsonText) as { content: string };
+    if (!parsed.content) return "";
+    return parsed.content;
+  } catch (err) {
+    // If repair fails, fall back to regex extraction for content property
+    const match = jsonText.match(/"content"\s*:\s*"([\s\S]*?)"\s*\}/);
+    if (match && match[1]) {
+      // Un-escape the string
+      return String(match[1]).replace(/\\n/g, "\n").replace(/\\"/g, '"');
+    }
+    throw new Error(`Claude writeDraftSection JSON parse failed: ${err}`);
+  }
+}
+
+/**
+ * Multi-Pass Humanization: Run after draft assembly to smooth transitions,
+ * vary sentence lengths, and make AI prose read more naturally.
+ */
+export async function humanizeContent(
+  draftHtml: string,
+  toneExamples?: string,
+  tokenUsage?: TokenUsageRecord[]
+): Promise<string> {
+  const anthropic = getAnthropicClient();
+  const startMs = Date.now();
+
+  const system = `You are an expert human editor. Your job is to take an AI-generated draft and make it read like it was written by a senior human practitioner.
+RULES:
+1. Do not change the HTML structure, H2/H3 tags, or remove any statistics/facts.
+2. Vary sentence openings (no repeating "Additionally,", "Moreover,", "Furthermore,").
+3. Smooth out transitions between paragraphs so the text flows beautifully.
+4. Remove robotic AI "fluff" and "wrap-up" conclusions (e.g. "In conclusion", "Ultimately").
+5. If tone examples are provided, match that exact voice.
+6. Return ONLY the edited HTML. Do not wrap in JSON. Do not wrap in markdown code blocks. Just the raw HTML.`;
+
+  const userMessage = `${toneExamples?.trim() ? `TONE TO MATCH:\n"""${toneExamples.trim()}"""\n\n` : ""}
+DRAFT HTML TO HUMANIZE:
+${draftHtml}`;
+
+  const stream = anthropic.messages.stream({
+    model: CLAUDE_DEFAULT_MODEL,
+    max_tokens: 32000,
+    temperature: 0.6,
+    system,
+    messages: [{ role: "user", content: userMessage }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) {
+    tokenUsage.push({
+      callName: "humanizeContent",
+      model: CLAUDE_DEFAULT_MODEL,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.promptTokens + usage.completionTokens,
+      durationMs,
+    });
+  }
+
+  const contentBlock = message.content?.[0];
+  if (!contentBlock || contentBlock.type !== "text") return draftHtml;
+
+  let html = contentBlock.text.trim();
+  if (html.startsWith("```html")) html = html.slice(7);
+  else if (html.startsWith("```")) html = html.slice(3);
+  if (html.endsWith("```")) html = html.slice(0, -3);
+
+  return html.trim() || draftHtml;
+}
+
+/** Strip markdown code fences from JSON string. */
+function stripJsonMarkdown(raw: string): string {
+  let s = raw.trim();
+  const backtick = "```";
+  if (s.startsWith(backtick)) {
+    const end = s.indexOf(backtick, backtick.length);
+    s = end > 0 ? s.slice(backtick.length, end) : s.slice(backtick.length);
+  }
+  const jsonMatch = s.match(/\{[\s\S]*\}/);
+  return jsonMatch ? jsonMatch[0] : s;
+}
+
+/**
+ * Generate 2 SEO-optimized title/meta/slug options from draft content.
+ * Uses the same Claude model as the article draft (Sonnet 4.6 or Opus 4.6).
+ * Aligned with article audit system: Google Search Central + Rank Math.
+ */
+export async function generateTitleMetaSlugFromContent(
+  primaryKeyword: string,
+  intent: string,
+  content: string,
+  tokenUsage?: TokenUsageRecord[],
+  draftModel: "opus-4.6" | "sonnet-4.6" = "opus-4.6"
+): Promise<TitleMetaSlugResult> {
+  const anthropic = getAnthropicClient();
+  const modelId = DRAFT_MODEL_IDS[draftModel] ?? CLAUDE_DEFAULT_MODEL;
+  const startMs = Date.now();
+
+  const plainText = content
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const fullExcerpt = plainText.slice(0, 4500);
+
+  const h2Matches = content.match(/<h2[^>]*>([\s\S]*?)<\/h2>/gi) || [];
+  const headings = h2Matches
+    .map((m) => m.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 12);
+
+  const auditRules = getAuditRulesForPrompt();
+  const intentGuidance = getIntentGuidanceForMeta(intent);
+
+  const systemPrompt = `You are an expert SEO copywriter. Generate exactly TWO distinct, high-quality meta options for a blog post. Each option must pass Google Search Central and Rank Math 100/100 checks.
+
+CRITICAL RULES (each option MUST satisfy — our audit will fail otherwise):
+${auditRules}
+
+VARIANT STRATEGY:
+• optionA: Lead with sentiment + power words. E.g. "Proven Guide to…", "Discover the Best…", "Avoid These [X] Mistakes…"
+• optionB: Lead with numbers + action. E.g. "7 Tips for…", "How to [X] in 5 Steps", "[N] Ways to…"
+
+ADDITIONAL GUIDANCE:
+• Match the article's actual content — never mislead
+• Search intent: ${intentGuidance}
+• Title: front-load the primary keyword; make every word earn its place. FATAL ERROR: Both optionA and optionB MUST contain a specific number (e.g., "7", "2025", "5 Ways"). Numbers critically improve CTR.
+• Meta: write a compelling pitch, not a dry summary; include keyword naturally in first 120 chars
+• Slug: concise, keyword-rich; omit articles (a, the) and prepositions where possible
+
+Return ONLY valid JSON, no markdown or explanation:
+{"optionA":{"title":"...","metaDescription":"...","suggestedSlug":"..."},"optionB":{"title":"...","metaDescription":"...","suggestedSlug":"..."}}`;
+
+  const headingsBlock = headings.length > 0
+    ? `\nArticle structure (H2s):\n${headings.map((h) => `- ${h}`).join("\n")}\n`
+    : "";
+
+  const userMessage = `Primary keyword: "${primaryKeyword}"
+Search intent: ${intent}
+${headingsBlock}
+Article content (first part):
+${fullExcerpt}
+
+Generate two distinct meta options (optionA and optionB). Each must satisfy all audit rules. Return JSON only.`;
+
+  const stream = anthropic.messages.stream({
+    model: modelId,
+    max_tokens: 4096,
+    temperature: 0.25,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) {
+    tokenUsage.push({
+      callName: "generateTitleMetaSlugFromContent",
+      model: modelId,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.promptTokens + usage.completionTokens,
+      durationMs,
+    });
+  }
+
+  const contentBlock = message.content[0];
+  if (contentBlock.type !== "text") {
+    throw new Error("generateTitleMetaSlugFromContent: Claude returned non-text response");
+  }
+  const rawContent = contentBlock.text;
+  if (!rawContent?.trim()) {
+    throw new Error("generateTitleMetaSlugFromContent: empty response from Claude");
+  }
+  const raw = stripJsonMarkdown(rawContent);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch (e) {
+    throw new Error(`generateTitleMetaSlugFromContent: invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+  }
+
+  const optionARaw = (parsed.optionA ?? parsed.optiona) as Record<string, unknown> | undefined;
+  const optionBRaw = (parsed.optionB ?? parsed.optionb) as Record<string, unknown> | undefined;
+
+  if (!optionARaw || !optionBRaw) {
+    throw new Error("generateTitleMetaSlugFromContent: response must include optionA and optionB");
+  }
+
+  const optionA = normalizeMetaOption(optionARaw, primaryKeyword);
+  const optionB = normalizeMetaOption(optionBRaw, primaryKeyword);
+
+  return {
+    options: [optionA, optionB],
+  };
+}
+
+/**
+ * Generate 5-10 title options for A/B testing, with different angles.
+ */
+export async function generateTitleVariations(
+  primaryKeyword: string,
+  contentExcerpt: string,
+  tokenUsage?: TokenUsageRecord[]
+): Promise<{ title: string; approach: string; ctrSignal: "High" | "Medium" }[]> {
+  const anthropic = getAnthropicClient();
+  const startMs = Date.now();
+
+  const systemPrompt = `You are a viral headline copywriter. Generate 7 distinctly different, highly clickable SEO title options for the provided article.
+Strategies to use: 1) Number/Listicle, 2) How-To/Guide, 3) Question/Curiosity Gap, 4) Negative Angle (e.g. "Mistakes to Avoid"), 5) Contrarian, 6) Ultimate Guide, 7) Benefit-Driven.
+For each, provide the title (max 60 chars, must include the keyword "${primaryKeyword}") and the approach used. Also provide a predicted CTR signal (High/Medium).
+Return valid JSON only:
+{ "titles": [ { "title": "...", "approach": "...", "ctrSignal": "High" } ] }`;
+
+  const stream = anthropic.messages.stream({
+    model: CLAUDE_DEFAULT_MODEL,
+    max_tokens: 1024,
+    temperature: 0.7,
+    system: systemPrompt,
+    messages: [{ role: "user", content: `Keyword: ${primaryKeyword}\n\nContent Excerpt:\n${contentExcerpt.slice(0, 3000)}` }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) tokenUsage.push({
+    callName: "generateTitleVariations",
+    model: CLAUDE_DEFAULT_MODEL,
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.promptTokens + usage.completionTokens,
+    durationMs,
+  });
+
+  try {
+    let raw = (message.content[0] as { type: "text"; text: string }).text;
+    raw = stripJsonFromResponse(raw);
+    const parsed = JSON.parse(raw);
+    if (!parsed.titles || !Array.isArray(parsed.titles)) return [];
+    return parsed.titles;
+  } catch (err) {
+    console.error("[generateTitleVariations] Parse error:", err);
+    return [];
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Auto-fix fact-check hallucinations (surgical rewrite, preserve flow)
@@ -1099,4 +1068,61 @@ ${draftHtml}`;
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+/**
+ * Auto-fix loop for SEO/Typography audit failures.
+ * Receives the HTML and a list of failure messages from the audit.
+ * Rewrites only what's necessary to fix the issues.
+ */
+export async function fixAuditIssues(
+  draftHtml: string,
+  auditFailures: string[],
+  tokenUsage?: TokenUsageRecord[]
+): Promise<string> {
+  if (auditFailures.length === 0) return draftHtml;
+
+  const anthropic = getAnthropicClient();
+  const startMs = Date.now();
+
+  const system = `You are an SEO Editor fixing a blog post.
+The post failed automated audits with the following errors:
+${auditFailures.map(f => `- ${f}`).join("\n")}
+
+Rewrite the article HTML to fix exactly these issues.
+- If it says keyword is missing in the first 10%, weave it naturally into the first paragraph.
+- If paragraphs are too long (>120 words), break them up.
+- If it mentions excessive symbols or "AI-sounding" phrases, remove them.
+- Preserve the overall structure and facts.
+- Return ONLY the raw fixed HTML. Do NOT return markdown blocks or JSON.`;
+
+  const stream = anthropic.messages.stream({
+    model: CLAUDE_DEFAULT_MODEL,
+    max_tokens: 32000,
+    temperature: 0.2,
+    system,
+    messages: [{ role: "user", content: draftHtml }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) tokenUsage.push({
+    callName: "fixAuditIssues",
+    model: CLAUDE_DEFAULT_MODEL,
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.promptTokens + usage.completionTokens,
+    durationMs,
+  });
+
+  const contentBlock = message.content?.[0];
+  if (!contentBlock || contentBlock.type !== "text") return draftHtml;
+
+  let html = contentBlock.text.trim();
+  if (html.startsWith("```html")) html = html.slice(7);
+  else if (html.startsWith("```")) html = html.slice(3);
+  if (html.endsWith("```")) html = html.slice(0, -3);
+
+  return html.trim() || draftHtml;
 }

@@ -55,6 +55,12 @@ export async function POST(request: NextRequest) {
         }
       };
 
+      const keepAlive = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(`:\\n\\n`));
+        } catch { }
+      }, 10_000);
+
       try {
         const result = await runResearchSerpOnly(
           pipelineInput,
@@ -69,12 +75,18 @@ export async function POST(request: NextRequest) {
             title: s.title,
             url: s.url,
           })),
+          paaQuestions: result.paaQuestions ?? [],
+          paaItems: result.paaItems ?? [],
+          serpFeatures: result.serpFeatures,
+          intentValidation: result.intentValidation,
+          redditThreads: result.redditThreads ?? [],
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Research failed";
         console.error("Blog research error:", error);
         sendEvent("error", { error: message });
       } finally {
+        clearInterval(keepAlive);
         try {
           controller.close();
         } catch {

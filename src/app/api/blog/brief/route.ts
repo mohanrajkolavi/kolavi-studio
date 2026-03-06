@@ -67,12 +67,12 @@ export async function POST(request: NextRequest) {
       clientInput &&
       clientSerpResults.length > 0 &&
       selectedUrls.length >= 1 &&
-      selectedUrls.length <= 3;
+      selectedUrls.length <= 4;
     if (!canRecover) {
       return new Response(
         JSON.stringify({
           error:
-            "Research not completed. Go back to Select competitors, pick 1–3 URLs, and click Continue.",
+            "Research not completed. Go back to Select competitors, pick 1–4 URLs, and click Continue.",
           code: ERROR_CODE_RESEARCH_INCOMPLETE,
         }),
         { status: 400, headers: { "Content-Type": "application/json" } }
@@ -154,6 +154,12 @@ export async function POST(request: NextRequest) {
         }
       };
 
+      const keepAlive = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(`:\\n\\n`));
+        } catch { }
+      }, 10_000);
+
       try {
         const result = await runBriefChunk(
           jobId,
@@ -173,12 +179,13 @@ export async function POST(request: NextRequest) {
         const message = error instanceof Error ? error.message : "Brief failed";
         const code =
           error instanceof Error &&
-          message.startsWith("Research not completed")
+            message.startsWith("Research not completed")
             ? ERROR_CODE_RESEARCH_INCOMPLETE
             : undefined;
         console.error("Blog brief error:", error);
         sendEvent("error", { error: message, ...(code && { code }) });
       } finally {
+        clearInterval(keepAlive);
         try {
           controller.close();
         } catch {

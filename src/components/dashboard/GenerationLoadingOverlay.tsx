@@ -139,15 +139,15 @@ export function GenerationLoadingOverlay({
     const chunk = progress?.chunk;
     const current = isDemo
       ? (key === "competitors" && demoStep === "research") ||
-        (key === "fetch_articles" && demoStep === "fetch") ||
-        (key === "brief" && demoStep === "brief") ||
-        (key === "draft" && demoStep === "draft") ||
-        (key === "validate" && demoStep === "validate")
+      (key === "fetch_articles" && demoStep === "fetch") ||
+      (key === "brief" && demoStep === "brief") ||
+      (key === "draft" && demoStep === "draft") ||
+      (key === "validate" && demoStep === "validate")
       : (key === "competitors" && chunk === "research" && !hasSerp) ||
-        (key === "fetch_articles" && chunk === "research" && hasSerp && !hasResearch) ||
-        (key === "brief" && chunk === "brief") ||
-        (key === "draft" && chunk === "draft") ||
-        (key === "validate" && chunk === "validate");
+      (key === "fetch_articles" && chunk === "research" && hasSerp && !hasResearch) ||
+      (key === "brief" && chunk === "brief") ||
+      (key === "draft" && chunk === "draft") ||
+      (key === "validate" && chunk === "validate");
 
     return { done, current };
   };
@@ -160,83 +160,77 @@ export function GenerationLoadingOverlay({
       role="status"
       aria-live="polite"
       aria-label="Content generation in progress"
-      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-8 px-6 py-10 animate-in fade-in duration-300 bg-background/90 backdrop-blur-2xl border border-border/40"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 bg-background/80 backdrop-blur-3xl"
     >
-      {/* Current step: message + elapsed + % */}
-      <div className="flex flex-col items-center gap-2 text-center">
-        <div className="flex items-center gap-3">
-          <div className="generation-loading-spinner shrink-0" aria-hidden />
-          <p className="text-[17px] font-semibold tracking-tight text-foreground">
-            {message}
-          </p>
-        </div>
-        {currentProcess && (
-          <p className="text-[13px] text-muted-foreground max-w-[320px]">
-            {currentProcess.description}
-          </p>
-        )}
-        <p className="text-[12px] font-medium tabular-nums text-muted-foreground/90 rounded-full bg-muted/50 px-3 py-1">
-          {elapsedSeconds > 0 ? formatElapsed(elapsedSeconds) : "—"} elapsed
-          <span className="mx-2 text-muted-foreground/60">·</span>
-          {Math.round(progressPercent)}%
-        </p>
-      </div>
+      <div className="flex flex-col items-center w-full max-w-md gap-10">
 
-      {/* Process list: each step clearly labeled */}
-      <div className="w-full max-w-[520px] space-y-2">
-        {PROCESSES.map(({ key, label, description }, i) => {
-          const { done, current } = getProcessState(key);
-          const stepNum = i + 1;
-          return (
-            <div
-              key={key}
-              className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-all duration-300 ${
-                current
-                  ? "border-orange-500/60 bg-orange-500/10"
-                  : done
-                    ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10"
-                    : "border-border/50 bg-muted/20"
-              }`}
-            >
-              <span
-                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold tabular-nums transition-colors ${
-                  done ? "" : current ? "" : "bg-muted/50 text-muted-foreground"
-                }`}
-                aria-hidden
-              >
-                {done ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2.5} />
-                ) : current ? (
-                  <span className="generation-loading-spinner-sm generation-loading-spinner-on-orange h-4 w-4" aria-hidden />
-                ) : (
-                  stepNum
-                )}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`text-[13px] font-medium ${
-                    current ? "text-foreground" : done ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"
+        {/* Main Status Text */}
+        <div className="flex flex-col items-center gap-3 text-center animate-reveal-hero">
+          <div className="generation-loading-spinner mb-4 shrink-0" aria-hidden />
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+            {message}
+          </h2>
+          {currentProcess && (
+            <p className="text-base text-muted-foreground/80 max-w-[280px]">
+              {currentProcess.description}
+            </p>
+          )}
+        </div>
+
+        {/* Minimalist Process List */}
+        <div className="w-full space-y-4 px-4 animate-reveal" style={{ animationDelay: "150ms" }}>
+          {PROCESSES.map(({ key, label }) => {
+            const { done, current } = getProcessState(key);
+
+            return (
+              <div
+                key={key}
+                className={`flex items-center gap-4 transition-all duration-500 ease-out ${current
+                    ? "opacity-100 scale-100"
+                    : done
+                      ? "opacity-60 scale-95"
+                      : "opacity-30 scale-95"
                   }`}
+              >
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center">
+                  {done ? (
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" strokeWidth={2.5} />
+                  ) : current ? (
+                    <span className="generation-loading-spinner-sm h-4 w-4" aria-hidden />
+                  ) : (
+                    <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+                  )}
+                </div>
+                <p
+                  className={`text-[15px] font-medium transition-colors duration-500 ${current
+                      ? "text-foreground"
+                      : done
+                        ? "text-foreground/80"
+                        : "text-muted-foreground"
+                    }`}
                 >
                   {label}
                 </p>
-                {current && (
-                  <p className="text-[11px] text-muted-foreground mt-0.5">{description}</p>
-                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {/* Progress bar */}
-      <div className="w-full max-w-[420px]" role="progressbar" aria-valuenow={Math.round(progressPercent)} aria-valuemin={0} aria-valuemax={100} aria-label="Overall progress">
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/50 dark:bg-muted/30">
+        {/* Floating Metrics Pill */}
+        <div className="mt-4 flex items-center gap-3 rounded-full bg-background/50 border border-border/40 px-5 py-2 text-[13px] font-medium tabular-nums text-muted-foreground shadow-sm backdrop-blur-md animate-reveal" style={{ animationDelay: "300ms" }}>
+          <span>{elapsedSeconds > 0 ? formatElapsed(elapsedSeconds) : "0s"} elapsed</span>
+          <div className="h-3 w-[1px] bg-border" />
+          <span className="text-foreground">{Math.round(progressPercent)}%</span>
+        </div>
+
+        {/* Ultra-thin Progress Bar - Positioned Fixed at Bottom */}
+        <div className="fixed bottom-0 left-0 w-full h-1 bg-transparent" role="progressbar" aria-valuenow={Math.round(progressPercent)} aria-valuemin={0} aria-valuemax={100}>
           <div
-            className="generation-loading-bar h-full rounded-full transition-all duration-700 ease-out"
-            style={{ width: `${Math.max(2, progressPercent)}%` }}
+            className="h-full bg-primary transition-all duration-700 ease-out shadow-[0_0_10px_rgba(255,100,0,0.4)]"
+            style={{ width: `${Math.max(1, progressPercent)}%` }}
           />
         </div>
+
       </div>
     </div>
   );

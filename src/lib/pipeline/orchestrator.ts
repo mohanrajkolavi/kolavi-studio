@@ -25,7 +25,6 @@ import {
   type ValidatedSourceUrl,
   type SchemaMarkup,
   type TokenUsageRecord,
-  getDefaultWordCountForIntent,
   RETRY_FAST,
   RETRY_STANDARD,
   RETRY_STANDARD_FAST,
@@ -40,6 +39,8 @@ import { writeDraft, fixHallucinationsInContent } from "@/lib/claude/client";
 import {
   auditArticle,
   generateSchemaMarkup,
+  generateLlmsTxt,
+  generateEntitySchema,
   enforceFaqCharacterLimit,
   extractH2sFromHtml,
   verifyFactsAgainstSource,
@@ -304,12 +305,12 @@ export async function runPipeline(
     groundingResult.success && groundingResult.data
       ? groundingResult.data
       : {
-          facts: [],
-          recentDevelopments: [],
-          lastUpdated: "Unknown",
-          groundingVerified: false,
-          sourceUrlValidation: { total: 0, accessible: 0, inaccessible: [] },
-        };
+        facts: [],
+        recentDevelopments: [],
+        lastUpdated: "Unknown",
+        groundingVerified: false,
+        sourceUrlValidation: { total: 0, accessible: 0, inaccessible: [] },
+      };
 
   emit("jina", jinaResult.success ? "completed" : "failed",
     `${competitors.filter((c) => c.fetchSuccess).length} articles fetched`, 15);
@@ -374,31 +375,12 @@ export async function runPipeline(
     );
   }
 
-  // --- Step 3: Brief (GPT-4.1) — outline, H2/H3, word count from intent, keyword rules ---
-  const wordCountOverride = (() => {
-    const preset = input.wordCountPreset;
-    if (preset === "custom") {
-      const n = input.wordCountCustom;
-      if (n == null || n < 500 || n > 6000) return undefined;
-      return {
-        target: Math.round(n),
-        note: "STRICT: target must be met within ±5%.",
-      };
-    }
-    // "auto" or unspecified: use intent-based default word count
-    const intentList = Array.isArray(input.intent) ? input.intent : input.intent ? [input.intent] : undefined;
-    const target = getDefaultWordCountForIntent(intentList);
-    return {
-      target,
-      note: "STRICT: target must be met within ±5%.",
-    };
-  })();
-
+  // --- Step 3: Brief (GPT-4.1) — outline, H2/H3, word count from extraction; user can change in brief section ---
   metrics.startChunk("gpt-brief");
   const gptBriefTokenStart = tokenUsage.length;
   emit("gpt-brief", "started", "Building strategic research brief...", 30);
   const briefResult = await withRetry(
-    async () => buildResearchBrief(topicExtraction, currentData, input, wordCountOverride, tokenUsage),
+    async () => buildResearchBrief(topicExtraction, currentData, input, undefined, tokenUsage),
     { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
     "gpt-brief"
   );
@@ -436,9 +418,9 @@ export async function runPipeline(
   metrics.startChunk("claude-draft");
   const claudeDraftTokenStart = tokenUsage.length;
   emit("claude-draft", "started", "Writing article draft (this is the longest step)...", 45);
-  const draftModel = input.draftModel ?? "sonnet-4.6";
+  const draftModel = input.draftModel ?? "opus-4.6";
   const draftResult = await withRetry(
-    async () => writeDraft(brief, titleMetaSlug, tokenUsage, draftModel),
+    async () => writeDraft(brief, titleMetaSlug, tokenUsage, draftModel, input.fieldNotes),
     { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
     "claude-draft"
   );
@@ -459,6 +441,12 @@ export async function runPipeline(
   metrics.startChunk("faq-enforcement");
   emit("faq-enforcement", "started", "Enforcing FAQ character limits...", 82);
   let finalContent = draft.content;
+
+  // Regex Nuke for Textbook Definitions (Claude habit)
+  finalContent = finalContent
+    .replace(/Local SEO is the process of optimizing your business'?s? online presence/gi, "If you want to dominate your neighborhood market, you have to master local search.")
+    .replace(new RegExp(`(?:<p>)?(?:<strong>)?${primaryKeyword}(?:<\\/strong>)?\\s+is the process of\\s+[^<]+(?:<\\/p>)?`, 'gi'), "");
+
   const faqEnforcement = enforceFaqCharacterLimit(finalContent, 300);
   if (!faqEnforcement.passed) {
     finalContent = faqEnforcement.fixedHtml;
@@ -582,10 +570,10 @@ export async function runPipeline(
     (brief.freshnessNote?.trim?.()?.length ?? 0) > 0;
   const briefSummary: BriefSummary | undefined = hasBriefSummary
     ? {
-        similaritySummary: brief.similaritySummary,
-        extraValueThemes: brief.extraValueThemes,
-        freshnessNote: brief.freshnessNote,
-      }
+      similaritySummary: brief.similaritySummary,
+      extraValueThemes: brief.extraValueThemes,
+      freshnessNote: brief.freshnessNote,
+    }
     : undefined;
 
   const targetWords = brief.wordCount?.target ?? 0;
@@ -595,6 +583,21 @@ export async function runPipeline(
   metrics.setAuditScore(auditResult.score ?? 0);
   metrics.setHallucinationCount(factCheck.hallucinations.length);
   const runMetrics = metrics.finishRun("completed");
+
+  // --- Generate machine-readable outputs (llms.txt + entity schema) ---
+  const llmsTxt = generateLlmsTxt(
+    finalContent,
+    titleMetaSlug.title,
+    titleMetaSlug.metaDescription,
+    primaryKeyword
+  );
+  const entitySchema = generateEntitySchema(
+    finalContent,
+    titleMetaSlug.title,
+    titleMetaSlug.metaDescription,
+    titleMetaSlug.suggestedSlug,
+    primaryKeyword
+  );
 
   return {
     article: {
@@ -627,5 +630,7 @@ export async function runPipeline(
     ...(tokenUsage.length > 0 ? { tokenUsage } : {}),
     metrics: runMetrics,
     performanceSummary: runMetrics.performanceSummary,
+    llmsTxt,
+    entitySchema,
   };
 }

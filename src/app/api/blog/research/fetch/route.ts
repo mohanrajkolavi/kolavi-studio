@@ -60,8 +60,8 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   }
-  if (selectedUrls.length === 0 || selectedUrls.length > 3) {
-    return new Response(JSON.stringify({ error: "Select 1 to 3 URLs" }), {
+  if (selectedUrls.length === 0 || selectedUrls.length > 4) {
+    return new Response(JSON.stringify({ error: "Select 1 to 4 URLs" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
@@ -139,6 +139,12 @@ export async function POST(request: NextRequest) {
         }
       };
 
+      const keepAlive = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(`:\\n\\n`));
+        } catch { }
+      }, 10_000);
+
       const startMs = Date.now();
       logResearchFetchApi("info", { event: "research_fetch_start", jobId, selectedCount: selectedUrls.length });
 
@@ -155,6 +161,11 @@ export async function POST(request: NextRequest) {
           researchSummary: result.researchSummary,
           competitorUrls: result.competitorUrls,
           competitorTitles: result.competitorTitles,
+          paaQuestions: result.paaQuestions ?? [],
+          paaItems: result.paaItems ?? [],
+          serpFeatures: result.serpFeatures,
+          redditQuotes: result.redditQuotes ?? [],
+          redditThreads: result.redditThreads ?? [],
         });
         logResearchFetchApi("info", {
           event: "research_fetch_complete",
@@ -173,6 +184,7 @@ export async function POST(request: NextRequest) {
         logResearchFetchApi("error", { event: "research_fetch_error", jobId, error: message, durationMs: Date.now() - startMs });
         sendEvent("error", { error: message });
       } finally {
+        clearInterval(keepAlive);
         try {
           controller.close();
         } catch {

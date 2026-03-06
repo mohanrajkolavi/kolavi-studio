@@ -35,6 +35,63 @@ function extractTitleFromContent(content: string, url: string): string {
 }
 
 /**
+ * Extract the most recent date from scraped content.
+ * Prioritizes "last updated" / "modified" dates over publish dates,
+ * since updated content is fresher even if originally published long ago.
+ */
+function extractFreshnessDate(content: string): string | undefined {
+  const isoDateRe = /(20\d{2}-\d{2}-\d{2})/;
+  const naturalDateRe = /(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+\d{1,2},?\s+20\d{2}/i;
+
+  // --- Priority 1: Look for "Updated" / "Modified" anywhere in the content ---
+  const updatePatterns = [
+    /(?:last\s+)?(?:updated|modified|revised|edited)\s*(?:on|:)?\s*/gi,
+    /dateModified["\s:]+/gi,
+    /article:modified_time["\s:]+/gi,
+  ];
+
+  for (const pattern of updatePatterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(content)) !== null) {
+      // Look for a date right after the "updated" label (within 80 chars)
+      const after = content.slice(match.index + match[0].length, match.index + match[0].length + 80);
+      const isoMatch = after.match(isoDateRe);
+      if (isoMatch) return isoMatch[1];
+      const naturalMatch = after.match(naturalDateRe);
+      if (naturalMatch) return naturalMatch[0];
+    }
+  }
+
+  // --- Priority 2: Fall back to earliest date in first 500 chars (likely publish date) ---
+  const head = content.slice(0, 500);
+  const isoMatch = head.match(isoDateRe);
+  if (isoMatch) return isoMatch[1];
+  const naturalMatch = head.match(naturalDateRe);
+  if (naturalMatch) return naturalMatch[0];
+
+  return undefined;
+}
+
+/** Compute freshness score 0-1 based on publish date. */
+function computeFreshnessScore(publishDate?: string): number {
+  if (!publishDate) return 0.5; // unknown = neutral
+  try {
+    const date = new Date(publishDate);
+    if (isNaN(date.getTime())) return 0.5;
+    const ageMs = Date.now() - date.getTime();
+    const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30);
+    if (ageMonths <= 3) return 1.0;
+    if (ageMonths <= 6) return 0.9;
+    if (ageMonths <= 12) return 0.7;
+    if (ageMonths <= 18) return 0.5;
+    if (ageMonths <= 24) return 0.3;
+    return 0.1; // >2 years old
+  } catch {
+    return 0.5;
+  }
+}
+
+/**
  * Fetch a single URL via Jina Reader.
  * Returns clean markdown/text of the page content.
  */
@@ -164,12 +221,15 @@ export async function fetchCompetitorContent(
   return results.map((r, i): CompetitorArticle => {
     const url = toFetch[i] ?? "";
     const title = r.success ? extractTitleFromContent(r.content, r.url) : "";
+    const publishDate = r.success ? extractFreshnessDate(r.content) : undefined;
     return {
       url: r.url,
       title,
       content: r.content,
       wordCount: wordCount(r.content),
       fetchSuccess: r.success,
+      publishDate,
+      freshnessScore: computeFreshnessScore(publishDate),
     };
   });
 }

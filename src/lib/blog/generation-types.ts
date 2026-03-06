@@ -60,6 +60,9 @@ export type PipelineResult = {
     reason: string;
     replacedWithVerifiedFact: boolean;
   }>;
+  contentDiff?: import("@/lib/seo/content-diff").ContentDiffResult;
+  semanticSimilarity?: { highestSimilarity: number; mostSimilarUrl: string; isTooDerivative: boolean };
+  contentDecayRisk?: import("@/lib/seo/content-decay").ContentDecayResult;
 };
 
 function humanizeSlug(slug: string): string {
@@ -101,10 +104,6 @@ export type GenerationInput = {
   peopleAlsoSearchFor?: string[];
   intent: string[];
   competitorUrls: string[];
-  /** "auto" = default by intent; "custom" = wordCountCustom. */
-  wordCountPreset?: "auto" | "custom";
-  /** Target words when wordCountPreset is "custom". */
-  wordCountCustom?: number;
   /** Draft model: Opus 4.6 or Sonnet 4.6. */
   draftModel?: "opus-4.6" | "sonnet-4.6";
 };
@@ -127,6 +126,39 @@ export type Phase =
 
 export type ChunkName = "research" | "brief" | "draft" | "validate";
 
+/** SERP features (from Step 1) for UI. */
+export type SerpFeaturesForUI = {
+  hasKnowledgeGraph: boolean;
+  hasAnswerBox: boolean;
+  hasFeaturedSnippet: boolean;
+  hasVideoCarousel: boolean;
+  hasTopStories: boolean;
+  relatedSearches: string[];
+};
+
+/** Intent validation (from Step 1) for UI. */
+export type IntentValidationForUI = {
+  declaredIntent: string;
+  detectedIntent: string;
+  confidence: number;
+  warning?: string;
+};
+
+/** Reddit thread for UI (from Step 1 or research chunk). */
+export type RedditThreadForUI = {
+  url: string;
+  title: string;
+  snippet?: string;
+};
+
+/** One People Also Ask item for UI (question + optional snippet/title/link). */
+export type PaaItemForUI = {
+  question: string;
+  snippet?: string;
+  title?: string;
+  link?: string;
+};
+
 /** Research chunk result for UI (summary card). */
 export type ResearchChunkResult = {
   urlCount: number;
@@ -135,6 +167,16 @@ export type ResearchChunkResult = {
   competitorUrls: string[];
   /** Titles for each competitor (same order as competitorUrls), when available. */
   competitorTitles?: string[];
+  /** People Also Ask questions (from Step 1, passed through research chunk). */
+  paaQuestions?: string[];
+  /** Full PAA items (question + snippet/title/link) for UI. */
+  paaItems?: PaaItemForUI[];
+  /** SERP features from Step 1. */
+  serpFeatures?: SerpFeaturesForUI;
+  /** Reddit quotes extracted in Step 2. */
+  redditQuotes?: string[];
+  /** Reddit thread URLs/titles from Step 1. */
+  redditThreads?: RedditThreadForUI[];
 };
 
 /** One SERP result for competitor selection (position, title, URL — no snippet). */
@@ -147,6 +189,16 @@ export type ResearchSerpItem = {
 /** Research SERP-only result (top 10 for user to select up to 3). */
 export type ResearchSerpResult = {
   results: ResearchSerpItem[];
+  /** People Also Ask questions from Serper. */
+  paaQuestions?: string[];
+  /** Full PAA items (question + snippet/title/link) for UI. */
+  paaItems?: PaaItemForUI[];
+  /** SERP features (knowledge graph, answer box, etc.). */
+  serpFeatures?: SerpFeaturesForUI;
+  /** Intent validation (declared vs detected). */
+  intentValidation?: IntentValidationForUI;
+  /** Reddit discussion threads (dedicated search + organic from SERP). */
+  redditThreads?: RedditThreadForUI[];
 };
 
 /** Outline section for brief/editor (matches pipeline OutlineSection). */
@@ -186,6 +238,10 @@ export type ValidationChunkResult = {
   schemaMarkup: NonNullable<PipelineResult["schemaMarkup"]>;
   /** FAQ-enforced HTML (used as article.content in PipelineResult). */
   finalContent: string;
+  autoFixAttempts?: number;
+  contentDiff?: import("@/lib/seo/content-diff").ContentDiffResult;
+  semanticSimilarity?: { highestSimilarity: number; mostSimilarUrl: string; isTooDerivative: boolean };
+  contentDecayRisk?: import("@/lib/seo/content-decay").ContentDecayResult;
 };
 
 /** Brief overrides for draft endpoint (edited outline). */
@@ -230,7 +286,7 @@ export function buildPipelineResultFromChunks(
   if (!draft || !validation) {
     throw new Error(
       "buildPipelineResultFromChunks requires chunkOutputs.draft and chunkOutputs.validation to be set; " +
-        `got draft=${Boolean(draft)}, validation=${Boolean(validation)}`
+      `got draft=${Boolean(draft)}, validation=${Boolean(validation)}`
     );
   }
   const brief = chunkOutputs.brief;
@@ -266,5 +322,8 @@ export function buildPipelineResultFromChunks(
     factCheck: validation.factCheck,
     briefSummary: brief?.briefSummary,
     outlineDrift,
+    contentDiff: validation.contentDiff,
+    semanticSimilarity: validation.semanticSimilarity,
+    contentDecayRisk: validation.contentDecayRisk,
   };
 }

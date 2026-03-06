@@ -13,9 +13,6 @@ import type { PipelineRunMetrics, PerformanceSummary } from "@/lib/pipeline/metr
 
 export type SearchIntent = "informational" | "commercial" | "transactional" | "navigational";
 
-/** Word count: "auto" = default by search intent; "custom" = wordCountCustom. */
-export type WordCountPreset = "auto" | "custom";
-
 /** Draft model for Claude writeDraft step. */
 export type DraftModel = "opus-4.6" | "sonnet-4.6";
 
@@ -43,18 +40,20 @@ export function getDefaultWordCountForIntent(intent: SearchIntent[] | undefined)
 
 export type PipelineInput = {
   primaryKeyword: string;
-  /** Max 2 secondary keywords. */
+  /** Max 4 secondary keywords. */
   secondaryKeywords?: string[];
   peopleAlsoSearchFor?: string[];
   intent?: SearchIntent | SearchIntent[];
-  /** "auto" = default by intent; "custom" = wordCountCustom. */
-  wordCountPreset?: WordCountPreset;
-  /** Used only when wordCountPreset is "custom". */
-  wordCountCustom?: number;
   /** Draft model: Opus 4.6 or Sonnet 4.6. */
   draftModel?: DraftModel;
   /** When true (default), auto-fix fact-check hallucinations via Claude. */
   autoFixHallucinations?: boolean;
+  /** Optional raw notes, quotes, or "field data" from the author/client for E-E-A-T. */
+  fieldNotes?: string;
+  /** Optional 1-2 paragraphs of client's existing writing for voice/tone matching. */
+  toneExamples?: string;
+  /** Optional existing blog URLs for internal link suggestions. */
+  existingBlogUrls?: string[];
 };
 
 /** Zod schema for validating job input (e.g. when loading from store). */
@@ -66,10 +65,11 @@ export const PipelineInputSchema = z.object({
     z.string(),
     z.array(z.string()),
   ]).optional(),
-  wordCountPreset: z.string().optional(),
-  wordCountCustom: z.number().optional(),
   draftModel: z.enum(["opus-4.6", "sonnet-4.6"]).optional(),
   autoFixHallucinations: z.boolean().optional(),
+  fieldNotes: z.string().optional(),
+  toneExamples: z.string().optional(),
+  existingBlogUrls: z.array(z.string()).optional(),
 });
 
 // =============================================================================
@@ -94,6 +94,54 @@ export type CompetitorArticle = {
   content: string;
   wordCount: number;
   fetchSuccess: boolean;
+  /** Extracted publish date (ISO or natural language). */
+  publishDate?: string;
+  /** Freshness score 0-1 (1 = very fresh, 0 = stale/unknown). */
+  freshnessScore?: number;
+  /** Quality score 0-100 based on word count, heading depth, data density. */
+  qualityScore?: number;
+};
+
+// =============================================================================
+// 3b. Reddit Insights
+// =============================================================================
+
+/** Structured insight from a Reddit discussion thread. */
+export type RedditInsight = {
+  threadUrl: string;
+  threadTitle: string;
+  /** Top comments/insights scraped from the thread. */
+  topComments: string[];
+  /** Overall sentiment of the discussion. */
+  sentiment: "positive" | "negative" | "mixed";
+  /** Actionable practitioner tips extracted from user comments. */
+  practitionerTips: string[];
+};
+
+// =============================================================================
+// 3c. SERP Features
+// =============================================================================
+
+/** SERP feature detection — what Google shows for this query. */
+export type SerpFeatures = {
+  hasKnowledgeGraph: boolean;
+  hasAnswerBox: boolean;
+  hasFeaturedSnippet: boolean;
+  hasVideoCarousel: boolean;
+  hasTopStories: boolean;
+  relatedSearches: string[];
+};
+
+// =============================================================================
+// 3d. Intent Validation
+// =============================================================================
+
+/** Validates user-declared intent against actual SERP composition. */
+export type IntentValidation = {
+  declaredIntent: string;
+  detectedIntent: string;
+  confidence: number;
+  warning?: string;
 };
 
 // =============================================================================
@@ -296,6 +344,10 @@ export const TopicExtractionResultSchema = z.object({
   editorialStyle: EditorialStyleSchema,
   wordCount: WordCountNoteSchema,
   paaAnalysis: z.array(PaaAnalysisItemSchema).optional().default([]),
+  /** Recommended content format based on SERP and competitor analysis. */
+  recommendedFormat: z.enum(["listicle", "how-to", "comparison", "deep-dive", "review", "guide"]).optional(),
+  /** Rationale for the recommended format. */
+  formatRationale: z.string().optional(),
 });
 
 export type PaaAnalysisItem = z.infer<typeof PaaAnalysisItemSchema>;
@@ -313,6 +365,10 @@ export type OutlineSection = {
   topics: string[];
   targetWords: number;
   geoNote?: string;
+  /** 2-3 sentence answer targeting AI Overviews / Featured Snippets for this section. */
+  aiOverviewTarget?: string;
+  /** Suggested visual asset for this section (e.g. "comparison chart", "step diagram"). */
+  visualSuggestion?: string;
   subsections?: OutlineSection[];
 };
 
@@ -324,6 +380,8 @@ const OutlineSectionSchemaInner: z.ZodType<OutlineSection> = z.lazy(() =>
     topics: z.array(z.string()),
     targetWords: z.number(),
     geoNote: z.string().optional(),
+    aiOverviewTarget: z.string().optional(),
+    visualSuggestion: z.string().optional(),
     subsections: z.array(OutlineSectionSchemaInner).optional(),
   })
 );
@@ -358,6 +416,16 @@ export const ResearchBriefWordCountSchema = z.object({
   note: z.string(),
 });
 
+/** POV insight for Information Gain — contrarian/unique angle on a topic. */
+export const PovInsightSchema = z.object({
+  topic: z.string(),
+  conventionalView: z.string(),
+  contrarian: z.string(),
+  source: z.string(),
+});
+
+export type PovInsight = z.infer<typeof PovInsightSchema>;
+
 export const ResearchBriefSchema = z.object({
   keyword: z.object({
     primary: z.string(),
@@ -378,6 +446,16 @@ export const ResearchBriefSchema = z.object({
   freshnessNote: z.string().optional(),
   /** Patterns to avoid (from likely_ai competitors); passed to Step 4 as writing constraints. */
   competitorDifferentiation: z.string().optional(),
+  /** POV / Information Gain insights — contrarian angles to differentiate content. */
+  povInsights: z.array(PovInsightSchema).optional().default([]),
+  /** Recommended content format for this article. */
+  contentFormat: z.string().optional(),
+  /** Internal link suggestions when existingBlogUrls provided. */
+  internalLinkSuggestions: z.array(z.object({
+    url: z.string(),
+    anchorText: z.string(),
+    targetSection: z.string(),
+  })).optional(),
 });
 
 /** Used when GPT returns brief without currentData (merged server-side). */
@@ -404,7 +482,7 @@ export const TitleMetaVariantSchema = z.object({
   approach: z.string(),
 });
 
-// Claude draft output (writeDraft response) — content only. Title, meta, slug come from OpenAI generateTitleMetaSlugFromContent (called from result page).
+// Claude draft output (writeDraft response) — content only. Title, meta, slug come from Claude generateTitleMetaSlugFromContent (same draft model; called from result page).
 export const ClaudeDraftOutputSchema = z.object({
   content: z.string().min(1),
   suggestedCategories: z.array(z.string()),
@@ -509,6 +587,22 @@ export type PipelineOutput = {
   metrics?: PipelineRunMetrics;
   /** Human-readable performance summary (observability). */
   performanceSummary?: PerformanceSummary;
+  /** llms.txt snippet for AI crawlers — machine-readable article summary. */
+  llmsTxt?: string;
+  /** JSON-LD entity/about schema mapping entities in the article. */
+  entitySchema?: object;
+  /** Readability scores (Flesch-Kincaid Grade Level, Gunning Fog Index). */
+  readabilityScores?: { fleschKincaid: number; gunningFog: number; grade: string };
+  /** Originality check — n-gram similarity against competitors. */
+  originalityScore?: { score: number; flaggedParagraphs: { text: string; similarity: number; matchedUrl: string }[] };
+  /** Competitive comparison score against top competitors. */
+  competitiveScore?: { score: number; breakdown: { wordCount: number; topicCoverage: number; dataDensity: number; headingDepth: number } };
+  /** SERP feature detection — what Google shows for this query. */
+  serpFeatures?: SerpFeatures;
+  /** Intent validation — user-declared vs SERP-detected intent. */
+  intentValidation?: IntentValidation;
+  /** Reddit/community insights gathered during research. */
+  redditInsights?: RedditInsight[];
 };
 
 // =============================================================================

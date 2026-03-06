@@ -127,10 +127,9 @@
 
 | Component | File |
 |-----------|------|
-| Blog generator | `src/lib/claude/client.ts` (SYSTEM_PROMPT, user prompt, `generateBlogPost`) |
+| Blog draft generator | `src/lib/claude/client.ts` (SYSTEM_PROMPT, `writeDraft`) |
 | Humanize | `src/lib/claude/client.ts` (HUMANIZE_SYSTEM, `humanizeArticleContent`) |
 | Article audit | `src/lib/seo/article-audit.ts` (`auditArticle`, AI_PHRASES, Level 1/2/3) |
-| Generate API | `src/app/api/blog/generate/route.ts` (generate → humanize → return) |
 | Dashboard | `src/app/dashboard/(main)/blog/page.tsx` (audit on `editing`, focusKeyword from first keyword) |
 | Standalone audit script | `scripts/run-audit.mjs` (AI_PHRASES kept in sync with article-audit) |
 
@@ -151,7 +150,7 @@ The flow is designed so every output embodies:
 
 ## Coordination (generator, humanize, audit)
 
-- **Generate API:** Runs `generateBlogPost` then `humanizeArticleContent`; returns one result. Dashboard audits that result with `focusKeyword` from the first keyword.
+- **Pipeline:** Research → Brief (OpenAI) → Draft (Claude `writeDraft`) → optional humanize; dashboard audits with `focusKeyword` from the first keyword.
 - **Shared AI phrases:** The generator and humanize prompts use the same conceptual BANNED list as the audit's `AI_PHRASES`. When adding or removing a phrase, update: (1) generator system + user prompt in `src/lib/claude/client.ts`, (2) `AI_PHRASES` in `src/lib/seo/article-audit.ts`, (3) `AI_PHRASES` in `scripts/run-audit.mjs`.
 - **Typography (strict for under 30% AI detection):** Em-dash, en-dash, curly quotes BANNED. Use straight " and ' only. Synced in auditAiTypography and generator/humanize prompts. No exceptions.
 - **Detection alignment:** Generator and humanize prompts now include perplexity (unpredictable word choice), burstiness of perplexity (vary predictability), varied sentence openings, and humanize explicitly does more than paraphrase (restructure, idioms) to align with how GPTZero/ZeroGPT and similar detectors work.

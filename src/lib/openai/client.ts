@@ -85,11 +85,11 @@ export async function extractTopicsAndStyle(
   const payload =
     successful.length > 0
       ? successful
-          .map(
-            (c) =>
-              `--- URL: ${c.url}\nTitle: ${c.title}\nWord count: ${c.wordCount}\n\n${c.content.slice(0, 12000)}`
-          )
-          .join("\n\n---\n\n")
+        .map(
+          (c) =>
+            `--- URL: ${c.url}\nTitle: ${c.title}\nWord count: ${c.wordCount}\n\n${c.content.slice(0, 12000)}`
+        )
+        .join("\n\n---\n\n")
       : "No competitor content provided. Generate expected topics and a default editorial style for a generic blog article.";
 
   const rootKeys = hasPaa
@@ -235,19 +235,19 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
   const keyword =
     parsed.keyword != null && typeof parsed.keyword === "object" && !Array.isArray(parsed.keyword)
       ? {
-          primary: String((parsed.keyword as Record<string, unknown>).primary ?? primaryKeyword),
-          secondary: Array.isArray((parsed.keyword as Record<string, unknown>).secondary)
-            ? ((parsed.keyword as Record<string, unknown>).secondary as unknown[]).map(String)
-            : [],
-          pasf: Array.isArray((parsed.keyword as Record<string, unknown>).pasf)
-            ? ((parsed.keyword as Record<string, unknown>).pasf as unknown[]).map(String)
-            : [],
-        }
+        primary: String((parsed.keyword as Record<string, unknown>).primary ?? primaryKeyword),
+        secondary: Array.isArray((parsed.keyword as Record<string, unknown>).secondary)
+          ? ((parsed.keyword as Record<string, unknown>).secondary as unknown[]).map(String)
+          : [],
+        pasf: Array.isArray((parsed.keyword as Record<string, unknown>).pasf)
+          ? ((parsed.keyword as Record<string, unknown>).pasf as unknown[]).map(String)
+          : [],
+      }
       : {
-          primary: typeof parsed.keyword === "string" ? parsed.keyword : primaryKeyword,
-          secondary: [] as string[],
-          pasf: [] as string[],
-        };
+        primary: typeof parsed.keyword === "string" ? parsed.keyword : primaryKeyword,
+        secondary: [] as string[],
+        pasf: [] as string[],
+      };
 
   function normSection(item: unknown): Record<string, unknown> {
     if (item != null && typeof item === "object" && !Array.isArray(item)) {
@@ -259,6 +259,7 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
         topics: Array.isArray(o.topics) ? o.topics.map(String) : [],
         targetWords: typeof o.targetWords === "number" ? o.targetWords : Number(o.targetWords) || 150,
         geoNote: o.geoNote != null ? String(o.geoNote) : undefined,
+        aiOverviewTarget: o.aiOverviewTarget != null ? String(o.aiOverviewTarget) : undefined,
         subsections: Array.isArray(o.subsections) ? o.subsections.map(normSection) : undefined,
       };
     }
@@ -304,44 +305,44 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
   const geoRequirements =
     rawGeo != null && typeof rawGeo === "object" && !Array.isArray(rawGeo)
       ? {
-          directAnswer: String((rawGeo as Record<string, unknown>).directAnswer ?? "The very first sentence of the article MUST contain a specific number from the research data. Not the second sentence. Not the third. The FIRST. THE TEST: Can an AI engine extract a complete factual answer from your first sentence alone, without reading anything else? If your first sentence contains zero numbers, it fails. BANNED FIRST SENTENCES (never write these): '[Subject] analysis reveals a company with unmatched brand value, record-setting financials, and a vast global ecosystem.' (no number, just adjectives); 'A [framework] breaks down [components] to assess where a business stands.' (definition of format); '[Subject] operates as the world's most valuable technology company.' (no specific data); '[Product] is one of the most popular choices in its category.' (vague, no data); 'This comprehensive guide covers everything you need to know about [topic].' (describes the article); 'When it comes to [topic], there are several factors to consider.' (says nothing). REQUIRED STRUCTURE: [Primary keyword] + [specific number from currentData] + [what that number means for the reader]. The number must come from currentData (revenue, market share, growth rate, price, benchmark score, user count). Pick the single most impressive or relevant number and lead with it. After this factual first sentence (30-40 words), follow with a hook (15-25 words)."),
-          statDensity: String((rawGeo as Record<string, unknown>).statDensity ?? "Include 1-2 stats per 200 words where data is provided."),
-          entities: String((rawGeo as Record<string, unknown>).entities ?? ""),
-          qaBlocks: String((rawGeo as Record<string, unknown>).qaBlocks ?? "FAQ ANSWERS: Maximum 300 characters per answer (roughly 2 short sentences). Be direct and factual. These must work as standalone snippets that Perplexity or Google AI Overviews can extract verbatim. Do NOT repeat what the article body already covers — provide a crisp new-angle summary instead. If the body explains something in 300 words, the FAQ answer should capture the essence in 2 sentences with a fresh framing."),
-          faqStrategy: String((rawGeo as Record<string, unknown>).faqStrategy ?? faqStrategyText),
-        }
+        directAnswer: String((rawGeo as Record<string, unknown>).directAnswer ?? "The very first sentence of the article MUST contain a specific number from the research data. Not the second sentence. Not the third. The FIRST. THE TEST: Can an AI engine extract a complete factual answer from your first sentence alone, without reading anything else? If your first sentence contains zero numbers, it fails. BANNED FIRST SENTENCES (never write these): '[Subject] analysis reveals a company with unmatched brand value, record-setting financials, and a vast global ecosystem.' (no number, just adjectives); 'A [framework] breaks down [components] to assess where a business stands.' (definition of format); '[Subject] operates as the world's most valuable technology company.' (no specific data); '[Product] is one of the most popular choices in its category.' (vague, no data); 'This comprehensive guide covers everything you need to know about [topic].' (describes the article); 'When it comes to [topic], there are several factors to consider.' (says nothing). REQUIRED STRUCTURE: [Primary keyword] + [specific number from currentData] + [what that number means for the reader]. The number must come from currentData (revenue, market share, growth rate, price, benchmark score, user count). Pick the single most impressive or relevant number and lead with it. After this factual first sentence (30-40 words), follow with a hook (15-25 words)."),
+        statDensity: String((rawGeo as Record<string, unknown>).statDensity ?? "Include 1-2 stats per 200 words where data is provided."),
+        entities: String((rawGeo as Record<string, unknown>).entities ?? ""),
+        qaBlocks: String((rawGeo as Record<string, unknown>).qaBlocks ?? "FAQ ANSWERS: Maximum 300 characters per answer (roughly 2 short sentences). Be direct and factual. These must work as standalone snippets that Perplexity or Google AI Overviews can extract verbatim. Do NOT repeat what the article body already covers — provide a crisp new-angle summary instead. If the body explains something in 300 words, the FAQ answer should capture the essence in 2 sentences with a fresh framing."),
+        faqStrategy: String((rawGeo as Record<string, unknown>).faqStrategy ?? faqStrategyText),
+      }
       : {
-          directAnswer: "The very first sentence of the article MUST contain a specific number from the research data. Not the second sentence. Not the third. The FIRST. THE TEST: Can an AI engine extract a complete factual answer from your first sentence alone, without reading anything else? If your first sentence contains zero numbers, it fails. BANNED FIRST SENTENCES (never write these): '[Subject] analysis reveals a company with unmatched brand value, record-setting financials, and a vast global ecosystem.' (no number, just adjectives); 'A [framework] breaks down [components] to assess where a business stands.' (definition of format); '[Subject] operates as the world's most valuable technology company.' (no specific data); '[Product] is one of the most popular choices in its category.' (vague, no data); 'This comprehensive guide covers everything you need to know about [topic].' (describes the article); 'When it comes to [topic], there are several factors to consider.' (says nothing). REQUIRED STRUCTURE: [Primary keyword] + [specific number from currentData] + [what that number means for the reader]. The number must come from currentData (revenue, market share, growth rate, price, benchmark score, user count). Pick the single most impressive or relevant number and lead with it. After this factual first sentence (30-40 words), follow with a hook (15-25 words).",
-          statDensity: "Include 1-2 stats per 200 words where data is provided.",
-          entities: "",
-          qaBlocks: "FAQ ANSWERS: Maximum 300 characters per answer (roughly 2 short sentences). Be direct and factual. Do NOT repeat what the article body already covers — provide a crisp new-angle summary instead.",
-          faqStrategy: faqStrategyText,
-        };
+        directAnswer: "The very first sentence of the article MUST contain a specific number from the research data. Not the second sentence. Not the third. The FIRST. THE TEST: Can an AI engine extract a complete factual answer from your first sentence alone, without reading anything else? If your first sentence contains zero numbers, it fails. BANNED FIRST SENTENCES (never write these): '[Subject] analysis reveals a company with unmatched brand value, record-setting financials, and a vast global ecosystem.' (no number, just adjectives); 'A [framework] breaks down [components] to assess where a business stands.' (definition of format); '[Subject] operates as the world's most valuable technology company.' (no specific data); '[Product] is one of the most popular choices in its category.' (vague, no data); 'This comprehensive guide covers everything you need to know about [topic].' (describes the article); 'When it comes to [topic], there are several factors to consider.' (says nothing). REQUIRED STRUCTURE: [Primary keyword] + [specific number from currentData] + [what that number means for the reader]. The number must come from currentData (revenue, market share, growth rate, price, benchmark score, user count). Pick the single most impressive or relevant number and lead with it. After this factual first sentence (30-40 words), follow with a hook (15-25 words).",
+        statDensity: "Include 1-2 stats per 200 words where data is provided.",
+        entities: "",
+        qaBlocks: "FAQ ANSWERS: Maximum 300 characters per answer (roughly 2 short sentences). Be direct and factual. Do NOT repeat what the article body already covers — provide a crisp new-angle summary instead.",
+        faqStrategy: faqStrategyText,
+      };
 
   const rawSeo = parsed.seoRequirements;
   const seoRequirements =
     rawSeo != null && typeof rawSeo === "object" && !Array.isArray(rawSeo)
       ? {
-          keywordInTitle: String((rawSeo as Record<string, unknown>).keywordInTitle ?? "Primary keyword in first 50% of title."),
-          keywordInFirst10Percent: Boolean((rawSeo as Record<string, unknown>).keywordInFirst10Percent),
-          keywordInSubheadings: Boolean((rawSeo as Record<string, unknown>).keywordInSubheadings),
-          maxParagraphWords: Number((rawSeo as Record<string, unknown>).maxParagraphWords) || 120,
-          faqCount: String((rawSeo as Record<string, unknown>).faqCount ?? "5-8"),
-        }
+        keywordInTitle: String((rawSeo as Record<string, unknown>).keywordInTitle ?? "Primary keyword in first 50% of title."),
+        keywordInFirst10Percent: Boolean((rawSeo as Record<string, unknown>).keywordInFirst10Percent),
+        keywordInSubheadings: Boolean((rawSeo as Record<string, unknown>).keywordInSubheadings),
+        maxParagraphWords: Number((rawSeo as Record<string, unknown>).maxParagraphWords) || 120,
+        faqCount: String((rawSeo as Record<string, unknown>).faqCount ?? "5-8"),
+      }
       : {
-          keywordInTitle: "Primary keyword in first 50% of title.",
-          keywordInFirst10Percent: true,
-          keywordInSubheadings: true,
-          maxParagraphWords: 120,
-          faqCount: "5-8",
-        };
+        keywordInTitle: "Primary keyword in first 50% of title.",
+        keywordInFirst10Percent: true,
+        keywordInSubheadings: true,
+        maxParagraphWords: 120,
+        faqCount: "5-8",
+      };
 
   const wordCount =
     parsed.wordCount != null && typeof parsed.wordCount === "object" && !Array.isArray(parsed.wordCount)
       ? {
-          target: Number((parsed.wordCount as Record<string, unknown>).target) || 1500,
-          note: String((parsed.wordCount as Record<string, unknown>).note ?? "STRICT: target must be met within ±5%."),
-        }
+        target: Number((parsed.wordCount as Record<string, unknown>).target) || 1500,
+        note: String((parsed.wordCount as Record<string, unknown>).note ?? "STRICT: target must be met within ±5%."),
+      }
       : { target: 1500, note: "STRICT: target must be met within ±5%." };
 
   const defaultEditorialStyle = {
@@ -360,19 +361,19 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
   const editorialStyle =
     rawStyle != null && typeof rawStyle === "object" && !Array.isArray(rawStyle)
       ? {
-          sentenceLength: (rawStyle as Record<string, unknown>).sentenceLength ?? defaultEditorialStyle.sentenceLength,
-          paragraphLength: (rawStyle as Record<string, unknown>).paragraphLength ?? defaultEditorialStyle.paragraphLength,
-          tone: String((rawStyle as Record<string, unknown>).tone ?? defaultEditorialStyle.tone),
-          readingLevel: String((rawStyle as Record<string, unknown>).readingLevel ?? defaultEditorialStyle.readingLevel),
-          contentMix: normalizeContentMix((rawStyle as Record<string, unknown>).contentMix) ?? defaultEditorialStyle.contentMix,
-          dataDensity: String((rawStyle as Record<string, unknown>).dataDensity ?? defaultEditorialStyle.dataDensity),
-          pointOfView: (["first", "second", "third", "mixed"] as const).includes((rawStyle as Record<string, unknown>).pointOfView as "first" | "second" | "third" | "mixed")
-            ? (rawStyle as Record<string, unknown>).pointOfView
-            : defaultEditorialStyle.pointOfView,
-          realExamplesFrequency: String((rawStyle as Record<string, unknown>).realExamplesFrequency ?? defaultEditorialStyle.realExamplesFrequency),
-          introStyle: String((rawStyle as Record<string, unknown>).introStyle ?? defaultEditorialStyle.introStyle),
-          ctaStyle: String((rawStyle as Record<string, unknown>).ctaStyle ?? defaultEditorialStyle.ctaStyle),
-        }
+        sentenceLength: (rawStyle as Record<string, unknown>).sentenceLength ?? defaultEditorialStyle.sentenceLength,
+        paragraphLength: (rawStyle as Record<string, unknown>).paragraphLength ?? defaultEditorialStyle.paragraphLength,
+        tone: String((rawStyle as Record<string, unknown>).tone ?? defaultEditorialStyle.tone),
+        readingLevel: String((rawStyle as Record<string, unknown>).readingLevel ?? defaultEditorialStyle.readingLevel),
+        contentMix: normalizeContentMix((rawStyle as Record<string, unknown>).contentMix) ?? defaultEditorialStyle.contentMix,
+        dataDensity: String((rawStyle as Record<string, unknown>).dataDensity ?? defaultEditorialStyle.dataDensity),
+        pointOfView: (["first", "second", "third", "mixed"] as const).includes((rawStyle as Record<string, unknown>).pointOfView as "first" | "second" | "third" | "mixed")
+          ? (rawStyle as Record<string, unknown>).pointOfView
+          : defaultEditorialStyle.pointOfView,
+        realExamplesFrequency: String((rawStyle as Record<string, unknown>).realExamplesFrequency ?? defaultEditorialStyle.realExamplesFrequency),
+        introStyle: String((rawStyle as Record<string, unknown>).introStyle ?? defaultEditorialStyle.introStyle),
+        ctaStyle: String((rawStyle as Record<string, unknown>).ctaStyle ?? defaultEditorialStyle.ctaStyle),
+      }
       : defaultEditorialStyle;
 
   const similaritySummary =
@@ -391,6 +392,20 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
       ? parsed.competitorDifferentiation.trim()
       : undefined;
 
+  // POV insights for Information Gain
+  const rawPov = parsed.povInsights;
+  const povInsights = Array.isArray(rawPov)
+    ? (rawPov as unknown[]).filter(
+      (p): p is { topic: string; conventionalView: string; contrarian: string; source: string } =>
+        p != null &&
+        typeof p === "object" &&
+        typeof (p as Record<string, unknown>).topic === "string" &&
+        typeof (p as Record<string, unknown>).conventionalView === "string" &&
+        typeof (p as Record<string, unknown>).contrarian === "string" &&
+        typeof (p as Record<string, unknown>).source === "string"
+    )
+    : [];
+
   const out: Record<string, unknown> = {
     keyword,
     outline,
@@ -405,6 +420,7 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
   if (extraValueThemes != null && extraValueThemes.length > 0) out.extraValueThemes = extraValueThemes;
   if (freshnessNote != null) out.freshnessNote = freshnessNote;
   if (competitorDifferentiation != null) out.competitorDifferentiation = competitorDifferentiation;
+  if (povInsights.length > 0) out.povInsights = povInsights;
   return out;
 }
 
@@ -432,8 +448,8 @@ export async function buildResearchBrief(
 MANDATORY USE OF STEP 2 EXTRACTION — do not ignore any of these. The extraction provides: paaAnalysis (which PAA questions are gap candidates), gaps (with evidence, readerDemand, actionableAngle), topics (importance, recommendedDepth), competitorStrengths (aiLikelihood), editorialStyle (pointOfView, tone, realExamplesFrequency, dataDensity). You MUST use all of them when building the outline, word distribution, editorial style, and competitorDifferentiation.
 
 RULES:
-1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition → how-to → advanced → FAQ; commercial: overview → comparison → pros/cons → pricing → recommendation; transactional: value prop → features → pricing → CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't). Every outline section must have enough topics and targetWords so the writer can hit the total word count without padding.
-2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote. Include H3 subsections where competitors commonly do. Where a PAA question is a gap candidate, either add an H3 for it under the relevant H2 or add an explicit "must answer: [question]" in that section's topics or geoNote.
+1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition → how-to → advanced → FAQ; commercial: overview → comparison → pros/cons → pricing → recommendation; transactional: value prop → features → pricing → CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't). Every outline section must have enough topics and targetWords so the writer can hit the total word count without padding. NEVER use "What is [Topic]?" or dictionary-style headings. Use benefit-driven or curiosity-driven headings (e.g., instead of "What is Local SEO?", use "The Mechanics of Local Search" or "Why Local Search Behaves Differently").
+2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote, and optional visualSuggestion (e.g., "Comparison Table", "Step-by-step Diagram" if a visual adds high value). Include H3 subsections where competitors commonly do. Where a PAA question is a gap candidate, either add an H3 for it under the relevant H2 or add an explicit "must answer: [question]" in that section's topics or geoNote.
 3. BEST-VERSION FIELDS (required in your JSON): (a) similaritySummary: 2-4 sentences summarizing what the top 5 competitors collectively cover and how they're similar. (b) extraValueThemes: array of 3-6 short strings, each 5-12 words, actionable (e.g. "Include 2025 pricing benchmarks from currentData" or "Add comparison table as bulleted lists" — not vague like "Be fresh"). These are concrete themes the writer must clearly cover. (c) freshnessNote: 1-2 sentences on how to position for freshness (e.g. "Lead with currentData numbers; avoid pre-2024 framing; mention [recent development] where relevant.").
 
 GAP PRIORITIZATION (use extraction.gaps: readerDemand + actionableAngle):
@@ -470,13 +486,21 @@ Each H3 gets its own topics, word target, and optional geoNote in the OutlineSec
 
 POST-GENERATION VALIDATION AWARENESS — design the brief so the writer can pass these checks:
 
+POV / INFORMATION GAIN (required — produces "povInsights"):
+- For 3-5 key topics from the extraction, identify: (a) what most competitors say about it (conventionalView), (b) a contrarian or nuanced angle that practitioners, Reddit threads, niche forums, or experts would know (contrarian), (c) the source of that insight (e.g. "common practitioner knowledge", "Reddit r/SEO consensus", "niche forum discussion", "expert disagreement").
+- Output as povInsights: array of { topic, conventionalView, contrarian, source }.
+- These will be passed to the writer so the article adds unique Information Gain beyond competitors.
+
+GEO / AI OVERVIEW TARGETS (required — per-H2 aiOverviewTarget):
+- For each H2 section in the outline, also generate aiOverviewTarget: a 2-3 sentence "featured snippet" answer that directly and factually answers the heading's implied question. This snippet should be self-contained, unambiguous, and extractable by AI engines (Google AI Overviews, Perplexity, ChatGPT). The writer will use it to lead each section with an "answer-first" structure.
+
 GOOGLE SEARCH CENTRAL ALIGNMENT:
 - The article must pass Google's Helpful Content self-assessment: original analysis, substantial value beyond competitors, complete intent satisfaction, would-be-bookmarked quality.
 - Design the outline to cover the topic comprehensively. Every H2 should earn its place by answering a real user question or providing unique value.
 
 RANK MATH SEO AUDIT (body content only; title/meta/slug are generated separately):
 - Paragraphs: never exceed 120 words.
-- Keyword in first 10% of body and in at least one subheading. Ensure at least one outline section heading includes the primary keyword or a natural variant (e.g. "SWOT Analysis" for keyword "SWOT analysis") so the writer can pass the subheading check.
+- Keyword in first 10% of body and in at least one subheading. FATAL ERROR: You MUST ensure that at least one outline section heading (H2) includes the EXACT primary keyword. Do not use just a natural variant.
 - No keyword stuffing (< 3% density).
 
 TYPOGRAPHY: The writer must use straight quotes/apostrophes only. ZERO em-dash, en-dash, or curly quotes — any instance fails the audit. No excessive symbols: no !! or !!!, no repeated ellipses (...). Single punctuation only. Avoid AI-typical phrases in section guidance where possible: delve, leverage, comprehensive, crucial, seamless, robust — the writer is instructed to prefer specific language.
@@ -490,12 +514,14 @@ E-E-A-T QUALITY SCORING:
 - Readability variance: varied sentence patterns (no monotony).
 - Sentence start variety: no 3+ sentences starting the same way.
 
-Output ONLY valid JSON. Do NOT include "currentData" in your output — it will be merged server-side. Include: keyword, outline, gaps, editorialStyle, editorialStyleFallback, geoRequirements, seoRequirements, wordCount, similaritySummary, extraValueThemes, freshnessNote, competitorDifferentiation (when applicable). No markdown fences.`;
+Output ONLY valid JSON. Do NOT include "currentData" in your output — it will be merged server-side. Include: keyword, outline, gaps, editorialStyle, editorialStyleFallback, geoRequirements, seoRequirements, wordCount, similaritySummary, extraValueThemes, freshnessNote, competitorDifferentiation (when applicable), povInsights. No markdown fences.
+
+Constraint: You must limit the currentData.facts array to a MAXIMUM of 5 distinct, high-impact statistics. Do not pass redundant data.`;
 
   // Keep payload compact to avoid timeouts and token limits
   const MAX_TOPICS = 14;
   const MAX_HEADINGS_PER_SOURCE = 10;
-  const MAX_FACTS = 10;
+  const MAX_FACTS = 5;
   const MAX_DEVELOPMENTS = 5;
 
   const trimmedHeadings = topics.competitorHeadings.slice(0, 5).map((ch) => ({
@@ -576,17 +602,47 @@ Output ONLY valid JSON. Do NOT include "currentData" in your output — it will 
 
       const validated = ResearchBriefWithoutCurrentDataSchema.safeParse(normalized);
       if (validated.success) {
-        const data = { ...validated.data, currentData } as ResearchBrief;
-        const briefWithWordCount = wordCountOverride
-          ? { ...data, wordCount: wordCountOverride }
-          : data;
+        let brief = { ...validated.data, currentData } as ResearchBrief;
+
+        // When a wordCountOverride is provided (revise flow), align the per-section
+        // targetWords with the new total target so the outline and UI stay in sync.
+        if (wordCountOverride && brief.outline?.sections?.length) {
+          const sections = brief.outline.sections;
+          const currentTotal = sections.reduce((sum, s) => sum + (s.targetWords || 0), 0);
+          const target = Math.round(wordCountOverride.target);
+
+          if (currentTotal > 0 && target > 0) {
+            const scaledSections = sections.map((s) => {
+              const base = s.targetWords && s.targetWords > 0 ? s.targetWords : Math.max(50, Math.round(target / sections.length));
+              const scaled = Math.max(50, Math.round((base * target) / currentTotal));
+              return { ...s, targetWords: scaled };
+            });
+            const newTotal = scaledSections.reduce((sum, s) => sum + (s.targetWords || 0), 0);
+            brief = {
+              ...brief,
+              wordCount: { ...wordCountOverride, target },
+              outline: {
+                ...brief.outline,
+                sections: scaledSections,
+                totalSections: scaledSections.length,
+                estimatedWordCount: newTotal,
+              },
+            };
+          } else {
+            brief = { ...brief, wordCount: wordCountOverride };
+          }
+        } else if (wordCountOverride) {
+          // No per-section targets to rescale; still respect the override at top level.
+          brief = { ...brief, wordCount: wordCountOverride };
+        }
+
         if (attempt === 1 && !hasBestVersionFields(normalized)) {
           if (process.env.NODE_ENV !== "test") {
             console.warn("[openai] buildResearchBrief: best-version fields missing, retrying with hint");
           }
           continue;
         }
-        return briefWithWordCount;
+        return brief;
       }
       lastError = validated.error;
       if (attempt === 1) {
@@ -605,7 +661,7 @@ Output ONLY valid JSON. Do NOT include "currentData" in your output — it will 
 }
 
 /** Intent-specific guidance for meta generation (Google: match search intent). */
-function getIntentGuidanceForMeta(intent: string): string {
+export function getIntentGuidanceForMeta(intent: string): string {
   const i = intent.toLowerCase();
   if (i.includes("transactional") || i.includes("commercial")) {
     return "User wants to buy or take action. Meta should emphasize value, outcomes, or conversion.";
@@ -636,7 +692,7 @@ export type TitleMetaSlugResult = {
   options: [TitleMetaSlugOption, TitleMetaSlugOption];
 };
 
-function normalizeMetaOption(
+export function normalizeMetaOption(
   raw: { title?: unknown; metaDescription?: unknown; suggestedSlug?: unknown },
   primaryKeyword: string
 ): TitleMetaSlugOption {

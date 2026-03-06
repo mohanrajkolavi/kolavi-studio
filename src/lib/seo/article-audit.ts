@@ -74,7 +74,7 @@ export type ArticleAuditResult = {
 
 // --- Helpers ---
 
-function stripHtml(html: string): string {
+export function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
@@ -1345,6 +1345,105 @@ export function generateSchemaMarkup(
 }
 
 /**
+ * Generate an llms.txt snippet for AI crawlers — structured plaintext summary of the article.
+ * Follows the llms.txt convention: title, summary, key topics, and FAQ Q&As in a machine-parseable format.
+ */
+export function generateLlmsTxt(
+  articleHtml: string,
+  title: string,
+  metaDescription: string,
+  keyword: string
+): string {
+  const headings = extractHeadings(articleHtml);
+  const h2s = headings.filter((h) => h.level === 2).map((h) => h.text);
+
+  // First paragraph as summary
+  const paragraphs = getParagraphs(articleHtml);
+  const summary = paragraphs.length > 0 ? paragraphs[0].slice(0, 300) : metaDescription;
+
+  // FAQ Q&As
+  const { questions, answers } = extractFaqBlock(articleHtml);
+  const faqLines = questions
+    .map((q, i) => `Q: ${q}\nA: ${answers[i] ?? ""}`)
+    .slice(0, 8);
+
+  const lines: string[] = [
+    `# ${title}`,
+    "",
+    `> ${metaDescription}`,
+    "",
+    `## Summary`,
+    summary,
+    "",
+    `## Primary Topic`,
+    keyword,
+    "",
+    `## Sections`,
+    ...h2s.map((h) => `- ${h}`),
+  ];
+
+  if (faqLines.length > 0) {
+    lines.push("", "## FAQ", ...faqLines);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Generate JSON-LD entity/about schema mapping for the article.
+ * Maps entities mentioned in the article (from headings and keyword) so AI crawlers
+ * know exactly what the article is about without guessing from HTML.
+ */
+export function generateEntitySchema(
+  articleHtml: string,
+  title: string,
+  metaDescription: string,
+  slug: string,
+  keyword: string
+): object {
+  const headings = extractHeadings(articleHtml);
+  const h2Texts = headings.filter((h) => h.level === 2).map((h) => h.text);
+
+  // Extract entity-like phrases from headings (capitalized proper nouns, named tools, etc.)
+  const entitySet = new Set<string>();
+  entitySet.add(keyword);
+
+  for (const h of h2Texts) {
+    // Skip FAQ headings
+    if (/faq|frequently asked/i.test(h)) continue;
+    // Extract multi-word capitalized phrases (potential named entities)
+    const entityMatches = h.match(/[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+)*/g);
+    if (entityMatches) {
+      for (const e of entityMatches) {
+        if (e.length > 2 && !["The", "And", "For", "How", "What", "Why", "When", "Which", "Best", "Top"].includes(e)) {
+          entitySet.add(e);
+        }
+      }
+    }
+  }
+
+  const aboutEntities = [...entitySet].slice(0, 10).map((name) => ({
+    "@type": "Thing",
+    name,
+  }));
+
+  const now = new Date().toISOString().slice(0, 10);
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title || "Article",
+    description: metaDescription || "",
+    keywords: keyword || "",
+    datePublished: now,
+    dateModified: now,
+    url: SITE_URL + "/blog/" + (slug || ""),
+    about: aboutEntities,
+    mentions: aboutEntities,
+  };
+}
+
+/**
  * Optional differentiation check: how many brief extra-value themes appear in content.
  * Level 3, informational only (does not block publishing).
  */
@@ -1431,12 +1530,12 @@ export function auditArticle(
   const schemaMarkup =
     input.title && input.metaDescription !== undefined && input.slug !== undefined
       ? generateSchemaMarkup(
-          input.content,
-          input.title,
-          input.metaDescription ?? "",
-          input.slug ?? "",
-          input.focusKeyword ?? ""
-        )
+        input.content,
+        input.title,
+        input.metaDescription ?? "",
+        input.slug ?? "",
+        input.focusKeyword ?? ""
+      )
       : undefined;
 
   return {
@@ -1501,4 +1600,149 @@ export function formatAuditReport(result: ArticleAuditResult): string {
   }
   lines.push("---");
   return lines.join("\n");
+}
+
+// =============================================================================
+// Readability Scoring — Flesch-Kincaid & Gunning Fog
+// =============================================================================
+
+/** Count syllables in a word (approximate). */
+function countSyllables(word: string): number {
+  const w = word.toLowerCase().replace(/[^a-z]/g, "");
+  if (w.length <= 3) return 1;
+  let count = 0;
+  const vowels = "aeiouy";
+  let prevVowel = false;
+  for (let i = 0; i < w.length; i++) {
+    const isVowel = vowels.includes(w[i]);
+    if (isVowel && !prevVowel) count++;
+    prevVowel = isVowel;
+  }
+  // Silent e
+  if (w.endsWith("e") && count > 1) count--;
+  return Math.max(1, count);
+}
+
+/** Split text into sentences (approximate). */
+function splitSentences(text: string): string[] {
+  return text.split(/[.!?]+/).map(s => s.trim()).filter(s => s.length > 0);
+}
+
+/** Compute readability scores from plain text. */
+export function auditReadability(plainText: string): {
+  fleschKincaid: number;
+  gunningFog: number;
+  grade: string;
+} {
+  const words = plainText.split(/\s+/).filter(Boolean);
+  const sentences = splitSentences(plainText);
+  const totalWords = words.length;
+  const totalSentences = sentences.length || 1;
+  const totalSyllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
+  const complexWords = words.filter(w => countSyllables(w) >= 3).length;
+
+  // Flesch-Kincaid Grade Level
+  const fk = 0.39 * (totalWords / totalSentences) + 11.8 * (totalSyllables / totalWords) - 15.59;
+  const fleschKincaid = Math.round(Math.max(0, fk) * 10) / 10;
+
+  // Gunning Fog Index
+  const fog = 0.4 * ((totalWords / totalSentences) + 100 * (complexWords / totalWords));
+  const gunningFog = Math.round(Math.max(0, fog) * 10) / 10;
+
+  // Grade assessment
+  const avg = (fleschKincaid + gunningFog) / 2;
+  let grade: string;
+  if (avg <= 8) grade = "Easy (Grade 6-8) — excellent for web";
+  else if (avg <= 10) grade = "Standard (Grade 8-10) — good for web";
+  else if (avg <= 12) grade = "Moderate (Grade 10-12) — acceptable";
+  else if (avg <= 14) grade = "Difficult (Grade 12-14) — academic";
+  else grade = "Very Difficult (Grade 15+) — too complex for web";
+
+  return { fleschKincaid, gunningFog, grade };
+}
+
+// =============================================================================
+// Competitive Comparison Score
+// =============================================================================
+
+/** Compare generated article against competitors and score competitiveness. */
+export function compareWithCompetitors(
+  articleHtml: string,
+  competitors: { url: string; content: string; wordCount: number }[],
+  extractedTopics?: string[]
+): { score: number; breakdown: { wordCount: number; topicCoverage: number; dataDensity: number; headingDepth: number } } {
+  const articleText = stripHtml(articleHtml);
+  const articleWords = articleText.split(/\s+/).filter(Boolean);
+  const articleWC = articleWords.length;
+
+  const successfulComps = competitors.filter(c => c.content.length > 0);
+  if (successfulComps.length === 0) {
+    return { score: 75, breakdown: { wordCount: 75, topicCoverage: 75, dataDensity: 75, headingDepth: 75 } };
+  }
+
+  const avgCompWC = successfulComps.reduce((sum, c) => sum + c.wordCount, 0) / successfulComps.length;
+
+  // Word count score (0-100): 100 if >115% of average, scales down
+  let wordCountScore: number;
+  if (avgCompWC === 0) wordCountScore = 75;
+  else {
+    const ratio = articleWC / avgCompWC;
+    if (ratio >= 1.15) wordCountScore = 100;
+    else if (ratio >= 1.0) wordCountScore = 85;
+    else if (ratio >= 0.85) wordCountScore = 70;
+    else if (ratio >= 0.7) wordCountScore = 50;
+    else wordCountScore = 30;
+  }
+
+  // Topic coverage score (0-100)
+  let topicCoverageScore = 75; // default
+  if (extractedTopics && extractedTopics.length > 0) {
+    const articleLower = articleText.toLowerCase();
+    const covered = extractedTopics.filter(t => articleLower.includes(t.toLowerCase())).length;
+    topicCoverageScore = Math.round((covered / extractedTopics.length) * 100);
+  }
+
+  // Data density score (numbers per 1000 words)
+  const articleNumbers = (articleText.match(/\d+[.,]?\d*/g) || []).length;
+  const articleDensity = articleWC > 0 ? (articleNumbers / articleWC) * 1000 : 0;
+  const compDensities = successfulComps.map(c => {
+    const nums = (c.content.match(/\d+[.,]?\d*/g) || []).length;
+    return c.wordCount > 0 ? (nums / c.wordCount) * 1000 : 0;
+  });
+  const avgCompDensity = compDensities.reduce((a, b) => a + b, 0) / compDensities.length;
+  let dataDensityScore: number;
+  if (avgCompDensity === 0) dataDensityScore = articleDensity > 0 ? 100 : 75;
+  else {
+    const ratio = articleDensity / avgCompDensity;
+    if (ratio >= 1.2) dataDensityScore = 100;
+    else if (ratio >= 0.8) dataDensityScore = 80;
+    else if (ratio >= 0.5) dataDensityScore = 60;
+    else dataDensityScore = 40;
+  }
+
+  // Heading depth score
+  const articleHeadings = (articleHtml.match(/<h[23][^>]*>/gi) || []).length;
+  const compHeadings = successfulComps.map(c => (c.content.match(/^#{2,3}\s/gm) || []).length);
+  const avgCompHeadings = compHeadings.reduce((a, b) => a + b, 0) / compHeadings.length;
+  let headingDepthScore: number;
+  if (avgCompHeadings === 0) headingDepthScore = articleHeadings > 0 ? 100 : 75;
+  else {
+    const ratio = articleHeadings / avgCompHeadings;
+    if (ratio >= 1.0) headingDepthScore = 100;
+    else if (ratio >= 0.8) headingDepthScore = 80;
+    else if (ratio >= 0.6) headingDepthScore = 60;
+    else headingDepthScore = 40;
+  }
+
+  const score = Math.round((wordCountScore + topicCoverageScore + dataDensityScore + headingDepthScore) / 4);
+
+  return {
+    score,
+    breakdown: {
+      wordCount: wordCountScore,
+      topicCoverage: topicCoverageScore,
+      dataDensity: dataDensityScore,
+      headingDepth: headingDepthScore,
+    },
+  };
 }

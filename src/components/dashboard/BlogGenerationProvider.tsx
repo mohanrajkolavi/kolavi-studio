@@ -115,8 +115,6 @@ function buildGenerateBody(input: GenerationInput): Record<string, unknown> {
     intent: input.intent.length > 0 ? input.intent : ["informational"],
     competitorUrls: input.competitorUrls,
     ...(input.peopleAlsoSearchFor?.length && { peopleAlsoSearchFor: input.peopleAlsoSearchFor.join(", ") }),
-    ...(input.wordCountPreset != null && { wordCountPreset: input.wordCountPreset }),
-    ...(input.wordCountPreset === "custom" && input.wordCountCustom != null && { wordCountCustom: input.wordCountCustom }),
     ...(input.draftModel != null && { draftModel: input.draftModel }),
   };
 }
@@ -175,13 +173,25 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         const job = (await res.json()) as {
           phase?: string;
           serpResults?: Array<{ position: number; title: string; url: string }>;
+          paaQuestions?: string[];
+          paaItems?: Array<{ question: string; snippet?: string; title?: string; link?: string }>;
+          serpFeatures?: object;
+          intentValidation?: object;
+          redditThreads?: Array<{ url: string; title: string; snippet?: string }>;
         };
         if (job.phase !== "waiting_for_review" || !Array.isArray(job.serpResults) || job.serpResults.length === 0) return;
         if (!mountedRef.current) return;
         setJobIdState(stored);
         setChunkOutputs((prev) => ({
           ...prev,
-          researchSerp: { results: job.serpResults! },
+          researchSerp: {
+            results: job.serpResults!,
+            ...(job.paaQuestions?.length ? { paaQuestions: job.paaQuestions } : {}),
+            ...(job.paaItems?.length ? { paaItems: job.paaItems } : {}),
+            ...(job.serpFeatures ? { serpFeatures: job.serpFeatures } : {}),
+            ...(job.intentValidation ? { intentValidation: job.intentValidation } : {}),
+            ...(job.redditThreads?.length ? { redditThreads: job.redditThreads } : {}),
+          },
           research: null,
         }));
         setPhase("reviewing");
@@ -298,7 +308,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     setError(null);
   }, []);
 
-  const startBriefRef = useRef<(jid: string) => void>(() => {});
+  const startBriefRef = useRef<(jid: string) => void>(() => { });
 
   const startResearchFetch = useCallback((jid: string, selectedUrls: string[]) => {
     abortControllerRef.current?.abort();
@@ -384,12 +394,12 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     const serp = chunkOutputs.researchSerp as { results?: Array<{ url: string; title?: string; position?: number }> } | null;
     const urls = (chunkOutputs.research as { competitorUrls?: string[] } | null)?.competitorUrls ?? [];
     const fallback =
-      input && serp?.results?.length && urls.length >= 1 && urls.length <= 3
+      input && serp?.results?.length && urls.length >= 1 && urls.length <= 4
         ? {
-            input: buildGenerateBody(input),
-            serpResults: serp.results.map((r) => ({ url: r.url, title: r.title, position: r.position })),
-            selectedUrls: urls,
-          }
+          input: buildGenerateBody(input),
+          serpResults: serp.results.map((r) => ({ url: r.url, title: r.title, position: r.position })),
+          selectedUrls: urls,
+        }
         : undefined;
     (async () => {
       try {
@@ -439,12 +449,12 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     const serp = chunkOutputs.researchSerp as { results?: Array<{ url: string; title?: string; position?: number }> } | null;
     const urls = (chunkOutputs.research as { competitorUrls?: string[] } | null)?.competitorUrls ?? [];
     const fallback =
-      input && serp?.results?.length && urls.length >= 1 && urls.length <= 3
+      input && serp?.results?.length && urls.length >= 1 && urls.length <= 4
         ? {
-            input: buildGenerateBody(input),
-            serpResults: serp.results.map((r) => ({ url: r.url, title: r.title, position: r.position })),
-            selectedUrls: urls,
-          }
+          input: buildGenerateBody(input),
+          serpResults: serp.results.map((r) => ({ url: r.url, title: r.title, position: r.position })),
+          selectedUrls: urls,
+        }
         : undefined;
     (async () => {
       try {
@@ -558,7 +568,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     if (chunk === "research") {
       const urls = (chunkOutputs.research as { competitorUrls?: string[] } | null)?.competitorUrls ?? [];
       const serp = chunkOutputs.researchSerp as { results?: unknown[] } | null;
-      if (serp?.results?.length && urls.length >= 1 && urls.length <= 3) {
+      if (serp?.results?.length && urls.length >= 1 && urls.length <= 4) {
         startResearchFetch(jid, urls);
         return;
       }
@@ -699,7 +709,15 @@ async function processResearchSSE(
       });
     }
     if (eventType === "result") {
-      const r = parsed as { jobId?: string; serpResults?: Array<{ position: number; title: string; url: string }> };
+      const r = parsed as {
+        jobId?: string;
+        serpResults?: Array<{ position: number; title: string; url: string }>;
+        paaQuestions?: string[];
+        paaItems?: Array<{ question: string; snippet?: string; title?: string; link?: string }>;
+        serpFeatures?: { hasKnowledgeGraph?: boolean; hasAnswerBox?: boolean; hasFeaturedSnippet?: boolean; hasVideoCarousel?: boolean; hasTopStories?: boolean; relatedSearches?: string[] };
+        intentValidation?: { declaredIntent?: string; detectedIntent?: string; confidence?: number; warning?: string };
+        redditThreads?: Array<{ url: string; title: string; snippet?: string }>;
+      };
       const jid = r.jobId ?? null;
       const serpResults = r.serpResults ?? [];
       if (serpResults.length === 0) {
@@ -713,7 +731,14 @@ async function processResearchSSE(
       guarded.setJobId?.(jid);
       guarded.setChunkOutputs((prev) => ({
         ...prev,
-        researchSerp: { results: serpResults },
+        researchSerp: {
+          results: serpResults,
+          ...(r.paaQuestions?.length ? { paaQuestions: r.paaQuestions } : {}),
+          ...(r.paaItems?.length ? { paaItems: r.paaItems } : {}),
+          ...(r.serpFeatures ? { serpFeatures: r.serpFeatures } : {}),
+          ...(r.intentValidation ? { intentValidation: r.intentValidation } : {}),
+          ...(r.redditThreads?.length ? { redditThreads: r.redditThreads } : {}),
+        },
         research: null,
       }));
       guarded.setPhase("reviewing");
@@ -756,6 +781,11 @@ async function processResearchFetchSSE(
         researchSummary?: { urlCount?: number; articleCount?: number; currentDataFacts?: number };
         competitorUrls?: string[];
         competitorTitles?: string[];
+        paaQuestions?: string[];
+        paaItems?: Array<{ question: string; snippet?: string; title?: string; link?: string }>;
+        serpFeatures?: { hasKnowledgeGraph?: boolean; hasAnswerBox?: boolean; hasFeaturedSnippet?: boolean; hasVideoCarousel?: boolean; hasTopStories?: boolean; relatedSearches?: string[] };
+        redditQuotes?: string[];
+        redditThreads?: Array<{ url: string; title: string; snippet?: string }>;
       };
       const summary = r.researchSummary;
       const competitorUrls = r.competitorUrls ?? [];
@@ -764,12 +794,17 @@ async function processResearchFetchSSE(
         ...prev,
         research: summary
           ? {
-              urlCount: summary.urlCount ?? 0,
-              articleCount: summary.articleCount ?? 0,
-              currentDataFacts: summary.currentDataFacts ?? 0,
-              competitorUrls,
-              competitorTitles: competitorTitles.length > 0 ? competitorTitles : undefined,
-            }
+            urlCount: summary.urlCount ?? 0,
+            articleCount: summary.articleCount ?? 0,
+            currentDataFacts: summary.currentDataFacts ?? 0,
+            competitorUrls,
+            competitorTitles: competitorTitles.length > 0 ? competitorTitles : undefined,
+            ...(r.paaQuestions?.length ? { paaQuestions: r.paaQuestions } : {}),
+            ...(r.paaItems?.length ? { paaItems: r.paaItems } : {}),
+            ...(r.serpFeatures ? { serpFeatures: r.serpFeatures } : {}),
+            ...(r.redditQuotes?.length ? { redditQuotes: r.redditQuotes } : {}),
+            ...(r.redditThreads?.length ? { redditThreads: r.redditThreads } : {}),
+          }
           : null,
         // Keep researchSerp so "Back to previous section" from research summary can show competitors again
       }));
@@ -788,13 +823,13 @@ async function processResearchFetchSSE(
       const msg =
         typeof parsed === "string"
           ? (() => {
-              try {
-                const o = JSON.parse(parsed) as { error?: string };
-                return o?.error;
-              } catch {
-                return parsed;
-              }
-            })()
+            try {
+              const o = JSON.parse(parsed) as { error?: string };
+              return o?.error;
+            } catch {
+              return parsed;
+            }
+          })()
           : (parsed as { error?: string }).error;
       throw new Error(msg ?? "Research fetch failed");
     }
@@ -852,10 +887,10 @@ async function processBriefSSE(
       const outline = r.outline ?? [];
       const briefSummary = r.brief
         ? {
-            similaritySummary: r.brief.similaritySummary,
-            extraValueThemes: r.brief.extraValueThemes,
-            freshnessNote: r.brief.freshnessNote,
-          }
+          similaritySummary: r.brief.similaritySummary,
+          extraValueThemes: r.brief.extraValueThemes,
+          freshnessNote: r.brief.freshnessNote,
+        }
         : undefined;
       guarded.setChunkOutputs((prev) => ({
         ...prev,

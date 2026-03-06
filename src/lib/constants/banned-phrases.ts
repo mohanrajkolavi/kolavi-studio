@@ -136,6 +136,7 @@ export function getBannedPhrasesForPrompt(): string {
     // Common phrases most likely to appear in AI output
     "leverage", "utilize", "comprehensive", "crucial",
     "when it comes to", "furthermore,", "moreover,",
+    "consider a", "focus on", "start with",
   ];
   // Deduplicate
   return [...new Set(combined)].map((p) => `"${p}"`).join(", ");

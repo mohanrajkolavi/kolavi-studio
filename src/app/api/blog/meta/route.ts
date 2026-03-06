@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { auditArticle } from "@/lib/seo/article-audit";
-import { generateTitleMetaSlugFromContent } from "@/lib/openai/client";
+import { generateTitleMetaSlugFromContent } from "@/lib/claude/client";
 import type { TitleMetaSlugOption } from "@/lib/openai/client";
 
 /** Normalize intent for meta generation (Google: match search intent). */
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  let body: { content?: string; primaryKeyword?: string; intent?: string };
+  let body: { content?: string; primaryKeyword?: string; intent?: string; draftModel?: "opus-4.6" | "sonnet-4.6" };
   try {
     body = await request.json();
   } catch {
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
   const content = typeof body.content === "string" ? body.content.trim() : "";
   const primaryKeyword = typeof body.primaryKeyword === "string" ? body.primaryKeyword.trim() : "";
   const intent = typeof body.intent === "string" ? body.intent : "informational";
+  const draftModel = body.draftModel === "opus-4.6" || body.draftModel === "sonnet-4.6" ? body.draftModel : "opus-4.6";
 
   if (!content) {
     return new Response(JSON.stringify({ error: "content is required" }), {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const intentNormalized = normalizeIntent(intent);
-    const result = await generateTitleMetaSlugFromContent(primaryKeyword, intentNormalized, content);
+    const result = await generateTitleMetaSlugFromContent(primaryKeyword, intentNormalized, content, undefined, draftModel);
 
     const optionsWithAudit: MetaOptionWithAudit[] = result.options.map((opt) => {
       const auditResult = auditArticle({

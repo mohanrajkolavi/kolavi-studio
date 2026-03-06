@@ -50,7 +50,7 @@ export function TagInput({
     <div
       role="button"
       tabIndex={0}
-      className={`flex min-h-10 flex-wrap gap-2 rounded-2xl border border-border bg-background px-3 py-2 transition-colors focus-visible:outline-none focus-within:border-foreground/20 focus-within:ring-2 focus-within:ring-foreground/15 ${disabled ? "cursor-not-allowed opacity-60" : ""} ${className}`}
+      className={`flex min-h-[44px] flex-wrap items-center gap-1.5 ${disabled ? "cursor-not-allowed opacity-60" : "cursor-text"} ${className}`}
       onClick={() => inputRef.current?.focus()}
       onKeyDown={(e) => {
         if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
@@ -62,7 +62,7 @@ export function TagInput({
       {tags.map((tag, i) => (
         <span
           key={`${tag}-${i}`}
-          className="inline-flex items-center gap-1 rounded-2xl bg-muted px-2.5 py-0.5 text-sm"
+          className="inline-flex items-center gap-1 rounded-lg bg-muted px-2.5 py-1 text-sm leading-none"
         >
           {tag}
           {!disabled && (
@@ -86,7 +86,7 @@ export function TagInput({
         placeholder={tags.length >= maxTags ? "" : placeholder}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        className="min-w-[120px] flex-1 border-0 bg-transparent py-1 text-sm outline-none placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
+        className="min-w-[100px] flex-1 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 disabled:cursor-not-allowed"
       />
     </div>
   );

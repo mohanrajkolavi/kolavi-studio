@@ -67,6 +67,12 @@ export async function POST(request: NextRequest) {
         }
       };
 
+      const keepAlive = setInterval(() => {
+        try {
+          controller.enqueue(encoder.encode(`:\\n\\n`));
+        } catch { }
+      }, 10_000);
+
       try {
         const result = await runDraftChunk(
           jobId,
@@ -86,6 +92,7 @@ export async function POST(request: NextRequest) {
         console.error("Blog draft error:", error);
         sendEvent("error", { error: message });
       } finally {
+        clearInterval(keepAlive);
         try {
           controller.close();
         } catch {
