@@ -28,6 +28,7 @@ import { Switch } from "@/components/ui/switch";
 import { ToolLayout } from "@/components/markdown-tools/ToolLayout";
 import { ShareButton } from "@/components/markdown-tools/ShareButton";
 import { DownloadButton } from "@/components/markdown-tools/DownloadButton";
+import { RelatedTools } from "@/components/markdown-tools/RelatedTools";
 import { parseMarkdown } from "@/lib/markdown/parser";
 import { getContentFromUrl } from "@/lib/markdown/shareUrl";
 import { cn } from "@/lib/utils";
@@ -362,7 +363,17 @@ function MarkdownEditorInner() {
       currentPath="/markdown-editor"
     >
       {/* Action buttons */}
-      <div className="mb-4 flex items-center justify-end">{actionButtons}</div>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <RelatedTools
+          links={[
+            { href: "/markdown-to-pdf", label: "Convert to PDF", getContent: () => content },
+            { href: "/markdown-to-html", label: "Convert to HTML", getContent: () => content },
+            { href: "/markdown-formatter", label: "Format", getContent: () => content },
+            { href: "/markdown-table-generator", label: "Build a Table" },
+          ]}
+        />
+        <div className="flex items-center justify-end">{actionButtons}</div>
+      </div>
 
       {/* Desktop: split pane */}
       <div className="hidden overflow-hidden rounded-lg border bg-background md:grid md:min-h-[600px] md:grid-cols-2 md:divide-x">
