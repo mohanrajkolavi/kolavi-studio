@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { setTransferContent } from "@/lib/markdown/shareUrl";
 
 export interface RelatedToolLink {
@@ -15,17 +14,16 @@ interface RelatedToolsProps {
 }
 
 export function RelatedTools({ links }: RelatedToolsProps) {
-  const router = useRouter();
-
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>, link: RelatedToolLink) => {
       if (!link.getContent) return; // let normal navigation happen
       e.preventDefault();
       const content = link.getContent();
       setTransferContent(content);
-      router.push(link.href);
+      // Use full page navigation to ensure the target component mounts fresh
+      window.location.href = link.href;
     },
-    [router]
+    []
   );
 
   return (
