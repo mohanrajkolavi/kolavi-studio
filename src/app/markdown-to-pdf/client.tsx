@@ -200,7 +200,7 @@ export function MarkdownToPdfClient() {
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <label className="text-sm font-medium text-muted-foreground">
+              <label htmlFor="theme-select" className="text-sm font-medium text-muted-foreground">
                 Theme
               </label>
               <Select
@@ -219,7 +219,7 @@ export function MarkdownToPdfClient() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <label className="text-sm font-medium text-muted-foreground">
+              <label htmlFor="fontsize-select" className="text-sm font-medium text-muted-foreground">
                 Font size
               </label>
               <Select
@@ -238,7 +238,7 @@ export function MarkdownToPdfClient() {
             </div>
 
             <div className="flex items-center gap-1.5">
-              <label className="text-sm font-medium text-muted-foreground">
+              <label htmlFor="pagesize-select" className="text-sm font-medium text-muted-foreground">
                 Page size
               </label>
               <Select

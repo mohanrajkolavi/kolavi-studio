@@ -163,38 +163,42 @@ function MarkdownToHtmlInner() {
 
   const optionsRow = (
     <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-      <label className="flex items-center gap-2 text-sm">
+      <span className="flex items-center gap-2 text-sm">
         <Switch
+          id="gfm-toggle"
           checked={gfm}
           onCheckedChange={setGfm}
           aria-label="Toggle GFM mode"
         />
-        GFM mode
-      </label>
-      <label className="flex items-center gap-2 text-sm">
+        <label htmlFor="gfm-toggle">GFM mode</label>
+      </span>
+      <span className="flex items-center gap-2 text-sm">
         <Switch
+          id="sanitize-toggle"
           checked={sanitize}
           onCheckedChange={setSanitize}
           aria-label="Toggle sanitize output"
         />
-        Sanitize output
-      </label>
-      <label className="flex items-center gap-2 text-sm">
+        <label htmlFor="sanitize-toggle">Sanitize output</label>
+      </span>
+      <span className="flex items-center gap-2 text-sm">
         <Switch
+          id="wrapper-toggle"
           checked={includeWrapper}
           onCheckedChange={setIncludeWrapper}
           aria-label="Toggle include HTML wrapper"
         />
-        Include HTML wrapper
-      </label>
-      <label className="flex items-center gap-2 text-sm">
+        <label htmlFor="wrapper-toggle">Include HTML wrapper</label>
+      </span>
+      <span className="flex items-center gap-2 text-sm">
         <Switch
+          id="minify-toggle"
           checked={minify}
           onCheckedChange={setMinify}
           aria-label="Toggle minify"
         />
-        Minify
-      </label>
+        <label htmlFor="minify-toggle">Minify</label>
+      </span>
     </div>
   );
 
