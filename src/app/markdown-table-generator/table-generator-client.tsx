@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { ToolLayout } from "@/components/markdown-tools/ToolLayout";
 import { CopyButton } from "@/components/markdown-tools/CopyButton";
 import { DownloadButton } from "@/components/markdown-tools/DownloadButton";
+import { RelatedTools } from "@/components/markdown-tools/RelatedTools";
 import { parseMarkdown } from "@/lib/markdown/parser";
 import { cn } from "@/lib/utils";
 
@@ -517,6 +518,14 @@ export function TableGeneratorClient() {
           <pre className="bg-muted overflow-x-auto rounded-lg border p-4 text-sm leading-relaxed">
             {markdown}
           </pre>
+          <div className="mt-3">
+            <RelatedTools
+              links={[
+                { href: "/markdown-editor", label: "Open in Editor", getContent: () => markdown },
+                { href: "/markdown-to-pdf", label: "Convert to PDF", getContent: () => markdown },
+              ]}
+            />
+          </div>
         </section>
 
         {/* ---- Rendered Preview ---- */}

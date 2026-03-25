@@ -199,6 +199,20 @@ export default function SlackMarkdownPage() {
             </Link>{" "}
             for a live preview as you type.
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href="/markdown-tools"
+              className="inline-flex items-center rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Browse all tools
+            </Link>
+            <Link
+              href="/markdown-cheat-sheet"
+              className="inline-flex items-center rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              Cheat Sheet
+            </Link>
+          </div>
         </div>
 
         <ToolFooter currentPath="/slack-markdown" />

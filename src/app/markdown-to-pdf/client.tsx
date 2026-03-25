@@ -14,6 +14,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { ToolLayout } from "@/components/markdown-tools/ToolLayout";
 import { ShareButton } from "@/components/markdown-tools/ShareButton";
+import { RelatedTools } from "@/components/markdown-tools/RelatedTools";
 import { parseMarkdown } from "@/lib/markdown/parser";
 import { getContentFromUrl } from "@/lib/markdown/shareUrl";
 import { cn } from "@/lib/utils";
@@ -266,6 +267,13 @@ export function MarkdownToPdfClient() {
             </Button>
             <ShareButton content={markdown} basePath="/markdown-to-pdf" />
           </div>
+
+          <RelatedTools
+            links={[
+              { href: "/markdown-editor", label: "Edit in Editor", getContent: () => markdown },
+              { href: "/markdown-to-html", label: "Convert to HTML instead", getContent: () => markdown },
+            ]}
+          />
         </div>
 
         {/* Preview Pane */}

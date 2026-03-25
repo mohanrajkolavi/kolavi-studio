@@ -10,6 +10,7 @@ import { ToolHeader } from "@/components/markdown-tools/ToolHeader";
 import { ToolFooter } from "@/components/markdown-tools/ToolFooter";
 import { parseMarkdown } from "@/lib/markdown/parser";
 import { encodeShareContent } from "@/lib/markdown/shareUrl";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface SyntaxEntry {
@@ -266,9 +267,19 @@ export function CheatSheetClient() {
               id={section.id}
               ref={(el) => registerRef(section.id, el)}
             >
-              <h2 className="text-xl font-semibold tracking-tight mb-4">
-                {section.name}
-              </h2>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-xl font-semibold tracking-tight">
+                  {section.name}
+                </h2>
+                {section.id === "tables" && (
+                  <Link
+                    href="/markdown-table-generator"
+                    className="inline-flex items-center rounded-lg border border-border bg-background px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    Build tables visually
+                  </Link>
+                )}
+              </div>
               <div className="space-y-4">
                 {section.entries.map((entry, idx) => (
                   <SyntaxCard key={`${section.id}-${idx}`} entry={entry} />

@@ -16,6 +16,7 @@ import { CopyButton } from "@/components/markdown-tools/CopyButton";
 import { ShareButton } from "@/components/markdown-tools/ShareButton";
 import { DownloadButton } from "@/components/markdown-tools/DownloadButton";
 import { ToolLayout } from "@/components/markdown-tools/ToolLayout";
+import { RelatedTools } from "@/components/markdown-tools/RelatedTools";
 import { formatMarkdown, diffLines, type DiffLine } from "@/lib/markdown/formatter";
 import { getContentFromUrl } from "@/lib/markdown/shareUrl";
 import { cn } from "@/lib/utils";
@@ -199,6 +200,16 @@ export function MarkdownFormatterClient() {
             />
           </div>
         </Card>
+      </div>
+
+      <div className="mt-4">
+        <RelatedTools
+          links={[
+            { href: "/markdown-editor", label: "Open in Editor", getContent: () => output || input },
+            { href: "/markdown-to-pdf", label: "Convert to PDF", getContent: () => output || input },
+            { href: "/markdown-to-html", label: "Convert to HTML", getContent: () => output || input },
+          ]}
+        />
       </div>
     </ToolLayout>
   );
