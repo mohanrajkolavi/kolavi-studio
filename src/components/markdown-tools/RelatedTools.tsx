@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { encodeShareContent } from "@/lib/markdown/shareUrl";
+import { setTransferContent } from "@/lib/markdown/shareUrl";
 
 export interface RelatedToolLink {
   href: string;
@@ -22,9 +22,8 @@ export function RelatedTools({ links }: RelatedToolsProps) {
       if (!link.getContent) return; // let normal navigation happen
       e.preventDefault();
       const content = link.getContent();
-      const encoded = encodeShareContent(content);
-      const url = encoded ? `${link.href}?c=${encoded}` : link.href;
-      router.push(url);
+      setTransferContent(content);
+      router.push(link.href);
     },
     [router]
   );
