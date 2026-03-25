@@ -31,6 +31,7 @@ const FOOTER_SECTIONS: { title: string; links: FooterLink[] }[] = [
     links: [
       { href: "/tools", label: "All Tools" },
       { href: "/tools/speed-audit", label: "Free Speed Audit →", primary: true },
+      { href: "/markdown-tools", label: "Markdown Tools" },
     ],
   },
 ];
