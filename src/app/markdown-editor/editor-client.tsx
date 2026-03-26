@@ -21,6 +21,8 @@ import {
   ListOrdered,
   Minus,
   Upload,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -38,6 +40,7 @@ import { cn } from "@/lib/utils";
 // ---------------------------------------------------------------------------
 
 const STORAGE_KEY = "md-editor-content";
+const MAX_HISTORY = 100;
 
 const DEFAULT_CONTENT = `# Welcome to the Markdown Editor
 
@@ -67,6 +70,128 @@ console.log(greeting);
 | Editor | ✅ |
 | Preview | ✅ |
 | Share | ✅ |`;
+
+// ---------------------------------------------------------------------------
+// Undo/Redo history hook
+// ---------------------------------------------------------------------------
+
+function useHistory(initialValue: string) {
+  const historyRef = useRef<string[]>([initialValue]);
+  const indexRef = useRef(0);
+  const [current, setCurrent] = useState(initialValue);
+  const batchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const push = useCallback((value: string) => {
+    // Debounce: batch rapid keystrokes into single history entries (300ms)
+    if (batchTimeoutRef.current) clearTimeout(batchTimeoutRef.current);
+
+    setCurrent(value);
+
+    batchTimeoutRef.current = setTimeout(() => {
+      const history = historyRef.current;
+      const idx = indexRef.current;
+
+      // If we're not at the end, trim forward history
+      if (idx < history.length - 1) {
+        historyRef.current = history.slice(0, idx + 1);
+      }
+
+      historyRef.current.push(value);
+
+      // Cap history length
+      if (historyRef.current.length > MAX_HISTORY) {
+        historyRef.current = historyRef.current.slice(-MAX_HISTORY);
+      }
+
+      indexRef.current = historyRef.current.length - 1;
+    }, 300);
+  }, []);
+
+  const setWithoutHistory = useCallback((value: string) => {
+    // Reset history when content is loaded from external source (file upload, URL)
+    historyRef.current = [value];
+    indexRef.current = 0;
+    setCurrent(value);
+  }, []);
+
+  const undo = useCallback(() => {
+    if (batchTimeoutRef.current) {
+      clearTimeout(batchTimeoutRef.current);
+      batchTimeoutRef.current = null;
+      // Flush pending push so the current state is saved before undoing
+      const history = historyRef.current;
+      const idx = indexRef.current;
+      if (idx < history.length - 1) {
+        historyRef.current = history.slice(0, idx + 1);
+      }
+      historyRef.current.push(current);
+      if (historyRef.current.length > MAX_HISTORY) {
+        historyRef.current = historyRef.current.slice(-MAX_HISTORY);
+      }
+      indexRef.current = historyRef.current.length - 1;
+    }
+
+    const idx = indexRef.current;
+    if (idx > 0) {
+      indexRef.current = idx - 1;
+      setCurrent(historyRef.current[idx - 1]);
+    }
+  }, [current]);
+
+  const redo = useCallback(() => {
+    const idx = indexRef.current;
+    const history = historyRef.current;
+    if (idx < history.length - 1) {
+      indexRef.current = idx + 1;
+      setCurrent(history[idx + 1]);
+    }
+  }, []);
+
+  const canUndo = indexRef.current > 0 || batchTimeoutRef.current !== null;
+  const canRedo = indexRef.current < historyRef.current.length - 1;
+
+  return { current, push, setWithoutHistory, undo, redo, canUndo, canRedo };
+}
+
+// ---------------------------------------------------------------------------
+// Resizable split pane hook
+// ---------------------------------------------------------------------------
+
+function useResizablePane(containerRef: RefObject<HTMLDivElement | null>) {
+  const [splitPercent, setSplitPercent] = useState(50);
+  const isDragging = useRef(false);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isDragging.current = true;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+
+      const onMouseMove = (moveEvent: MouseEvent) => {
+        if (!isDragging.current || !containerRef.current) return;
+        const rect = containerRef.current.getBoundingClientRect();
+        const x = moveEvent.clientX - rect.left;
+        const percent = Math.min(Math.max((x / rect.width) * 100, 20), 80);
+        setSplitPercent(percent);
+      };
+
+      const onMouseUp = () => {
+        isDragging.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup", onMouseUp);
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup", onMouseUp);
+    },
+    [containerRef]
+  );
+
+  return { splitPercent, handleMouseDown };
+}
 
 // ---------------------------------------------------------------------------
 // Toolbar config
@@ -167,8 +292,10 @@ function MarkdownEditorInner() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const [content, setContent] = useState<string>(() => {
+  // Determine initial content
+  const initialContent = useMemo(() => {
     if (typeof window === "undefined") return DEFAULT_CONTENT;
 
     const fromUrl = getContentFromUrl(searchParams);
@@ -182,7 +309,20 @@ function MarkdownEditorInner() {
     }
 
     return DEFAULT_CONTENT;
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const {
+    current: content,
+    push: pushContent,
+    setWithoutHistory,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useHistory(initialContent);
+
+  const { splitPercent, handleMouseDown } = useResizablePane(splitContainerRef);
 
   const [gfm, setGfm] = useState<boolean>(() => {
     if (typeof window === "undefined") return true;
@@ -212,12 +352,18 @@ function MarkdownEditorInner() {
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
-      if (e.key === "b") {
+      if (e.key === "z" && !e.shiftKey) {
         e.preventDefault();
-        applyToolbarAction(textareaRef, TOOLBAR_ACTIONS[0], content, setContent);
+        undo();
+      } else if ((e.key === "z" && e.shiftKey) || e.key === "y") {
+        e.preventDefault();
+        redo();
+      } else if (e.key === "b") {
+        e.preventDefault();
+        applyToolbarAction(textareaRef, TOOLBAR_ACTIONS[0], content, pushContent);
       } else if (e.key === "i") {
         e.preventDefault();
-        applyToolbarAction(textareaRef, TOOLBAR_ACTIONS[1], content, setContent);
+        applyToolbarAction(textareaRef, TOOLBAR_ACTIONS[1], content, pushContent);
       } else if (e.key === "s") {
         e.preventDefault();
         triggerDownload(content);
@@ -226,7 +372,7 @@ function MarkdownEditorInner() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [content]);
+  }, [content, pushContent, undo, redo]);
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -237,7 +383,7 @@ function MarkdownEditorInner() {
       reader.onload = (ev) => {
         const text = ev.target?.result;
         if (typeof text === "string") {
-          setContent(text);
+          setWithoutHistory(text);
         }
       };
       reader.readAsText(file);
@@ -245,7 +391,7 @@ function MarkdownEditorInner() {
       // Reset input so the same file can be re-uploaded
       e.target.value = "";
     },
-    []
+    [setWithoutHistory]
   );
 
   const renderedHtml = useMemo(
@@ -258,15 +404,38 @@ function MarkdownEditorInner() {
 
   const handleToolbarClick = useCallback(
     (action: ToolbarAction) => {
-      applyToolbarAction(textareaRef, action, content, setContent);
+      applyToolbarAction(textareaRef, action, content, pushContent);
     },
-    [content]
+    [content, pushContent]
   );
 
   // ---- Shared UI pieces ----
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-0.5 border-b p-1">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        onClick={undo}
+        disabled={!canUndo}
+        aria-label="Undo"
+        title="Undo (Ctrl+Z)"
+      >
+        <Undo2 className="h-4 w-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8"
+        onClick={redo}
+        disabled={!canRedo}
+        aria-label="Redo"
+        title="Redo (Ctrl+Shift+Z)"
+      >
+        <Redo2 className="h-4 w-4" />
+      </Button>
+      <div className="mx-1 h-5 w-px bg-border" />
       {TOOLBAR_ACTIONS.map((action) => (
         <Button
           key={action.label}
@@ -287,7 +456,7 @@ function MarkdownEditorInner() {
     <textarea
       ref={textareaRef}
       value={content}
-      onChange={(e) => setContent(e.target.value)}
+      onChange={(e) => pushContent(e.target.value)}
       className={cn(
         "h-full w-full flex-1 resize-none bg-transparent p-4 font-mono text-sm",
         "focus:outline-none"
@@ -375,14 +544,42 @@ function MarkdownEditorInner() {
         <div className="flex items-center justify-end">{actionButtons}</div>
       </div>
 
-      {/* Desktop: split pane (fixed height, independently scrollable) */}
-      <div className="hidden overflow-hidden rounded-lg border bg-background md:grid md:h-[calc(100vh-280px)] md:min-h-[500px] md:max-h-[900px] md:grid-cols-2 md:divide-x">
-        <div className="flex flex-col overflow-hidden">
+      {/* Desktop: split pane with draggable resizer */}
+      <div
+        ref={splitContainerRef}
+        className="hidden overflow-hidden rounded-lg border bg-background md:flex md:h-[calc(100vh-280px)] md:min-h-[500px] md:max-h-[900px]"
+      >
+        {/* Editor side */}
+        <div
+          className="flex flex-col overflow-hidden"
+          style={{ width: `${splitPercent}%` }}
+        >
           {toolbar}
           <div className="flex-1 overflow-auto">{editorTextarea}</div>
           {statsBar}
         </div>
-        <div className="overflow-auto">{previewPane}</div>
+
+        {/* Draggable resizer handle */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize editor and preview panes"
+          className="relative z-10 w-1.5 cursor-col-resize select-none border-x border-border bg-muted transition-colors hover:bg-primary/20 active:bg-primary/30"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <div className="flex flex-col gap-1">
+              <div className="h-1 w-1 rounded-full bg-muted-foreground/40" />
+              <div className="h-1 w-1 rounded-full bg-muted-foreground/40" />
+              <div className="h-1 w-1 rounded-full bg-muted-foreground/40" />
+            </div>
+          </div>
+        </div>
+
+        {/* Preview side */}
+        <div className="flex-1 overflow-auto">
+          {previewPane}
+        </div>
       </div>
 
       {/* Mobile: tabs (fixed height, scrollable) */}
