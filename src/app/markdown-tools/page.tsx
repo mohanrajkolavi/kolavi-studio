@@ -12,10 +12,16 @@ import {
   MessageCircle,
   Hash,
   Github,
+  FileText,
+  Puzzle,
+  Compass,
+  Lightbulb,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ToolFooter } from "@/components/markdown-tools/ToolFooter";
+import { MARKDOWN_TOOLS, TOOL_CATEGORIES } from "@/lib/markdown/tools-data";
 
 export const metadata = getPageMetadata({
   title: "Free Markdown Tools | Editor, Converter, Formatter & More",
@@ -237,6 +243,70 @@ export default function MarkdownToolsPage() {
               <ToolCardItem key={tool.href} tool={tool} />
             ))}
           </div>
+        </section>
+
+        {/* Syntax & Learning */}
+        <section className="mt-16">
+          <h2 className="text-2xl font-semibold tracking-tight mb-6">
+            Learn Markdown
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { href: "/markdown-guide", icon: Compass, name: "Getting Started", description: "Beginner-friendly introduction to markdown" },
+              { href: "/markdown-syntax", icon: FileText, name: "Basic Syntax", description: "Complete reference for core markdown elements" },
+              { href: "/markdown-extended-syntax", icon: Puzzle, name: "Extended Syntax", description: "Tables, footnotes, task lists, and more" },
+              { href: "/markdown-hacks", icon: Lightbulb, name: "Hacks & Tips", description: "Workarounds for things markdown doesn't natively support" },
+            ].map((item) => (
+              <Link key={item.href} href={item.href} className="group block h-full">
+                <Card className="h-full transition-all duration-200 hover:shadow-md hover:border-primary/30">
+                  <CardContent className="flex flex-col gap-2 p-5">
+                    <div className="flex items-center gap-2">
+                      <item.icon className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold text-sm group-hover:text-primary transition-colors">{item.name}</h3>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{item.description}</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Apps & Tools That Support Markdown */}
+        <section className="mt-16">
+          <h2 className="text-2xl font-semibold tracking-tight mb-2">
+            Apps That Support Markdown
+          </h2>
+          <p className="text-muted-foreground mb-8">
+            Markdown support guides for popular apps, editors, and platforms.
+          </p>
+          {TOOL_CATEGORIES.map((category) => {
+            const categoryTools = MARKDOWN_TOOLS.filter(
+              (t) => t.category === category.id
+            );
+            if (categoryTools.length === 0) return null;
+            return (
+              <div key={category.id} className="mb-10">
+                <h3 className="text-lg font-semibold mb-1">{category.label}</h3>
+                <p className="text-sm text-muted-foreground mb-4">{category.description}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                  {categoryTools.map((tool) => {
+                    const href = tool.externalPath || `/markdown-tools/${tool.slug}`;
+                    return (
+                      <Link
+                        key={tool.slug}
+                        href={href}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        {tool.name}
+                        <ExternalLink className="h-3 w-3 opacity-40" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </section>
 
         {/* SEO Content */}
