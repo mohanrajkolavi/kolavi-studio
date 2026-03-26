@@ -17,6 +17,7 @@ import { CopyButton } from "@/components/markdown-tools/CopyButton";
 import { ShareButton } from "@/components/markdown-tools/ShareButton";
 import { DownloadButton } from "@/components/markdown-tools/DownloadButton";
 import { RelatedTools } from "@/components/markdown-tools/RelatedTools";
+import { UploadButton } from "@/components/markdown-tools/UploadButton";
 import { parseMarkdown, minifyHtml, wrapHtml } from "@/lib/markdown/parser";
 import { getContentFromUrl } from "@/lib/markdown/shareUrl";
 import { cn } from "@/lib/utils";
@@ -254,7 +255,10 @@ function MarkdownToHtmlInner() {
       {/* Action bar */}
       <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         {optionsRow}
-        <ShareButton content={content} basePath="/markdown-to-html" />
+        <div className="flex items-center gap-2">
+          <UploadButton onContent={setContent} />
+          <ShareButton content={content} basePath="/markdown-to-html" />
+        </div>
       </div>
 
       <div className="mb-4">

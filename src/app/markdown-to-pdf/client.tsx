@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UploadButton } from "@/components/markdown-tools/UploadButton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -248,6 +249,7 @@ export function MarkdownToPdfClient() {
         </div>
 
         <div className="ml-auto flex items-center gap-3">
+          <UploadButton onContent={setMarkdown} />
           <Button
             onClick={handleDownload}
             disabled={generating || !markdown.trim()}

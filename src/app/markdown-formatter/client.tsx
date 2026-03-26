@@ -17,6 +17,7 @@ import { ShareButton } from "@/components/markdown-tools/ShareButton";
 import { DownloadButton } from "@/components/markdown-tools/DownloadButton";
 import { ToolLayout } from "@/components/markdown-tools/ToolLayout";
 import { RelatedTools } from "@/components/markdown-tools/RelatedTools";
+import { UploadButton } from "@/components/markdown-tools/UploadButton";
 import { formatMarkdown, diffLines, type DiffLine } from "@/lib/markdown/formatter";
 import { getContentFromUrl } from "@/lib/markdown/shareUrl";
 import { cn } from "@/lib/utils";
@@ -153,6 +154,7 @@ export function MarkdownFormatterClient() {
             <Button onClick={handleFormat} disabled={!input.trim()}>
               Format
             </Button>
+            <UploadButton onContent={setInput} />
             <ShareButton content={input} basePath="/markdown-formatter" />
           </div>
         </Card>
