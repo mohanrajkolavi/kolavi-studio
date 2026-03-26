@@ -266,8 +266,8 @@ function MarkdownToHtmlInner() {
         />
       </div>
 
-      {/* Desktop: 3-column layout (lg+) */}
-      <div className="hidden lg:grid lg:grid-cols-3 lg:divide-x rounded-lg border bg-background overflow-hidden min-h-[600px]">
+      {/* Desktop: 3-column layout (lg+), fixed height with independent scroll */}
+      <div className="hidden lg:grid lg:grid-cols-3 lg:divide-x rounded-lg border bg-background overflow-hidden h-[calc(100vh-300px)] min-h-[500px] max-h-[800px]">
         {inputPane}
         {htmlPane}
         {previewPane}
