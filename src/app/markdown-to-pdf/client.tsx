@@ -189,99 +189,97 @@ export function MarkdownToPdfClient() {
       description="Convert markdown to a beautifully formatted PDF. Choose from multiple themes."
       currentPath="/markdown-to-pdf"
     >
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* Controls bar */}
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="theme-select" className="text-sm font-medium text-muted-foreground">
+            Theme
+          </label>
+          <Select
+            value={theme}
+            onValueChange={(v) => setTheme(v as Theme)}
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="default">Default</SelectItem>
+              <SelectItem value="github">GitHub</SelectItem>
+              <SelectItem value="resume">Resume</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="fontsize-select" className="text-sm font-medium text-muted-foreground">
+            Font size
+          </label>
+          <Select
+            value={fontSize}
+            onValueChange={(v) => setFontSize(v as FontSize)}
+          >
+            <SelectTrigger className="w-[90px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="12px">12px</SelectItem>
+              <SelectItem value="14px">14px</SelectItem>
+              <SelectItem value="16px">16px</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="pagesize-select" className="text-sm font-medium text-muted-foreground">
+            Page size
+          </label>
+          <Select
+            value={pageSize}
+            onValueChange={(v) => setPageSize(v as PageSize)}
+          >
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="a4">A4</SelectItem>
+              <SelectItem value="letter">Letter</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="ml-auto flex items-center gap-3">
+          <Button
+            onClick={handleDownload}
+            disabled={generating || !markdown.trim()}
+          >
+            <FileDown className="mr-2 h-4 w-4" />
+            {generating ? "Generating..." : "Convert & Download PDF"}
+          </Button>
+          <ShareButton content={markdown} basePath="/markdown-to-pdf" />
+        </div>
+      </div>
+
+      {/* Split pane: input and preview at equal height */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:h-[calc(100vh-340px)] lg:min-h-[400px] lg:max-h-[700px]">
         {/* Input Pane */}
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col overflow-hidden rounded-lg border bg-background">
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <h2 className="text-sm font-semibold text-muted-foreground">Markdown</h2>
+          </div>
           <Textarea
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
             placeholder="Type or paste your markdown here..."
-            className="h-[400px] min-h-[300px] max-h-[600px] resize-y font-mono text-sm"
-          />
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <label htmlFor="theme-select" className="text-sm font-medium text-muted-foreground">
-                Theme
-              </label>
-              <Select
-                value={theme}
-                onValueChange={(v) => setTheme(v as Theme)}
-              >
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="github">GitHub</SelectItem>
-                  <SelectItem value="resume">Resume</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <label htmlFor="fontsize-select" className="text-sm font-medium text-muted-foreground">
-                Font size
-              </label>
-              <Select
-                value={fontSize}
-                onValueChange={(v) => setFontSize(v as FontSize)}
-              >
-                <SelectTrigger className="w-[90px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="12px">12px</SelectItem>
-                  <SelectItem value="14px">14px</SelectItem>
-                  <SelectItem value="16px">16px</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex items-center gap-1.5">
-              <label htmlFor="pagesize-select" className="text-sm font-medium text-muted-foreground">
-                Page size
-              </label>
-              <Select
-                value={pageSize}
-                onValueChange={(v) => setPageSize(v as PageSize)}
-              >
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="a4">A4</SelectItem>
-                  <SelectItem value="letter">Letter</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              onClick={handleDownload}
-              disabled={generating || !markdown.trim()}
-            >
-              <FileDown className="mr-2 h-4 w-4" />
-              {generating ? "Generating..." : "Convert & Download PDF"}
-            </Button>
-            <ShareButton content={markdown} basePath="/markdown-to-pdf" />
-          </div>
-
-          <RelatedTools
-            links={[
-              { href: "/markdown-editor", label: "Edit in Editor", getContent: () => markdown },
-              { href: "/markdown-to-html", label: "Convert to HTML instead", getContent: () => markdown },
-            ]}
+            className="flex-1 resize-none rounded-none border-0 font-mono text-sm focus-visible:ring-0"
           />
         </div>
 
         {/* Preview Pane */}
-        <div className="rounded-lg bg-muted p-4">
-          <p className="mb-3 text-sm font-medium text-muted-foreground">
-            Preview
-          </p>
-          <Card className="h-[400px] min-h-[300px] max-h-[600px] overflow-auto shadow-md">
+        <div className="flex flex-col overflow-hidden rounded-lg border bg-background">
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <h2 className="text-sm font-semibold text-muted-foreground">Preview</h2>
+          </div>
+          <Card className="flex-1 overflow-auto rounded-none border-0 shadow-none">
             <div
               ref={previewRef}
               className={cn("p-8", themeClasses[theme])}
@@ -293,6 +291,16 @@ export function MarkdownToPdfClient() {
             </p>
           </Card>
         </div>
+      </div>
+
+      {/* Related tools */}
+      <div className="mt-4">
+        <RelatedTools
+          links={[
+            { href: "/markdown-editor", label: "Edit in Editor", getContent: () => markdown },
+            { href: "/markdown-to-html", label: "Convert to HTML instead", getContent: () => markdown },
+          ]}
+        />
       </div>
     </ToolLayout>
   );
