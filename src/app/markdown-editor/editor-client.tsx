@@ -385,7 +385,7 @@ function MarkdownEditorInner() {
         <div className="overflow-auto">{previewPane}</div>
       </div>
 
-      {/* Mobile: tabs */}
+      {/* Mobile: tabs (fixed height, scrollable) */}
       <div className="md:hidden">
         <Tabs defaultValue="write">
           <TabsList className="w-full">
@@ -398,15 +398,15 @@ function MarkdownEditorInner() {
           </TabsList>
 
           <TabsContent value="write">
-            <div className="flex min-h-[400px] flex-col rounded-lg border bg-background">
+            <div className="flex h-[calc(100vh-300px)] min-h-[350px] max-h-[600px] flex-col overflow-hidden rounded-lg border bg-background">
               {toolbar}
-              <div className="flex-1">{editorTextarea}</div>
+              <div className="flex-1 overflow-auto">{editorTextarea}</div>
               {statsBar}
             </div>
           </TabsContent>
 
           <TabsContent value="preview">
-            <div className="min-h-[400px] rounded-lg border bg-background">
+            <div className="h-[calc(100vh-300px)] min-h-[350px] max-h-[600px] overflow-auto rounded-lg border bg-background">
               {previewPane}
             </div>
           </TabsContent>
