@@ -560,11 +560,10 @@ function MarkdownEditorInner() {
         </div>
 
         {/* Draggable resizer handle */}
-        <div
-          role="separator"
-          aria-orientation="vertical"
+        <button
+          type="button"
           aria-label="Resize editor and preview panes"
-          className="relative z-10 w-1.5 cursor-col-resize select-none border-x border-border bg-muted transition-colors hover:bg-primary/20 active:bg-primary/30"
+          className="relative z-10 w-1.5 cursor-col-resize select-none border-x border-border bg-muted transition-colors hover:bg-primary/20 active:bg-primary/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onMouseDown={handleMouseDown}
         >
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -574,7 +573,7 @@ function MarkdownEditorInner() {
               <div className="h-1 w-1 rounded-full bg-muted-foreground/40" />
             </div>
           </div>
-        </div>
+        </button>
 
         {/* Preview side */}
         <div className="flex-1 overflow-auto">
