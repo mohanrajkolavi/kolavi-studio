@@ -273,7 +273,7 @@ function MarkdownToHtmlInner() {
         {previewPane}
       </div>
 
-      {/* Mobile / tablet: tabs (below lg) */}
+      {/* Mobile / tablet: tabs (below lg), fixed height with scroll */}
       <div className="lg:hidden">
         <Tabs defaultValue="markdown">
           <TabsList className="w-full">
@@ -289,19 +289,19 @@ function MarkdownToHtmlInner() {
           </TabsList>
 
           <TabsContent value="markdown">
-            <div className="flex flex-col rounded-lg border bg-background min-h-[400px]">
+            <div className="flex flex-col rounded-lg border bg-background h-[calc(100vh-320px)] min-h-[350px] max-h-[600px] overflow-hidden">
               {inputPane}
             </div>
           </TabsContent>
 
           <TabsContent value="html">
-            <div className="flex flex-col rounded-lg border bg-background min-h-[400px]">
+            <div className="flex flex-col rounded-lg border bg-background h-[calc(100vh-320px)] min-h-[350px] max-h-[600px] overflow-hidden">
               {htmlPane}
             </div>
           </TabsContent>
 
           <TabsContent value="preview">
-            <div className="rounded-lg border bg-background min-h-[400px]">
+            <div className="rounded-lg border bg-background h-[calc(100vh-320px)] min-h-[350px] max-h-[600px] overflow-auto">
               {previewPane}
             </div>
           </TabsContent>
