@@ -196,7 +196,7 @@ export function MarkdownToPdfClient() {
             value={markdown}
             onChange={(e) => setMarkdown(e.target.value)}
             placeholder="Type or paste your markdown here..."
-            className="min-h-[500px] resize-y font-mono text-sm"
+            className="h-[400px] min-h-[300px] max-h-[600px] resize-y font-mono text-sm"
           />
 
           <div className="flex flex-wrap items-center gap-3">
@@ -281,7 +281,7 @@ export function MarkdownToPdfClient() {
           <p className="mb-3 text-sm font-medium text-muted-foreground">
             Preview
           </p>
-          <Card className="min-h-[500px] overflow-auto shadow-md">
+          <Card className="h-[400px] min-h-[300px] max-h-[600px] overflow-auto shadow-md">
             <div
               ref={previewRef}
               className={cn("p-8", themeClasses[theme])}

@@ -375,9 +375,9 @@ function MarkdownEditorInner() {
         <div className="flex items-center justify-end">{actionButtons}</div>
       </div>
 
-      {/* Desktop: split pane */}
-      <div className="hidden overflow-hidden rounded-lg border bg-background md:grid md:min-h-[600px] md:grid-cols-2 md:divide-x">
-        <div className="flex flex-col">
+      {/* Desktop: split pane (fixed height, independently scrollable) */}
+      <div className="hidden overflow-hidden rounded-lg border bg-background md:grid md:h-[calc(100vh-280px)] md:min-h-[500px] md:max-h-[900px] md:grid-cols-2 md:divide-x">
+        <div className="flex flex-col overflow-hidden">
           {toolbar}
           <div className="flex-1 overflow-auto">{editorTextarea}</div>
           {statsBar}
