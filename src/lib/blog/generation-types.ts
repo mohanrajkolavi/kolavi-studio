@@ -8,6 +8,15 @@ export type GeneratedContent = {
   suggestedSlug?: string;
   suggestedCategories?: string[];
   suggestedTags?: string[];
+  // --- Pipeline metadata (persisted to DB for analysis & reuse) ---
+  schemaMarkup?: PipelineResult["schemaMarkup"];
+  auditResult?: PipelineResult["auditResult"];
+  eeatFeedback?: Record<string, unknown>;
+  factCheck?: PipelineResult["factCheck"];
+  sourceUrls?: string[];
+  tokenUsage?: Record<string, unknown>[];
+  briefSummary?: BriefSummary;
+  readabilityScores?: Record<string, unknown>;
 };
 
 /** Best-version brief summary (strategy/differentiation). */
@@ -84,6 +93,12 @@ export function pipelineToGenerated(result: PipelineResult): GeneratedContent {
     suggestedSlug: result.article.suggestedSlug,
     suggestedCategories: result.article.suggestedCategories,
     suggestedTags: result.article.suggestedTags,
+    // Pipeline metadata — persisted to DB for analysis & reuse
+    schemaMarkup: result.schemaMarkup,
+    auditResult: result.auditResult,
+    factCheck: result.factCheck,
+    sourceUrls: result.sourceUrls,
+    briefSummary: result.briefSummary,
   };
 }
 
@@ -106,6 +121,10 @@ export type GenerationInput = {
   competitorUrls: string[];
   /** Draft model: Opus 4.6 or Sonnet 4.6. */
   draftModel?: "opus-4.6" | "sonnet-4.6";
+  /** Cluster position for topical authority. */
+  clusterPosition?: "pillar" | "spoke" | "standalone";
+  /** Broader topic when spoke position. */
+  clusterTopic?: string;
 };
 
 // -----------------------------------------------------------------------------

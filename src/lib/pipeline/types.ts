@@ -54,6 +54,10 @@ export type PipelineInput = {
   toneExamples?: string;
   /** Optional existing blog URLs for internal link suggestions. */
   existingBlogUrls?: string[];
+  /** Cluster position for topical authority. Default: "standalone" (backward compatible). */
+  clusterPosition?: "pillar" | "spoke" | "standalone";
+  /** When clusterPosition is "spoke", the broader cluster topic this article supports. */
+  clusterTopic?: string;
 };
 
 /** Zod schema for validating job input (e.g. when loading from store). */
@@ -70,6 +74,8 @@ export const PipelineInputSchema = z.object({
   fieldNotes: z.string().optional(),
   toneExamples: z.string().optional(),
   existingBlogUrls: z.array(z.string()).optional(),
+  clusterPosition: z.enum(["pillar", "spoke", "standalone"]).optional().default("standalone"),
+  clusterTopic: z.string().optional(),
 });
 
 // =============================================================================
@@ -426,6 +432,53 @@ export const PovInsightSchema = z.object({
 
 export type PovInsight = z.infer<typeof PovInsightSchema>;
 
+// ---------------------------------------------------------------------------
+// Knowledge Engine Schemas
+// ---------------------------------------------------------------------------
+
+export const TopicNodeSchema = z.object({
+  topic: z.string(),
+  category: z.enum(["core", "entity", "strategy", "tactic", "concept"]),
+  relevanceScore: z.number().min(0).max(10),
+  competitorCoverage: z.number().min(0).max(100),
+});
+
+export const TopicGraphSchema = z.object({
+  nodes: z.array(TopicNodeSchema),
+  edges: z.array(z.object({
+    source: z.string(),
+    target: z.string(),
+    relationship: z.string(),
+  })),
+  informationGaps: z.array(z.string()),
+  saturatedTopics: z.array(z.string()),
+});
+
+export const AlgorithmicInsightSchema = z.object({
+  type: z.enum(["contrarian", "correlation", "myth_buster", "practitioner_observation", "framework_pillar"]),
+  headline: z.string(),
+  explanation: z.string(),
+  supportingDataPoint: z.string().optional(),
+  whyCompetitorsMissedIt: z.string(),
+});
+
+export const ProprietaryFrameworkSchema = z.object({
+  name: z.string(),
+  tagline: z.string(),
+  corePillars: z.array(z.object({
+    name: z.string(),
+    description: z.string(),
+    underlyingInsight: z.string(),
+  })),
+  howItBeatsTheSerp: z.string(),
+});
+
+export const KnowledgeEngineSchema = z.object({
+  topicGraph: TopicGraphSchema.optional(),
+  algorithmicInsights: z.array(AlgorithmicInsightSchema).optional(),
+  proprietaryFramework: ProprietaryFrameworkSchema.nullable().optional(),
+});
+
 export const ResearchBriefSchema = z.object({
   keyword: z.object({
     primary: z.string(),
@@ -433,11 +486,7 @@ export const ResearchBriefSchema = z.object({
     pasf: z.array(z.string()),
   }),
   currentData: CurrentDataSchema,
-  knowledgeEngine: z.object({
-    topicGraph: z.any().optional(),
-    algorithmicInsights: z.array(z.any()).optional(),
-    proprietaryFramework: z.any().optional(),
-  }).optional(),
+  knowledgeEngine: KnowledgeEngineSchema.optional(),
   outline: ResearchBriefOutlineSchema,
   gaps: z.array(z.string()),
   editorialStyle: EditorialStyleSchema,
@@ -461,6 +510,10 @@ export const ResearchBriefSchema = z.object({
     anchorText: z.string(),
     targetSection: z.string(),
   })).optional(),
+  /** Cluster position for topical authority building. */
+  clusterPosition: z.enum(["pillar", "spoke", "standalone"]).optional(),
+  /** Broader cluster topic when this article is a "spoke". */
+  clusterTopic: z.string().optional(),
 });
 
 /** Used when GPT returns brief without currentData (merged server-side). */
@@ -505,6 +558,10 @@ export type SchemaMarkup = {
   faq: object | null;
   breadcrumb: object | null;
   faqSchemaNote: string;
+  /** Speakable schema for voice assistant optimization. */
+  speakable?: object;
+  /** HowTo schema for procedural content (numbered steps). */
+  howTo?: object | null;
 };
 
 // =============================================================================
@@ -668,8 +725,15 @@ export const RETRY_EXPENSIVE: RetryConfig = {
 export const RETRY_STANDARD_FAST: RetryConfig = {
   maxRetries: 2,
   retryDelayMs: 1000,
-  timeoutMs: 40000,
+  timeoutMs: 60000,
   retryOn: ["timeout", "rate_limit", "server_error"],
+};
+
+export const RETRY_JINA: RetryConfig = {
+  maxRetries: 2,
+  retryDelayMs: 1000,
+  timeoutMs: 20000,
+  retryOn: ["timeout", "server_error"],
 };
 
 export const RETRY_CLAUDE_DRAFT: RetryConfig = {

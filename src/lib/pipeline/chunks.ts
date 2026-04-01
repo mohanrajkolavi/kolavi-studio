@@ -24,16 +24,15 @@ import type { ChunkCost } from "./jobs/types";
 import type { PipelineProgressEvent } from "./orchestrator";
 import { buildChunkCost } from "./cost";
 import { withRetry, validateSourceUrls } from "./orchestrator";
-import { RETRY_FAST, RETRY_STANDARD_FAST, RETRY_CLAUDE_DRAFT } from "./types";
+import { RETRY_FAST, RETRY_JINA, RETRY_STANDARD_FAST, RETRY_CLAUDE_DRAFT } from "./types";
 import { searchCompetitorUrlsWithPaa, searchRedditDiscussions, type RedditThread, type PaaItem } from "@/lib/serper/client";
 import { fetchCompetitorContent } from "@/lib/jina/reader";
 import { fetchCurrentData, extractQuotesFromReddit } from "@/lib/gemini/client";
 import {
   extractTopicsAndStyle,
-  buildResearchBrief,
   type WordCountOverride,
 } from "@/lib/openai/client";
-import { writeDraft, writeDraftSection, humanizeContent, fixAuditIssues, fixHallucinationsInContent } from "@/lib/claude/client";
+import { writeDraft, writeDraftSection, fixAuditIssues, fixHallucinationsInContent, buildResearchBrief } from "@/lib/claude/client";
 import { generateContentDiff, type ContentDiffResult } from "@/lib/seo/content-diff";
 import { computeSemanticSimilarity } from "@/lib/seo/similarity";
 import { assessContentDecay, type ContentDecayResult } from "@/lib/seo/content-decay";
@@ -50,6 +49,7 @@ import {
 import { buildTopicGraph } from "@/lib/knowledge/topic-graph";
 import { generateAlgorithmicInsights } from "@/lib/knowledge/insight-generator";
 import { synthesizeProprietaryFramework } from "@/lib/knowledge/framework-generator";
+import { ContentRegistry, lintDraft, fixDefinitionOpening } from "@/lib/pipeline/content-registry";
 
 /** Thrown when topic extraction fails after store updates; catch should not re-call store.setChunkFailed/updatePhase. */
 class TopicExtractionError extends Error {
@@ -75,12 +75,18 @@ class TimeBudget {
   remaining(): number {
     return Math.max(0, this.budgetMs - this.elapsed());
   }
-  cap(requestedMs: number): number {
+  cap(requestedMs: number, minMs?: number): number {
     const remaining = this.remaining();
     if (remaining < 10_000) return Math.max(remaining - 2_000, 1_000);
     const capped = Math.min(requestedMs, remaining - 5_000);
-    return Math.max(capped, 5_000);
+    const floor = minMs ?? 5_000;
+    return Math.max(capped, floor);
   }
+}
+
+/** Check if keyword implies strategic/methodology content (gates proprietary framework for commercial intent). */
+function isStrategyKeyword(keyword: string): boolean {
+  return /\b(strateg(y|ies)|methodology|framework|approach|playbook|blueprint|model|system|process)\b/i.test(keyword);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +341,7 @@ export async function runResearchFetch(
       const t0 = Date.now();
       const r = await withRetry(
         async () => fetchCompetitorContent(urls, urls.length),
-        { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
+        { ...RETRY_JINA, timeoutMs: budget.cap(RETRY_JINA.timeoutMs) },
         "jina"
       );
       jinaDurationMs = Date.now() - t0;
@@ -392,11 +398,14 @@ export async function runResearchFetch(
       };
 
   const articleCount = competitors.filter((c) => c.fetchSuccess).length;
-  if (articleCount === 0) {
-    const message = "We couldn't fetch content from the selected links. Try different sources or retry.";
+  if (articleCount === 0 && currentData.facts.length === 0) {
+    const message = "We couldn't fetch content from the selected links and no current data available. Try different sources or retry.";
     await store.setChunkFailed(jobId, "research", message);
     logResearchFetch("error", { event: "research_fetch_failed", jobId, reason: "no_articles_fetched", durationMs: Date.now() - researchStartMs });
     throw new Error(message);
+  }
+  if (articleCount === 0 && currentData.facts.length > 0) {
+    console.warn(`[chunks] No competitor articles fetched, but ${currentData.facts.length} current data facts available — proceeding with reduced context.`);
   }
 
   emit("jina", jinaResult.success ? "completed" : "failed", `${articleCount} articles fetched`, 50);
@@ -527,7 +536,7 @@ export async function runResearchChunk(
         const t0 = Date.now();
         const r = await withRetry(
           async () => fetchCompetitorContent(urls, DEFAULT_MAX_COMPETITOR_URLS),
-          { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
+          { ...RETRY_JINA, timeoutMs: budget.cap(RETRY_JINA.timeoutMs) },
           "jina"
         );
         jinaDurationMs = Date.now() - t0;
@@ -726,7 +735,12 @@ export async function runBriefChunk(
       const algorithmicInsights = await generateAlgorithmicInsights(input.primaryKeyword!, topicGraph, factsStrings);
 
       emit("topic-extraction", "started", "Synthesizing Proprietary Framework...", 30);
-      const proprietaryFramework = await synthesizeProprietaryFramework(input.primaryKeyword!, topicGraph, algorithmicInsights);
+      const intentList = Array.isArray(input.intent) ? input.intent : [input.intent ?? "informational"];
+      const skipFramework = intentList.some(i => i === "transactional" || i === "navigational") ||
+        (intentList.includes("commercial") && !isStrategyKeyword(input.primaryKeyword!));
+      const proprietaryFramework = skipFramework
+        ? null
+        : await synthesizeProprietaryFramework(input.primaryKeyword!, topicGraph, algorithmicInsights);
 
       await store.saveChunkOutput(jobId, "topic_extraction", {
         competitorUrlHash,
@@ -785,7 +799,7 @@ export async function runBriefChunk(
         cachedTopic?.algorithmicInsights,
         cachedTopic?.proprietaryFramework
       ),
-      { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
+      { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(120000, 120_000) },
       "gpt-brief"
     );
     if (!briefResult.success || !briefResult.data) {
@@ -967,23 +981,44 @@ export async function runDraftChunk(
     let assembledHtml = "";
     let totalWordCount = 0;
 
+    // --- Phase 4: ContentRegistry — track consumed stats/quotes/insights ---
+    // After each section, detect what was used and REMOVE it from subsequent
+    // section payloads. This prevents the AI from repeating the same stat or
+    // quote across multiple sections.
+    const registry = new ContentRegistry();
+    let availableFacts = [...brief.currentData.facts];
+    let availableQuotes = [...(redditQuotes ?? [])];
+    let availableInsights = [...(brief.knowledgeEngine?.algorithmicInsights ?? [])];
+
     for (let i = 0; i < brief.outline.sections.length; i++) {
       const section = brief.outline.sections[i];
       const progressPct = Math.round((i / brief.outline.sections.length) * 80);
       emit("claude-draft", "started", `Writing section ${i + 1}/${brief.outline.sections.length}: ${section.heading}`, progressPct);
 
+      // Build a shallow clone of the brief with filtered data for this section
+      const sectionBrief: typeof brief = {
+        ...brief,
+        currentData: { ...brief.currentData, facts: availableFacts },
+        knowledgeEngine: brief.knowledgeEngine
+          ? { ...brief.knowledgeEngine, algorithmicInsights: availableInsights }
+          : undefined,
+      };
+
+      const jobInput = job.input as PipelineInput;
+      const primaryIntent = Array.isArray(jobInput.intent) ? jobInput.intent[0] : (jobInput.intent ?? "informational");
       const draftResult = await withRetry(
         async () => writeDraftSection(
-          brief,
+          sectionBrief,
           section,
           assembledHtml,
           tokenUsage,
           draftModel,
           fieldNotes,
           toneExamples,
-          redditQuotes,
+          availableQuotes,
           i === 0,
-          primaryKeyword
+          primaryKeyword,
+          primaryIntent
         ),
         { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
         "claude-draft-section"
@@ -998,20 +1033,68 @@ export async function runDraftChunk(
       const sectionWordCount = sectionContent.split(/\s+/).filter(Boolean).length;
       totalWordCount += sectionWordCount;
 
+      // --- Registry: detect consumed items and splice them out ---
+      const { remainingFacts, remainingQuotes, remainingInsights, usedInThisSection } =
+        registry.markUsedAndFilter(
+          sectionContent, i, section.heading,
+          availableFacts, availableQuotes, availableInsights
+        );
+      availableFacts = remainingFacts;
+      availableQuotes = remainingQuotes;
+      availableInsights = remainingInsights;
+
+      if (usedInThisSection.length > 0 && process.env.NODE_ENV !== "test") {
+        console.log(
+          `[registry] Section ${i + 1} "${section.heading}": consumed ${usedInThisSection.length} items ` +
+          `(${usedInThisSection.map(u => u.matchType).join(", ")}). ` +
+          `Remaining: ${availableFacts.length} facts, ${availableQuotes.length} quotes, ${availableInsights.length} insights`
+        );
+      }
+
       // Inject the H2 heading and the content
       const slug = section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       assembledHtml += `\n<h2 id="${slug}">${section.heading}</h2>\n${sectionContent}\n`;
     }
 
-    emit("claude-draft", "started", "Humanizing content for natural flow...", 85);
-    const humanizeResult = await withRetry(
-      async () => humanizeContent(assembledHtml, toneExamples, tokenUsage),
-      { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
-      "claude-humanize"
-    );
+    if (process.env.NODE_ENV !== "test") {
+      console.log(`[registry] ${registry.getSummary()}`);
+    }
 
-    if (humanizeResult.success && typeof humanizeResult.data === "string") {
-      assembledHtml = humanizeResult.data;
+    // --- Phase 5 (lightweight): Style Linter + Definition Nuke ---
+    // Fix definition openings programmatically (the AI cannot be prompt-engineered out of this)
+    assembledHtml = fixDefinitionOpening(assembledHtml, primaryKeyword);
+
+    // Run style linter and log violations (non-blocking for now — informational)
+    const styleViolations = lintDraft(assembledHtml, primaryKeyword);
+    if (styleViolations.length > 0 && process.env.NODE_ENV !== "test") {
+      console.log(`[style-linter] ${styleViolations.length} violation(s) detected:`);
+      for (const v of styleViolations) {
+        console.log(`  [${v.type}] ${v.location}: ${v.evidence.slice(0, 100)}`);
+      }
+    }
+
+    // Audit-to-rewrite loop: catch Level 1 failures (typography, structure) before validation chunk
+    emit("claude-draft", "started", "Running pre-validation audit...", 88);
+    const preAudit = auditArticle({
+      title: titleMetaSlug.title,
+      content: assembledHtml,
+      slug: titleMetaSlug.suggestedSlug,
+      focusKeyword: primaryKeyword,
+    });
+    const level1Failures = preAudit.items
+      .filter((item) => item.level === 1 && item.severity === "fail")
+      .map((item) => `[Level 1] ${item.label}: ${item.message}`);
+
+    if (level1Failures.length > 0 && !preAudit.publishable) {
+      emit("claude-draft", "started", `Fixing ${level1Failures.length} Level 1 audit issue(s)...`, 92);
+      const fixResult = await withRetry(
+        async () => fixAuditIssues(assembledHtml, level1Failures, tokenUsage),
+        { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
+        "fix-audit-issues"
+      );
+      if (fixResult.success && typeof fixResult.data === "string" && fixResult.data.trim().length > 0) {
+        assembledHtml = fixResult.data;
+      }
     }
 
     emit("claude-draft", "completed", `Draft: ${totalWordCount} words`, 100);
@@ -1107,10 +1190,14 @@ export async function runValidationChunk(
     // Optional fact-check auto-fix (if input specifies)
     let factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
     if ((job.input as PipelineInput).autoFixHallucinations && factCheck.hallucinations.length > 0) {
-      const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData);
-      finalContent = fixResult.fixedHtml;
-      // Re-run fact check after fixes
-      factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+      try {
+        const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData);
+        finalContent = fixResult.fixedHtml;
+        // Re-run fact check after fixes
+        factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+      } catch (err) {
+        console.warn(`[chunks] fixHallucinations failed (non-fatal, proceeding with unfixed draft): ${err instanceof Error ? err.message : err}`);
+      }
     }
 
     // Run audit

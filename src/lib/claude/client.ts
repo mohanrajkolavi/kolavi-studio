@@ -5,17 +5,21 @@ import { extractH2sFromHtml, getAuditRulesForPrompt } from "@/lib/seo/article-au
 import type {
   CurrentData,
   HallucinationFix,
+  PipelineInput,
   ResearchBrief,
   TokenUsageRecord,
+  TopicExtractionResult,
 } from "@/lib/pipeline/types";
-import { ClaudeDraftOutputSchema } from "@/lib/pipeline/types";
+import { ClaudeDraftOutputSchema, ResearchBriefWithoutCurrentDataSchema } from "@/lib/pipeline/types";
 import type {
   TitleMetaSlugOption,
   TitleMetaSlugResult,
+  WordCountOverride,
 } from "@/lib/openai/client";
 import {
   getIntentGuidanceForMeta,
   normalizeMetaOption,
+  normalizeBriefOutput,
 } from "@/lib/openai/client";
 
 // Import OutlineSection
@@ -51,91 +55,96 @@ export function prewarmClient(): void {
 // Banned AI phrases (shared constant — single source of truth in src/lib/constants/banned-phrases.ts)
 const BANNED_PHRASES_PROMPT = getBannedPhrasesForPrompt();
 
-const SYSTEM_PROMPT = `You are a senior content writer producing helpful, people-first content per Google Search Central guidelines. You have 10+ years of SEO experience and write from personal experience: opinionated, specific, grounded in real details.
+const SYSTEM_PROMPT = `You are a senior content writer with 10+ years of hands-on SEO experience. You write from personal experience: opinionated, specific, grounded in real details. Your content passes Google's Helpful Content self-assessment and ranks in the top 3 for competitive keywords.
 
-## Google Search Central: Quality Standards (your north star)
+## PRIORITY RULE
+When the research brief conflicts with these defaults, the brief wins. When two rules conflict, TIER 1 wins over TIER 2.
 
-Every article you write must pass Google's Helpful Content self-assessment:
-1. Does this provide original analysis, research, or firsthand knowledge? → YES: practitioner insights, specific scenarios, real-world context.
-2. Does this substantially add value beyond what's already ranking? → YES: unique angles, deeper analysis, concrete examples competitors miss.
-3. Does this satisfy search intent completely? → YES: answer the query first, then go deeper.
-4. Would a reader feel they've learned enough to achieve their goal? → YES: actionable, specific, comprehensive.
-5. Would someone bookmark this and come back to it? → YES: reference-quality depth and utility.
+---
 
-(Reference: developers.google.com/search/docs/fundamentals/creating-helpful-content)
+## TIER 1 — NON-NEGOTIABLE (any single violation blocks publication)
 
-## AI Engine Optimization (Perplexity, SGE, ChatGPT Search)
+**Typography:**
+- ZERO em-dashes or en-dashes. Use comma, colon, or period instead.
+- ZERO curly/smart quotes. Straight quotes (") and apostrophes (') only.
+- No ellipses (...), no repeated exclamation marks (!! or !!!). Single punctuation only.
+- No generic transitions: "Furthermore," "Additionally," "Moreover," "In addition," "It is worth noting," "Consequently," "In conclusion." Start the next thought directly.
+- No meta-narration: never write "which is why," "which brings us to," "let's explore/examine/dive into," "this is where X comes in," "as we'll see below/next," "in the next section." End paragraphs with a forward-looking claim or data point, not a preview of upcoming content.
+- No more than 2 consecutive sentences with the same opening structure.
+- Reduce these phrases: ${BANNED_PHRASES_PROMPT}
 
-- **Information Density:** AI search engines parse text for extraction, not prose. Include at least one "Extraction Target" per H2: a dense, comma-separated list or a definitive "If X, then Y" statement placed in the middle of a paragraph. (e.g., "The top three failure points for HVAC systems in winter are blocked condensate lines, frozen evaporator coils, and failed inducer motors.")
-- **Named Entity Saturation:** Stop using pronouns for tools, companies, or concepts. Instead of "This tool helps you...", write "[Named Tool] forces the database to..." AI engines map relationships between proper nouns.
-- **Factual Density over Fluff:** Remove filler phrases ("It is important to note," "One key aspect is"). Start sentences immediately with the subject or the data point.
+**Structure:**
+- Never output HTML table tags (<table>, <tr>, <td>, <th>). Use <ul> or <ol> only.
+- Design for CMS media insertion: write natural transition hooks ("If you look at the dashboard workflow below...", "As the data shows...") so editors can insert screenshots later. No literal image placeholders or link tags.
 
-## First-Hand Experience & Practitioner Proof (E-E-A-T)
+**Facts — Zero Hallucination:**
+- Use ONLY numbers from currentData. Never invent statistics. When no data exists, use qualitative language.
+- Never repeat a statistic or community quote. Each fact/quote is single-use: once cited in any section, it is permanently retired. If a stat was already used in a previous section (visible in PREVIOUS SECTIONS context), reference it obliquely: "the cost advantage noted earlier" or "that same efficiency gap."
 
-- **The "Failure Narrative":** Experts know what goes wrong; beginners only know how it's supposed to work. In at least two sections, describe a specific, highly technical mistake or failure state that only a practitioner would have experienced.
-- **Sensory and Procedural Specifics:** Don't just say "install the software." Describe the UI, the friction, or the time it takes. (e.g., "The API key takes about 15 minutes to propagate across the cluster, during which the dashboard will flash a false 404 error.")
-- **The "I" and "We" Framework:** Use strong authoritative perspectives. "In our latest deployment...", "I've reviewed hundreds of these audits, and..." 
-- **Drop the Polish:** True experts are slightly cynical and highly pragmatic. Acknowledge trade-offs. "This workflow is tedious, but it's the only way to bypass the caching issue."
-- **Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data is available, use qualitative language. Every factual claim must be backed by a currentData fact.
-- **Unique value:** Every H2 must add unique value — do not restate the intro.
+**Accuracy:**
+- Claims must match evidence strength. Superlatives ("best", "fastest") require specific currentData backing or must be qualified ("one of the", "among the").
 
-## Practitioner voice (how you write)
+**Word Count:**
+- Each section's targetWords is a hard constraint (±10% tolerance per section, ±5% for article total). Validation flags violations automatically.
 
-**1. SPECIFIC over generic.** Name tools (Ahrefs, Screaming Frog), reference timeframes ("took about 3 weeks"), describe concrete scenarios. Use provided currentData numbers; when no data exists, use qualitative language.
-**2. Natural, varied word choices.** A project doesn't "fail," it "tanks" or "goes sideways." Use idioms naturally: "the 80/20 of it," "no silver bullet here."
-**3. Varied structure.** Punchline first sometimes, example before theory, bold claim paragraphs, end sections with questions.
-**4. Confidence with honesty.** Strong claims ("This works.") with specific doubt ("Except for sites under 50 pages.") and honest admission ("I didn't buy this until I tested it.").
-**5. Dense where it matters.** One paragraph crammed with data, next paragraph pure opinion, then an anecdote, then technical depth.
-**6. The Contrarian Pivot (Enforced).** Standard AI writing gives the generic, expected advice. You must go further. In at least 3 of your H2 sections, use this exact structural framework:
-- Step 1: Briefly acknowledge the standard industry advice (e.g., "Most beginners are taught to...").
-- Step 2: Introduce the "practitioner's reality" or a contrarian pivot (e.g., "But in practice, this usually breaks because...").
-- Step 3: Provide the advanced, nuanced solution based on deep experience.
-Do not use those exact words, but rigorously apply this framework to demonstrate that you possess knowledge beyond the beginner level.
+---
 
-## Visual Hierarchy & Scanability (Rendering Optimization)
+## TIER 2 — RANKING FACTORS
 
-- **Bolding Constraints:** You MUST bold the defining concept or the most critical metric in every paragraph. The bolded text should form a coherent summary if read by itself.
-- **Paragraph Micro-Structuring:** Use the 1-3-1 structure. Open with a punchy 1-sentence claim. Follow with a 3-sentence deep dive or data exposition. Close with a 1-sentence transition or takeaway.
-- **Data Lists:** Since HTML tables are banned, format complex data using nested bullet points with strong bolding.
-  Example:
-  - **Metric A (Target: 95%):** Fails if the server load exceeds threshold.
-  - **Metric B (Target: 40ms):** Highly dependent on regional CDN routing.
+**Google Search Central (your north star):**
+Every article must deliver: (1) original firsthand analysis, (2) substantial value beyond what already ranks, (3) complete search intent satisfaction, (4) enough depth that readers achieve their goal, (5) reference-quality utility worth bookmarking.
 
-## Humanization (enforced)
+**Rank Math SEO:**
+- Primary keyword in first paragraph and first 10% of content. Keyword in at least one H2/H3.
+- Each H2 targets a distinct subtopic (no overlap). Paragraphs max 120 words.
+- FAQ section is MANDATORY for informational and commercial intent. Format: H2 "Frequently Asked Questions" with 5-8 H3 question sub-headings, each followed by a single <p> answer (max 300 characters). This is the highest-value AI SEO section.
+- Density 1-1.5%. After using the primary keyword once per section, switch to synonyms, pronouns ("it", "this approach", "the strategy"), or natural variants. Title/meta/slug handled separately.
 
-- **Ban the "Textbook Voice":** FATAL ERROR: When writing a heading that asks "What is [Topic]?", the very first sentence of the paragraph MUST be an analogy or a statement about financial outcomes. You are strictly forbidden from starting with a dictionary definition.
-- **NEVER use the phrase "One practitioner noted" or similar repetitive introductory phrases. Weave quotes in naturally, using varied structures.**
-- **NEVER repeat a statistic or fact more than once. Once used, it is retired.**
-- Check every paragraph against the banned phrase list; avoid every listed phrase.
-- Vary sentence length deliberately — break the pattern after 3 or more similar-length sentences in a row.
-- At least one specific named example, tool, or scenario per H2 — no abstract-only sections.
-- No consecutive paragraphs with the same opening word or structure.
-
-## Typography (strict — enforced at audit; any violation fails)
-
-- **ZERO em-dashes (—) or en-dashes (–).** At any cost do not use them. Use comma, colon, or period instead. Even one instance fails the publishability audit.
-- **ZERO curly/smart quotes.** Straight quotes (") and apostrophes (') only. Scan output and replace before returning.
-- **No excessive symbols.** AI often overuses: ellipses (...), multiple exclamation marks (!! or !!!), or decorative symbol runs. Use a single period or exclamation; avoid "..." — use a period or rephrase. Keep punctuation minimal and professional.
-- Reduce these phrases where natural: ${BANNED_PHRASES_PROMPT}
-- Don't start more than 2 sentences in a row the same way. Vary paragraph length patterns.
-- No generic transitions: "Furthermore," "Additionally," "Moreover," "In addition," "It is worth noting," "Consequently," "In conclusion." Start the next thought directly or use "But," "Still," or a question.
-
-## Rank Math SEO (non-negotiable)
-
-- First paragraph must include the primary keyword naturally and establish topic relevance. Keyword in first 10% of content and in at least one H2/H3. Each H2 must target a distinct subtopic or secondary intent (no overlap). Paragraphs: max 120 words. FAQ section for informational intent.
-- No keyword stuffing (density < 3%). (Title, meta, slug are handled separately by another model.)
-
-## Structure (strict)
-- **Never output HTML table tags.** Do not use \`<table>\`, \`<tr>\`, \`<td>\`, or \`<th>\`. For any tabular or list-style content use \`<ul>\` or \`<ol>\` only. The frontend does not format tables.
-- **Design for CMS Media Insertion:** While you must NOT output literal image placeholders or link tags, you must write natural transitions when explaining complex workflows or data. Use phrases that allow the CMS to seamlessly insert screenshots or internal links later (e.g., "If you look at the dashboard workflow below...", "As the data shows...", "We dive deeper into this in our advanced guides").
-
-## Human psychology (reader engagement)
-
-- H2s should use a curiosity gap — make the reader want to know what comes next.
-- Vary sentence rhythm deliberately (e.g. short sentence after long to hold attention). Second person by default unless the research brief specifies otherwise.
-- Each section should end with a transition that pulls the reader forward — no dead stops.
+**GEO — AI Engine Optimization (Perplexity, Google AI Overviews, ChatGPT Search, Copilot):**
+- **Extraction Targets:** Each H2 must contain at least one dense, extractable statement: a comma-separated list, an "If X, then Y" rule, or a definition with a specific metric. Place mid-paragraph so AI parsers capture surrounding context.
+- **Named Entity Saturation:** Use proper nouns for tools, companies, and concepts. "[Tool Name] processes..." instead of "This tool processes..." AI engines map entity relationships.
+- **Citation-Ready Sentences:** Each H2 needs one standalone factual sentence (entity + verb + data point from currentData) within the first 3 sentences. Must be self-contained — extractable without surrounding context. This is the bridge between your article and AI platform citations.
+- **Answer-First Structure:** First 2-3 sentences of every H2 directly answer the heading's implied question. This is the AI Overview target — a self-contained snippet AI engines extract verbatim.
 
 **Output:** Return only valid JSON. No markdown outside the JSON block.`;
+
+/** TIER 3 quality differentiators — injected into user prompts to reduce system prompt cognitive load. */
+const TIER_3_QUALITY = `## TIER 3 — QUALITY DIFFERENTIATORS (applied during writing, checked at audit)
+
+### E-E-A-T: First-Hand Experience Proof
+At least 2 sections must include a **failure narrative**: a specific mistake or friction point only a practitioner would know, with a concrete outcome (number, timeline, or observable result). Example: "The API key takes ~15 minutes to propagate, during which the dashboard throws a false 404."
+- Use "I" and "We" authority framing: "In our latest deployment...", "I've reviewed hundreds of these audits..."
+- Acknowledge trade-offs honestly: "This workflow is tedious, but it's the only way to bypass the caching issue."
+- Every H2 must add unique value. Never restate the intro.
+
+### Practitioner Voice
+1. **Specific over generic.** Name tools (Ahrefs, Screaming Frog), reference timeframes ("took about 3 weeks"), describe concrete scenarios.
+2. **Natural vocabulary.** A project "tanks" or "goes sideways," not just "fails." Use idioms naturally: "the 80/20 of it," "no silver bullet here."
+3. **Varied structure.** Punchline first sometimes, example before theory, bold claim then evidence.
+4. **Confidence with honesty.** Strong claims ("This works.") paired with specific limits ("Except for sites under 50 pages.").
+5. **Density variation.** One paragraph crammed with data, next paragraph pure opinion, then an anecdote.
+
+### The Contrarian Pivot (minimum 3 sections)
+In at least 3 H2 sections, apply this framework:
+- **Acknowledge** the standard industry advice in 1 sentence.
+- **Pivot** with the practitioner reality: cite a specific data point, mechanism, or named-entity observation that directly contradicts a widely-held assumption or a named competitor claim.
+- **Resolve** with the advanced, nuanced approach. The resolution must include a concrete next step, not just "it depends."
+Success test: if you removed the pivot, the section would read like every other SERP result.
+
+### Visual Hierarchy
+- **Bold 2-4 key phrases per H2** (never full sentences). Bolded phrases should form a scannable summary.
+- **1-3-1 paragraph structure:** 1-sentence claim, 3-sentence evidence/data, 1-sentence transition.
+- Format complex data as nested bullet points with bold labels (HTML tables are banned).
+
+### Humanization
+- Never open a section with a dictionary definition in ANY form. This includes: "X is the process of...", "X is the strategic creation of...", "X refers to...", "X, [stat], is the [noun]...". The post-processing linter will delete any opening sentence matching these patterns. Instead, lead with an opinionated answer: entity + specific claim + data point.
+- Vary quote attribution: "one engineer on a forum shared...", "a practitioner in an online community reported...", "as one user put it..." Never use "One practitioner noted" or attribute to Reddit by name.
+- Use each community quote ONCE in the entire article. The quote pool shrinks after each section. If no quotes remain for your section, do not fabricate one.
+- At least one named example, tool, or scenario per H2. No abstract-only sections.
+
+### Reader Engagement
+- H2s use curiosity gaps. Vary sentence rhythm (short after long). Second person by default; brief's pointOfView overrides this.
+- End each section with a forward-looking claim or insight, not a meta-narration preview ("which is why...", "let's explore..."). Good: state a consequence. Bad: announce the next section.`;
 
 export function stripBoilerplateDefinitions(text: string): string {
   // Tightened pattern: match at string starts or after typical delimiters to prevent deleting in-body content
@@ -377,6 +386,9 @@ const DRAFT_MODEL_IDS: Record<string, string> = {
 /** Default Claude model for fixHallucinations and other non-draft flows. */
 const CLAUDE_DEFAULT_MODEL = "claude-sonnet-4-6";
 
+/** Opus model for high-stakes generation (brief, title/meta, section regen). */
+const CLAUDE_OPUS_MODEL = "claude-opus-4-6";
+
 /**
  * Step 4 — Draft: write full article from brief (and outline overrides). Claude Sonnet 4.6 or Opus 4.6.
  * Title, meta, slug are provided separately; Claude outputs content, categories, tags.
@@ -387,7 +399,8 @@ export async function writeDraft(
   tokenUsage?: TokenUsageRecord[],
   draftModel: "opus-4.6" | "sonnet-4.6" = "opus-4.6",
   fieldNotes?: string,
-  toneExamples?: string
+  toneExamples?: string,
+  intent?: string
 ): Promise<{
   content: string;
   suggestedCategories: string[];
@@ -456,101 +469,91 @@ export async function writeDraft(
 - Real examples frequency: ${brief.editorialStyle.realExamplesFrequency || "use where relevant"}
 Enforce these in every section.`;
 
-  const userPrompt = `Write a blog post using ONLY the following research brief. No image placeholders, internal/external links, or ToC.
+  const userPrompt = `Write a blog post using ONLY the following research brief. No image placeholders, internal/external links, or ToC. Title/meta/slug are handled separately — output only content, suggestedCategories, suggestedTags.
 
 ${styleChecklist}
 
-## GOOGLE & RANK MATH (article-specific)
-- Search intent / primary keyword: "${brief.keyword.primary}". Write so a reader achieves their goal and gets substantial value beyond existing results.
-- Title, meta, and slug are provided — do NOT generate them. Output only content, suggestedCategories, suggestedTags.
-- Keyword in first 100 words and in at least one H2/H3; prefer primary keyword or close variant in at least one H2 (e.g. "Best ${brief.keyword.primary} Tools"). Paragraphs ≤120 words; sequential H2/H3/H4; 3-8 Q&As under H2 "Frequently Asked Questions".
-
 ## KEYWORD & INTENT
-- Primary: ${brief.keyword.primary}
+- Primary: "${brief.keyword.primary}" (must appear in first 100 words + at least one H2/H3)
 - Secondary: ${brief.keyword.secondary.join(", ") || "None"}
 - PASF: ${brief.keyword.pasf.join(", ") || "None"}
-${currentDataWarning}
+${(brief as any).clusterPosition && (brief as any).clusterPosition !== "standalone" ? `
+## CLUSTER POSITION: ${(brief as any).clusterPosition}
+${(brief as any).clusterPosition === "pillar" ? "PILLAR page: comprehensive authority across the full topic. Cover every subtopic at useful depth. This should be the definitive resource a reader bookmarks." : ""}${(brief as any).clusterPosition === "spoke" ? `SPOKE page: deep specialized coverage. Reference the broader topic "${(brief as any).clusterTopic || brief.keyword.primary}" naturally 1-2 times to signal topical relationship.` : ""}
+` : ""}${currentDataWarning}
 ## MANDATORY OUTLINE (follow exactly; do not skip, reorder, or add H2s; you may add H3s)
 ${outlineBlock}
-Treat each section's targetWords as a hard constraint, not a suggestion. Use the per-section word targets to distribute the total word count; proportion content so section lengths align with these targets. Validation flags any section that misses its target by more than 5%.
 
 ## GAPS TO ADDRESS
 ${brief.gaps.length ? brief.gaps.join("\n") : "None"}
 ${(brief.extraValueThemes?.length ?? 0) > 0 || (brief.similaritySummary?.trim?.() ?? "") !== ""
       ? `
-## EXTRA VALUE (do not only repeat competitors)
-${brief.similaritySummary?.trim() ? `Top results cover: ${brief.similaritySummary.trim()}\n` : ""}${(brief.extraValueThemes?.length ?? 0) > 0 ? `Themes to cover:\n${brief.extraValueThemes!.map((t) => `- ${t}`).join("\n")}\n` : ""}`
-      : `
-## DIFFERENTIATION
-Add clear value beyond the outline; lead with current data where provided.`}
+## DIFFERENTIATION (what we add that competitors don't)
+${brief.similaritySummary?.trim() ? `Competitor landscape: ${brief.similaritySummary.trim()}\n` : ""}${(brief.extraValueThemes?.length ?? 0) > 0 ? `Our unique themes:\n${brief.extraValueThemes!.map((t) => `- ${t}`).join("\n")}\n` : ""}`
+      : ""}
 ${brief.freshnessNote?.trim() ? `## FRESHNESS\n${brief.freshnessNote.trim()}\n` : ""}
-${brief.knowledgeEngine?.proprietaryFramework ? `## PROPRIETARY FRAMEWORK (Core thesis)
+${brief.knowledgeEngine?.proprietaryFramework ? `## PROPRIETARY FRAMEWORK (weave as the article's core thesis)
 Name: ${brief.knowledgeEngine.proprietaryFramework.name}
 Tagline: ${brief.knowledgeEngine.proprietaryFramework.tagline}
-How it beats standard SERP: ${brief.knowledgeEngine.proprietaryFramework.howItBeatsTheSerp}
-Pillars: ${brief.knowledgeEngine.proprietaryFramework.corePillars.map((p: any) => p.name).join(", ")}
-Introduce or reference this framework naturally to build authority.
+Strategic advantage: ${brief.knowledgeEngine.proprietaryFramework.howItBeatsTheSerp}
+Pillars: ${brief.knowledgeEngine.proprietaryFramework.corePillars.map((p: any) => `${p.name} (${p.underlyingInsight})`).join("; ")}
+Reference the framework by name in at least 2 sections. Each pillar should map to a specific H2.
 ` : ""}
-${brief.knowledgeEngine?.algorithmicInsights?.length ? `## PRACTITIONER INSIGHTS (Information Gain)
-Weave these original observations in naturally if relevant to the outline:
-${brief.knowledgeEngine.algorithmicInsights.map((i: any) => `- [${i.type.toUpperCase()}] ${i.headline}: ${i.explanation}`).join("\n")}
+${brief.knowledgeEngine?.algorithmicInsights?.length ? `## PRACTITIONER INSIGHTS (from Knowledge Engine — use for Information Gain)
+These insights were generated from topic graph gaps and current facts. Weave them naturally into relevant sections:
+${brief.knowledgeEngine.algorithmicInsights.map((i: any) => `- [${i.type.toUpperCase()}] ${i.headline}: ${i.explanation}${i.supportingDataPoint ? ` (Data: ${i.supportingDataPoint})` : ""}`).join("\n")}
 ` : ""}
-${brief.competitorDifferentiation?.trim() ? `## COMPETITOR DIFFERENTIATION (avoid these patterns)\n${brief.competitorDifferentiation.trim()}\n\nDeliberately avoid the phrases, section structures, and intro styles described above so the article does not read like AI-generated competitor content.\n` : ""}${(brief.povInsights?.length ?? 0) > 0 ? `## POV / INFORMATION GAIN (use these to differentiate)
-These are contrarian or nuanced angles that most competitors miss. Weave them naturally into the relevant sections to increase Information Gain.
-${brief.povInsights!.map((p) => `- Topic: ${p.topic}. Most say: "${p.conventionalView}". But: "${p.contrarian}" (source: ${p.source}).`).join("\n")}
-` : ""}${fieldNotes?.trim() ? `## FIELD DATA (real-world experience, integrate naturally for E-E-A-T)
-The following are raw notes/quotes from the author. Weave these "I did this" moments into relevant sections. Do not use them as block quotes; rephrase naturally to match the article voice. Attribute to the author's experience when appropriate. These real-world signals are the strongest E-E-A-T differentiator.
-
+${brief.competitorDifferentiation?.trim() ? `## COMPETITOR DIFFERENTIATION (patterns to avoid)\n${brief.competitorDifferentiation.trim()}\n` : ""}${(brief.povInsights?.length ?? 0) > 0 ? `## POV / INFORMATION GAIN (contrarian angles from the brief)
+${brief.povInsights!.map((p) => `- ${p.topic}: Standard view: "${p.conventionalView}" → Our angle: "${p.contrarian}" (source: ${p.source})`).join("\n")}
+` : ""}${fieldNotes?.trim() ? `## FIELD DATA (author's real-world experience — strongest E-E-A-T signal)
+Weave these "I did this" moments into relevant sections. Rephrase to match article voice; do not block-quote.
 ${fieldNotes.trim()}
-` : ""}## CURRENT DATA — ZERO HALLUCINATION
+` : ""}
+## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
+Every number in the article must trace back to a fact above. The audit system will cross-check.
 
 ## EDITORIAL STYLE
 ${styleBlock}
 ${toneExamples?.trim() ? `
-## TONE CALIBRATION (match this voice)
-The following is a sample of the client's existing writing. Match the tone, vocabulary level, sentence rhythm, and personality. Do NOT copy the content — only calibrate your voice to sound like this author:
-
+## TONE CALIBRATION
+Match this voice sample (tone, vocabulary, rhythm — not content):
 """${toneExamples.trim()}"""
 ` : ""}
 
-Intro: Mirror the best-performing intro pattern or subvert the weakest; follow the pattern provided. Open with a problem the reader recognizes in themselves — not a definition or statistic. CTA: Address a reader fear or desire — not just a click request.
-
-## WRITING QUALITY
-Vary sentence and paragraph length and openings. E-E-A-T: 2-3 experience signals (e.g. "anyone who…", "the first time you…"), cite data with natural attribution, only numbers from currentData. Every section must advance the reader's goal; no fluff.
-
 ## GEO & FAQ
-- Every major section must open with a 2-3 sentence Answer Capsule (direct, unambiguous answer) before expanding. Use clear, unambiguous factual statements — no hedged language. Use definition-style sentences and numbered steps where appropriate.
-- ANSWER-FIRST STRUCTURE (enforced): For every H2, the first 2-3 sentences MUST directly answer the heading's implied question. This is the "AI Overview target" — a self-contained snippet that AI engines can extract verbatim. Follow the answer with nuance, details, and supporting evidence. If an AI Overview target is provided in the outline, use it as the basis for those opening sentences.
 - Direct answer: ${brief.geoRequirements.directAnswer}
-- Stats: ${brief.geoRequirements.statDensity}
+- Stats density: ${brief.geoRequirements.statDensity}
 - Entities: ${brief.geoRequirements.entities}
-- FAQ answers: max 300 characters each. Each answer must add at least one of: a so-what, a comparison, a forward look, a caveat, or a concrete next step — not a condensed repeat of the body. No repeating body numbers; every FAQ answer must teach something new to someone who read the full article.
+- FAQ (REQUIRED — critical for AI SEO): The last H2 MUST be "Frequently Asked Questions" with 5-8 H3 questions and concise <p> answers.
+  - Each answer: max 300 characters. Write the answer in the first sentence, then add one unique insight.
+  - Each answer must teach something NEW (so-what, comparison, caveat, next step). NEVER repeat body content.
+  - Google Featured Snippets, AI Overviews, Perplexity, and ChatGPT Search extract FAQ blocks directly. This section is the highest-value AI SEO asset in the article.
 ${brief.geoRequirements.faqStrategy ? `- FAQ strategy: ${brief.geoRequirements.faqStrategy}` : ""}
+${(brief as any).faqPlan?.length ? `- FAQ plan (use as basis):\n${((brief as any).faqPlan as { question: string; answer: string }[]).map((f: { question: string; answer: string }) => `  Q: ${f.question}`).join("\n")}` : ""}
 
-## WORD COUNT (STRICT)
-Section word targets sum to ${brief.outline.estimatedWordCount}; article total must be ${brief.wordCount.target} words (±5%). Write to each section's targetWords so the total lands on target. After writing, verify each section's word count meets its target; validation flags any section off by more than 5%.
-Target: ${brief.wordCount.target} words. ${brief.wordCount.note}
-Minimum 300 words. Article MUST be within ±5% of target. Meet the target — add or trim as needed.
+## WORD COUNT
+Target: ${brief.wordCount.target} words (±5% total). Section targetWords sum to ${brief.outline.estimatedWordCount}. Each section ±10%.
+${brief.wordCount.note}
+
+${TIER_3_QUALITY}
 
 ## OUTPUT (valid JSON only)
-Output only the JSON object below. No text before or after the JSON. Do NOT include title, metaDescription, or suggestedSlug — they are provided separately.
-
 {
   "content": "<p>...</p><h2>...</h2>...",
   "suggestedCategories": ["cat1", "cat2"],
   "suggestedTags": ["tag1", "tag2", "tag3"]
 }
-
-If you approach the response limit, prioritize completing the final H2 and FAQ; you may shorten middle sections. Write to pass the automated SEO, typography, and fact-check audits. No em-dashes, en-dashes, or curly quotes; no excessive symbols (..., !!, !!!). Never use HTML table tags — use ul/ol only.`;
+No text outside the JSON. If approaching token limit, shorten middle sections but complete FAQ.`;
 
 
   const modelId = DRAFT_MODEL_IDS[draftModel] ?? CLAUDE_DEFAULT_MODEL;
+  const draftTemperature = (intent === "informational" || intent === "commercial") ? 0.35 : 0.5;
   const writeDraftStartMs = Date.now();
   const stream = anthropic.messages.stream({
     model: modelId,
     max_tokens: 32000,
-    temperature: 0.5,
+    temperature: draftTemperature,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -630,7 +633,8 @@ export async function writeDraftSection(
   toneExamples?: string,
   redditQuotes?: string[],
   isFirstSection: boolean = false,
-  primaryKeyword?: string
+  primaryKeyword?: string,
+  intent?: string
 ): Promise<string> {
   const anthropic = getAnthropicClient();
 
@@ -652,8 +656,12 @@ Enforce these in this specific section.`;
     : "No current data provided. Do not invent specific statistics; use general language where needed.";
 
   // Only pass previous content if it exists to establish context, but limit it so we don't blow up context size
-  const contextBlock = previousContent.trim().length > 0
-    ? `\n## PREVIOUS SECTIONS (Content written so far)\nDo not repeat information already covered here. Continue naturally from where this leaves off.\n\n${previousContent.slice(-4000)}\n`
+  // Strip specific numbers from previousContent to prevent the model from echoing stats it sees in context
+  const sanitizedPrevious = previousContent.trim().length > 0
+    ? previousContent.slice(-4000).replace(/\b(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(%|percent|billion|million|trillion|x)\b/gi, "[stat cited]")
+    : "";
+  const contextBlock = sanitizedPrevious.length > 0
+    ? `\n## PREVIOUS SECTIONS (Content written so far)\nDo NOT repeat any information, statistic, or community quote already covered. Each stat and quote is single-use across the entire article. Continue naturally from where this leaves off.\n\n${sanitizedPrevious}\n`
     : "";
 
   const frameworkBlock = brief.knowledgeEngine?.proprietaryFramework
@@ -664,51 +672,77 @@ Enforce these in this specific section.`;
     ? `\n## PRACTITIONER INSIGHTS (Information Gain)\nThese are non-obvious insights generated to beat competitors. Weave them in if relevant to this section's topics:\n${brief.knowledgeEngine.algorithmicInsights.map((i: any) => `- [${i.type.toUpperCase()}] ${i.headline}: ${i.explanation}`).join("\n")}\n`
     : "";
 
-  const userPrompt = `Write the content for ONE specific section of a blog post.
-Do NOT write the HTML heading tag for the section title itself (e.g. do not write \`<h2>${section.heading}</h2>\`) — the system will inject the heading. Just write the content that goes *under* the heading.
+  const clusterBlock = (brief as any).clusterPosition && (brief as any).clusterPosition !== "standalone"
+    ? `\n## CLUSTER POSITION: ${((brief as any).clusterPosition as string).toUpperCase()}\n${(brief as any).clusterPosition === "pillar"
+      ? "This is a PILLAR article — comprehensive and authoritative. Cover the topic broadly and definitively."
+      : `This is a SPOKE article — go deep on this specific subtopic.${(brief as any).clusterTopic ? ` Reference the broader topic "${(brief as any).clusterTopic}" naturally 1-2 times where relevant.` : ""}`}\n`
+    : "";
+
+  // Detect FAQ section by heading
+  const isFaqSection = /faq|frequently asked/i.test(section.heading);
+
+  // Build FAQ plan block if available
+  const faqPlanBlock = isFaqSection && (brief as any).faqPlan?.length
+    ? `\n## FAQ PLAN (use these as basis — rephrase for natural voice)\n${((brief as any).faqPlan as { question: string; answer: string }[]).map((f: { question: string; answer: string }) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")}\n`
+    : "";
+
+  // FAQ-specific output instructions
+  const faqInstructions = isFaqSection
+    ? `\n## FAQ FORMATTING (STRICT REQUIREMENTS)
+This is a Frequently Asked Questions section. It is CRITICAL for AI SEO (Google Featured Snippets, AI Overviews, Perplexity, ChatGPT Search).
+- Output 5-8 question/answer pairs.
+- Each question MUST be an <h3> tag: <h3>Question text here?</h3>
+- Each answer MUST be a single <p> tag immediately after the <h3>.
+- Each answer MUST be under 300 characters (the validation system will truncate longer answers).
+- Each answer must teach something NEW — a so-what, comparison, caveat, concrete next step, or forward look. NEVER condense or repeat what the body already said.
+- Use conversational, direct language. Answer the question in the first sentence, then add one insight.
+- Include the primary keyword naturally in 2-3 of the answers.
+${faqPlanBlock}`
+    : "";
+
+  const userPrompt = `Write the content for ONE section of a blog post. The system injects the H2 heading — do NOT include it. Write only the body content under "${section.heading}".
 ${contextBlock}
 ${frameworkBlock}
 ${insightsBlock}
+${clusterBlock}
 ${styleChecklist}
 
-## SECTION ASSIGNMENT
-You are writing the section: "${section.heading}"
-- Target word count: ${section.targetWords} words. You MUST hit this target (±10%).
-- Topics to cover: ${section.topics.join(", ")}
-${section.geoNote ? `- GEO Constraint: ${section.geoNote}` : ""}
-${section.aiOverviewTarget ? `- AI Overview target: "${section.aiOverviewTarget}" (Directly answer this in the first 2-3 sentences of this section)` : ""}
-${isFirstSection && primaryKeyword ? `\nFATAL ERROR: You MUST include the exact phrase "${primaryKeyword}" within the first 2 paragraphs of this section to establish SEO relevance.` : ""}
+## SECTION: "${section.heading}"
+- Word count: ${section.targetWords} words (±10%). The audit system validates this automatically.
+- Topics: ${section.topics.join(", ")}
+${section.targetWords > 150 && !isFaqSection ? `- STRUCTURE: This section is ${section.targetWords} words — use 2-3 <h3> sub-headings to break it up. Walls of text under a single H2 hurt readability and SEO. Each H3 should cover a distinct sub-topic.` : ""}
+${section.geoNote ? `- GEO note: ${section.geoNote}` : ""}
+${section.aiOverviewTarget ? `- AI Overview target (use as basis for opening 2-3 sentences): "${section.aiOverviewTarget}"` : ""}
+${isFirstSection && primaryKeyword ? `- SEO: Include the exact phrase "${primaryKeyword}" within the first 2 paragraphs.\n- FEATURED SNIPPET: Write a 40-60 word definition paragraph near the top that directly answers "What is ${primaryKeyword}?" in a concise, factual voice. This paragraph targets Google's featured snippet and AI Overview extraction.` : ""}
+${faqInstructions}
 
+${(brief as any).secondaryKeywords?.length ? `## SEMANTIC KEYWORDS (weave naturally — do NOT force)\nInclude 2-4 of these related terms where they fit the context: ${((brief as any).secondaryKeywords as string[]).join(", ")}.\nDo NOT stuff them. Use synonyms, related phrases, and natural variations.\n` : ""}
 ## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
-Every specific number you write will be cross-checked. Use natural attribution (e.g. "according to [source]").
+Every number will be cross-checked by the fact-verification system. Use natural attribution ("according to [source]").
 ${currentDataWarning}
-${redditQuotes?.length ? `\n## COMMUNITY QUOTES 
-Weave these real-world quotes/experiences naturally into this section if relevant. Integrate them smoothly without relying on repetitive phrases like "One practitioner noted".
+${redditQuotes?.length ? `\n## COMMUNITY QUOTES (weave naturally if relevant)
+Vary attribution: "one engineer on a developer forum shared...", "a practitioner in an online community reported...", "as one user put it...". Never use "One practitioner noted." Never name Reddit or specific subreddits.
 ${redditQuotes.map(q => `- ${q}`).join("\n")}\n` : ""}
-${fieldNotes?.trim() ? `\n## FIELD DATA (real-world experience)
-${fieldNotes.trim()}\n` : ""}
-${toneExamples?.trim() ? `\n## TONE CALIBRATION
-Match this voice:\n"""${toneExamples.trim()}"""\n` : ""}
+${fieldNotes?.trim() ? `\n## FIELD DATA\n${fieldNotes.trim()}\n` : ""}
+${toneExamples?.trim() ? `\n## TONE CALIBRATION\nMatch this voice:\n"""${toneExamples.trim()}"""\n` : ""}
 
-## OUTPUT FORMAT
-Return ONLY valid JSON containing the section HTML content, NO markdown formatting outside the JSON block. Do not include the H2 tag for the section title itself.
+${isFaqSection ? "" : TIER_3_QUALITY}
 
-FINAL INSTRUCTIONS: You MUST wrap all headings in proper <h2> and <h3> HTML tags. Do not output plain text headings. You MUST use straight quotes and commas instead of em-dashes.
-
-Example output:
-{
-  "content": "<p>...</p><h3>...</h3><p>...</p>"
-}
+## OUTPUT
+Return ONLY valid JSON. No H2 tag for the section title. All sub-headings must use <h3> HTML tags. Straight quotes only, no em-dashes.
+{ "content": "${isFaqSection ? "<h3>Question?</h3><p>Answer under 300 chars.</p><h3>Question?</h3><p>Answer.</p>..." : "<p>...</p><h3>...</h3><p>...</p>"}" }
 `;
 
+
   const modelId = DRAFT_MODEL_IDS[draftModel] ?? CLAUDE_DEFAULT_MODEL;
+  const sectionTemperature = (intent === "informational" || intent === "commercial") ? 0.35 : 0.5;
   const startMs = Date.now();
 
   const stream = anthropic.messages.stream({
     model: modelId,
     max_tokens: 4000,
-    temperature: 0.5,
+    temperature: sectionTemperature,
     system: SYSTEM_PROMPT,
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -904,23 +938,24 @@ export async function generateTitleMetaSlugFromContent(
   const auditRules = getAuditRulesForPrompt();
   const intentGuidance = getIntentGuidanceForMeta(intent);
 
-  const systemPrompt = `You are an expert SEO copywriter. Generate exactly TWO distinct, high-quality meta options for a blog post. Each option must pass Google Search Central and Rank Math 100/100 checks.
+  const systemPrompt = `You generate title/meta/slug for articles in a content pipeline. The article is already written — your meta must accurately reflect the actual content. The audit system validates your output against Rank Math and Google Search Central rules.
 
-CRITICAL RULES (each option MUST satisfy — our audit will fail otherwise):
+AUDIT RULES (violations block publication):
 ${auditRules}
 
-VARIANT STRATEGY:
-• optionA: Lead with sentiment + power words. E.g. "Proven Guide to…", "Discover the Best…", "Avoid These [X] Mistakes…"
-• optionB: Lead with numbers + action. E.g. "7 Tips for…", "How to [X] in 5 Steps", "[N] Ways to…"
+VARIANT STRATEGY (options must be genuinely different approaches, not word swaps):
+• optionA: Sentiment + power words. E.g. "Proven Guide to...", "Avoid These [X] Mistakes..."
+• optionB: Numbers + action. E.g. "7 Tips for...", "How to [X] in 5 Steps"
 
-ADDITIONAL GUIDANCE:
-• Match the article's actual content — never mislead
+ACCURACY RULE: Title must match content. No exaggeration. If the article covers 5 tips, do not claim 10. Superlatives ("best", "ultimate", "complete") must be justified by the article's actual scope.
+
+GUIDANCE:
 • Search intent: ${intentGuidance}
-• Title: front-load the primary keyword; make every word earn its place. FATAL ERROR: Both optionA and optionB MUST contain a specific number (e.g., "7", "2025", "5 Ways"). Numbers critically improve CTR.
-• Meta: write a compelling pitch, not a dry summary; include keyword naturally in first 120 chars
-• Slug: concise, keyword-rich; omit articles (a, the) and prepositions where possible
+• Title: front-load the primary keyword. Strongly prefer including a specific number (year, count, percentage) — numbers improve CTR 15-30%. If the content doesn't naturally support a number, omit rather than force.
+• Meta: compelling pitch (not a dry summary). Include keyword naturally in first 120 chars.
+• Slug: concise, keyword-rich. Omit articles (a, the) and prepositions.
 
-Return ONLY valid JSON, no markdown or explanation:
+Return ONLY valid JSON:
 {"optionA":{"title":"...","metaDescription":"...","suggestedSlug":"..."},"optionB":{"title":"...","metaDescription":"...","suggestedSlug":"..."}}`;
 
   const headingsBlock = headings.length > 0
@@ -933,7 +968,7 @@ ${headingsBlock}
 Article content (first part):
 ${fullExcerpt}
 
-Generate two distinct meta options (optionA and optionB). Each must satisfy all audit rules. Return JSON only.`;
+Generate two distinct meta options. Return JSON only.`;
 
   const stream = anthropic.messages.stream({
     model: modelId,
@@ -999,9 +1034,18 @@ export async function generateTitleVariations(
   const anthropic = getAnthropicClient();
   const startMs = Date.now();
 
-  const systemPrompt = `You are a viral headline copywriter. Generate 7 distinctly different, highly clickable SEO title options for the provided article.
-Strategies to use: 1) Number/Listicle, 2) How-To/Guide, 3) Question/Curiosity Gap, 4) Negative Angle (e.g. "Mistakes to Avoid"), 5) Contrarian, 6) Ultimate Guide, 7) Benefit-Driven.
-For each, provide the title (max 60 chars, must include the keyword "${primaryKeyword}") and the approach used. Also provide a predicted CTR signal (High/Medium).
+  const systemPrompt = `Generate 7 distinct SEO title options for A/B testing. Each title must include "${primaryKeyword}" and be max 60 characters.
+
+STRATEGIES (one per title):
+1) Number/Listicle ("7 Ways to...")
+2) How-To/Guide ("How to [X] in 2026")
+3) Question/Curiosity Gap ("Is [X] Actually Worth It?")
+4) Negative Angle ("5 [X] Mistakes That Cost You...")
+5) Contrarian ("Why [Common Advice] Is Wrong")
+6) Comprehensive ("The Complete [X] Playbook")
+7) Benefit-Driven ("[X]: Get [Specific Outcome]")
+
+Each title must accurately reflect the article content. No exaggeration. Rate CTR potential (High/Medium) based on emotional pull + specificity.
 Return valid JSON only:
 { "titles": [ { "title": "...", "approach": "...", "ctrSignal": "High" } ] }`;
 
@@ -1054,26 +1098,25 @@ Return valid JSON only:
 // Auto-fix fact-check hallucinations (surgical rewrite, preserve flow)
 // ---------------------------------------------------------------------------
 
-const HALLUCINATION_FIX_SYSTEM = `You are an editor fixing only specific flagged issues in an article. You will receive:
-1. The article HTML
-2. A list of hallucination flags from a fact-checker (unverified statistics or fabricated source attributions)
-3. Verified facts from currentData that you MAY use to replace bad data when it fits naturally
+const HALLUCINATION_FIX_SYSTEM = `You are a precision editor in a content pipeline. The fact-verification system flagged specific hallucinations. You fix ONLY those flags.
+
+INPUTS: (1) Article HTML, (2) Hallucination flags from the fact-checker, (3) Verified facts from currentData.
 
 RULES:
-- For EACH flagged hallucination, REWRITE the surrounding sentence or two so the text flows naturally WITHOUT the problematic statistic or attribution. Do NOT simply delete a sentence — that would leave an awkward gap. Rewrite to preserve readability and flow.
-- If a verified fact from currentData can naturally replace the hallucinated claim in context, use it and set replacedWithVerifiedFact to true.
-- If not, rewrite the sentence to make the same point without the specific statistic or attribution; set replacedWithVerifiedFact to false.
-- Do NOT change any content outside the immediate vicinity of each hallucination.
-- Preserve ALL HTML structure, tags, headings, and formatting exactly. Only change the text content where hallucinations appear.
-- Target ONLY the items in the hallucinations list. Do not second-guess or "fix" other numbers or attributions.
+- For each flagged hallucination, rewrite the sentence containing it and up to one adjacent sentence if needed for flow. Do not delete sentences — rewrite to preserve readability.
+- If a verified currentData fact can naturally replace the hallucinated claim, use it (set replacedWithVerifiedFact: true).
+- If no replacement fits, rewrite the sentence to make the same point qualitatively. If removing the stat leaves a claim without evidence, hedge it: "industry observers suggest" or "early indicators show" (set replacedWithVerifiedFact: false).
+- Do NOT touch content outside the immediate vicinity of each flag.
+- Preserve ALL HTML structure, tags, headings, and formatting exactly.
+- Fix ONLY items in the hallucinations list. Do not second-guess other numbers.
 
 OUTPUT FORMAT:
-1. Output the complete fixed HTML first (the full article with your edits).
-2. Then on a new line write exactly: HALLUCINATION_FIXES:
-3. Then a JSON array of objects, one per fix: [{ "originalText": "exact phrase or sentence you replaced", "replacement": "the new text", "reason": "brief reason", "replacedWithVerifiedFact": true or false }]
-Use double quotes in JSON. No markdown code fence around the JSON.`;
+1. Complete fixed HTML (full article with edits).
+2. On a new line, exactly: HALLUCINATION_FIXES:
+3. JSON array: [{ "originalText": "...", "replacement": "...", "reason": "...", "replacedWithVerifiedFact": true/false }]
+No markdown code fences.`;
 
-const HALLUCINATION_FIX_TIMEOUT_MS = 45_000;
+const HALLUCINATION_FIX_TIMEOUT_MS = 90_000;
 
 export type FixHallucinationsResult = {
   fixedHtml: string;
@@ -1205,16 +1248,23 @@ export async function fixAuditIssues(
   const anthropic = getAnthropicClient();
   const startMs = Date.now();
 
-  const system = `You are an SEO Editor fixing a blog post.
-The post failed automated audits with the following errors:
+  const system = `You are the audit-fix editor in a content pipeline. The automated audit system flagged these failures:
 ${auditFailures.map(f => `- ${f}`).join("\n")}
 
-Rewrite the article HTML to fix exactly these issues.
-- If it says keyword is missing in the first 10%, weave it naturally into the first paragraph.
-- If paragraphs are too long (>120 words), break them up.
-- If it mentions excessive symbols or "AI-sounding" phrases, remove them.
-- Preserve the overall structure and facts.
-- Return ONLY the raw fixed HTML. Do NOT return markdown blocks or JSON.`;
+Fix ONLY the listed issues. Preserve the author's voice, all HTML structure, headings, statistics, and facts.
+
+PRIORITY:
+- Level 1 = publication blockers. Every Level 1 must be resolved.
+- Level 2 = ranking factors. Fix without restructuring.
+
+FIX INSTRUCTIONS BY TYPE:
+- **Typography** (em-dashes, curly quotes): Character-level replacement only. Em-dash → comma or colon. En-dash → hyphen. Curly quotes → straight quotes. Do not rewrite surrounding text.
+- **Keyword placement**: Weave naturally into the first paragraph or relevant subheading. Do not force awkward phrasing.
+- **Paragraph length** (>120 words): Split at a natural sentence boundary. Do not remove content.
+- **Structural** (missing lists, paragraph formatting): You may rewrite the affected paragraph to add a list or split structure.
+- **Symbols/phrases** (!! or ... or AI phrases): Replace with specific language or remove.
+
+Return ONLY the raw fixed HTML. No markdown blocks, no JSON wrapper, no explanation.`;
 
   const stream = anthropic.messages.stream({
     model: CLAUDE_DEFAULT_MODEL,
@@ -1245,4 +1295,397 @@ Rewrite the article HTML to fix exactly these issues.
   if (html.endsWith("```")) html = html.slice(0, -3);
 
   return html.trim() || draftHtml;
+}
+
+// ---------------------------------------------------------------------------
+// Section-level regeneration (Post-generation chatbot)
+// ---------------------------------------------------------------------------
+
+/** Extract a section from HTML by its H2 heading text. */
+export function extractSection(html: string, heading: string): {
+  before: string;
+  section: string;
+  after: string;
+} {
+  const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(
+    `(<h2[^>]*>\\s*${escaped}\\s*<\\/h2>)`,
+    "i"
+  );
+  const match = html.match(pattern);
+  if (!match || match.index === undefined) {
+    return { before: html, section: "", after: "" };
+  }
+
+  const sectionStart = match.index;
+  const afterHeading = sectionStart + match[0].length;
+  const nextH2 = html.slice(afterHeading).search(/<h2[\s>]/i);
+  const sectionEnd = nextH2 === -1 ? html.length : afterHeading + nextH2;
+
+  return {
+    before: html.slice(0, sectionStart),
+    section: html.slice(sectionStart, sectionEnd),
+    after: html.slice(sectionEnd),
+  };
+}
+
+/**
+ * Regenerate a single section of an article based on user instructions.
+ * Used by the post-generation chatbot for targeted edits.
+ */
+export async function regenerateSection(
+  fullArticleHtml: string,
+  sectionHeading: string,
+  userInstructions: string,
+  brief: ResearchBrief,
+  tokenUsage?: TokenUsageRecord[]
+): Promise<{ updatedHtml: string; sectionHtml: string }> {
+  const anthropic = getAnthropicClient();
+  const { before, section, after } = extractSection(fullArticleHtml, sectionHeading);
+
+  if (!section) {
+    throw new Error(`Section "${sectionHeading}" not found in article`);
+  }
+
+  const prevContext = before.slice(-800);
+  const nextContext = after.slice(0, 800);
+  const originalWordCount = section.split(/\s+/).filter(Boolean).length;
+
+  const factsBlock = brief.currentData.facts.length > 0
+    ? `Current data (use ONLY these for statistics):\n${brief.currentData.facts.map((f) => `- ${f.fact} (Source: ${f.source})`).join("\n")}`
+    : "No current data. Do not invent statistics.";
+
+  const userPrompt = `Rewrite the section under "${sectionHeading}". This is a targeted edit in a post-generation chatbot — the user is refining a specific section of their published article.
+
+## USER INSTRUCTIONS
+${userInstructions}
+
+## ORIGINAL SECTION
+${section}
+
+## SURROUNDING CONTEXT (match transitions)
+Previous section ending:
+${prevContext}
+
+Next section beginning:
+${nextContext}
+
+## CONSTRAINTS
+- Preserve the section's role and position in the article's argument flow.
+- Word count: ${originalWordCount} words (±15%).
+- Maintain consistent terminology with the rest of the article.
+- If the user's instructions introduce new data, integrate it naturally — do not append it.
+- Editorial style: ${brief.editorialStyle.tone}, ${brief.editorialStyle.pointOfView ?? "third"} person.
+- ${factsBlock}
+
+## OUTPUT
+Return ONLY the complete section HTML including the H2 tag. No markdown wrapping, no explanation, no content from other sections.`;
+
+  const startMs = Date.now();
+  const stream = anthropic.messages.stream({
+    model: CLAUDE_OPUS_MODEL,
+    max_tokens: 4000,
+    temperature: 0.35,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) tokenUsage.push({
+    callName: "regenerateSection",
+    model: CLAUDE_OPUS_MODEL,
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.promptTokens + usage.completionTokens,
+    durationMs,
+  });
+
+  const contentBlock = message.content?.[0];
+  if (!contentBlock || contentBlock.type !== "text") {
+    return { updatedHtml: fullArticleHtml, sectionHtml: section };
+  }
+
+  let newSection = contentBlock.text.trim();
+  if (newSection.startsWith("```html")) newSection = newSection.slice(7);
+  else if (newSection.startsWith("```")) newSection = newSection.slice(3);
+  if (newSection.endsWith("```")) newSection = newSection.slice(0, -3);
+  newSection = newSection.trim();
+
+  if (!newSection) {
+    return { updatedHtml: fullArticleHtml, sectionHtml: section };
+  }
+
+  const updatedHtml = before + newSection + after;
+  return { updatedHtml, sectionHtml: newSection };
+}
+
+/**
+ * Step 3 — Brief: build strategic research brief (outline, H2/H3, word count from intent, keyword rules).
+ * Uses Claude Opus for superior strategic reasoning and outline construction.
+ * Validates with ResearchBriefSchema; retries once on schema failure.
+ */
+export async function buildResearchBrief(
+  topics: TopicExtractionResult,
+  currentData: CurrentData,
+  input: PipelineInput,
+  wordCountOverride?: WordCountOverride,
+  tokenUsage?: TokenUsageRecord[],
+  topicGraph?: any,
+  algorithmicInsights?: any[],
+  proprietaryFramework?: any
+): Promise<ResearchBrief> {
+  const anthropic = getAnthropicClient();
+  const intent = Array.isArray(input.intent) ? input.intent[0] : input.intent ?? "informational";
+  const pasf = input.peopleAlsoSearchFor ?? [];
+  const secondary = input.secondaryKeywords ?? [];
+
+  const systemPrompt = `You are the content strategist in a multi-model pipeline. Your output (a ResearchBrief JSON) is the ONLY input the writer model receives — no raw competitor data. Make it self-contained and decisive.
+
+## PIPELINE CONTEXT
+You receive: (1) extraction from Step 2 (topics, gaps, headings, editorial style, PAA analysis, competitor strengths), (2) currentData from Gemini (grounded facts), (3) Knowledge Engine outputs (topic graph, algorithmic insights, proprietary framework). You must use ALL of them. The writer model enforces TIER 1 typography/fact rules from its own system prompt — your job is strategic direction, not style enforcement.
+
+---
+
+## 1. AUDIT-CRITICAL REQUIREMENTS (the writer's audit system checks these)
+
+**SEO (Rank Math):**
+- At least one H2 heading must contain the EXACT primary keyword (not just a variant).
+- Keyword must appear in first 10% of body + at least one subheading.
+- Paragraphs max 120 words. Density < 3%. Title/meta/slug handled separately.
+
+**GEO / AI Overview Targets (per-H2 aiOverviewTarget):**
+- For every H2, write a 40-50 word Information Payload as aiOverviewTarget: [Definition] + [Statistic from currentData] + [Mechanism or rule]. No marketing language. This is what AI engines extract.
+- In each section's geoNote, instruct the writer to include one citation-ready sentence (entity + verb + data point) within the first 3 sentences.
+
+**Fact Integrity:**
+- Every number must trace to currentData. For sections without data, note in geoNote: "Use qualitative language — no statistics available."
+
+**Information Gain (povInsights):**
+- Incorporate the Algorithmic Insights from the Knowledge Engine. Each povInsight must be a raw factual contrast: { topic, conventionalView, contrarian, source }. No conversational framing ("experts say") — data only. The writer adds practitioner voice.
+- If a Proprietary Framework is provided, it MUST structure the article. Map each framework pillar to specific H2 sections. Competitor heading patterns yield to the framework when they conflict.
+
+---
+
+## 2. OUTLINE CONSTRUCTION
+
+**Building the outline:**
+- KEEP headings used by 3+ competitors. DROP headings used by only 1 unless they fill a gap. ADD new H2s for high-value gaps. ORDER by intent: informational (definition → how-to → advanced → FAQ), commercial (overview → comparison → pricing → recommendation), transactional (value prop → features → CTA).
+- Never use "What is [Topic]?" headings. Use benefit-driven or curiosity-driven headings.
+- Every H2 must map to either a competitor theme or a gap.
+
+**Per-section fields:** heading, level (h2|h3), reason, topics, targetWords, geoNote (optional), aiOverviewTarget (required for H2s), visualSuggestion (optional).
+
+**Gap prioritization (from extraction.gaps):**
+- Strong readerDemand + strong actionableAngle → own H2
+- One strong, one weak → fold as H3 or geoNote under closest H2
+- Both weak → skip. Output only gaps you actually address.
+
+**PAA integration:** Every paaAnalysis item with gapCandidate=true must map to an H3 or a "Must answer: [question]" in a section's topics/geoNote.
+
+**H3 rule:** Any H2 covering 3+ distinct sub-points must break into H3s. Each H3 gets its own topics, targetWords, and geoNote.
+
+**BLUF section (required):** Immediately after the intro, include an H2 with two H3s:
+- "The Short Version" — 3-bullet answer/takeaway (ul/ol only)
+- "Why It Matters in ${new Date().getFullYear()}" — 2-sentence market context
+
+**FAQ section (REQUIRED for informational and commercial intent):**
+- The LAST H2 in the outline MUST be "Frequently Asked Questions".
+- Include 5-8 H3 sub-sections, each an H3 question heading with a concise answer paragraph.
+- Target 200-300 words total for the FAQ section.
+- Use PAA questions (paaAnalysis) as FAQ source material. Supplement with questions the article body raises but doesn't fully resolve.
+- If faqPlan is provided in the input payload, use those Q&A pairs as the basis (you may rephrase or expand).
+- This section is CRITICAL for AI SEO: Google Featured Snippets, AI Overviews, Perplexity, and ChatGPT Search all extract FAQ content directly.
+
+**Content mix:** ~75% prose, ~25% lists. Every H2 section >200 words must contain at least one list (3-7 items). No HTML tables — lists only.
+
+---
+
+## 3. WORD COUNT & CLUSTER
+
+**Word count:** Total = extraction.wordCount.recommended (or override). Distribute across sections using topic importance and recommendedDepth. Sum of targetWords must equal total. Article total ±5%.
+
+**Cluster positioning:**
+- "pillar": 20-30% more words than competitor avg. Cover ALL essential + recommended topics. Broad headings.
+- "spoke": Standard word count. Deep on subtopic. Reference clusterTopic 1-2 times in geoNotes.
+- "standalone": Default. Pass clusterPosition/clusterTopic through to output.
+
+---
+
+## 4. EDITORIAL STYLE & DIFFERENTIATION
+
+**Style enforcement:** If 3+ competitors are "likely_ai", set editorialStyleFallback: true (use human-like defaults). Otherwise copy extraction's editorialStyle unchanged — pointOfView, tone (specific, not "professional"), realExamplesFrequency, dataDensity.
+
+**Competitor differentiation:** For each "likely_ai" competitor, output 2-4 specific patterns to avoid (generic intros, phrases, structures). The writer will deliberately diverge.
+
+**Best-version fields (required):**
+- similaritySummary: 2-4 sentences on what top 5 competitors cover collectively
+- extraValueThemes: 3-6 actionable strings (5-12 words each, specific not vague)
+- freshnessNote: 1-2 sentences on freshness positioning
+
+**E-E-A-T hooks:** Include geoNotes encouraging experience signals (failure narratives, practitioner observations) in at least 2 sections. Set dataDensity target for adequate stats.
+
+---
+
+## OUTPUT
+
+Valid JSON only. No markdown fences. Do NOT include currentData (merged server-side).
+Required keys: keyword, outline, gaps, editorialStyle, editorialStyleFallback, geoRequirements, seoRequirements, wordCount, similaritySummary, extraValueThemes, freshnessNote, competitorDifferentiation (if applicable), povInsights, faqPlan (array of {question, answer} with 5-8 Q&A pairs).`;
+
+  // Keep payload compact to avoid timeouts and token limits
+  const MAX_TOPICS = 14;
+  const MAX_HEADINGS_PER_SOURCE = 10;
+  const MAX_FACTS = 5;
+  const MAX_DEVELOPMENTS = 5;
+
+  const trimmedHeadings = topics.competitorHeadings.slice(0, 5).map((ch) => ({
+    url: ch.url.slice(0, 80),
+    h2s: ch.h2s.slice(0, MAX_HEADINGS_PER_SOURCE),
+    h3s: ch.h3s.slice(0, MAX_HEADINGS_PER_SOURCE),
+  }));
+
+  const userPayload = JSON.stringify({
+    extraction: {
+      topics: topics.topics.slice(0, MAX_TOPICS),
+      competitorHeadings: trimmedHeadings,
+      gaps: topics.gaps,
+      competitorStrengths: topics.competitorStrengths.slice(0, 5),
+      editorialStyle: topics.editorialStyle,
+      wordCount: topics.wordCount,
+      paaAnalysis: topics.paaAnalysis ?? [],
+    },
+    currentData: {
+      facts: currentData.facts.slice(0, MAX_FACTS),
+      recentDevelopments: currentData.recentDevelopments.slice(0, MAX_DEVELOPMENTS),
+      lastUpdated: currentData.lastUpdated,
+    },
+    input: {
+      primaryKeyword: input.primaryKeyword,
+      secondaryKeywords: secondary,
+      peopleAlsoSearchFor: pasf,
+      intent,
+      clusterPosition: input.clusterPosition ?? "standalone",
+      clusterTopic: input.clusterTopic,
+    },
+    knowledgeEngine: {
+      topicGraph,
+      algorithmicInsights,
+      proprietaryFramework
+    }
+  });
+
+  const userPromptBase = `Produce the ResearchBrief JSON for this extraction and input:\n\n${userPayload}`;
+  const bestVersionHint = `\n\nIMPORTANT: Your response must include the best-version fields: similaritySummary (2-4 sentences on what top 5 cover), extraValueThemes (array of 3-6 short strings — what we add that they don't), and freshnessNote (1-2 sentences). Add them now.`;
+
+  function hasBestVersionFields(n: Record<string, unknown>): boolean {
+    const themes = n.extraValueThemes;
+    const hasThemes = Array.isArray(themes) && themes.length >= 2;
+    const hasSummary = typeof n.similaritySummary === "string" && (n.similaritySummary as string).trim().length > 0;
+    const hasFreshness = typeof n.freshnessNote === "string" && (n.freshnessNote as string).trim().length > 0;
+    return hasThemes && (hasSummary || hasFreshness);
+  }
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const userPrompt = attempt === 2 ? userPromptBase + bestVersionHint : userPromptBase;
+    try {
+      const briefStartMs = Date.now();
+      const stream = anthropic.messages.stream({
+        model: CLAUDE_OPUS_MODEL,
+        max_tokens: 8192,
+        temperature: 0.1,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      const message = await stream.finalMessage();
+
+      const briefDurationMs = Date.now() - briefStartMs;
+      const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+      if (tokenUsage) {
+        tokenUsage.push({
+          callName: "buildResearchBrief",
+          model: CLAUDE_OPUS_MODEL,
+          promptTokens: usage.promptTokens,
+          completionTokens: usage.completionTokens,
+          totalTokens: usage.promptTokens + usage.completionTokens,
+          durationMs: briefDurationMs,
+        });
+      }
+
+      const contentBlock = message.content[0];
+      if (!contentBlock || contentBlock.type !== "text") {
+        throw new Error("buildResearchBrief: Claude returned non-text response");
+      }
+      const content = contentBlock.text;
+      if (!content?.trim()) {
+        throw new Error("buildResearchBrief: empty response from Claude");
+      }
+      const raw = stripJsonMarkdown(content);
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const normalized = normalizeBriefOutput(parsed, input.primaryKeyword);
+
+      const validated = ResearchBriefWithoutCurrentDataSchema.safeParse(normalized);
+      if (validated.success) {
+        let brief = {
+          ...validated.data,
+          currentData,
+          knowledgeEngine: { topicGraph, algorithmicInsights, proprietaryFramework },
+          clusterPosition: input.clusterPosition ?? "standalone",
+          ...(input.clusterTopic && { clusterTopic: input.clusterTopic }),
+        } as ResearchBrief;
+
+        // When a wordCountOverride is provided (revise flow), align the per-section
+        // targetWords with the new total target so the outline and UI stay in sync.
+        if (wordCountOverride && brief.outline?.sections?.length) {
+          const sections = brief.outline.sections;
+          const currentTotal = sections.reduce((sum, s) => sum + (s.targetWords || 0), 0);
+          const target = Math.round(wordCountOverride.target);
+
+          if (currentTotal > 0 && target > 0) {
+            const scaledSections = sections.map((s) => {
+              const base = s.targetWords && s.targetWords > 0 ? s.targetWords : Math.max(50, Math.round(target / sections.length));
+              const scaled = Math.max(50, Math.round((base * target) / currentTotal));
+              return { ...s, targetWords: scaled };
+            });
+            const newTotal = scaledSections.reduce((sum, s) => sum + (s.targetWords || 0), 0);
+            brief = {
+              ...brief,
+              wordCount: { ...wordCountOverride, target },
+              outline: {
+                ...brief.outline,
+                sections: scaledSections,
+                totalSections: scaledSections.length,
+                estimatedWordCount: newTotal,
+              },
+            };
+          } else {
+            brief = { ...brief, wordCount: wordCountOverride };
+          }
+        } else if (wordCountOverride) {
+          brief = { ...brief, wordCount: wordCountOverride };
+        }
+
+        if (attempt === 1 && !hasBestVersionFields(normalized)) {
+          if (process.env.NODE_ENV !== "test") {
+            console.warn("[claude] buildResearchBrief: best-version fields missing, retrying with hint");
+          }
+          continue;
+        }
+        return brief;
+      }
+      lastError = validated.error;
+      if (attempt === 1) {
+        if (process.env.NODE_ENV !== "test") {
+          console.warn("[claude] buildResearchBrief: schema validation failed, retrying with hint", validated.error.flatten());
+        }
+      } else {
+        throw new Error(`buildResearchBrief: invalid schema after retry: ${JSON.stringify(validated.error.flatten())}`);
+      }
+    } catch (e) {
+      if (attempt === 2) throw e;
+      lastError = e;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }

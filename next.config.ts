@@ -42,6 +42,7 @@ const nextConfig: NextConfig = {
       { protocol: "http", hostname: "localhost" },
     ],
     formats: ["image/avif", "image/webp"],
+    qualities: [60, 75, 90],
     minimumCacheTTL: 86400, // 24h for external images (PageSpeed / LCP)
   },
 };

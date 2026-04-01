@@ -1,5 +1,6 @@
 import { getClient, stripJsonMarkdown } from "@/lib/openai/client";
 import type { CompetitorArticle } from "@/lib/pipeline/types";
+import { TopicGraphSchema } from "@/lib/pipeline/types";
 
 export interface TopicNode {
     topic: string;
@@ -25,23 +26,28 @@ export async function buildTopicGraph(
     const paaContext = paaQuestions && paaQuestions.length ? `People Also Ask:\n${paaQuestions.join("\n")}` : "";
     const redditContext = redditThreads && redditThreads.length ? `Reddit Discussions:\n${redditThreads.map(r => r.title).join("\n")}` : "";
 
-    const systemPrompt = `You are a world-class Semantic SEO Architect and Knowledge Graph extraction engine.
-Your goal is to build a "Topic Graph" for the keyword: "${keyword}".
+    const systemPrompt = `You build semantic topic graphs for content strategy. Your output feeds the Insight Generator (which finds non-obvious angles) and the Brief Builder (which constructs the article outline).
 
-1. Identify the IDEAL universe of topics, entities, and concepts that SHOULD be covered in a definitive master guide on this subject.
-2. Analyze the provided competitor content, PAA questions, and Reddit discussions to determine current SERP coverage.
-3. Calculate the 'competitorCoverage' (0-100%) for each ideal topic based on how well the provided competitors cover it.
-4. Identify 'informationGaps': Topics that have high relevance (>7) but low competitor coverage (<30%). THIS IS CRITICAL for Information Gain.
-5. Identify 'saturatedTopics': Topics that all competitors are covering heavily (>80% coverage).
+For the keyword "${keyword}":
 
-Output this as a strictly formatted JSON object matching this schema:
+1. Map the IDEAL topic universe for a definitive guide on this subject.
+2. Score each topic against the provided competitor content, PAA questions, and Reddit discussions.
+3. Scoring guide:
+   - relevanceScore (1-10): 10 = directly answers the search query, 7 = important supporting concept, 4 = tangentially related, 1 = barely relevant.
+   - competitorCoverage (0-100%): percentage of top competitors that meaningfully cover this topic (1+ substantive paragraphs, not just a mention).
+4. informationGaps: Topics with relevance >= 7 AND competitorCoverage <= 30%. These are high-value content opportunities the article MUST address.
+5. saturatedTopics: Topics with competitorCoverage >= 80%. The writer must differentiate on these, not duplicate.
+
+Prioritize unique angles from PAA and Reddit data that competitors missed. These become the raw material for the Insight Generator downstream.
+
+Output strictly formatted JSON:
 {
   "nodes": [{ "topic": string, "category": "core"|"entity"|"strategy"|"tactic"|"concept", "relevanceScore": number (1-10), "competitorCoverage": number (0-100) }],
   "edges": [{ "source": string, "target": string, "relationship": string }],
   "informationGaps": [string],
   "saturatedTopics": [string]
 }
-Focus highly on unique angles from PAA and Reddit data that competitors missed. Return ONLY valid JSON, no markdown blocks.`;
+Return ONLY valid JSON, no markdown blocks.`;
 
     const userPrompt = `Keyword: ${keyword}\n\n${paaContext}\n\n${redditContext}\n\nCompetitor Content (Truncated):\n${competitorSummaries}`;
 
@@ -60,5 +66,10 @@ Focus highly on unique angles from PAA and Reddit data that competitors missed. 
     if (!content) throw new Error("buildTopicGraph: empty response from OpenAI");
 
     const raw = stripJsonMarkdown(content);
-    return JSON.parse(raw) as TopicGraph;
+    const parsed = JSON.parse(raw);
+    const validated = TopicGraphSchema.safeParse(parsed);
+    if (!validated.success) {
+        console.warn("buildTopicGraph: schema validation failed, using raw parse:", validated.error.issues);
+    }
+    return (validated.success ? validated.data : parsed) as TopicGraph;
 }

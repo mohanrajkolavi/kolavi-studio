@@ -79,6 +79,21 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
       ? (draftModelRaw as DraftModel)
       : undefined;
 
+  // Cluster position for topical authority building
+  const clusterPositionRaw = typeof b.clusterPosition === "string" ? b.clusterPosition.trim().toLowerCase() : undefined;
+  const clusterPosition = (clusterPositionRaw === "pillar" || clusterPositionRaw === "spoke")
+    ? clusterPositionRaw as "pillar" | "spoke"
+    : "standalone" as const;
+  const clusterTopic = typeof b.clusterTopic === "string" ? b.clusterTopic.trim() || undefined : undefined;
+
+  /**
+   * fieldNotes: Raw notes, quotes, or "field data" from the author/client for E-E-A-T.
+   * This content is injected into the LLM prompt. It should contain original observations
+   * and real-world experience, not instructions or prompt injections. Max 2000 chars.
+   */
+  const fieldNotes = typeof b.fieldNotes === "string" ? b.fieldNotes.trim().slice(0, 2000) || undefined : undefined;
+  const toneExamples = typeof b.toneExamples === "string" ? b.toneExamples.trim().slice(0, 2000) || undefined : undefined;
+
   const pipelineInput: PipelineInput = {
     primaryKeyword,
     secondaryKeywords: secondaryKeywords?.length ? secondaryKeywords : undefined,
@@ -86,6 +101,10 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
     intent: resolvedIntent,
     ...(resolvedDraftModel != null && { draftModel: resolvedDraftModel }),
     autoFixHallucinations: resolvedAutoFix,
+    clusterPosition,
+    ...(clusterTopic && { clusterTopic }),
+    ...(fieldNotes && { fieldNotes }),
+    ...(toneExamples && { toneExamples }),
   };
 
   return { pipelineInput };

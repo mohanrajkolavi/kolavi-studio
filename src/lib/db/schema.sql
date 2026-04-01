@@ -86,7 +86,15 @@ CREATE TABLE IF NOT EXISTS blog_generation_history (
   suggested_slug TEXT,
   suggested_categories JSONB,
   suggested_tags JSONB,
-  generation_time_ms INTEGER
+  generation_time_ms INTEGER,
+  schema_markup JSONB,
+  audit_result JSONB,
+  eeat_feedback JSONB,
+  fact_check JSONB,
+  source_urls TEXT[],
+  token_usage JSONB,
+  brief_summary JSONB,
+  readability_scores JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_generation_history(created_at DESC);
 

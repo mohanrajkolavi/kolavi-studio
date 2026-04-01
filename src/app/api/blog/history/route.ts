@@ -17,12 +17,19 @@ async function ensureBlogHistoryTable() {
       suggested_slug TEXT,
       suggested_categories JSONB,
       suggested_tags JSONB,
-      generation_time_ms INTEGER
+      generation_time_ms INTEGER,
+      schema_markup JSONB,
+      audit_result JSONB,
+      eeat_feedback JSONB,
+      fact_check JSONB,
+      source_urls TEXT[],
+      token_usage JSONB,
+      brief_summary JSONB,
+      readability_scores JSONB
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_blog_generation_history_created_at ON blog_generation_history(created_at DESC)`;
-  // Add missing columns for tables created before focus_keyword/generation_time_ms were added
-  // Use DO block for compatibility with older Postgres where ADD COLUMN IF NOT EXISTS may not exist
+  // Add missing columns for tables created before these columns were added
   await sql`
     DO $migrate$
     BEGIN
@@ -37,6 +44,19 @@ async function ensureBlogHistoryTable() {
         WHERE table_schema = 'public' AND table_name = 'blog_generation_history' AND column_name = 'generation_time_ms'
       ) THEN
         ALTER TABLE blog_generation_history ADD COLUMN generation_time_ms INTEGER;
+      END IF;
+      IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'public' AND table_name = 'blog_generation_history' AND column_name = 'schema_markup'
+      ) THEN
+        ALTER TABLE blog_generation_history ADD COLUMN schema_markup JSONB;
+        ALTER TABLE blog_generation_history ADD COLUMN audit_result JSONB;
+        ALTER TABLE blog_generation_history ADD COLUMN eeat_feedback JSONB;
+        ALTER TABLE blog_generation_history ADD COLUMN fact_check JSONB;
+        ALTER TABLE blog_generation_history ADD COLUMN source_urls TEXT[];
+        ALTER TABLE blog_generation_history ADD COLUMN token_usage JSONB;
+        ALTER TABLE blog_generation_history ADD COLUMN brief_summary JSONB;
+        ALTER TABLE blog_generation_history ADD COLUMN readability_scores JSONB;
       END IF;
     END $migrate$
   `;
@@ -56,6 +76,15 @@ export type BlogHistoryRow = {
   suggested_categories: string[] | null;
   suggested_tags: string[] | null;
   generation_time_ms?: number | null;
+  // Pipeline metadata
+  schema_markup?: Record<string, unknown> | null;
+  audit_result?: Record<string, unknown> | null;
+  eeat_feedback?: Record<string, unknown> | null;
+  fact_check?: Record<string, unknown> | null;
+  source_urls?: string[] | null;
+  token_usage?: Record<string, unknown>[] | null;
+  brief_summary?: Record<string, unknown> | null;
+  readability_scores?: Record<string, unknown> | null;
 };
 
 type GeneratedContentBody = {
@@ -69,6 +98,15 @@ type GeneratedContentBody = {
   focusKeyword?: string;
   /** Total generation time in milliseconds. */
   generationTimeMs?: number;
+  // Pipeline metadata
+  schemaMarkup?: Record<string, unknown>;
+  auditResult?: Record<string, unknown>;
+  eeatFeedback?: Record<string, unknown>;
+  factCheck?: Record<string, unknown>;
+  sourceUrls?: string[];
+  tokenUsage?: Record<string, unknown>[];
+  briefSummary?: Record<string, unknown>;
+  readabilityScores?: Record<string, unknown>;
 };
 
 function normalizeKeyword(kw: string | null | undefined): string {
@@ -130,7 +168,9 @@ export async function GET(request: NextRequest) {
   if (id) {
     const rows = await sql`
       SELECT id, created_at, focus_keyword, title, meta_description, outline, content,
-             suggested_slug, suggested_categories, suggested_tags, generation_time_ms
+             suggested_slug, suggested_categories, suggested_tags, generation_time_ms,
+             schema_markup, audit_result, eeat_feedback, fact_check, source_urls,
+             token_usage, brief_summary, readability_scores
       FROM blog_generation_history
       WHERE id = ${id}
       LIMIT 1
@@ -149,7 +189,9 @@ export async function GET(request: NextRequest) {
 
   const rows = await sql`
     SELECT id, created_at, focus_keyword, title, meta_description, outline, content,
-           suggested_slug, suggested_categories, suggested_tags, generation_time_ms
+           suggested_slug, suggested_categories, suggested_tags, generation_time_ms,
+           schema_markup, audit_result, eeat_feedback, fact_check, source_urls,
+           token_usage, brief_summary, readability_scores
     FROM blog_generation_history
     ORDER BY created_at DESC
     LIMIT ${FETCH_LIMIT}
@@ -176,20 +218,6 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  // #region agent log
-  fetch("http://127.0.0.1:7242/ingest/c40bd895-fc10-4d3b-a4cb-1ef041cfae3a", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "history/route.ts:before-ensure",
-      message: "POST history before ensureBlogHistoryTable",
-      data: { hasDbUrl: !!dbUrl?.trim() },
-      timestamp: Date.now(),
-      hypothesisId: "H1",
-    }),
-  }).catch(() => {});
-  // #endregion
-
   try {
     await ensureBlogHistoryTable();
   } catch (e) {
@@ -199,19 +227,6 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
-  // #region agent log
-  fetch("http://127.0.0.1:7242/ingest/c40bd895-fc10-4d3b-a4cb-1ef041cfae3a", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "history/route.ts:after-ensure",
-      message: "POST history after ensureBlogHistoryTable OK",
-      data: {},
-      timestamp: Date.now(),
-      hypothesisId: "H1",
-    }),
-  }).catch(() => {});
-  // #endregion
 
   let body: GeneratedContentBody;
   try {
@@ -229,6 +244,14 @@ export async function POST(request: NextRequest) {
     suggestedTags,
     focusKeyword,
     generationTimeMs,
+    schemaMarkup,
+    auditResult,
+    eeatFeedback,
+    factCheck,
+    sourceUrls,
+    tokenUsage,
+    briefSummary,
+    readabilityScores,
   } = body;
   if (
     typeof title !== "string" ||
@@ -254,33 +277,20 @@ export async function POST(request: NextRequest) {
       ? Math.round(generationTimeMs)
       : null;
 
-  // #region agent log
-  fetch("http://127.0.0.1:7242/ingest/c40bd895-fc10-4d3b-a4cb-1ef041cfae3a", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      location: "history/route.ts:pre-insert",
-      message: "POST history pre-insert",
-      data: {
-        outlineLen: outline?.length,
-        outlineTypes: outline?.map((x) => typeof x),
-        contentLen: content?.length,
-        suggestedCategoriesLen: suggestedCategoriesVal?.length,
-        suggestedTagsLen: suggestedTagsVal?.length,
-        hasDbUrl: !!dbUrl?.trim(),
-      },
-      timestamp: Date.now(),
-      hypothesisId: "H2",
-    }),
-  }).catch(() => {});
-  // #endregion
+  // Serialize optional JSONB metadata (null-safe)
+  const jsonbOrNull = (v: unknown) =>
+    v != null && typeof v === "object" ? sql`(${JSON.stringify(v)}::text)::jsonb` : sql`NULL`;
+  const textArrayOrNull = (v: unknown) =>
+    Array.isArray(v) && v.length > 0 ? v : null;
 
   try {
     const inserted = await sql`
       INSERT INTO blog_generation_history (
         title, meta_description, outline, content,
         suggested_slug, suggested_categories, suggested_tags,
-        focus_keyword, generation_time_ms
+        focus_keyword, generation_time_ms,
+        schema_markup, audit_result, eeat_feedback, fact_check,
+        source_urls, token_usage, brief_summary, readability_scores
       )
       VALUES (
         ${title.trim()},
@@ -291,72 +301,33 @@ export async function POST(request: NextRequest) {
         ${suggestedCategoriesVal != null ? sql`(${JSON.stringify(suggestedCategoriesVal)}::text)::jsonb` : sql`NULL`},
         ${suggestedTagsVal != null ? sql`(${JSON.stringify(suggestedTagsVal)}::text)::jsonb` : sql`NULL`},
         ${optionalText(focusKeywordVal)},
-        ${optionalInt(generationTimeMsVal)}
+        ${optionalInt(generationTimeMsVal)},
+        ${jsonbOrNull(schemaMarkup)},
+        ${jsonbOrNull(auditResult)},
+        ${jsonbOrNull(eeatFeedback)},
+        ${jsonbOrNull(factCheck)},
+        ${textArrayOrNull(sourceUrls)},
+        ${jsonbOrNull(tokenUsage)},
+        ${jsonbOrNull(briefSummary)},
+        ${jsonbOrNull(readabilityScores)}
       )
       RETURNING id
     `;
     const newId = (inserted[0] as { id: string })?.id ?? null;
 
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/c40bd895-fc10-4d3b-a4cb-1ef041cfae3a", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "history/route.ts:insert-success",
-        message: "POST history INSERT succeeded",
-        data: { newId },
-        timestamp: Date.now(),
-        hypothesisId: "H4",
-      }),
-    }).catch(() => {});
-    // #endregion
-
-    // #region agent log
-    const all = await sql`
-      SELECT id FROM blog_generation_history
-      ORDER BY created_at DESC
+    // Atomic trim: delete oldest entries beyond MAX_HISTORY (no race condition)
+    await sql`
+      DELETE FROM blog_generation_history
+      WHERE id NOT IN (
+        SELECT id FROM blog_generation_history
+        ORDER BY created_at DESC
+        LIMIT ${MAX_HISTORY}
+      )
     `;
-    fetch("http://127.0.0.1:7242/ingest/c40bd895-fc10-4d3b-a4cb-1ef041cfae3a", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "history/route.ts:before-trim",
-        message: "POST history before trim",
-        data: { allLen: all.length, toDelete: all.length > MAX_HISTORY ? all.length - MAX_HISTORY : 0 },
-        timestamp: Date.now(),
-        hypothesisId: "H4",
-      }),
-    }).catch(() => {});
-    // #endregion
-    if (all.length > MAX_HISTORY) {
-      await sql`
-        DELETE FROM blog_generation_history
-        WHERE id NOT IN (
-          SELECT id FROM blog_generation_history
-          ORDER BY created_at DESC
-          LIMIT ${MAX_HISTORY}
-        )
-      `;
-    }
 
     return NextResponse.json(newId != null ? { ok: true, id: newId } : { ok: true }, { status: 201 });
   } catch (err) {
     console.error("[blog/history] POST insert error:", err);
-    // #region agent log
-    const errMsg = err instanceof Error ? err.message : String(err);
-    const errStack = err instanceof Error ? err.stack : undefined;
-    fetch("http://127.0.0.1:7242/ingest/c40bd895-fc10-4d3b-a4cb-1ef041cfae3a", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "history/route.ts:POST-catch",
-        message: "POST history insert/trim failed",
-        data: { errMsg, errName: err instanceof Error ? err.name : undefined, errStack: errStack?.slice(0, 500) },
-        timestamp: Date.now(),
-        hypothesisId: "H1,H2,H3,H4",
-      }),
-    }).catch(() => {});
-    // #endregion
     const msg = err instanceof Error ? err.message : String(err);
     const isConnection =
       /connection|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|connect/i.test(msg) ||
@@ -459,20 +430,6 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("[blog/history] PATCH error:", err);
-    // #region agent log
-    const errMsg = err instanceof Error ? err.message : String(err);
-    fetch("http://127.0.0.1:7242/ingest/c40bd895-fc10-4d3b-a4cb-1ef041cfae3a", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "history/route.ts:PATCH-catch",
-        message: "PATCH history failed",
-        data: { errMsg, errName: err instanceof Error ? err.name : undefined },
-        timestamp: Date.now(),
-        hypothesisId: "H1,H2,H3,H4",
-      }),
-    }).catch(() => {});
-    // #endregion
     return NextResponse.json({ error: "Failed to update entry" }, { status: 500 });
   }
 }
