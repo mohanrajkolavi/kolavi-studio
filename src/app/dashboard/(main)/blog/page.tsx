@@ -2876,8 +2876,9 @@ export default function BlogMakerPage() {
                     </div>
                     {clusterPosition === "spoke" && (
                       <div className="pt-2">
-                        <label className="text-xs text-muted-foreground mb-1 block">Broader cluster topic</label>
+                        <label htmlFor="cluster-topic-input" className="text-xs text-muted-foreground mb-1 block">Broader cluster topic</label>
                         <input
+                          id="cluster-topic-input"
                           type="text"
                           value={clusterTopic}
                           onChange={(e) => setClusterTopic(e.target.value)}
