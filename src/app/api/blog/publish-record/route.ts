@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
+import { requestIndexing, isIndexingConfigured } from "@/lib/google-indexing";
 
 /**
  * POST: Record that an article was published (for future feedback loop / ranking tracking).
@@ -43,7 +44,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ ok: true });
+    // Auto-submit URL for Google Instant Indexing (best-effort, non-blocking)
+    let indexed = false;
+    if (publishedUrl && isIndexingConfigured()) {
+      try {
+        const indexResult = await requestIndexing(publishedUrl);
+        indexed = indexResult.success;
+        if (!indexed) {
+          console.warn("[blog/publish-record] Indexing request failed:", indexResult.error);
+        }
+      } catch {
+        // best-effort: don't fail the request
+      }
+    }
+
+    return NextResponse.json({ ok: true, indexed });
   } catch (e) {
     console.error("[blog/publish-record]", e);
     return NextResponse.json({ error: "Failed to record publish" }, { status: 500 });

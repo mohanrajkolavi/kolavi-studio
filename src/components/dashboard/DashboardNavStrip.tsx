@@ -11,6 +11,7 @@ import {
   Loader2,
   Handshake,
   BarChart3,
+  Zap,
 } from "lucide-react";
 import { useBlogGenerationOptional } from "@/components/dashboard/BlogGenerationProvider";
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/dashboard/blog", label: "Content Writer", icon: FileEdit },
   { href: "/dashboard/recent", label: "Recent", icon: History },
   { href: "/dashboard/content-maintenance", label: "Content", icon: FileSearch },
+  { href: "/dashboard/indexing", label: "Indexing", icon: Zap },
 ];
 
 export function DashboardNavStrip() {
