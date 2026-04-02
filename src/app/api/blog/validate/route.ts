@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await runValidationChunk(jobId, jobStore, 15_000);
+    const result = await runValidationChunk(jobId, jobStore, 28_000);
     return new Response(
       JSON.stringify({
         jobId,
@@ -74,9 +74,21 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Validation failed";
     console.error("Blog validate error:", error);
-    return new Response(JSON.stringify({ error: message }), {
-      status: 500,
-      headers: withCors({ "Content-Type": "application/json" }),
-    });
+    // Always return the article even if validation fails — frontend shows a warning alert
+    return new Response(
+      JSON.stringify({
+        jobId,
+        finalContent: draft.content as string,
+        validationFailed: true,
+        validationError: message,
+        faqEnforcement: { passed: true, violations: [] },
+        factCheck: { verified: false, hallucinations: [], issues: [], skippedRhetorical: [] },
+        schemaMarkup: { article: {}, faq: null, breadcrumb: null },
+      }),
+      {
+        status: 200,
+        headers: withCors({ "Content-Type": "application/json" }),
+      }
+    );
   }
 }

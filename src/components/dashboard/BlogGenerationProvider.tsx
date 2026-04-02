@@ -1082,11 +1082,20 @@ async function processValidateRequest(
     factCheck?: ValidationChunkResult["factCheck"];
     schemaMarkup?: ValidationChunkResult["schemaMarkup"];
     finalContent?: string;
+    validationFailed?: boolean;
+    validationError?: string;
   };
+  // Show a small alert if validation had issues but still returned the article
+  if (data.validationFailed) {
+    console.warn("[validation] Validation failed but article returned:", data.validationError);
+    if (typeof window !== "undefined") {
+      window.alert(`Validation skipped: ${data.validationError ?? "timed out"}. Article is ready but may need manual review.`);
+    }
+  }
   guarded.setProgress?.({
     step: "validate",
     status: "completed",
-    message: "Validation complete",
+    message: data.validationFailed ? "Validation skipped" : "Validation complete",
     progress: 100,
     elapsedMs: 0,
     chunk: "validate",
