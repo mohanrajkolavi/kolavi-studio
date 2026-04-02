@@ -766,13 +766,13 @@ export default function ContentMaintenancePage() {
                     </th>
                     <th className="w-32 px-5 py-3.5 text-left">
                       <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                        Review Status
+                        Review
                       </span>
                     </th>
                     <th className="w-28 px-5 py-3.5 text-left">
                       <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         <Zap className="h-3.5 w-3.5 opacity-60" />
-                        Index Status
+                        Index
                       </span>
                     </th>
                     <th className="w-16 px-3 py-3.5 text-left">
