@@ -752,7 +752,7 @@ export default function ContentMaintenancePage() {
                         Categories
                       </span>
                     </th>
-                    <th className="w-20 px-5 py-3.5 text-left">
+                    <th className="w-16 px-5 py-3.5 text-left">
                       <button
                         type="button"
                         onClick={() => toggleSort("age")}
@@ -762,21 +762,15 @@ export default function ContentMaintenancePage() {
                         {sortKey === "age" && (sortDir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
                       </button>
                     </th>
-                    <th className="w-28 px-5 py-3.5 text-left">
-                      <button
-                        type="button"
-                        onClick={() => toggleSort("lastReviewed")}
-                        className="flex items-center gap-1.5 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
-                      >
-                        <Calendar className="h-3.5 w-3.5 opacity-60" />
-                        Reviewed
-                        {sortKey === "lastReviewed" && (sortDir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
-                      </button>
+                    <th className="w-32 px-5 py-3.5 text-left">
+                      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        Review Status
+                      </span>
                     </th>
-                    <th className="w-24 px-5 py-3.5 text-left">
+                    <th className="w-28 px-5 py-3.5 text-left">
                       <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         <Zap className="h-3.5 w-3.5 opacity-60" />
-                        Indexed
+                        Index Status
                       </span>
                     </th>
                     <th className="w-16 px-3 py-3.5 text-left">
@@ -818,6 +812,7 @@ export default function ContentMaintenancePage() {
                           aria-label={`Select ${post.title}`}
                         />
                       </td>
+                      {/* Post title */}
                       <td className="px-5 py-4">
                         <Link
                           href={`/blog/${post.slug}`}
@@ -829,6 +824,7 @@ export default function ContentMaintenancePage() {
                           {post.title}
                         </Link>
                       </td>
+                      {/* Categories */}
                       <td className="w-32 px-5 py-4 align-top">
                         {post.categories.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
@@ -848,7 +844,8 @@ export default function ContentMaintenancePage() {
                           <span className="text-sm text-muted-foreground/60">—</span>
                         )}
                       </td>
-                      <td className="w-20 px-5 py-4 align-top">
+                      {/* Age */}
+                      <td className="w-16 px-5 py-4 align-top">
                         <span
                           className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium tabular-nums ${
                             post.ageDays > 60
@@ -859,13 +856,25 @@ export default function ContentMaintenancePage() {
                           {post.ageDays}d
                         </span>
                       </td>
-                      <td className="w-28 px-5 py-4 align-top text-sm tabular-nums text-muted-foreground">
-                        {post.lastReviewedAt
-                          ? new Date(post.lastReviewedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-                          : "—"}
+                      {/* Review Status */}
+                      <td className="w-32 px-5 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+                        <select
+                          value={post.status}
+                          onChange={(e) => handleStatusChange(post.slug, e.target.value)}
+                          disabled={updating === post.slug}
+                          className={`h-7 w-full min-w-0 rounded-md border-0 px-2 text-xs font-medium focus:ring-2 focus:ring-ring focus:ring-offset-1 ${
+                            statusStyles[post.status] || statusStyles.unreviewed
+                          }`}
+                        >
+                          {STATUS_TABS.slice(1).map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
                       </td>
-                      {/* Indexing status */}
-                      <td className="w-24 px-5 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+                      {/* Index Status */}
+                      <td className="w-28 px-5 py-4 align-top" onClick={(e) => e.stopPropagation()}>
                         {indexingSlug === post.slug ? (
                           <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />

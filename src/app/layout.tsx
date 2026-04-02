@@ -34,7 +34,7 @@ export default async function RootLayout({
   const isBlogRoute = pathname.startsWith("/blog");
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <head>
         {isBlogRoute && (
           <link rel="preconnect" href="https://cms.kolavistudio.com" crossOrigin="anonymous" />

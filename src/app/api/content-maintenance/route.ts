@@ -11,7 +11,9 @@ type MaintenanceRecordRow = {
   updated_at: Date;
 };
 
+let tableEnsured = false;
 async function ensureContentMaintenanceTable() {
+  if (tableEnsured) return;
   // Use a minimal schema that doesn't require extensions (e.g. gen_random_uuid()).
   await sql`
     CREATE TABLE IF NOT EXISTS content_maintenance (
@@ -23,6 +25,7 @@ async function ensureContentMaintenanceTable() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_content_maintenance_status ON content_maintenance(status)`;
+  tableEnsured = true;
 }
 
 export async function GET(request: NextRequest) {

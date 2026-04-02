@@ -4,7 +4,9 @@ import { sql, optionalText, optionalInt } from "@/lib/db";
 
 const MAX_HISTORY = 10;
 
+let tableEnsured = false;
 async function ensureBlogHistoryTable() {
+  if (tableEnsured) return;
   await sql`
     CREATE TABLE IF NOT EXISTS blog_generation_history (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,6 +62,7 @@ async function ensureBlogHistoryTable() {
       END IF;
     END $migrate$
   `;
+  tableEnsured = true;
 }
 /** Fetch more rows so we can dedupe by keyword and still return up to MAX_HISTORY. */
 const FETCH_LIMIT = 80;

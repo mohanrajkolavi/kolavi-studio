@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { sql } from "@/lib/db";
 
+let tableEnsured = false;
 async function ensureContentMaintenanceTable() {
+  if (tableEnsured) return;
   await sql`
     CREATE TABLE IF NOT EXISTS content_maintenance (
       post_slug VARCHAR(255) PRIMARY KEY,
@@ -13,6 +15,7 @@ async function ensureContentMaintenanceTable() {
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_content_maintenance_status ON content_maintenance(status)`;
+  tableEnsured = true;
 }
 
 export async function GET(
