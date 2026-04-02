@@ -82,11 +82,13 @@ function isArticleUrl(url: string): boolean {
   if (FILE_EXTENSIONS.test(url)) return false;
   if (CATEGORY_TAG_PATHS.test(path)) return false;
 
+  // Accept any URL with a path (even single segment like /markdown-guide)
+  // Only reject bare homepages (no path) and listing-only paths
   const segments = path.split("/").filter(Boolean);
   if (segments.length === 0) return false;
-  if (segments.length === 1 && ["blog", "news", "articles"].includes(segments[0].toLowerCase())) return false;
+  if (segments.length === 1 && ["blog", "news", "articles", "category", "tag"].includes(segments[0].toLowerCase())) return false;
 
-  return segments.length >= 2 || path.length > 10;
+  return true;
 }
 
 // =============================================================================
@@ -300,11 +302,14 @@ export async function searchCompetitorUrls(
     if (filtered.length >= maxResults) break;
   }
 
-  // When filter removes all results (e.g. Reddit/YouTube-heavy SERP), fall back to top organic URLs
-  if (filtered.length === 0 && organic.length > 0) {
+  // Fill remaining slots with non-article URLs so we always return up to maxResults
+  if (filtered.length < maxResults) {
+    const usedUrls = new Set(filtered.map((r) => r.url));
     for (const item of organic) {
       const url = item.link?.trim();
-      if (!url) continue;
+      if (!url || usedUrls.has(url)) continue;
+      const domain = getDomain(url);
+      if (NON_ARTICLE_DOMAINS.has(domain)) continue;
       filtered.push({
         url,
         title: item.title ?? "",
@@ -396,7 +401,8 @@ export async function searchCompetitorUrlsWithPaa(
         snippet: item.snippet ?? "",
       });
     }
-    if (!isArticleUrl(url)) continue;
+    const isArticle = isArticleUrl(url);
+    if (!isArticle) continue;
     filtered.push({
       url,
       title: item.title ?? "",
@@ -406,10 +412,15 @@ export async function searchCompetitorUrlsWithPaa(
     });
     if (filtered.length >= maxResults) break;
   }
-  if (filtered.length === 0 && organic.length > 0) {
+  // Fill remaining slots with non-article URLs (homepages, tools, etc.) so we always return up to maxResults
+  if (filtered.length < maxResults) {
+    const usedUrls = new Set(filtered.map((r) => r.url));
     for (const item of organic) {
       const url = item.link?.trim();
-      if (!url) continue;
+      if (!url || usedUrls.has(url)) continue;
+      const domain = getDomain(url);
+      if (NON_ARTICLE_DOMAINS.has(domain)) continue;
+      if (domain === "reddit.com" || domain === "www.reddit.com") continue;
       filtered.push({
         url,
         title: item.title ?? "",
