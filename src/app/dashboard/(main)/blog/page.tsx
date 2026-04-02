@@ -1959,7 +1959,7 @@ export default function BlogMakerPage() {
                       </button>
                     </div>
                     <p className="mt-2.5 text-[15px] text-muted-foreground leading-relaxed whitespace-nowrap overflow-x-auto">
-                      Pick at least 3 sources (up to 4). We&apos;ll use them to build your outline and draft. 1 of them can be a custom URL.
+                      Pick up to 4 sources. We&apos;ll use them to build your outline and draft. 1 of them can be a custom URL.
                     </p>
                   </header>
 
@@ -2271,9 +2271,9 @@ export default function BlogMakerPage() {
                       const urlsToFetch = isValidCustom ? [...selectedSerpUrls, customCompetitorUrl.trim()] : selectedSerpUrls;
                       return (
                         <>
-                          {totalSelected < 3 && (
+                          {totalSelected < 1 && (
                             <p className="text-[13px] text-muted-foreground">
-                              Select at least three sources to continue.
+                              Select at least one source to continue.
                             </p>
                           )}
                           {totalSelected >= 4 && (
@@ -2315,7 +2315,7 @@ export default function BlogMakerPage() {
                               )}
                               <Button
                                 type="button"
-                                disabled={totalSelected < 3}
+                                disabled={totalSelected < 1}
                                 onClick={() => {
                                   if (demoRunning && demoChunkOutputs.researchSerp) {
                                     setDemoStep("fetch");
@@ -2324,13 +2324,13 @@ export default function BlogMakerPage() {
                                     return;
                                   }
                                   setStepView(null);
-                                  if (jobId && urlsToFetch.length >= 3 && urlsToFetch.length <= 4) {
+                                  if (jobId && urlsToFetch.length >= 1 && urlsToFetch.length <= 4) {
                                     startResearchFetch(jobId, urlsToFetch);
                                   }
                                 }}
                                 className="w-full sm:w-auto h-11 rounded-full bg-foreground px-8 text-[15px] font-medium text-background shadow-sm hover:bg-foreground/90 hover:shadow transition-all duration-200 active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100"
                               >
-                                {totalSelected < 3 ? "Select at least 3" : "Continue"}
+                                {totalSelected < 1 ? "Select at least 1" : "Continue"}
                               </Button>
                             </div>
                           </div>
