@@ -94,6 +94,129 @@ export default function ContentMaintenancePage() {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://kolavistudio.com";
 
+  // Static site pages for indexing
+  const STATIC_PAGES: { category: string; pages: { path: string; label: string }[] }[] = [
+    {
+      category: "Main",
+      pages: [
+        { path: "/", label: "Home" },
+        { path: "/about", label: "About" },
+        { path: "/services", label: "Services" },
+        { path: "/pricing", label: "Pricing" },
+        { path: "/portfolio", label: "Portfolio" },
+        { path: "/contact", label: "Contact" },
+        { path: "/blog", label: "Blog" },
+      ],
+    },
+    {
+      category: "Markdown Tools",
+      pages: [
+        { path: "/markdown-editor", label: "Markdown Editor" },
+        { path: "/markdown-guide", label: "Markdown Guide" },
+        { path: "/markdown-syntax", label: "Markdown Syntax" },
+        { path: "/markdown-extended-syntax", label: "Extended Syntax" },
+        { path: "/markdown-cheat-sheet", label: "Cheat Sheet" },
+        { path: "/markdown-formatter", label: "Formatter" },
+        { path: "/markdown-to-html", label: "MD to HTML" },
+        { path: "/markdown-to-pdf", label: "MD to PDF" },
+        { path: "/markdown-hacks", label: "Hacks" },
+        { path: "/markdown-table-generator", label: "Table Generator" },
+        { path: "/markdown-tools", label: "Tools Hub" },
+        { path: "/discord-markdown", label: "Discord Markdown" },
+        { path: "/github-markdown", label: "GitHub Markdown" },
+        { path: "/slack-markdown", label: "Slack Markdown" },
+      ],
+    },
+    {
+      category: "Tools",
+      pages: [
+        { path: "/tools", label: "Tools Hub" },
+        { path: "/tools/roi-calculator", label: "ROI Calculator" },
+        { path: "/tools/speed-audit", label: "Speed Audit" },
+        { path: "/tools/competitor-comparison", label: "Competitor Comparison" },
+        { path: "/tools/treatment-analyzer", label: "Treatment Analyzer" },
+        { path: "/tools/treatment-visualizer", label: "Treatment Visualizer" },
+      ],
+    },
+    {
+      category: "Partner",
+      pages: [
+        { path: "/partner", label: "Partner Program" },
+        { path: "/partner/apply", label: "Apply" },
+      ],
+    },
+    {
+      category: "Legal",
+      pages: [
+        { path: "/privacy", label: "Privacy" },
+        { path: "/terms", label: "Terms" },
+        { path: "/cookies", label: "Cookies" },
+        { path: "/disclaimer", label: "Disclaimer" },
+      ],
+    },
+  ];
+
+  const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
+  const [pagesIndexing, setPagesIndexing] = useState(false);
+  const [indexedPages, setIndexedPages] = useState<Record<string, { success: boolean; error?: string }>>({});
+
+  const togglePageSelect = (path: string) => {
+    setSelectedPages((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  };
+
+  const toggleCategoryPages = (pages: { path: string }[]) => {
+    setSelectedPages((prev) => {
+      const next = new Set(prev);
+      const allSelected = pages.every((p) => next.has(p.path));
+      if (allSelected) pages.forEach((p) => next.delete(p.path));
+      else pages.forEach((p) => next.add(p.path));
+      return next;
+    });
+  };
+
+  const selectAllPages = () => {
+    const allPaths = STATIC_PAGES.flatMap((g) => g.pages.map((p) => p.path));
+    setSelectedPages((prev) => {
+      if (prev.size === allPaths.length) return new Set();
+      return new Set(allPaths);
+    });
+  };
+
+  const handleIndexPages = async () => {
+    const paths = Array.from(selectedPages);
+    if (paths.length === 0) return;
+    setPagesIndexing(true);
+    const urls = paths.map((p) => `${siteUrl}${p}`);
+    try {
+      const res = await fetch("/api/indexing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+      const data = await res.json();
+      const mapped: Record<string, { success: boolean; error?: string }> = {};
+      if (data.results) {
+        data.results.forEach((r: { url: string; success: boolean; error?: string }, i: number) => {
+          mapped[paths[i]] = { success: r.success, error: r.error };
+        });
+      }
+      setIndexedPages((prev) => ({ ...prev, ...mapped }));
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : "Request failed";
+      const failed: Record<string, { success: boolean; error?: string }> = {};
+      paths.forEach((p) => { failed[p] = { success: false, error: errMsg }; });
+      setIndexedPages((prev) => ({ ...prev, ...failed }));
+    } finally {
+      setPagesIndexing(false);
+      setSelectedPages(new Set());
+    }
+  };
+
   const getPostUrl = useCallback((slug: string) => `${siteUrl}/blog/${slug}`, [siteUrl]);
 
   const handleIndexPost = useCallback(async (slug: string) => {
@@ -1034,6 +1157,82 @@ export default function ContentMaintenancePage() {
             )}
           </div>
         )}
+      </section>
+
+      {/* Site Pages indexing */}
+      <section className="rounded-xl border border-border/50 bg-card p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Site Pages</h2>
+          <div className="flex items-center gap-3">
+            {selectedPages.size > 0 && (
+              <>
+                <span className="text-sm text-muted-foreground">{selectedPages.size} selected</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleIndexPages}
+                  disabled={pagesIndexing}
+                  className="gap-1.5"
+                >
+                  {pagesIndexing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                  Index Selected
+                </Button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={selectAllPages}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              {selectedPages.size === STATIC_PAGES.flatMap((g) => g.pages).length ? "Deselect all" : "Select all"}
+            </button>
+          </div>
+        </div>
+        <div className="space-y-4">
+          {STATIC_PAGES.map((group) => (
+            <div key={group.category}>
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="checkbox"
+                  checked={group.pages.every((p) => selectedPages.has(p.path))}
+                  onChange={() => toggleCategoryPages(group.pages)}
+                  className="h-3.5 w-3.5 rounded border-border accent-orange-600"
+                />
+                <span className="text-xs font-medium text-muted-foreground">{group.category}</span>
+              </div>
+              <div className="flex flex-wrap gap-2 ml-5">
+                {group.pages.map((page) => {
+                  const idx = indexedPages[page.path];
+                  return (
+                    <label
+                      key={page.path}
+                      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs cursor-pointer transition-colors ${
+                        selectedPages.has(page.path)
+                          ? "border-orange-500/50 bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-500/30"
+                          : "border-border/50 text-muted-foreground hover:border-border hover:text-foreground"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedPages.has(page.path)}
+                        onChange={() => togglePageSelect(page.path)}
+                        className="sr-only"
+                      />
+                      {idx ? (
+                        idx.success ? (
+                          <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        ) : (
+                          <XCircle className="h-3 w-3 text-red-500" />
+                        )
+                      ) : null}
+                      {page.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Manual Indexing section */}
