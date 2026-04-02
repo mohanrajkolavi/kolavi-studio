@@ -6,15 +6,24 @@ import { jobStore } from "@/lib/pipeline/jobs";
 import { prewarmClient as prewarmClaude } from "@/lib/claude/client";
 import { prewarmClient as prewarmOpenAI } from "@/lib/openai/client";
 import { prewarmClient as prewarmGemini } from "@/lib/gemini/client";
+import { handleCorsPreflightIfNeeded, withCors } from "@/lib/api/middleware";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
   "Cache-Control": "no-cache, no-transform",
   Connection: "keep-alive",
   "X-Accel-Buffering": "no",
+  ...withCors({}),
 } as const;
 
 export const maxDuration = 300;
+
+/** CORS preflight handler. */
+export async function OPTIONS(request: NextRequest) {
+  const preflight = handleCorsPreflightIfNeeded(request);
+  if (preflight) return preflight;
+  return new Response(null, { status: 200 });
+}
 
 /** Phase 1: Serper only. Returns top 10 results (position, title, url) for user to select up to 3.
  * Uses job store when available (DATABASE_URL set); if store fails, still returns SERP results
@@ -23,7 +32,7 @@ export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: { "Content-Type": "application/json" },
+      headers: withCors({ "Content-Type": "application/json" }),
     });
   }
 
@@ -32,7 +41,9 @@ export async function POST(request: NextRequest) {
     (async () => prewarmClaude())(),
     (async () => prewarmOpenAI())(),
     (async () => prewarmGemini())()
-  ]).catch(() => { });
+  ]).catch((err) => {
+    console.warn("[pipeline] Client prewarming failed:", err instanceof Error ? err.message : String(err));
+  });
 
   let body: unknown;
   try {
@@ -40,7 +51,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: withCors({ "Content-Type": "application/json" }),
     });
   }
 
@@ -48,7 +59,7 @@ export async function POST(request: NextRequest) {
   if ("error" in parsed) {
     return new Response(JSON.stringify({ error: parsed.error }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: withCors({ "Content-Type": "application/json" }),
     });
   }
   const { pipelineInput } = parsed;
@@ -60,8 +71,8 @@ export async function POST(request: NextRequest) {
       const sendEvent = (event: string, data: unknown) => {
         try {
           controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
-        } catch {
-          // Controller may be closed
+        } catch (err) {
+          console.warn("[pipeline/sse] Failed to enqueue event:", event, err instanceof Error ? err.message : String(err));
         }
       };
 

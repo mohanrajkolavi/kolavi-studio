@@ -1,6 +1,6 @@
-import { getClient, stripJsonMarkdown } from "@/lib/openai/client";
+import { callClaudeJson, stripJsonMarkdown } from "@/lib/anthropic/shared-client";
 import type { CompetitorArticle } from "@/lib/pipeline/types";
-import { TopicGraphSchema } from "@/lib/pipeline/types";
+import { z } from "zod";
 
 export interface TopicNode {
     topic: string;
@@ -16,11 +16,62 @@ export interface TopicGraph {
     saturatedTopics: string[];
 }
 
+// ---------------------------------------------------------------------------
+// Zod validation schemas
+// ---------------------------------------------------------------------------
+
+const TopicNodeSchema = z.object({
+    topic: z.string(),
+    category: z.enum(["core", "entity", "strategy", "tactic", "concept"]).catch("concept"),
+    relevanceScore: z.coerce.number().min(0).max(10).catch(5),
+    competitorCoverage: z.coerce.number().min(0).max(100).catch(50),
+});
+
+const TopicEdgeSchema = z.object({
+    source: z.string(),
+    target: z.string(),
+    relationship: z.string(),
+});
+
+const TopicGraphSchema = z.object({
+    nodes: z.array(TopicNodeSchema).catch([]),
+    edges: z.array(TopicEdgeSchema).catch([]),
+    informationGaps: z.array(z.string()).catch([]),
+    saturatedTopics: z.array(z.string()).catch([]),
+});
+
+/** Default fallback when LLM returns garbage or call fails. */
+function fallbackTopicGraph(keyword: string): TopicGraph {
+    return {
+        nodes: [{ topic: keyword, category: "core", relevanceScore: 10, competitorCoverage: 50 }],
+        edges: [],
+        informationGaps: [`Comprehensive guide to ${keyword}`],
+        saturatedTopics: [],
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Retry helper (1 retry with simpler prompt fallback)
+// ---------------------------------------------------------------------------
+
+async function withSingleRetry<T>(
+    fn: () => Promise<T>,
+    fallbackFn: () => Promise<T>,
+    label: string
+): Promise<T> {
+    try {
+        return await fn();
+    } catch (err) {
+        console.warn(`[knowledge/${label}] First attempt failed, retrying with simpler prompt:`, err instanceof Error ? err.message : String(err));
+        return fallbackFn();
+    }
+}
+
 export async function buildTopicGraph(
     keyword: string,
     competitorArticles: CompetitorArticle[],
     paaQuestions?: string[],
-    redditThreads?: any[]
+    redditThreads?: { title: string }[]
 ): Promise<TopicGraph> {
     const competitorSummaries = competitorArticles.map((c, i) => `Competitor ${i + 1} (${c.url}):\n${c.content.substring(0, 3000)}...`).join("\n\n");
     const paaContext = paaQuestions && paaQuestions.length ? `People Also Ask:\n${paaQuestions.join("\n")}` : "";
@@ -49,27 +100,48 @@ Output strictly formatted JSON:
 }
 Return ONLY valid JSON, no markdown blocks.`;
 
+    const simpleSystemPrompt = `You are a Semantic SEO Architect. Build a topic graph for "${keyword}".
+Return valid JSON with keys: nodes (array of {topic, category, relevanceScore, competitorCoverage}), edges (array of {source, target, relationship}), informationGaps (string[]), saturatedTopics (string[]).`;
+
     const userPrompt = `Keyword: ${keyword}\n\n${paaContext}\n\n${redditContext}\n\nCompetitor Content (Truncated):\n${competitorSummaries}`;
 
-    const openai = getClient();
-    const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: userPrompt }
-        ],
-        temperature: 0.2,
-        response_format: { type: "json_object" }
-    });
+    const callLLM = async (system: string) => {
+        const result = await callClaudeJson(system, userPrompt, { temperature: 0.2 });
+        const content = result.content;
+        if (!content) throw new Error("buildTopicGraph: empty response from Claude");
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) throw new Error("buildTopicGraph: empty response from OpenAI");
+        const raw = stripJsonMarkdown(content);
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(raw);
+        } catch (e) {
+            throw new Error(`buildTopicGraph: invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
+        }
 
-    const raw = stripJsonMarkdown(content);
-    const parsed = JSON.parse(raw);
-    const validated = TopicGraphSchema.safeParse(parsed);
-    if (!validated.success) {
-        console.warn("buildTopicGraph: schema validation failed, using raw parse:", validated.error.issues);
-    }
-    return (validated.success ? validated.data : parsed) as TopicGraph;
+        // Unwrap if LLM nests under a key like "topicGraph" or "graph"
+        if (parsed != null && typeof parsed === "object" && !Array.isArray(parsed)) {
+            const obj = parsed as Record<string, unknown>;
+            if (!("nodes" in obj)) {
+                for (const val of Object.values(obj)) {
+                    if (val != null && typeof val === "object" && "nodes" in (val as Record<string, unknown>)) {
+                        parsed = val;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const validated = TopicGraphSchema.safeParse(parsed);
+        if (!validated.success) {
+            console.warn("[knowledge/topic-graph] Zod validation failed, using fallback:", validated.error.flatten());
+            return fallbackTopicGraph(keyword);
+        }
+        return validated.data;
+    };
+
+    return withSingleRetry(
+        () => callLLM(systemPrompt),
+        () => callLLM(simpleSystemPrompt),
+        "topic-graph"
+    );
 }

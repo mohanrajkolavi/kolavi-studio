@@ -6,6 +6,7 @@
 import { z } from "zod";
 import type { ArticleAuditResult } from "@/lib/seo/article-audit";
 import type { PipelineRunMetrics, PerformanceSummary } from "@/lib/pipeline/metrics/types";
+import type { VoicePresetId } from "@/lib/constants/voices";
 
 // =============================================================================
 // 1. PipelineInput
@@ -52,6 +53,12 @@ export type PipelineInput = {
   fieldNotes?: string;
   /** Optional 1-2 paragraphs of client's existing writing for voice/tone matching. */
   toneExamples?: string;
+  /** Voice preset for article generation. Defaults to "authoritative-practitioner". */
+  voice?: VoicePresetId;
+  /** Custom voice description (used when voice === "custom"). */
+  customVoiceDescription?: string;
+  /** Skip the humanization pass after drafting. Default true (skip) — voice presets handle tone. */
+  skipHumanize?: boolean;
   /** Optional existing blog URLs for internal link suggestions. */
   existingBlogUrls?: string[];
   /** Cluster position for topical authority. Default: "standalone" (backward compatible). */
@@ -73,6 +80,9 @@ export const PipelineInputSchema = z.object({
   autoFixHallucinations: z.boolean().optional(),
   fieldNotes: z.string().optional(),
   toneExamples: z.string().optional(),
+  voice: z.enum(["conversational-expert", "authoritative-practitioner", "friendly-guide", "newsletter-editorial", "custom"]).optional(),
+  customVoiceDescription: z.string().optional(),
+  skipHumanize: z.boolean().optional(),
   existingBlogUrls: z.array(z.string()).optional(),
   clusterPosition: z.enum(["pillar", "spoke", "standalone"]).optional().default("standalone"),
   clusterTopic: z.string().optional(),
@@ -375,6 +385,8 @@ export type OutlineSection = {
   aiOverviewTarget?: string;
   /** Suggested visual asset for this section (e.g. "comparison chart", "step diagram"). */
   visualSuggestion?: string;
+  /** How to open this section: "pain_point", "failure_story", "bold_claim", "financial_outcome", "question", "counter_intuitive". */
+  sectionHook?: string;
   subsections?: OutlineSection[];
 };
 
@@ -388,6 +400,7 @@ const OutlineSectionSchemaInner: z.ZodType<OutlineSection> = z.lazy(() =>
     geoNote: z.string().optional(),
     aiOverviewTarget: z.string().optional(),
     visualSuggestion: z.string().optional(),
+    sectionHook: z.string().optional(),
     subsections: z.array(OutlineSectionSchemaInner).optional(),
   })
 );

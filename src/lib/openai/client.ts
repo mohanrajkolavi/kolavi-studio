@@ -1,6 +1,7 @@
 /**
- * OpenAI API client — Step 2 (topic extraction), GPT-4.1.
- * Brief building (Step 3) and title/meta generation moved to claude/client.ts (Claude Opus).
+ * OpenAI API client — Step 2 (topic extraction) + Step 3 (strategic brief), GPT-4.1.
+ * GPT-4.1 is faster than Claude Sonnet for structured JSON extraction with large payloads.
+ * Brief building (Step 3) also available via claude/client.ts (Claude Opus).
  * Exports shared helpers: normalizeBriefOutput, normalizeMetaOption, getIntentGuidanceForMeta, types.
  */
 
@@ -35,11 +36,7 @@ export function getClient(): OpenAI {
 }
 
 export function prewarmClient(): void {
-  try {
-    getClient();
-  } catch {
-    // ignore if no key during warmup
-  }
+  try { getClient(); } catch { /* ignore if no key during warmup */ }
 }
 
 export function stripJsonMarkdown(raw: string): string {
@@ -89,7 +86,6 @@ export async function extractTopicsAndStyle(
   const paaQuestions = options.paaQuestions ?? [];
   const hasPaa = paaQuestions.length > 0;
 
-  const openai = getClient();
   const startMs = Date.now();
   const successful = competitors.filter((c) => c.fetchSuccess && c.content.length > 0);
   const payload =
@@ -97,7 +93,7 @@ export async function extractTopicsAndStyle(
       ? successful
         .map(
           (c) =>
-            `--- URL: ${c.url}\nTitle: ${c.title}\nWord count: ${c.wordCount}\n\n${c.content.slice(0, 12000)}`
+            `--- URL: ${c.url}\nTitle: ${c.title}\nWord count: ${c.wordCount}\n\n${c.content.slice(0, 8000)}`
         )
         .join("\n\n---\n\n")
       : "No competitor content provided. Generate expected topics and a default editorial style for a generic blog article.";
@@ -145,6 +141,7 @@ ${paaBlock}--- COMPETITOR ARTICLES ---
 
 ${payload}`;
 
+  const openai = getClient();
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     messages: [
@@ -268,6 +265,7 @@ export function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKey
         targetWords: typeof o.targetWords === "number" ? o.targetWords : Number(o.targetWords) || 150,
         geoNote: o.geoNote != null ? String(o.geoNote) : undefined,
         aiOverviewTarget: o.aiOverviewTarget != null ? String(o.aiOverviewTarget) : undefined,
+        sectionHook: o.sectionHook != null ? String(o.sectionHook) : undefined,
         subsections: Array.isArray(o.subsections) ? o.subsections.map(normSection) : undefined,
       };
     }
@@ -474,7 +472,6 @@ async function _deprecatedBuildResearchBrief(
   algorithmicInsights?: any[],
   proprietaryFramework?: any
 ): Promise<ResearchBrief> {
-  const openai = getClient();
   const intent = Array.isArray(input.intent) ? input.intent[0] : input.intent ?? "informational";
   const pasf = input.peopleAlsoSearchFor ?? [];
   const secondary = input.secondaryKeywords ?? [];
@@ -516,8 +513,10 @@ POV / INFORMATION GAIN (Semantic Novelty):
 
 ## OUTLINE CONSTRUCTION
 
+RULES:
 1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition, how-to, advanced, FAQ; commercial: overview, comparison, pros/cons, pricing, recommendation; transactional: value prop, features, pricing, CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't). Every outline section must have enough topics and targetWords so the writer can hit the total word count without padding. NEVER use "What is [Topic]?" or dictionary-style headings. Use benefit-driven or curiosity-driven headings (e.g., instead of "What is Local SEO?", use "The Mechanics of Local Search" or "Why Local Search Behaves Differently").
-2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote, and optional visualSuggestion (e.g., "Comparison Table", "Step-by-step Diagram" if a visual adds high value). Include H3 subsections where competitors commonly do. Where a PAA question is a gap candidate, either add an H3 for it under the relevant H2 or add an explicit "must answer: [question]" in that section's topics or geoNote.
+2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote, optional visualSuggestion (e.g., "Comparison Table", "Step-by-step Diagram" if a visual adds high value), and REQUIRED sectionHook (string). The sectionHook tells the writer HOW to open the section. It must be one of: "pain_point" (open with a problem the reader recognizes), "failure_story" (open with what goes wrong), "bold_claim" (open with a strong opinion), "financial_outcome" (open with money/ROI impact), "question" (open with a provocative question to the reader), "counter_intuitive" (open with something that contradicts expectations). NEVER use "define" or "explain" as a hook. The writer is FORBIDDEN from opening any section with a definition pattern like "[Topic] means..." or "[Topic] is...". Include H3 subsections where competitors commonly do. Where a PAA question is a gap candidate, either add an H3 for it under the relevant H2 or add an explicit "must answer: [question]" in that section's topics or geoNote.
+3. BEST-VERSION FIELDS (required in your JSON): (a) similaritySummary: 2-4 sentences summarizing what the top 5 competitors collectively cover and how they're similar. (b) extraValueThemes: array of 3-6 short strings, each 5-12 words, actionable (e.g. "Include 2025 pricing benchmarks from currentData" or "Add comparison table as bulleted lists" — not vague like "Be fresh"). These are concrete themes the writer must clearly cover. (c) freshnessNote: 1-2 sentences on how to position for freshness (e.g. "Lead with currentData numbers; avoid pre-2024 framing; mention [recent development] where relevant.").
 
 GAP PRIORITIZATION (use extraction.gaps: readerDemand + actionableAngle):
 - Strong reader demand AND strong actionable angle: give the gap its own H2.
@@ -661,6 +660,7 @@ Constraint: You must limit the currentData.facts array to a MAXIMUM of 5 distinc
   for (let attempt = 1; attempt <= 2; attempt++) {
     const userPrompt = attempt === 2 ? userPromptBase + bestVersionHint : userPromptBase;
     try {
+      const openai = getClient();
       const briefStartMs = Date.now();
       const completion = await openai.chat.completions.create({
         model: OPENAI_MODEL,
@@ -825,7 +825,6 @@ async function _deprecatedGenerateTitleMetaSlugFromContent(
   content: string,
   tokenUsage?: TokenUsageRecord[]
 ): Promise<TitleMetaSlugResult> {
-  const openai = getClient();
   const startMs = Date.now();
 
   // Strip HTML and extract structure for context
@@ -879,6 +878,7 @@ ${fullExcerpt}
 
 Generate two distinct meta options (optionA and optionB). Each must satisfy all audit rules. Return JSON only.`;
 
+  const openai = getClient();
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     messages: [

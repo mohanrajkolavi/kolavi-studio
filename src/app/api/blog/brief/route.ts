@@ -162,12 +162,13 @@ export async function POST(request: NextRequest) {
       }, 10_000);
 
       try {
+        const briefTokenUsage: import("@/lib/pipeline/types").TokenUsageRecord[] = [];
         const result = await runBriefChunk(
           jobId,
           jobStore,
           90_000,
           (evt) => sendEvent("progress", evt),
-          undefined,
+          briefTokenUsage,
           undefined,
           revise ? { revise: true, wordCountTarget: wordCountTarget! } : undefined
         );

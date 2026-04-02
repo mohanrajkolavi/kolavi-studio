@@ -121,6 +121,14 @@ export type GenerationInput = {
   competitorUrls: string[];
   /** Draft model: Opus 4.6 or Sonnet 4.6. */
   draftModel?: "opus-4.6" | "sonnet-4.6";
+  /** Voice preset for article tone/style. */
+  voice?: "conversational-expert" | "authoritative-practitioner" | "friendly-guide" | "newsletter-editorial" | "custom";
+  /** Custom voice description (used when voice === "custom"). */
+  customVoiceDescription?: string;
+  /** Raw field notes from author for E-E-A-T signals. */
+  fieldNotes?: string;
+  /** Sample text of client's existing writing for tone matching. */
+  toneExamples?: string;
   /** Cluster position for topical authority. */
   clusterPosition?: "pillar" | "spoke" | "standalone";
   /** Broader topic when spoke position. */

@@ -117,6 +117,10 @@ function buildGenerateBody(input: GenerationInput): Record<string, unknown> {
     competitorUrls: input.competitorUrls,
     ...(input.peopleAlsoSearchFor?.length && { peopleAlsoSearchFor: input.peopleAlsoSearchFor.join(", ") }),
     ...(input.draftModel != null && { draftModel: input.draftModel }),
+    ...(input.voice != null && { voice: input.voice }),
+    ...(input.customVoiceDescription?.trim() && { customVoiceDescription: input.customVoiceDescription }),
+    ...(input.fieldNotes?.trim() && { fieldNotes: input.fieldNotes }),
+    ...(input.toneExamples?.trim() && { toneExamples: input.toneExamples }),
     ...(input.clusterPosition && input.clusterPosition !== "standalone" && { clusterPosition: input.clusterPosition }),
     ...(input.clusterTopic && { clusterTopic: input.clusterTopic }),
   };

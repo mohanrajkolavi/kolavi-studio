@@ -1,4 +1,3 @@
-import { headers } from "next/headers";
 import dynamic from "next/dynamic";
 import { HeroRevamp } from "@/components/sections/home/HeroRevamp";
 import { HomeBelowFoldSections } from "@/components/sections/home/HomeBelowFoldSections";
@@ -23,7 +22,6 @@ export const metadata = getPageMetadata({
 });
 
 export default async function HomePage() {
-  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const faqSchema = getFAQSchema(HOMEPAGE_FAQ_ITEMS);
 
   return (
@@ -31,7 +29,6 @@ export default async function HomePage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
-        nonce={nonce}
       />
       <main id="main-content" className="relative w-full">
         <HeroRevamp />

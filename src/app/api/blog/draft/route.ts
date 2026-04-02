@@ -75,12 +75,14 @@ export async function POST(request: NextRequest) {
       }, 10_000);
 
       try {
+        const draftTokenUsage: import("@/lib/pipeline/types").TokenUsageRecord[] = [];
         const result = await runDraftChunk(
           jobId,
           jobStore,
           briefOverrides,
           180_000,
-          (evt) => sendEvent("progress", evt)
+          (evt) => sendEvent("progress", evt),
+          draftTokenUsage
         );
         sendEvent("result", {
           jobId,

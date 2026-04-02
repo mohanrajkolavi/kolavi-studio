@@ -4,6 +4,7 @@
  */
 
 import type { PipelineInput, SearchIntent, DraftModel } from "./types";
+import type { VoicePresetId } from "@/lib/constants/voices";
 
 const ALLOWED_INTENTS = new Set<SearchIntent>([
   "informational",
@@ -14,6 +15,14 @@ const ALLOWED_INTENTS = new Set<SearchIntent>([
 
 const DRAFT_MODELS = new Set<DraftModel>(["opus-4.6", "sonnet-4.6"]);
 
+const ALLOWED_VOICES = new Set<VoicePresetId>([
+  "conversational-expert",
+  "authoritative-practitioner",
+  "friendly-guide",
+  "newsletter-editorial",
+  "custom",
+]);
+
 export type ParseGenerateBodyResult =
   | { pipelineInput: PipelineInput }
   | { error: string };
@@ -23,7 +32,7 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
     return { error: "Request body must be a JSON object" };
   }
   const b = body as Record<string, unknown>;
-  const { keywords, peopleAlsoSearchFor, intent, draftModel, autoFixHallucinations } = b;
+  const { keywords, peopleAlsoSearchFor, intent, draftModel, autoFixHallucinations, voice, customVoiceDescription, fieldNotes, toneExamples } = b;
 
   const keywordTokens =
     typeof keywords === "string"
@@ -79,20 +88,37 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
       ? (draftModelRaw as DraftModel)
       : undefined;
 
+  // Voice preset
+  const voiceRaw = voice != null && typeof voice === "string" ? voice.trim().toLowerCase() : undefined;
+  const resolvedVoice: VoicePresetId | undefined =
+    voiceRaw && ALLOWED_VOICES.has(voiceRaw as VoicePresetId)
+      ? (voiceRaw as VoicePresetId)
+      : undefined;
+
+  // Custom voice description (only when voice === "custom")
+  const resolvedCustomVoice =
+    resolvedVoice === "custom" && typeof customVoiceDescription === "string" && customVoiceDescription.trim()
+      ? customVoiceDescription.trim().slice(0, 3000)
+      : undefined;
+
+  // Field notes (E-E-A-T author experience)
+  const resolvedFieldNotes =
+    typeof fieldNotes === "string" && fieldNotes.trim()
+      ? fieldNotes.trim().slice(0, 3000)
+      : undefined;
+
+  // Tone examples (sample writing for voice matching)
+  const resolvedToneExamples =
+    typeof toneExamples === "string" && toneExamples.trim()
+      ? toneExamples.trim().slice(0, 3000)
+      : undefined;
+
   // Cluster position for topical authority building
   const clusterPositionRaw = typeof b.clusterPosition === "string" ? b.clusterPosition.trim().toLowerCase() : undefined;
   const clusterPosition = (clusterPositionRaw === "pillar" || clusterPositionRaw === "spoke")
     ? clusterPositionRaw as "pillar" | "spoke"
     : "standalone" as const;
   const clusterTopic = typeof b.clusterTopic === "string" ? b.clusterTopic.trim() || undefined : undefined;
-
-  /**
-   * fieldNotes: Raw notes, quotes, or "field data" from the author/client for E-E-A-T.
-   * This content is injected into the LLM prompt. It should contain original observations
-   * and real-world experience, not instructions or prompt injections. Max 2000 chars.
-   */
-  const fieldNotes = typeof b.fieldNotes === "string" ? b.fieldNotes.trim().slice(0, 2000) || undefined : undefined;
-  const toneExamples = typeof b.toneExamples === "string" ? b.toneExamples.trim().slice(0, 2000) || undefined : undefined;
 
   const pipelineInput: PipelineInput = {
     primaryKeyword,
@@ -101,10 +127,12 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
     intent: resolvedIntent,
     ...(resolvedDraftModel != null && { draftModel: resolvedDraftModel }),
     autoFixHallucinations: resolvedAutoFix,
+    ...(resolvedVoice != null && { voice: resolvedVoice }),
+    ...(resolvedCustomVoice != null && { customVoiceDescription: resolvedCustomVoice }),
+    ...(resolvedFieldNotes != null && { fieldNotes: resolvedFieldNotes }),
+    ...(resolvedToneExamples != null && { toneExamples: resolvedToneExamples }),
     clusterPosition,
     ...(clusterTopic && { clusterTopic }),
-    ...(fieldNotes && { fieldNotes }),
-    ...(toneExamples && { toneExamples }),
   };
 
   return { pipelineInput };
