@@ -84,6 +84,7 @@ export default async function PartnerPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
         nonce={nonce}
+        suppressHydrationWarning
       />
 
       <main className="relative w-full">

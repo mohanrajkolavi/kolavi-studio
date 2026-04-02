@@ -136,6 +136,7 @@ export default async function BlogPage() {
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: breadcrumbSchemaJson }}
             nonce={nonce}
+            suppressHydrationWarning
           />
         )}
         {blogSchemaJson && (
@@ -143,6 +144,7 @@ export default async function BlogPage() {
             type="application/ld+json"
             dangerouslySetInnerHTML={{ __html: blogSchemaJson }}
             nonce={nonce}
+            suppressHydrationWarning
           />
         )}
 

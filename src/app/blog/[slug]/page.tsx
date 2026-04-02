@@ -129,11 +129,13 @@ export default async function BlogPostPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
         nonce={nonce}
+        suppressHydrationWarning
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         nonce={nonce}
+        suppressHydrationWarning
       />
 
       <article className="min-h-screen bg-background">

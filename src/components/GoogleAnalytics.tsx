@@ -14,8 +14,9 @@ export function GoogleAnalytics({ measurementId, nonce }: GoogleAnalyticsProps) 
         src={`https://www.googletagmanager.com/gtag/js?id=${measurementId}`}
         strategy="afterInteractive"
         nonce={nonce}
+        suppressHydrationWarning
       />
-      <Script id="google-analytics" strategy="afterInteractive" nonce={nonce}>
+      <Script id="google-analytics" strategy="afterInteractive" nonce={nonce} suppressHydrationWarning>
         {`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}

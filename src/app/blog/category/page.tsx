@@ -37,6 +37,7 @@ export default async function BlogCategoryIndexPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         nonce={nonce}
+        suppressHydrationWarning
       />
       <main>
         <section className="py-16 sm:py-24">

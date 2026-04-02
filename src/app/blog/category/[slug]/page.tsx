@@ -127,11 +127,13 @@ export default async function CategoryPage({ params }: PageProps) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
         nonce={nonce}
+        suppressHydrationWarning
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
         nonce={nonce}
+        suppressHydrationWarning
       />
 
       {/* Hero Section with Gradient */}
