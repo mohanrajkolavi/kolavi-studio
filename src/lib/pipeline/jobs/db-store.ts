@@ -11,6 +11,17 @@ import { PIPELINE_VERSION } from "../version";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
+/** Simple string hash for advisory lock keys. */
+function hashCode(s: string): number {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    const char = s.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0; // Convert to 32-bit integer
+  }
+  return hash;
+}
+
 function initialChunkRecords(): Partial<Record<ChunkKind, ChunkRecord>> {
   const out: Partial<Record<ChunkKind, ChunkRecord>> = {};
   for (const k of CHUNK_ORDER) {
@@ -75,7 +86,11 @@ export function createDbJobStore(): JobStore {
 
   return {
     async createJob<TInput>(id: string, input: TInput): Promise<Job<TInput>> {
-      await this.cleanup(ONE_HOUR_MS);
+      // Async cleanup: fire-and-forget to avoid blocking job creation under load.
+      // Errors are logged but never block the caller.
+      this.cleanup(ONE_HOUR_MS).catch((err) => {
+        console.warn("[pipeline/db-store] Background cleanup failed:", err instanceof Error ? err.message : String(err));
+      });
       const job: Job<TInput> = {
         id,
         phase: "created",
@@ -152,6 +167,10 @@ export function createDbJobStore(): JobStore {
       const costJson = cost != null ? JSON.stringify(cost) : "null";
       const path = [kind] as string[];
       try {
+        // Use advisory lock keyed on job ID hash to prevent concurrent chunk saves
+        // from clobbering each other (jsonb_set is read-modify-write, not atomic).
+        const lockKey = Math.abs(hashCode(id));
+        await sql`SELECT pg_advisory_xact_lock(${lockKey})`;
         await sql`
           UPDATE pipeline_jobs
           SET

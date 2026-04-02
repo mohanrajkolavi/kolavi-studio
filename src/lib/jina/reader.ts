@@ -7,8 +7,8 @@
 import type { CompetitorArticle } from "@/lib/pipeline/types";
 
 const JINA_READER_BASE = "https://r.jina.ai";
-/** Stagger between starting each URL fetch (ms) to be respectful to rate limits. */
-const JINA_STAGGER_MS = process.env.JINA_API_KEY ? 100 : 400;
+/** Max concurrent Jina fetches. With API key we allow 3 concurrent; without, 2 to respect rate limits. */
+const JINA_CONCURRENCY = process.env.JINA_API_KEY ? 3 : 2;
 
 export type FetchResult = {
   url: string;
@@ -91,6 +91,25 @@ function computeFreshnessScore(publishDate?: string): number {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Semaphore for concurrent fetch limiting
+// ---------------------------------------------------------------------------
+
+class Semaphore {
+  private queue: (() => void)[] = [];
+  private active = 0;
+  constructor(private readonly max: number) {}
+  async acquire(): Promise<void> {
+    if (this.active < this.max) { this.active++; return; }
+    return new Promise<void>((resolve) => { this.queue.push(resolve); });
+  }
+  release(): void {
+    this.active--;
+    const next = this.queue.shift();
+    if (next) { this.active++; next(); }
+  }
+}
+
 /**
  * Fetch a single URL via Jina Reader.
  * Returns clean markdown/text of the page content.
@@ -162,7 +181,7 @@ export async function fetchViaJinaReader(url: string): Promise<FetchResult> {
 }
 
 /**
- * Fetch multiple URLs via Jina Reader with staggered parallel requests.
+ * Fetch multiple URLs via Jina Reader with concurrent requests limited by semaphore.
  * Callers can override maxUrls (default 3 for diminishing returns on 4th/5th article).
  */
 export async function fetchCompetitorUrls(
@@ -170,12 +189,15 @@ export async function fetchCompetitorUrls(
   maxUrls = 3
 ): Promise<FetchResult[]> {
   const toFetch = urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean);
-  const promises = toFetch.map(
-    (url, i) =>
-      new Promise<FetchResult>((resolve) => {
-        setTimeout(() => fetchViaJinaReader(url).then(resolve), i * JINA_STAGGER_MS);
-      })
-  );
+  const sem = new Semaphore(JINA_CONCURRENCY);
+  const promises = toFetch.map(async (url): Promise<FetchResult> => {
+    await sem.acquire();
+    try {
+      return await fetchViaJinaReader(url);
+    } finally {
+      sem.release();
+    }
+  });
   const settled = await Promise.allSettled(promises);
   return settled.map((s, i): FetchResult => {
     if (s.status === "fulfilled") return s.value;
@@ -190,9 +212,9 @@ export async function fetchCompetitorUrls(
 }
 
 /**
- * Fetch competitor content from URLs in parallel with a short stagger (400ms) to
- * respect rate limits. Each URL has its own 15s timeout. Failed fetches return an
- * entry with fetchSuccess: false and empty content (no throw).
+ * Fetch competitor content from URLs with concurrent requests limited by semaphore.
+ * Each URL has its own 15s timeout. Failed fetches return an entry with
+ * fetchSuccess: false and empty content (no throw).
  * @param maxUrls Default 3; callers can override (diminishing returns on 4th/5th).
  */
 export async function fetchCompetitorContent(
@@ -200,12 +222,15 @@ export async function fetchCompetitorContent(
   maxUrls = 3
 ): Promise<CompetitorArticle[]> {
   const toFetch = urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean);
-  const promises = toFetch.map(
-    (url, i) =>
-      new Promise<FetchResult>((resolve) => {
-        setTimeout(() => fetchViaJinaReader(url).then(resolve), i * JINA_STAGGER_MS);
-      })
-  );
+  const sem = new Semaphore(JINA_CONCURRENCY);
+  const promises = toFetch.map(async (url): Promise<FetchResult> => {
+    await sem.acquire();
+    try {
+      return await fetchViaJinaReader(url);
+    } finally {
+      sem.release();
+    }
+  });
   const settled = await Promise.allSettled(promises);
   const results = settled.map((s, i): FetchResult => {
     if (s.status === "fulfilled") return s.value;

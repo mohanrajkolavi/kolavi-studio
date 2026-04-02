@@ -656,6 +656,8 @@ export default function BlogMakerPage() {
   const [selectedIntents, setSelectedIntents] = useState<IntentType[]>(["informational"]);
   const [competitorUrls, setCompetitorUrls] = useState<string[]>([]);
   const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("opus-4.6");
+  const [voice, setVoice] = useState<"conversational-expert" | "authoritative-practitioner" | "friendly-guide" | "newsletter-editorial">("authoritative-practitioner");
+  const [fieldNotes, setFieldNotes] = useState<string>("");
   /** Intent array sent to API (1 or 2; default informational if none selected). */
   const intent = useMemo(
     () => (selectedIntents.length > 0 ? selectedIntents : (["informational"] as IntentType[])),
@@ -1443,6 +1445,8 @@ export default function BlogMakerPage() {
       intent,
       competitorUrls,
       draftModel,
+      voice,
+      ...(fieldNotes.trim() && { fieldNotes: fieldNotes.trim() }),
     });
     setContentView("preview");
   }
@@ -2677,7 +2681,7 @@ export default function BlogMakerPage() {
 
                 </div>
 
-                {/* Search intent + Draft model — combined */}
+                {/* Search intent + Draft model */}
                 <div className="p-8 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-0 sm:divide-x sm:divide-border/50">
 
                   {/* Search intent */}
@@ -2757,7 +2761,67 @@ export default function BlogMakerPage() {
                       ))}
                     </div>
                   </div>
+                </div>
 
+                {/* Writing voice — card-based selection */}
+                <div className="p-8 sm:p-10 space-y-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground tracking-tight">Writing voice</p>
+                    <p className="text-xs text-muted-foreground mt-1">How should the article sound? Each voice optimizes for Google E-E-A-T and AI search citation.</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {([
+                      { value: "conversational-expert" as const, label: "Conversational", desc: "Like talking to a smart friend. Short, punchy, questions to the reader.", icon: "\uD83D\uDCAC" },
+                      { value: "authoritative-practitioner" as const, label: "Practitioner", desc: "Confident expert sharing hard-won knowledge. Opinionated, evidence-backed.", icon: "\uD83C\uDFAF" },
+                      { value: "friendly-guide" as const, label: "Friendly Guide", desc: "Patient teacher. Step-by-step, encouraging, perfect for tutorials.", icon: "\uD83E\uDD1D" },
+                      { value: "newsletter-editorial" as const, label: "Newsletter", desc: "Substack energy. Strong opinions, mini-stories, personality-forward.", icon: "\u270D\uFE0F" },
+                    ]).map(({ value: v, label, desc, icon }) => (
+                      <label
+                        key={v}
+                        className={`group relative flex flex-col cursor-pointer rounded-xl border-2 p-4 transition-all duration-150 ${voice === v
+                          ? "border-orange-500 bg-orange-500/5 shadow-sm shadow-orange-500/10"
+                          : "border-border/50 bg-background/30 hover:border-border hover:bg-muted/30"
+                          } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name="voice"
+                          value={v}
+                          checked={voice === v}
+                          onChange={() => setVoice(v)}
+                          className="sr-only"
+                        />
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-lg">{icon}</span>
+                          <span className={`text-sm font-semibold ${voice === v ? "text-orange-500" : "text-foreground"}`}>{label}</span>
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-muted-foreground">{desc}</p>
+                        {voice === v && (
+                          <div className="absolute top-2.5 right-2.5 h-2 w-2 rounded-full bg-orange-500" />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Field notes (E-E-A-T) */}
+                <div className="p-8 sm:p-10 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground tracking-tight">Field notes <span className="text-muted-foreground font-normal">(optional)</span></p>
+                    <p className="text-xs text-muted-foreground mt-1">Raw notes, quotes, or real-world experience from the author. These become first-hand E-E-A-T signals in the article.</p>
+                  </div>
+                  <textarea
+                    value={fieldNotes}
+                    onChange={(e) => setFieldNotes(e.target.value)}
+                    placeholder="e.g. &quot;We tested this on 12 client sites over 3 months. The biggest surprise was that page speed improvements alone drove a 23% increase in leads. One client's site went from 4.2s to 1.8s load time...&quot;"
+                    rows={3}
+                    maxLength={3000}
+                    disabled={generating || demoRunning}
+                    className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-500/30 disabled:opacity-60 resize-none transition-colors"
+                  />
+                  {fieldNotes.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground text-right">{fieldNotes.length}/3000</p>
+                  )}
                 </div>
 
               </section>

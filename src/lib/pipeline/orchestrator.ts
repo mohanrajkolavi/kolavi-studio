@@ -78,8 +78,8 @@ export type PipelineProgressEvent = {
 
 export type ProgressCallback = (event: PipelineProgressEvent) => void;
 
-/** Default number of competitor URLs to fetch (Serper + Jina). Callers can override. */
-const DEFAULT_MAX_COMPETITOR_URLS = 3;
+/** Default number of competitor URLs to fetch (Serper + Jina). Must match chunks.ts. */
+const DEFAULT_MAX_COMPETITOR_URLS = 4;
 
 // ---------------------------------------------------------------------------
 // Time-budget helper: caps per-step timeout so we never exceed route budget
@@ -188,7 +188,12 @@ export async function validateSourceUrls(urls: string[]): Promise<ValidatedSourc
   const results = await Promise.allSettled(
     unique.map(async (url): Promise<ValidatedSourceUrl> => {
       try {
-        const res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(3000) });
+        // Try HEAD first (cheaper); fall back to GET if HEAD fails or returns 405.
+        // Many servers don't support HEAD, causing false negatives.
+        let res = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(3000) });
+        if (res.status === 405 || res.status === 403 || res.status === 501) {
+          res = await fetch(url, { method: "GET", signal: AbortSignal.timeout(4000) });
+        }
         const isAccessible = res.ok || (res.status >= 300 && res.status < 400);
         return {
           url,
@@ -423,7 +428,7 @@ export async function runPipeline(
   emit("claude-draft", "started", "Writing article draft (this is the longest step)...", 45);
   const draftModel = input.draftModel ?? "opus-4.6";
   const draftResult = await withRetry(
-    async () => writeDraft(brief, titleMetaSlug, tokenUsage, draftModel, input.fieldNotes),
+    async () => writeDraft(brief, titleMetaSlug, tokenUsage, draftModel, input.fieldNotes, input.toneExamples, input.voice, input.customVoiceDescription),
     { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
     "claude-draft"
   );

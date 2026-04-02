@@ -958,60 +958,120 @@ export async function runDraftChunk(
     };
 
     // Step 4 — Draft: Claude Sonnet 4.6 or Opus 4.6 writes article section by section from brief
-    const draftModel = (job.input as PipelineInput).draftModel ?? "opus-4.6";
+    const draftModel = (job.input as PipelineInput).draftModel ?? "sonnet-4.6";
     const fieldNotes = (job.input as PipelineInput).fieldNotes;
     const toneExamples = (job.input as PipelineInput).toneExamples;
+    const voice = (job.input as PipelineInput).voice;
+    const customVoiceDescription = (job.input as PipelineInput).customVoiceDescription;
 
     emit("claude-draft", "started", "Writing article draft section by section...", 0);
 
-    let assembledHtml = "";
-    let totalWordCount = 0;
+    // -----------------------------------------------------------------------
+    // STAT REGISTRY: Prevent data repetition across sections.
+    // Each stat is allocated to at most 1-2 sections, then physically removed
+    // from the payload so Claude cannot repeat it.
+    // -----------------------------------------------------------------------
+    const allFacts = [...(brief.currentData?.facts ?? [])];
+    const sectionCount = brief.outline.sections.length;
+    const BATCH_SIZE = 3;
 
-    for (let i = 0; i < brief.outline.sections.length; i++) {
+    // -----------------------------------------------------------------------
+    // Pre-allocate facts per section index (deterministic, no race conditions)
+    // -----------------------------------------------------------------------
+    const statsPerSection = Math.max(1, Math.ceil(allFacts.length / Math.max(sectionCount - 1, 1)));
+    const factsPerSection: Array<typeof allFacts> = [];
+    let factIdx = 0;
+    for (let i = 0; i < sectionCount; i++) {
+      const isIntroOrFaq = i === 0 || i === sectionCount - 1;
+      const allocCount = isIntroOrFaq ? statsPerSection + 1 : statsPerSection;
+      const end = Math.min(factIdx + allocCount, allFacts.length);
+      factsPerSection.push(allFacts.slice(factIdx, end));
+      factIdx = end;
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: draft a single section
+    // -----------------------------------------------------------------------
+    const draftOneSection = async (
+      i: number,
+      previousContext: string
+    ): Promise<{ index: number; html: string; wordCount: number }> => {
       const section = brief.outline.sections[i];
-      const progressPct = Math.round((i / brief.outline.sections.length) * 80);
-      emit("claude-draft", "started", `Writing section ${i + 1}/${brief.outline.sections.length}: ${section.heading}`, progressPct);
+      const sectionBrief: ResearchBrief = {
+        ...brief,
+        currentData: { ...brief.currentData, facts: factsPerSection[i] },
+      };
 
       const draftResult = await withRetry(
         async () => writeDraftSection(
-          brief,
-          section,
-          assembledHtml,
-          tokenUsage,
-          draftModel,
-          fieldNotes,
-          toneExamples,
-          redditQuotes,
-          i === 0,
-          primaryKeyword
+          sectionBrief, section, previousContext, tokenUsage, draftModel,
+          fieldNotes, toneExamples, redditQuotes, i === 0, primaryKeyword,
+          voice, customVoiceDescription
         ),
         { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
         "claude-draft-section"
       );
 
       if (!draftResult.success || typeof draftResult.data !== "string") {
-        emit("claude-draft", "failed", draftResult.error ?? `Draft failed on section: ${section.heading}`, progressPct);
         throw new Error(`Draft failed on section: ${section.heading}: ${draftResult.error ?? "unknown"}`);
       }
 
-      const sectionContent = draftResult.data;
-      const sectionWordCount = sectionContent.split(/\s+/).filter(Boolean).length;
-      totalWordCount += sectionWordCount;
-
-      // Inject the H2 heading and the content
+      const content = draftResult.data;
+      const wc = content.split(/\s+/).filter(Boolean).length;
       const slug = section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      assembledHtml += `\n<h2 id="${slug}">${section.heading}</h2>\n${sectionContent}\n`;
+      const html = `\n<h2 id="${slug}">${section.heading}</h2>\n${content}\n`;
+
+      if (process.env.NODE_ENV !== "test") {
+        console.log(`[pipeline] Section ${i + 1}/${sectionCount}: "${section.heading}" — ${wc} words, ${factsPerSection[i].length} stats allocated`);
+      }
+      return { index: i, html, wordCount: wc };
+    };
+
+    // -----------------------------------------------------------------------
+    // Draft section 0 first (needs keyword in first paragraph)
+    // -----------------------------------------------------------------------
+    emit("claude-draft", "started", `Writing section 1/${sectionCount}: ${brief.outline.sections[0].heading}`, 0);
+    const firstResult = await draftOneSection(0, "");
+    const sectionResults: Array<{ index: number; html: string; wordCount: number }> = [firstResult];
+    const section0Html = firstResult.html;
+
+    // -----------------------------------------------------------------------
+    // Draft remaining sections in parallel batches of BATCH_SIZE
+    // Each batch uses section 0's HTML as shared context for repetition avoidance
+    // -----------------------------------------------------------------------
+    for (let batchStart = 1; batchStart < sectionCount; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, sectionCount);
+      const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, j) => batchStart + j);
+      const progressPct = Math.round((batchStart / sectionCount) * 80);
+      emit("claude-draft", "started", `Writing sections ${batchStart + 1}-${batchEnd}/${sectionCount} (parallel)`, progressPct);
+
+      const batchResults = await Promise.all(
+        batchIndices.map(i => draftOneSection(i, section0Html))
+      );
+      sectionResults.push(...batchResults);
     }
 
-    emit("claude-draft", "started", "Humanizing content for natural flow...", 85);
-    const humanizeResult = await withRetry(
-      async () => humanizeContent(assembledHtml, toneExamples, tokenUsage),
-      { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
-      "claude-humanize"
-    );
+    // -----------------------------------------------------------------------
+    // Assemble in outline order
+    // -----------------------------------------------------------------------
+    sectionResults.sort((a, b) => a.index - b.index);
+    let assembledHtml = sectionResults.map(r => r.html).join("");
+    let totalWordCount = sectionResults.reduce((sum, r) => sum + r.wordCount, 0);
 
-    if (humanizeResult.success && typeof humanizeResult.data === "string") {
-      assembledHtml = humanizeResult.data;
+    // Humanize pass: skipped by default (voice presets + section hooks handle tone).
+    // Set skipHumanize: false in PipelineInput to enable.
+    const skipHumanize = (job.input as PipelineInput).skipHumanize !== false;
+    if (!skipHumanize) {
+      emit("claude-draft", "started", "Humanizing content for natural flow...", 85);
+      const humanizeResult = await withRetry(
+        async () => humanizeContent(assembledHtml, toneExamples, tokenUsage, voice),
+        { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
+        "claude-humanize"
+      );
+
+      if (humanizeResult.success && typeof humanizeResult.data === "string") {
+        assembledHtml = humanizeResult.data;
+      }
     }
 
     emit("claude-draft", "completed", `Draft: ${totalWordCount} words`, 100);
@@ -1071,7 +1131,8 @@ export type ValidationChunkOutput = {
 export async function runValidationChunk(
   jobId: string,
   store: JobStore,
-  budgetMs = 45_000 // Increased budget for possible auto-fix
+  budgetMs = 45_000, // Increased budget for possible auto-fix
+  tokenUsage?: TokenUsageRecord[]
 ): Promise<ValidationChunkOutput> {
   const job = await store.getJob<PipelineInput>(jobId);
   if (!job) throw new Error("Job not found");
@@ -1107,7 +1168,7 @@ export async function runValidationChunk(
     // Optional fact-check auto-fix (if input specifies)
     let factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
     if ((job.input as PipelineInput).autoFixHallucinations && factCheck.hallucinations.length > 0) {
-      const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData);
+      const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData, tokenUsage);
       finalContent = fixResult.fixedHtml;
       // Re-run fact check after fixes
       factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
@@ -1145,8 +1206,7 @@ export async function runValidationChunk(
       autoFixAttempts++;
 
       try {
-        // Provide tokenUsage tracking if we had it in scope (passing undefined for now since runValidationChunk signature doesn't take it)
-        finalContent = await fixAuditIssues(finalContent, fixableFailures);
+        finalContent = await fixAuditIssues(finalContent, fixableFailures, tokenUsage);
       } catch (err) {
         if (process.env.NODE_ENV !== "test") {
           console.warn("[pipeline] fixAuditIssues failed during validation; continuing with existing content", err);
