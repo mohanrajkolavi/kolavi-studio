@@ -278,7 +278,9 @@ export interface UrlInspectionResult {
   error?: string;
 }
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kolavistudio.com";
+// GSC property can be URL-prefix ("https://kolavistudio.com") or domain ("sc-domain:kolavistudio.com").
+// Set GOOGLE_SEARCH_CONSOLE_SITE_URL to match your exact GSC property format.
+const SITE_URL = process.env.GOOGLE_SEARCH_CONSOLE_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "sc-domain:kolavistudio.com";
 
 /**
  * Inspect a URL using Google Search Console's URL Inspection API.
