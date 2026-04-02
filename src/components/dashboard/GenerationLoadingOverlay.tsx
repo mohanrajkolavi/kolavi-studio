@@ -163,9 +163,9 @@ export function GenerationLoadingOverlay({
       role="status"
       aria-live="polite"
       aria-label="Content generation in progress"
-      className="fixed bottom-6 right-6 z-50 w-[380px] rounded-[40px] bg-background border border-border/40 shadow-2xl overflow-hidden backdrop-blur-3xl animate-in slide-in-from-bottom-8 fade-in-0 zoom-in-95 duration-500"
+      className="fixed bottom-4 left-4 right-4 z-50 sm:left-auto sm:right-6 sm:bottom-6 sm:w-[380px] rounded-[28px] sm:rounded-[40px] bg-background border border-border/40 shadow-2xl overflow-hidden backdrop-blur-3xl animate-in slide-in-from-bottom-8 fade-in-0 zoom-in-95 duration-500"
     >
-      <div className="flex flex-col items-center w-full px-6 pt-8 pb-6 gap-6 relative">
+      <div className="flex flex-col items-center w-full px-4 pt-6 pb-4 gap-4 sm:px-6 sm:pt-8 sm:pb-6 sm:gap-6 relative">
 
         {/* Main Status Text */}
         <div className="flex flex-col items-center gap-2 text-center animate-reveal-hero w-full">

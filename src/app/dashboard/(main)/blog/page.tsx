@@ -1961,7 +1961,7 @@ export default function BlogMakerPage() {
           <div className="space-y-0">
             {/* Step mode: select competitors — 3x3 grid, improved card layout and UX */}
             {showStep1Content && (
-              <section className="flex min-h-0 max-h-[100dvh] flex-col px-5 pt-6 pb-10 sm:px-8 sm:pt-10 sm:pb-16">
+              <section className="flex min-h-0 max-h-[100dvh] flex-col px-4 pt-5 pb-8 sm:px-8 sm:pt-10 sm:pb-16">
                 <div className="mx-auto flex w-full max-w-5xl flex-1 min-h-0 flex-col">
                   {/* Header */}
                   <header className="shrink-0 mb-8">
@@ -1990,7 +1990,7 @@ export default function BlogMakerPage() {
                         Change keywords
                       </button>
                     </div>
-                    <p className="mt-2.5 text-[15px] text-muted-foreground leading-relaxed whitespace-nowrap overflow-x-auto">
+                    <p className="mt-2.5 text-[14px] sm:text-[15px] text-muted-foreground leading-relaxed">
                       Pick up to 4 sources. We&apos;ll use them to build your outline and draft. 1 of them can be a custom URL.
                     </p>
                   </header>
@@ -1998,7 +1998,7 @@ export default function BlogMakerPage() {
                   {/* Custom URL — 1 slot for user-provided URL (single line) */}
                   <div className="shrink-0 mb-5">
                     <div className="rounded-xl border border-border/60 bg-card p-4 sm:p-5">
-                      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-600 dark:text-orange-400">
                           <Plus className="h-4 w-4" />
                         </span>
@@ -2011,7 +2011,7 @@ export default function BlogMakerPage() {
                           value={customCompetitorUrl}
                           onChange={(e) => setCustomCompetitorUrl(e.target.value)}
                           placeholder="https://example.com/article"
-                          className="h-10 flex-1 min-w-[200px] rounded-lg border-0 bg-muted/30 text-[14px] placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 transition-colors"
+                          className="h-10 w-full sm:flex-1 sm:min-w-[200px] rounded-lg border-0 bg-muted/30 text-[14px] placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 transition-colors"
                         />
                         {customCompetitorUrl.trim() && (
                           <Button
@@ -2061,7 +2061,7 @@ export default function BlogMakerPage() {
                       return (
                         <li
                           key={item.url}
-                          className={`group relative flex h-full min-h-[140px] flex-col rounded-xl border-2 text-left select-none ${atMax ? "cursor-not-allowed border-border/30 bg-muted/10 opacity-60" : "cursor-pointer border-border/40 bg-card"
+                          className={`group relative flex h-full min-h-[120px] sm:min-h-[140px] flex-col rounded-xl border-2 text-left select-none ${atMax ? "cursor-not-allowed border-border/30 bg-muted/10 opacity-60" : "cursor-pointer border-border/40 bg-card"
                             } ${selected ? "border-orange-500 bg-orange-500/5 shadow-md ring-2 ring-orange-500/20" : ""}`}
                         >
                           <button
@@ -2164,14 +2164,17 @@ export default function BlogMakerPage() {
                       <div className="shrink-0 mt-20 pt-8 border-t border-border/40">
                         <Tabs defaultValue={hasPaa ? "paa" : hasFeatures ? "features" : "reddit"} className="rounded-xl border border-border/60 bg-muted/20 overflow-hidden">
                           <TabsList className="grid w-full grid-cols-3 h-auto rounded-none border-b border-border/40 bg-transparent p-0">
-                            <TabsTrigger value="paa" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
-                              People Also Ask
+                            <TabsTrigger value="paa" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
+                              <span className="sm:hidden">PAA</span>
+                              <span className="hidden sm:inline">People Also Ask</span>
                             </TabsTrigger>
-                            <TabsTrigger value="features" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
-                              SERP Features
+                            <TabsTrigger value="features" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
+                              <span className="sm:hidden">SERP</span>
+                              <span className="hidden sm:inline">SERP Features</span>
                             </TabsTrigger>
-                            <TabsTrigger value="reddit" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
-                              Reddit & Community
+                            <TabsTrigger value="reddit" className="rounded-none border-b-2 border-transparent data-[state=active]:border-orange-500 data-[state=active]:bg-muted/30 data-[state=active]:shadow-none py-2.5 sm:py-3 text-xs sm:text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors">
+                              <span className="sm:hidden">Reddit</span>
+                              <span className="hidden sm:inline">Reddit &amp; Community</span>
                             </TabsTrigger>
                           </TabsList>
                           <TabsContent value="paa" className="p-4 pt-3 space-y-3">
@@ -2377,21 +2380,21 @@ export default function BlogMakerPage() {
             {/* Step mode: outline editor (research & brief run in sequence; no separate research summary) */}
             {inStepMode && (chunkOutputs.brief || demoChunkOutputs.brief) && displayStep === 2 && (
               <section className="flex min-h-0 max-h-[100dvh] flex-col w-full bg-background">
-                <div className="flex w-full flex-1 min-h-0 flex-col px-8 sm:px-12 lg:px-20 xl:px-24">
+                <div className="flex w-full flex-1 min-h-0 flex-col px-4 sm:px-8 lg:px-20 xl:px-24">
                   {/* Header — spacious, minimal */}
-                  <header className="shrink-0 pt-14 pb-10">
+                  <header className="shrink-0 pt-8 pb-6 sm:pt-14 sm:pb-10">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <h2 className="text-[26px] font-semibold text-foreground tracking-tight leading-tight">
+                        <h2 className="text-xl sm:text-[26px] font-semibold text-foreground tracking-tight leading-tight">
                           Article outline
                         </h2>
-                        <p className="mt-3 text-[15px] text-muted-foreground leading-[1.6]">
+                        <p className="mt-2 sm:mt-3 text-[13px] sm:text-[15px] text-muted-foreground leading-[1.6]">
                           Define your article structure. Edit headings, set word targets, use Redistribute or Revise Brief to adjust word count, then continue to draft.
                         </p>
                       </div>
                     </div>
                     {editedOutline.length > 0 && (
-                      <div className="mt-10 flex flex-wrap items-center gap-6 w-full">
+                      <div className="mt-6 sm:mt-10 flex flex-wrap items-center gap-3 sm:gap-6 w-full">
                         <div className="flex items-center gap-4">
                           <div className="flex items-baseline gap-2 rounded-full bg-muted/40 px-4 py-2">
                             <span className="tabular-nums text-[15px] font-semibold text-foreground">{editedOutline.length}</span>
@@ -2578,8 +2581,8 @@ export default function BlogMakerPage() {
                             onDragStart={() => handleSectionDragStart(idx)}
                             onDragOver={(e) => handleSectionDragOver(e, idx)}
                             onDragEnd={handleSectionDragEnd}
-                            className={`group outline-section-row flex items-start gap-5 py-5 px-5 -mx-4 rounded-xl first:pt-5 border border-border/30
-                                ${section.level === "h3" ? "ml-4 pl-5 border-l-2 border-l-orange-500/50" : ""}`}
+                            className={`group outline-section-row flex items-start gap-3 sm:gap-5 py-4 px-3 sm:py-5 sm:px-5 -mx-2 sm:-mx-4 rounded-xl first:pt-4 sm:first:pt-5 border border-border/30
+                                ${section.level === "h3" ? "ml-2 sm:ml-4 pl-3 sm:pl-5 border-l-2 border-l-orange-500/50" : ""}`}
                           >
                             <div className="flex shrink-0 items-center gap-2 pt-1">
                               <span
@@ -2598,7 +2601,7 @@ export default function BlogMakerPage() {
                             </div>
 
                             <div className="flex-1 min-w-0 flex flex-col gap-3.5">
-                              <div className="flex flex-wrap items-center gap-3">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                                 <Input
                                   value={section.heading}
                                   onChange={(e) =>
@@ -2606,10 +2609,11 @@ export default function BlogMakerPage() {
                                       prev.map((s, i) => (i === idx ? { ...s, heading: e.target.value } : s))
                                     )
                                   }
-                                  className={`flex-1 min-w-[200px] h-10 rounded-lg border-0 bg-muted/30 px-4 text-[15px] font-medium placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 hover:bg-muted/35 transition-all duration-200 ${section.level === "h3" ? "text-[14px] font-normal" : ""
+                                  className={`w-full sm:flex-1 sm:min-w-[200px] h-10 rounded-lg border-0 bg-muted/30 px-3 sm:px-4 text-[14px] sm:text-[15px] font-medium placeholder:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-orange-500/25 focus-visible:bg-muted/40 hover:bg-muted/35 transition-all duration-200 ${section.level === "h3" ? "text-[13px] sm:text-[14px] font-normal" : ""
                                     }`}
                                   placeholder="Section heading"
                                 />
+                                <div className="flex items-center gap-2 sm:contents">
                                 <select
                                   value={section.level}
                                   onChange={(e) =>
@@ -2617,13 +2621,13 @@ export default function BlogMakerPage() {
                                       prev.map((s, i) => (i === idx ? { ...s, level: e.target.value as "h2" | "h3" } : s))
                                     )
                                   }
-                                  className="h-10 w-[68px] rounded-lg border-0 bg-muted/30 px-3 text-[13px] font-medium text-muted-foreground focus:ring-2 focus:ring-orange-500/25 focus:outline-none hover:bg-muted/35 transition-all duration-200"
+                                  className="h-9 sm:h-10 w-[60px] sm:w-[68px] rounded-lg border-0 bg-muted/30 px-2 sm:px-3 text-[12px] sm:text-[13px] font-medium text-muted-foreground focus:ring-2 focus:ring-orange-500/25 focus:outline-none hover:bg-muted/35 transition-all duration-200"
                                   aria-label="Heading level"
                                 >
                                   <option value="h2">H2</option>
                                   <option value="h3">H3</option>
                                 </select>
-                                <div className="flex items-center gap-2 rounded-lg bg-muted/30 px-3 py-2 min-w-[88px] hover:bg-muted/35 transition-colors duration-200">
+                                <div className="flex items-center gap-1.5 sm:gap-2 rounded-lg bg-muted/30 px-2 sm:px-3 py-2 min-w-[80px] sm:min-w-[88px] hover:bg-muted/35 transition-colors duration-200">
                                   <Input
                                     type="number"
                                     min={0}
@@ -2638,6 +2642,7 @@ export default function BlogMakerPage() {
                                   />
                                   <span className="text-[12px] text-muted-foreground">words</span>
                                 </div>
+                                </div>
                               </div>
                               {section.topics?.length > 0 && (
                                 <div className="flex flex-wrap gap-2">
@@ -2650,7 +2655,7 @@ export default function BlogMakerPage() {
                               )}
                             </div>
 
-                            <div className="flex shrink-0 items-center gap-1 pt-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity duration-200">
+                            <div className="flex shrink-0 items-center gap-0.5 sm:gap-1 pt-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity duration-200">
                               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full" disabled={idx === 0} aria-label="Move up"
                                 onClick={() => setEditedOutline((prev) => {
                                   if (idx <= 0) return prev;
@@ -2697,7 +2702,7 @@ export default function BlogMakerPage() {
                   </div>
 
                   {/* Footer */}
-                  <footer className="shrink-0 flex flex-col gap-6 py-10 border-t border-border/40 sm:flex-row sm:items-center sm:justify-between">
+                  <footer className="shrink-0 flex flex-col gap-4 sm:gap-6 py-6 sm:py-10 border-t border-border/40 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3 min-w-0 sm:justify-start">
                       {editedOutline.length > 0 ? (
                         <span className="inline-flex items-center gap-2.5 text-[15px]">
@@ -2820,7 +2825,7 @@ export default function BlogMakerPage() {
               <section className="divide-y divide-border/50">
 
                 {/* Primary + Secondary keywords — combined */}
-                <div className="p-8 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-0 sm:divide-x sm:divide-border/50">
+                <div className="p-5 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-0 sm:divide-x sm:divide-border/50">
 
                   {/* Primary keyword */}
                   <div className="space-y-2.5 sm:pr-8">
@@ -2865,7 +2870,7 @@ export default function BlogMakerPage() {
                 </div>
 
                 {/* Search intent + Draft model */}
-                <div className="p-8 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-8 sm:gap-0 sm:divide-x sm:divide-border/50">
+                <div className="p-5 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-0 sm:divide-x sm:divide-border/50">
 
                   {/* Search intent */}
                   <div className="space-y-2.5 sm:pr-8">
@@ -2947,7 +2952,7 @@ export default function BlogMakerPage() {
                 </div>
 
                 {/* Writing voice — card-based selection */}
-                <div className="p-8 sm:p-10 space-y-4">
+                <div className="p-5 sm:p-10 space-y-4">
                   <div>
                     <p className="text-sm font-semibold text-foreground tracking-tight">Writing voice</p>
                     <p className="text-xs text-muted-foreground mt-1">How should the article sound? Each voice optimizes for Google E-E-A-T and AI search citation.</p>
@@ -2988,7 +2993,7 @@ export default function BlogMakerPage() {
                 </div>
 
                 {/* Field notes (E-E-A-T) */}
-                <div className="p-8 sm:p-10 space-y-3">
+                <div className="p-5 sm:p-10 space-y-3">
                   <div>
                     <p className="text-sm font-semibold text-foreground tracking-tight">Field notes <span className="text-muted-foreground font-normal">(optional)</span></p>
                     <p className="text-xs text-muted-foreground mt-1">Raw notes, quotes, or real-world experience from the author. These become first-hand E-E-A-T signals in the article.</p>
@@ -3008,7 +3013,7 @@ export default function BlogMakerPage() {
                 </div>
 
                 {/* Cluster position — topical authority */}
-                <div className="p-8 sm:p-10 border-t border-border/50">
+                <div className="p-5 sm:p-10 border-t border-border/50">
                   <div className="space-y-2.5">
                     <div className="flex items-baseline justify-between">
                       <p className="text-sm font-semibold text-foreground tracking-tight">Content cluster</p>
@@ -3062,7 +3067,7 @@ export default function BlogMakerPage() {
 
             {/* Submit: Run demo, Generate. Sticky when refining demo so Refine dropdown stays visible. */}
             {showInputSections && (
-              <section className={`flex flex-wrap items-center justify-between gap-6 border-t border-border/50 p-6 sm:p-8 ${hasDemoChunks ? "sticky bottom-0 z-10 bg-card" : ""}`}>
+              <section className={`flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between border-t border-border/50 p-4 sm:p-8 ${hasDemoChunks ? "sticky bottom-0 z-10 bg-card" : ""}`}>
                 {inStepMode && displayStep === 0 && (
                   <div className="w-full mb-2">
                     <Button
@@ -3100,7 +3105,7 @@ export default function BlogMakerPage() {
                       setDemoElapsedTick(0);
                       setStepView(null);
                     }}
-                    className="h-12 shrink-0 rounded-full border-2 border-border px-8 text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
+                    className="h-11 sm:h-12 shrink-0 rounded-full border-2 border-border px-5 sm:px-8 text-sm sm:text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
                   >
                     {demoRunning ? "Running demo…" : "Run demo (25s)"}
                   </Button>
@@ -3115,7 +3120,7 @@ export default function BlogMakerPage() {
                       }
                     }}
                     disabled={generating || demoRunning}
-                    className="h-12 min-w-[160px] cursor-pointer rounded-full border border-border bg-background px-4 pr-10 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="h-11 sm:h-12 min-w-[140px] sm:min-w-[160px] cursor-pointer rounded-full border border-border bg-background px-3 sm:px-4 pr-8 sm:pr-10 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
                     aria-label="Jump to stage"
                   >
                     <option value="">Jump to stage…</option>
@@ -3127,7 +3132,7 @@ export default function BlogMakerPage() {
                 <Button
                   type="submit"
                   disabled={generating || demoRunning || !primaryKeyword.trim()}
-                  className="h-12 shrink-0 rounded-full bg-orange-600 px-8 text-base font-medium text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/25 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600 disabled:shadow-none"
+                  className="w-full sm:w-auto h-11 sm:h-12 shrink-0 rounded-full bg-orange-600 px-6 sm:px-8 text-sm sm:text-base font-medium text-white shadow-md shadow-orange-500/20 transition-all hover:bg-orange-700 hover:shadow-lg hover:shadow-orange-500/25 dark:bg-orange-500 dark:shadow-orange-400/20 dark:hover:bg-orange-600 disabled:shadow-none"
                 >
                   {(generating || demoRunning) ? (
                     <>
@@ -3158,13 +3163,13 @@ export default function BlogMakerPage() {
               </p>
             </div>
           )}
-          <div className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr] lg:items-stretch">
+          <div className="grid gap-6 lg:grid-cols-[minmax(280px,360px)_1fr] lg:items-stretch" style={{ minHeight: 0 }}>
             {/* Left: outline column. Right: content column. Both columns match height; content box ends where outline ends. */}
-            <aside className="order-1 flex min-w-0 flex-col gap-4 lg:order-none">
+            <aside className="order-2 lg:order-1 flex min-w-0 flex-col gap-3 sm:gap-4 lg:order-none">
               {/* SEO Audit — Google Search Central + Rank Math compliance */}
               {editing && seoAudit && (
-                <div className="flex h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
+                <div className="flex h-[360px] sm:h-[440px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex shrink-0 flex-col gap-2 sm:gap-3 border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-foreground">Google &amp; Rank Math Audit</h3>
                       <a
@@ -3308,8 +3313,8 @@ export default function BlogMakerPage() {
 
               {/* Quality checks — fact verification + FAQ compliance */}
               {(pipelineResult?.faqEnforcement || pipelineResult?.factCheck) && (
-                <div className="flex h-[280px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
+                <div className="flex h-[240px] sm:h-[280px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex shrink-0 flex-col gap-2 sm:gap-3 border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
                     <h3 className="text-sm font-semibold text-foreground">Content Integrity</h3>
                     <p className="text-[11px] text-muted-foreground">FAQ compliance and fact verification against source data.</p>
                     <div className="flex rounded-lg bg-muted/60 p-0.5">
@@ -3415,10 +3420,10 @@ export default function BlogMakerPage() {
               {/* E-E-A-T & Content Quality — Google quality rater guidelines */}
               {editing?.content && (
                 <div
-                  className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${eeatResult?.results || eeatError || eeatLoading ? "h-[440px]" : "h-[200px]"
+                  className={`flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm ${eeatResult?.results || eeatError || eeatLoading ? "h-[360px] sm:h-[440px]" : "h-[180px] sm:h-[200px]"
                     }`}
                 >
-                  <div className="flex shrink-0 flex-col gap-3 border-b border-border px-4 py-3">
+                  <div className="flex shrink-0 flex-col gap-2 sm:gap-3 border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
                     <h3 className="text-sm font-semibold text-foreground">E-E-A-T &amp; Content Quality</h3>
                     <p className="text-[11px] text-muted-foreground">Google quality rater signals: experience, expertise, readability, structure.</p>
                     <div className="flex items-center gap-2">
@@ -3597,8 +3602,8 @@ export default function BlogMakerPage() {
 
               {/* Source URLs (pipeline v3) */}
               {pipelineResult?.sourceUrls && pipelineResult.sourceUrls.length > 0 && (
-                <div className="flex h-[180px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  <div className="border-b border-border px-4 py-3">
+                <div className="flex h-[160px] sm:h-[180px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
                     <h3 className="text-sm font-semibold text-foreground">Sources used in this article</h3>
                     <p className="mt-0.5 text-[11px] text-muted-foreground">URLs referenced during research and fact-check.</p>
                   </div>
@@ -3706,11 +3711,11 @@ export default function BlogMakerPage() {
               </p>
             </aside>
 
-            {/* Right: Content panel – absolute wrapper so row height = outline only; content box ends exactly where outline ends */}
-            <div className="order-2 relative min-h-0 min-w-0 lg:order-none">
-              <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+            {/* Right: Content panel – on desktop uses absolute wrapper so row height = outline only; on mobile flows normally */}
+            <div className="order-1 lg:order-2 relative min-h-0 min-w-0 lg:order-none">
+              <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:absolute lg:inset-0">
                 {/* Meta – editable title, meta description, slug */}
-                <div className="shrink-0 border-t border-border/60 px-4 pt-4 pb-2">
+                <div className="shrink-0 border-t border-border/60 px-3 sm:px-4 pt-3 sm:pt-4 pb-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <h3 className="text-sm font-semibold text-foreground">Meta</h3>
@@ -3890,10 +3895,10 @@ export default function BlogMakerPage() {
                 </div>
 
                 {/* Content – tabs + preview/outline box */}
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border/60 px-4 py-4">
-                  <div className="shrink-0 flex flex-col gap-3 pb-3">
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border/60 px-3 sm:px-4 py-3 sm:py-4">
+                  <div className="shrink-0 flex flex-col gap-2 sm:gap-3 pb-3">
                     <h3 className="text-sm font-semibold text-foreground">Content</h3>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
                       <div className="flex rounded-lg bg-muted/60 p-0.5" role="group" aria-label="View mode">
                         {[
                           { id: "preview" as const, label: "Preview", icon: Eye },
@@ -3913,7 +3918,7 @@ export default function BlogMakerPage() {
                           </button>
                         ))}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -3924,7 +3929,7 @@ export default function BlogMakerPage() {
                               setEditing({ ...generated! });
                             }
                           }}
-                          className="h-8 rounded-lg border-border bg-background px-3 text-[11px] font-medium"
+                          className="h-7 sm:h-8 rounded-lg border-border bg-background px-2 sm:px-3 text-[10px] sm:text-[11px] font-medium"
                         >
                           Reset edits
                         </Button>
@@ -3934,7 +3939,7 @@ export default function BlogMakerPage() {
                             size="sm"
                             disabled={generating || demoRunning}
                             onClick={() => startValidate(jobId)}
-                            className="h-8 rounded-lg px-3 text-[11px] font-medium"
+                            className="h-7 sm:h-8 rounded-lg px-2 sm:px-3 text-[10px] sm:text-[11px] font-medium"
                           >
                             Re-run validation
                           </Button>
@@ -3942,10 +3947,10 @@ export default function BlogMakerPage() {
                         <Button
                           size="sm"
                           onClick={handleCopyForWordPress}
-                          className="h-8 rounded-lg bg-orange-600 px-3 text-[11px] font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                          className="h-7 sm:h-8 rounded-lg bg-orange-600 px-2 sm:px-3 text-[10px] sm:text-[11px] font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
                         >
-                          <Copy className="mr-1.5 h-3.5 w-3.5" />
-                          {copyFeedback ? "Copied!" : "Copy for WordPress"}
+                          <Copy className="mr-1 sm:mr-1.5 h-3 sm:h-3.5 w-3 sm:w-3.5" />
+                          {copyFeedback ? "Copied!" : "Copy for WP"}
                         </Button>
                       </div>
                     </div>
@@ -4084,18 +4089,19 @@ export default function BlogMakerPage() {
                                 </div>
                               )}
                               {/* Add link form */}
-                              <div className="flex gap-2">
+                              <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
                                 <Input
                                   value={chatLinkUrl}
                                   onChange={(e) => setChatLinkUrl(e.target.value)}
                                   placeholder="https://yourblog.com/post-slug"
-                                  className="flex-1 h-7 text-[11px] rounded-md border-border/50 bg-background px-2"
+                                  className="w-full sm:flex-1 h-8 sm:h-7 text-[12px] sm:text-[11px] rounded-md border-border/50 bg-background px-2"
                                 />
+                                <div className="flex gap-2">
                                 <Input
                                   value={chatLinkAnchor}
                                   onChange={(e) => setChatLinkAnchor(e.target.value)}
                                   placeholder="Anchor text (optional)"
-                                  className="w-32 h-7 text-[11px] rounded-md border-border/50 bg-background px-2"
+                                  className="flex-1 sm:w-32 sm:flex-none h-8 sm:h-7 text-[12px] sm:text-[11px] rounded-md border-border/50 bg-background px-2"
                                 />
                                 <button
                                   type="button"
@@ -4107,10 +4113,11 @@ export default function BlogMakerPage() {
                                     setChatLinkUrl("");
                                     setChatLinkAnchor("");
                                   }}
-                                  className="shrink-0 h-7 px-2.5 rounded-md text-[11px] font-medium bg-orange-500/15 text-orange-600 hover:bg-orange-500/25 dark:text-orange-400 transition-colors disabled:opacity-40"
+                                  className="shrink-0 h-8 sm:h-7 px-3 sm:px-2.5 rounded-md text-[12px] sm:text-[11px] font-medium bg-orange-500/15 text-orange-600 hover:bg-orange-500/25 dark:text-orange-400 transition-colors disabled:opacity-40"
                                 >
                                   <Plus className="h-3 w-3" />
                                 </button>
+                                </div>
                               </div>
                             </div>
                           )}
