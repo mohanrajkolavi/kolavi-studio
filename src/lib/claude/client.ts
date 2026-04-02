@@ -1449,12 +1449,19 @@ export function extractSection(html: string, heading: string): {
  * Regenerate a single section of an article based on user instructions.
  * Used by the post-generation chatbot for targeted edits.
  */
+/** Internal link to be placed in a regenerated section. */
+export type ChatInternalLink = {
+  url: string;
+  anchorText?: string;
+};
+
 export async function regenerateSection(
   fullArticleHtml: string,
   sectionHeading: string,
   userInstructions: string,
   brief: ResearchBrief,
-  tokenUsage?: TokenUsageRecord[]
+  tokenUsage?: TokenUsageRecord[],
+  internalLinks?: ChatInternalLink[]
 ): Promise<{ updatedHtml: string; sectionHtml: string }> {
   const anthropic = getAnthropicClient();
   const { before, section, after } = extractSection(fullArticleHtml, sectionHeading);
@@ -1471,6 +1478,20 @@ export async function regenerateSection(
     ? `Current data (use ONLY these for statistics):\n${brief.currentData.facts.map((f) => `- ${f.fact} (Source: ${f.source})`).join("\n")}`
     : "No current data. Do not invent statistics.";
 
+  const internalLinksBlock = internalLinks && internalLinks.length > 0
+    ? `\n## INTERNAL LINKS TO INCLUDE
+Place these links naturally within the section. Use the provided anchor text, or create contextually appropriate anchor text if none is given. Links must feel editorial, not forced.
+
+${internalLinks.map((l) => `- <a href="${l.url}">${l.anchorText || "contextual anchor text"}</a>`).join("\n")}
+
+Rules:
+- Place each link on its first natural mention of the related topic.
+- Never cluster multiple links in one paragraph.
+- Anchor text must read naturally in the sentence — no "click here" or naked URLs.
+- Maximum ${Math.min(internalLinks.length, 3)} internal links in this section.
+`
+    : "";
+
   const userPrompt = `Rewrite the section under "${sectionHeading}". This is a targeted edit in a post-generation chatbot — the user is refining a specific section of their published article.
 
 ## USER INSTRUCTIONS
@@ -1485,7 +1506,7 @@ ${prevContext}
 
 Next section beginning:
 ${nextContext}
-
+${internalLinksBlock}
 ## CONSTRAINTS
 - Preserve the section's role and position in the article's argument flow.
 - Word count: ${originalWordCount} words (±15%).
@@ -1535,6 +1556,175 @@ Return ONLY the complete section HTML including the H2 tag. No markdown wrapping
 
   const updatedHtml = before + newSection + after;
   return { updatedHtml, sectionHtml: newSection };
+}
+
+/**
+ * Organic brief revision — patches an existing approved brief based on user instructions.
+ * Unlike buildResearchBrief which starts from extraction data, this takes the existing
+ * brief as baseline and applies targeted changes, preserving what the user already approved.
+ */
+export async function reviseBrief(
+  existingBrief: ResearchBrief,
+  revisionInstructions: string,
+  topics: TopicExtractionResult,
+  currentData: CurrentData,
+  input: PipelineInput,
+  wordCountOverride?: WordCountOverride,
+  tokenUsage?: TokenUsageRecord[],
+  structuredEdits?: {
+    sectionEdits?: Array<{ heading: string; action: string; newHeading?: string; newPosition?: number }>;
+    addSections?: Array<{ heading: string; afterSection?: string; reason?: string }>;
+  }
+): Promise<ResearchBrief> {
+  const anthropic = getAnthropicClient();
+
+  const systemPrompt = `You are revising an existing content brief that the user has already approved. Your job is to apply ONLY the changes the user requests while preserving everything else exactly as-is.
+
+## CRITICAL RULES
+1. The existing brief is the BASELINE. Do NOT rebuild from scratch.
+2. Sections the user did not mention must remain IDENTICAL — same heading, targetWords, topics, geoNote, aiOverviewTarget, reason.
+3. When adding sections, distribute word count from existing sections or increase total — never leave other sections starved.
+4. When removing sections, redistribute their word count to remaining sections proportionally.
+5. All SEO requirements from the original brief must be preserved (keyword placement, density rules, geoNotes, aiOverviewTargets).
+6. The sum of all section targetWords must equal the wordCount.target (±5%).
+7. Maintain the same editorial style, tone, and point of view unless the user explicitly asks to change them.
+8. Keep all knowledgeEngine data references (topicGraph, algorithmicInsights, proprietaryFramework) intact.
+9. Preserve povInsights, faqPlan, gaps, similaritySummary, extraValueThemes, freshnessNote unless the user's changes directly affect them.
+
+## OUTPUT
+Return the COMPLETE revised ResearchBrief as valid JSON (same schema as the original). No markdown fences, no explanation. Include ALL fields from the original — this replaces it entirely.`;
+
+  // Build the structured edits block
+  let structuredEditsBlock = "";
+  if (structuredEdits?.sectionEdits?.length) {
+    structuredEditsBlock += "\n\n## STRUCTURED SECTION EDITS\n";
+    for (const edit of structuredEdits.sectionEdits) {
+      switch (edit.action) {
+        case "remove":
+          structuredEditsBlock += `- REMOVE section: "${edit.heading}"\n`;
+          break;
+        case "rename":
+          structuredEditsBlock += `- RENAME section "${edit.heading}" → "${edit.newHeading}"\n`;
+          break;
+        case "reorder":
+          structuredEditsBlock += `- MOVE section "${edit.heading}" to position ${edit.newPosition}\n`;
+          break;
+        case "keep":
+          structuredEditsBlock += `- KEEP section "${edit.heading}" unchanged\n`;
+          break;
+      }
+    }
+  }
+  if (structuredEdits?.addSections?.length) {
+    structuredEditsBlock += "\n## NEW SECTIONS TO ADD\n";
+    for (const add of structuredEdits.addSections) {
+      structuredEditsBlock += `- Add "${add.heading}"${add.afterSection ? ` after "${add.afterSection}"` : " at the end"}${add.reason ? ` (reason: ${add.reason})` : ""}\n`;
+    }
+  }
+
+  // Serialize the existing brief (omit currentData and knowledgeEngine to save tokens)
+  const { currentData: _cd, knowledgeEngine: _ke, ...briefWithoutLargeFields } = existingBrief;
+  const existingBriefJson = JSON.stringify(briefWithoutLargeFields, null, 2);
+
+  // Compact extraction context (only what Claude needs for adding new sections)
+  const extractionContext = JSON.stringify({
+    topics: topics.topics.slice(0, 10).map(t => ({ name: t.name, importance: t.importance })),
+    gaps: topics.gaps.slice(0, 5),
+    primaryKeyword: input.primaryKeyword,
+  });
+
+  const wordCountNote = wordCountOverride
+    ? `\n\nNEW WORD COUNT TARGET: ${wordCountOverride.target} words. Adjust section targetWords to meet this total.`
+    : "";
+
+  const userPrompt = `## EXISTING APPROVED BRIEF
+${existingBriefJson}
+
+## USER'S REVISION INSTRUCTIONS
+${revisionInstructions}${structuredEditsBlock}${wordCountNote}
+
+## RESEARCH CONTEXT (for adding new content only)
+${extractionContext}
+
+Apply the user's changes to the existing brief. Return the complete revised brief JSON.`;
+
+  const startMs = Date.now();
+  const stream = anthropic.messages.stream({
+    model: CLAUDE_OPUS_MODEL,
+    max_tokens: 8192,
+    temperature: 0.15,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) {
+    tokenUsage.push({
+      callName: "reviseBrief",
+      model: CLAUDE_OPUS_MODEL,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      totalTokens: usage.promptTokens + usage.completionTokens,
+      durationMs,
+    });
+  }
+
+  const contentBlock = message.content[0];
+  if (!contentBlock || contentBlock.type !== "text") {
+    throw new Error("reviseBrief: Claude returned non-text response");
+  }
+  const content = contentBlock.text;
+  if (!content?.trim()) {
+    throw new Error("reviseBrief: empty response from Claude");
+  }
+
+  const raw = stripJsonMarkdown(content);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch (jsonErr) {
+    throw new Error(`reviseBrief: JSON parse failed: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`);
+  }
+
+  const normalized = normalizeBriefOutput(parsed, input.primaryKeyword);
+  const validated = ResearchBriefWithoutCurrentDataSchema.safeParse(normalized);
+
+  if (!validated.success) {
+    throw new Error(`reviseBrief: invalid schema: ${JSON.stringify(validated.error.flatten())}`);
+  }
+
+  // Merge back currentData and knowledgeEngine from the original
+  const brief: ResearchBrief = {
+    ...validated.data,
+    currentData,
+    knowledgeEngine: existingBrief.knowledgeEngine,
+    clusterPosition: existingBrief.clusterPosition ?? input.clusterPosition ?? "standalone",
+    ...(existingBrief.clusterTopic && { clusterTopic: existingBrief.clusterTopic }),
+  };
+
+  // Apply word count override if provided (same logic as buildResearchBrief)
+  if (wordCountOverride && brief.outline?.sections?.length) {
+    const sections = brief.outline.sections;
+    const currentTotal = sections.reduce((sum, s) => sum + (s.targetWords || 0), 0);
+    const target = Math.round(wordCountOverride.target);
+    if (currentTotal > 0 && target > 0 && Math.abs(currentTotal - target) > target * 0.05) {
+      const scaledSections = sections.map((s) => {
+        const base = s.targetWords && s.targetWords > 0 ? s.targetWords : Math.max(50, Math.round(target / sections.length));
+        const scaled = Math.max(50, Math.round((base * target) / currentTotal));
+        return { ...s, targetWords: scaled };
+      });
+      const newTotal = scaledSections.reduce((sum, s) => sum + (s.targetWords || 0), 0);
+      return {
+        ...brief,
+        wordCount: { ...wordCountOverride, target },
+        outline: { ...brief.outline, sections: scaledSections, totalSections: scaledSections.length, estimatedWordCount: newTotal },
+      };
+    }
+  }
+
+  return brief;
 }
 
 /**

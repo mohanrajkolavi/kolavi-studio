@@ -26,6 +26,9 @@ export async function POST(request: NextRequest) {
     jobId?: string;
     revise?: boolean;
     wordCountTarget?: number;
+    revisionInstructions?: string;
+    sectionEdits?: Array<{ heading: string; action: string; newHeading?: string; newPosition?: number }>;
+    addSections?: Array<{ heading: string; afterSection?: string; reason?: string }>;
     input?: unknown;
     serpResults?: Array<{ url: string; title?: string; position?: number }>;
     selectedUrls?: string[];
@@ -45,9 +48,28 @@ export async function POST(request: NextRequest) {
   const clientInput = body.input;
   const clientSerpResults = Array.isArray(body.serpResults) ? body.serpResults : [];
   const selectedUrls = Array.isArray(body.selectedUrls) ? body.selectedUrls : [];
-  if (revise && (wordCountTarget == null || wordCountTarget < 500 || wordCountTarget > 6000)) {
+  const revisionInstructions = typeof body.revisionInstructions === "string" ? body.revisionInstructions.trim() : undefined;
+  const validActions = new Set(["keep", "remove", "rename", "reorder"]);
+  const sectionEdits = Array.isArray(body.sectionEdits)
+    ? body.sectionEdits.filter(
+      (e): e is { heading: string; action: "keep" | "remove" | "rename" | "reorder"; newHeading?: string; newPosition?: number } =>
+        typeof e?.heading === "string" && typeof e?.action === "string" && validActions.has(e.action)
+    )
+    : undefined;
+  const addSections = Array.isArray(body.addSections) ? body.addSections : undefined;
+  const hasOrganicRevision = revise && !!revisionInstructions;
+
+  // wordCountTarget is required for legacy revise (no instructions), optional for organic revision
+  if (revise && !hasOrganicRevision && (wordCountTarget == null || wordCountTarget < 500 || wordCountTarget > 6000)) {
     return new Response(
-      JSON.stringify({ error: "wordCountTarget (500–6000) is required when revise is true" }),
+      JSON.stringify({ error: "wordCountTarget (500–6000) is required when revise is true without revisionInstructions" }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  // Validate wordCountTarget range if provided (even in organic revision)
+  if (wordCountTarget != null && (wordCountTarget < 500 || wordCountTarget > 6000)) {
+    return new Response(
+      JSON.stringify({ error: "wordCountTarget must be between 500 and 6000" }),
       { status: 400, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -170,7 +192,15 @@ export async function POST(request: NextRequest) {
           (evt) => sendEvent("progress", evt),
           briefTokenUsage,
           undefined,
-          revise ? { revise: true, wordCountTarget: wordCountTarget! } : undefined
+          revise
+            ? {
+              revise: true,
+              ...(wordCountTarget != null && { wordCountTarget }),
+              ...(revisionInstructions && { revisionInstructions }),
+              ...(sectionEdits && { sectionEdits }),
+              ...(addSections && { addSections }),
+            }
+            : undefined
         );
         sendEvent("result", {
           jobId,

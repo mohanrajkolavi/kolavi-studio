@@ -62,7 +62,7 @@ type BlogGenerationContextValue = {
   errorChunk: ChunkName | null;
   startResearchFetch: (jobId: string, selectedUrls: string[]) => void;
   startBrief: (jobId: string) => void;
-  startReviseBrief: (jobId: string, wordCountTarget: number) => void;
+  startReviseBrief: (jobId: string, wordCountTarget?: number, revisionInstructions?: string, sectionEdits?: Array<{ heading: string; action: string; newHeading?: string; newPosition?: number }>, addSections?: Array<{ heading: string; afterSection?: string; reason?: string }>) => void;
   startDraft: (jobId: string, briefOverrides?: BriefOverridesForDraft) => void;
   startValidate: (jobId: string) => void;
   retryFromChunk: (chunk: ChunkName) => void;
@@ -480,7 +480,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     startBriefRef.current = startBrief;
   }, [startBrief]);
 
-  const startReviseBrief = useCallback((jid: string, wordCountTarget: number) => {
+  const startReviseBrief = useCallback((jid: string, wordCountTarget?: number, revisionInstructions?: string, sectionEdits?: Array<{ heading: string; action: string; newHeading?: string; newPosition?: number }>, addSections?: Array<{ heading: string; afterSection?: string; reason?: string }>) => {
     // Allow when in "reviewing" phase (outline step) so user can revise brief while waiting to continue
     if (statusRef.current === "generating" && phaseRef.current !== "reviewing") return;
     abortControllerRef.current?.abort();
@@ -515,7 +515,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
         : undefined;
     (async () => {
       try {
-        await processBriefSSE(jid, signal, guarded, { revise: true, wordCountTarget, fallback });
+        await processBriefSSE(jid, signal, guarded, { revise: true, wordCountTarget, revisionInstructions, sectionEdits, addSections, fallback });
         if (!signal.aborted && mountedRef.current) setPhase("reviewing");
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -901,13 +901,19 @@ async function processBriefSSE(
   options?: {
     revise?: boolean;
     wordCountTarget?: number;
+    revisionInstructions?: string;
+    sectionEdits?: Array<{ heading: string; action: string; newHeading?: string; newPosition?: number }>;
+    addSections?: Array<{ heading: string; afterSection?: string; reason?: string }>;
     fallback?: { input: Record<string, unknown>; serpResults: Array<{ url: string; title?: string; position?: number }>; selectedUrls: string[] };
   }
 ) {
   const body: Record<string, unknown> = { jobId };
-  if (options?.revise && typeof options?.wordCountTarget === "number") {
+  if (options?.revise) {
     body.revise = true;
-    body.wordCountTarget = options.wordCountTarget;
+    if (typeof options.wordCountTarget === "number") body.wordCountTarget = options.wordCountTarget;
+    if (options.revisionInstructions) body.revisionInstructions = options.revisionInstructions;
+    if (options.sectionEdits?.length) body.sectionEdits = options.sectionEdits;
+    if (options.addSections?.length) body.addSections = options.addSections;
   }
   if (options?.fallback) {
     body.input = options.fallback.input;

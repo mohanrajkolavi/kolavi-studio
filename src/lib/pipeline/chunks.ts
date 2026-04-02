@@ -32,7 +32,7 @@ import {
   extractTopicsAndStyle,
   type WordCountOverride,
 } from "@/lib/openai/client";
-import { writeDraft, writeDraftSection, fixAuditIssues, fixHallucinationsInContent, buildResearchBrief, humanizeContent } from "@/lib/claude/client";
+import { writeDraft, writeDraftSection, fixAuditIssues, fixHallucinationsInContent, buildResearchBrief, reviseBrief, humanizeContent } from "@/lib/claude/client";
 import { generateContentDiff, type ContentDiffResult } from "@/lib/seo/content-diff";
 import { computeSemanticSimilarity } from "@/lib/seo/similarity";
 import { assessContentDecay, type ContentDecayResult } from "@/lib/seo/content-decay";
@@ -639,11 +639,32 @@ export async function runResearchChunk(
 // Brief chunk
 // ---------------------------------------------------------------------------
 
+/** Structured edit for an existing outline section during brief revision. */
+export type BriefRevisionSectionEdit = {
+  heading: string;
+  action: "keep" | "remove" | "rename" | "reorder";
+  newHeading?: string;
+  newPosition?: number;
+};
+
+/** A new section to add during brief revision. */
+export type BriefRevisionAddSection = {
+  heading: string;
+  afterSection?: string;
+  reason?: string;
+};
+
 export type BriefChunkOptions = {
   /** When true, use wordCountTarget instead of job input for word count override. */
   revise?: boolean;
-  /** New target word count (500–6000). Required when revise is true. */
+  /** New target word count (500–6000). Optional when revise is true (no longer required). */
   wordCountTarget?: number;
+  /** Free-text revision instructions (organic revision mode). */
+  revisionInstructions?: string;
+  /** Structured per-section edits for organic revision. */
+  sectionEdits?: BriefRevisionSectionEdit[];
+  /** New sections to add during organic revision. */
+  addSections?: BriefRevisionAddSection[];
 };
 
 export type RunBriefChunkResult = {
@@ -793,7 +814,51 @@ export async function runBriefChunk(
           note: "Guideline only. Strong value: provide more value than competitors; length is secondary.",
         }
         : undefined;
-    // Step 3 — Brief: GPT-4.1 builds outline, H2/H3; word count from extraction (user can change in brief section)
+
+    // Organic revision: if user provided instructions, patch existing brief instead of rebuilding
+    const isOrganicRevision = options?.revise && options.revisionInstructions?.trim();
+
+    if (isOrganicRevision) {
+      // Load the existing approved brief from the job store
+      const existingBriefOutput = await store.getChunkOutput(jobId, "analysis");
+      if (!existingBriefOutput) {
+        throw new Error("Cannot revise: no existing brief found. Generate a brief first.");
+      }
+      const existingBrief = existingBriefOutput as unknown as ResearchBrief;
+
+      emit("gpt-brief", "started", "Revising brief based on your instructions...", 30);
+      const briefResult = await withRetry(
+        async () => reviseBrief(
+          existingBrief,
+          options.revisionInstructions!.trim(),
+          topicExtraction,
+          currentData,
+          input,
+          wordCountOverride,
+          tokenUsage,
+          {
+            sectionEdits: options.sectionEdits,
+            addSections: options.addSections,
+          }
+        ),
+        { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(120000, 120_000) },
+        "gpt-brief"
+      );
+      if (!briefResult.success || !briefResult.data) {
+        emit("gpt-brief", "failed", briefResult.error ?? "brief revision failed", 40);
+        throw new Error(`Brief revision failed: ${briefResult.error ?? "unknown"}`);
+      }
+      const brief: ResearchBrief = briefResult.data;
+      emit("gpt-brief", "completed", `Revised brief: ${brief.outline.sections.length} sections`, 40);
+
+      const durationMs = Date.now() - analysisStartMs;
+      const cost = buildChunkCost({ openai: { calls: 1, durationMs } }, durationMs);
+      await store.saveChunkOutput(jobId, "analysis", brief as unknown as Record<string, unknown>, cost);
+      await store.updatePhase(jobId, "waiting_for_review");
+      return { brief, outline: brief.outline.sections };
+    }
+
+    // Step 3 — Brief: Claude builds outline, H2/H3; word count from extraction (user can change in brief section)
     emit("gpt-brief", "started", options?.revise ? "Revising brief with new word count..." : "Building strategic research brief...", 30);
     const briefResult = await withRetry(
       async () => buildResearchBrief(

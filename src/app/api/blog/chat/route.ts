@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { jobStore } from "@/lib/pipeline/jobs";
-import { regenerateSection } from "@/lib/claude/client";
+import { regenerateSection, type ChatInternalLink } from "@/lib/claude/client";
 import {
   auditArticle,
   verifyFactsAgainstSource,
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  let body: { jobId?: string; sectionHeading?: string; message?: string };
+  let body: { jobId?: string; sectionHeading?: string; message?: string; internalLinks?: ChatInternalLink[] };
   try {
     body = await request.json();
   } catch {
@@ -82,13 +82,21 @@ export async function POST(request: NextRequest) {
   const tokenUsage: TokenUsageRecord[] = [];
 
   try {
+    // Validate and pass internal links if provided
+    const internalLinks: ChatInternalLink[] = Array.isArray(body.internalLinks)
+      ? body.internalLinks.filter((l): l is ChatInternalLink =>
+        typeof l === "object" && l !== null && typeof l.url === "string" && l.url.trim().length > 0
+      ).map((l) => ({ url: l.url.trim(), ...(l.anchorText && { anchorText: l.anchorText.trim() }) }))
+      : [];
+
     // Regenerate the section
     const { updatedHtml, sectionHtml } = await regenerateSection(
       currentHtml,
       sectionHeading,
       message,
       brief,
-      tokenUsage
+      tokenUsage,
+      internalLinks.length > 0 ? internalLinks : undefined
     );
 
     // Run audit on updated content

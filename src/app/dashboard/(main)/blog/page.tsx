@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TagInput } from "@/components/dashboard/TagInput";
 import { useBlogGeneration } from "@/components/dashboard/BlogGenerationProvider";
-import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown, ChevronUp, GripVertical, Trash2, Plus, Save, Search, PenLine, MessageSquare, Send } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown, ChevronUp, GripVertical, Trash2, Plus, Save, Search, PenLine, MessageSquare, Send, Link2, Undo2 } from "lucide-react";
 import { GenerationLoadingOverlay } from "@/components/dashboard/GenerationLoadingOverlay";
 import { SEO } from "@/lib/constants";
 import { auditArticle, MIN_PUBLISH_SCORE } from "@/lib/seo/article-audit";
@@ -689,6 +689,14 @@ export default function BlogMakerPage() {
     auditScore?: number;
   }>>([]);
   const [chatSuccess, setChatSuccess] = useState(false);
+  /** Internal links to include in chat section regeneration. */
+  const [chatInternalLinks, setChatInternalLinks] = useState<Array<{ url: string; anchorText: string }>>([]);
+  /** Current URL being typed in the internal link input. */
+  const [chatLinkUrl, setChatLinkUrl] = useState("");
+  /** Current anchor text being typed in the internal link input. */
+  const [chatLinkAnchor, setChatLinkAnchor] = useState("");
+  /** Whether the internal links section is expanded. */
+  const [chatLinksOpen, setChatLinksOpen] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   /** Demo workflow: same as production (research → brief → draft → validate) with sample data, ~10s per stage. */
   const [demoRunning, setDemoRunning] = useState(false);
@@ -713,6 +721,12 @@ export default function BlogMakerPage() {
   const [draggingSectionIndex, setDraggingSectionIndex] = useState<number | null>(null);
   /** Target total words for outline; used by Redistribute and Revise Brief. */
   const [targetTotal, setTargetTotal] = useState<number>(0);
+  /** Revision instructions for organic brief revision. */
+  const [revisionInstructions, setRevisionInstructions] = useState("");
+  /** Whether the revision panel is open. */
+  const [revisionPanelOpen, setRevisionPanelOpen] = useState(false);
+  /** Brief version history for undo (max 5 previous versions). */
+  const [briefHistory, setBriefHistory] = useState<Array<{ outline: Array<OutlineSectionForEditor & { originalIndex: number }>; targetTotal: number; timestamp: number }>>([]);
   /** Which step to show when in step mode (1=Select competitors, 2=Research summary, 3=Outline). null = show latest. */
   const [stepView, setStepView] = useState<number | null>(null);
   /** Cache SERP so "Back to previous section" from research summary can still show competitors (provider may clear researchSerp). */
@@ -831,9 +845,18 @@ export default function BlogMakerPage() {
   useEffect(() => {
     const outline = chunkOutputs.brief?.outline;
     if (outline?.length) {
-      const sections = outline.map((s, i) => ({ ...s, originalIndex: i }));
-      setEditedOutline(sections);
-      const sum = sections.reduce((acc, s) => acc + (s.targetWords || 150), 0);
+      // Push current outline to history before replacing (for undo), but only if we already have an outline
+      setEditedOutline((prevOutline) => {
+        if (prevOutline.length > 0) {
+          const prevTotal = prevOutline.reduce((acc, s) => acc + (s.targetWords || 150), 0);
+          setBriefHistory((prev) => [
+            { outline: prevOutline, targetTotal: prevTotal, timestamp: Date.now() },
+            ...prev.slice(0, 4), // keep max 5
+          ]);
+        }
+        return outline.map((s, i) => ({ ...s, originalIndex: i }));
+      });
+      const sum = outline.reduce((acc, s) => acc + (s.targetWords || 150), 0);
       setTargetTotal(sum);
     }
   }, [chunkOutputs.brief, outlineKey]);
@@ -1489,6 +1512,12 @@ export default function BlogMakerPage() {
           jobId,
           sectionHeading: chatSection.trim(),
           message: chatMessage.trim(),
+          ...(chatInternalLinks.length > 0 && {
+            internalLinks: chatInternalLinks.map((l) => ({
+              url: l.url,
+              ...(l.anchorText && { anchorText: l.anchorText }),
+            })),
+          }),
         }),
       });
       const data = await res.json();
@@ -1521,6 +1550,9 @@ export default function BlogMakerPage() {
         },
       ]);
       setChatMessage("");
+      setChatInternalLinks([]);
+      setChatLinkUrl("");
+      setChatLinkAnchor("");
       setChatError(null);
       // Show success indicator (auto-dismiss after 3s)
       setChatSuccess(true);
@@ -2407,28 +2439,33 @@ export default function BlogMakerPage() {
                             <button
                               type="button"
                               disabled={generating && phase !== "reviewing"}
-                              onClick={() => {
-                                const sum = editedOutline.reduce((s, x) => s + (x.targetWords || 150), 0);
-                                const effectiveTarget = Math.max(
-                                  500,
-                                  Math.min(6000, (targetTotal >= 500 && targetTotal <= 6000 ? targetTotal : sum) || sum || 1500)
-                                );
-                                if (jobId) startReviseBrief(jobId, Math.round(effectiveTarget));
-                                else if (demoChunkOutputs.brief && sum > 0) {
-                                  setEditedOutline((prev) =>
-                                    prev.map((s) => ({
-                                      ...s,
-                                      targetWords: Math.max(50, Math.round((s.targetWords || 150) * (effectiveTarget / sum))),
-                                    }))
-                                  );
-                                }
-                              }}
-                              className="h-10 rounded-full px-5 text-[14px] font-medium bg-orange-500/15 text-orange-600 border border-orange-500/30 hover:bg-orange-500/25 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/25 transition-all duration-200 disabled:opacity-50"
+                              onClick={() => setRevisionPanelOpen((v) => !v)}
+                              className={`h-10 rounded-full px-5 text-[14px] font-medium border transition-all duration-200 disabled:opacity-50 ${revisionPanelOpen
+                                ? "bg-orange-600 text-white border-orange-600 hover:bg-orange-700 dark:bg-orange-500 dark:border-orange-500"
+                                : "bg-orange-500/15 text-orange-600 border-orange-500/30 hover:bg-orange-500/25 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/25"
+                                }`}
                             >
                               Revise Brief
                             </button>
                           )}
                         </div>
+                        {briefHistory.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const prev = briefHistory[0];
+                              if (!prev) return;
+                              setEditedOutline(prev.outline);
+                              setTargetTotal(prev.targetTotal);
+                              setBriefHistory((h) => h.slice(1));
+                            }}
+                            className="ml-auto h-10 rounded-full px-5 text-[14px] font-medium bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent hover:border-border/50 transition-all duration-200 flex items-center gap-2"
+                            title={`Undo to previous version (${briefHistory.length} available)`}
+                          >
+                            <Undo2 className="h-4 w-4" />
+                            Undo
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
@@ -2437,13 +2474,78 @@ export default function BlogMakerPage() {
                             setEditedOutline(sections);
                             setTargetTotal(sections.reduce((acc, s) => acc + (s.targetWords || 150), 0));
                           }}
-                          className="ml-auto h-10 rounded-full px-5 text-[14px] font-medium bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent hover:border-border/50 transition-all duration-200"
+                          className={`h-10 rounded-full px-5 text-[14px] font-medium bg-muted/40 text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-transparent hover:border-border/50 transition-all duration-200 ${briefHistory.length === 0 ? "ml-auto" : ""}`}
                         >
                           Reset
                         </button>
                       </div>
                     )}
                   </header>
+
+                  {/* Revision panel — organic brief revision with instructions */}
+                  {revisionPanelOpen && (
+                    <div className="shrink-0 rounded-xl border border-orange-500/30 bg-orange-500/5 dark:bg-orange-500/10 p-5 mt-2 mb-4 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-[14px] font-semibold text-foreground">Revise your brief</h3>
+                        <button
+                          type="button"
+                          onClick={() => setRevisionPanelOpen(false)}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label="Close revision panel"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <p className="text-[13px] text-muted-foreground leading-relaxed">
+                        Describe what you want to change. The AI will modify only what you ask for and keep everything else intact.
+                      </p>
+                      <Textarea
+                        value={revisionInstructions}
+                        onChange={(e) => setRevisionInstructions(e.target.value)}
+                        placeholder='e.g. "Add a pricing comparison section after the features overview" or "Make the intro more aggressive and remove the FAQ section" or "Shift focus toward enterprise use cases"'
+                        rows={3}
+                        className="resize-y rounded-lg border-border/50 bg-background text-[14px] leading-snug focus:ring-2 focus:ring-orange-500/20 placeholder:text-muted-foreground/50"
+                      />
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          disabled={(generating && phase !== "reviewing") || !revisionInstructions.trim()}
+                          onClick={() => {
+                            if (!jobId) return;
+                            const sum = editedOutline.reduce((s, x) => s + (x.targetWords || 150), 0);
+                            const effectiveTarget = targetTotal >= 500 && targetTotal <= 6000 ? targetTotal : sum > 0 ? sum : undefined;
+                            startReviseBrief(
+                              jobId,
+                              effectiveTarget ? Math.round(effectiveTarget) : undefined,
+                              revisionInstructions.trim()
+                            );
+                            setRevisionInstructions("");
+                            setRevisionPanelOpen(false);
+                          }}
+                          className="h-9 rounded-full px-6 text-[13px] font-semibold bg-orange-600 text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Revise with instructions
+                        </button>
+                        <span className="text-[12px] text-muted-foreground">or</span>
+                        <button
+                          type="button"
+                          disabled={generating && phase !== "reviewing"}
+                          onClick={() => {
+                            const sum = editedOutline.reduce((s, x) => s + (x.targetWords || 150), 0);
+                            const effectiveTarget = Math.max(
+                              500,
+                              Math.min(6000, (targetTotal >= 500 && targetTotal <= 6000 ? targetTotal : sum) || sum || 1500)
+                            );
+                            if (jobId) startReviseBrief(jobId, Math.round(effectiveTarget));
+                            setRevisionPanelOpen(false);
+                          }}
+                          className="h-9 rounded-full px-5 text-[13px] font-medium bg-muted/50 text-foreground hover:bg-muted border border-transparent hover:border-border/60 transition-all duration-200 disabled:opacity-50"
+                        >
+                          Adjust word count only
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Section list */}
                   <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-4 pb-12">
@@ -3933,10 +4035,87 @@ export default function BlogMakerPage() {
                         <Textarea
                           value={chatMessage}
                           onChange={(e) => setChatMessage(e.target.value)}
-                          placeholder='e.g. "Update the revenue figure to $4.2B" or "Add a case study about Company X"'
+                          placeholder='e.g. "Update the revenue figure to $4.2B" or "Add a case study about Company X" or "Include internal links to related posts"'
                           rows={3}
                           className="resize-y rounded-lg border-border bg-background text-sm leading-snug focus:ring-2 focus:ring-orange-500/20"
                         />
+
+                        {/* Internal links section */}
+                        <div className="rounded-lg border border-border/40 bg-muted/20">
+                          <button
+                            type="button"
+                            onClick={() => setChatLinksOpen(!chatLinksOpen)}
+                            className="flex w-full items-center justify-between px-3 py-2 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Link2 className="h-3.5 w-3.5" />
+                              Internal links
+                              {chatInternalLinks.length > 0 && (
+                                <span className="ml-1 inline-flex h-4 min-w-[16px] items-center justify-center rounded-full bg-orange-500/20 px-1 text-[10px] font-semibold text-orange-600 dark:text-orange-400">
+                                  {chatInternalLinks.length}
+                                </span>
+                              )}
+                            </span>
+                            {chatLinksOpen ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          </button>
+                          {chatLinksOpen && (
+                            <div className="px-3 pb-3 space-y-2">
+                              <p className="text-[11px] text-muted-foreground">Add URLs to include as internal links in the regenerated section.</p>
+                              {/* Existing links */}
+                              {chatInternalLinks.length > 0 && (
+                                <div className="space-y-1">
+                                  {chatInternalLinks.map((link, i) => (
+                                    <div key={i} className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5">
+                                      <Link2 className="h-3 w-3 shrink-0 text-orange-500" />
+                                      <span className="flex-1 min-w-0 text-[11px] text-foreground truncate">{link.url}</span>
+                                      {link.anchorText && (
+                                        <span className="shrink-0 text-[10px] text-muted-foreground italic truncate max-w-[100px]">&ldquo;{link.anchorText}&rdquo;</span>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => setChatInternalLinks((prev) => prev.filter((_, idx) => idx !== i))}
+                                        className="shrink-0 text-muted-foreground hover:text-red-500 transition-colors"
+                                        aria-label="Remove link"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {/* Add link form */}
+                              <div className="flex gap-2">
+                                <Input
+                                  value={chatLinkUrl}
+                                  onChange={(e) => setChatLinkUrl(e.target.value)}
+                                  placeholder="https://yourblog.com/post-slug"
+                                  className="flex-1 h-7 text-[11px] rounded-md border-border/50 bg-background px-2"
+                                />
+                                <Input
+                                  value={chatLinkAnchor}
+                                  onChange={(e) => setChatLinkAnchor(e.target.value)}
+                                  placeholder="Anchor text (optional)"
+                                  className="w-32 h-7 text-[11px] rounded-md border-border/50 bg-background px-2"
+                                />
+                                <button
+                                  type="button"
+                                  disabled={!chatLinkUrl.trim()}
+                                  onClick={() => {
+                                    const url = chatLinkUrl.trim();
+                                    if (!url) return;
+                                    setChatInternalLinks((prev) => [...prev, { url, anchorText: chatLinkAnchor.trim() }]);
+                                    setChatLinkUrl("");
+                                    setChatLinkAnchor("");
+                                  }}
+                                  className="shrink-0 h-7 px-2.5 rounded-md text-[11px] font-medium bg-orange-500/15 text-orange-600 hover:bg-orange-500/25 dark:text-orange-400 transition-colors disabled:opacity-40"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         {chatError && (
                           <p className="text-xs text-red-500">{chatError}</p>
                         )}
