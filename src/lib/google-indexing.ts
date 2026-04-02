@@ -66,8 +66,18 @@ function getServiceAccount(): ServiceAccountKey {
   }
 }
 
+// Token cache — avoid fetching a new token for every single request.
+// Google OAuth2 tokens are valid for 1 hour; we cache for 50 minutes.
+let cachedToken: { token: string; expiresAt: number } | null = null;
+const TOKEN_CACHE_MS = 50 * 60 * 1000; // 50 minutes
+
 /** Create a signed JWT and exchange it for a Google OAuth2 access token. */
 async function getAccessToken(): Promise<string> {
+  // Return cached token if still valid
+  if (cachedToken && Date.now() < cachedToken.expiresAt) {
+    return cachedToken.token;
+  }
+
   const sa = getServiceAccount();
   const now = Math.floor(Date.now() / 1000);
 
@@ -107,6 +117,10 @@ async function getAccessToken(): Promise<string> {
   }
 
   const data = (await tokenRes.json()) as { access_token: string };
+
+  // Cache the token
+  cachedToken = { token: data.access_token, expiresAt: Date.now() + TOKEN_CACHE_MS };
+
   return data.access_token;
 }
 
@@ -118,19 +132,21 @@ const INDEXING_API = "https://indexing.googleapis.com/v3/urlNotifications";
 
 /**
  * Notify Google that a URL has been updated or removed.
+ * Accepts an optional pre-fetched access token to avoid redundant auth calls in batch operations.
  */
 export async function requestIndexing(
   url: string,
-  action: IndexingAction = "URL_UPDATED"
+  action: IndexingAction = "URL_UPDATED",
+  accessToken?: string
 ): Promise<IndexingResult> {
   try {
-    const accessToken = await getAccessToken();
+    const token = accessToken ?? await getAccessToken();
 
     const res = await fetch(`${INDEXING_API}:publish`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ url, type: action }),
     });
@@ -159,16 +175,27 @@ export async function requestIndexing(
 
 /**
  * Batch-notify Google for multiple URLs.
- * Sends requests sequentially to respect rate limits (200 req/min default).
+ * Fetches a single access token and reuses it across all requests.
+ * Runs up to 5 requests in parallel to stay within rate limits (200 req/min).
  */
 export async function requestIndexingBatch(
   urls: string[],
   action: IndexingAction = "URL_UPDATED"
 ): Promise<IndexingResult[]> {
+  const accessToken = await getAccessToken();
+
+  // Process in chunks of 5 for parallelism without overwhelming rate limits
+  const CHUNK_SIZE = 5;
   const results: IndexingResult[] = [];
-  for (const url of urls) {
-    results.push(await requestIndexing(url, action));
+
+  for (let i = 0; i < urls.length; i += CHUNK_SIZE) {
+    const chunk = urls.slice(i, i + CHUNK_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map((url) => requestIndexing(url, action, accessToken))
+    );
+    results.push(...chunkResults);
   }
+
   return results;
 }
 

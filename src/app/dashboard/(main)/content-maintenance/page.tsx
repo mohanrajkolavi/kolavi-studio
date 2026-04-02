@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-import { FileText, ExternalLink, X, RefreshCw, Loader2, AlertCircle, Calendar, Tag, ChevronUp, ChevronDown, Download, Zap, MoreHorizontal, CheckCircle2, Globe } from "lucide-react";
+import { FileText, ExternalLink, X, RefreshCw, Loader2, AlertCircle, Calendar, Tag, ChevronUp, ChevronDown, Download, Zap, MoreHorizontal, CheckCircle2, Globe, Send, Clock, XCircle } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const CATEGORY_DEBOUNCE_MS = 300;
@@ -77,10 +77,18 @@ export default function ContentMaintenancePage() {
 
   // Indexing state
   const [indexingSlug, setIndexingSlug] = useState<string | null>(null);
-  const [indexedSlugs, setIndexedSlugs] = useState<Record<string, { success: boolean; time: string }>>({});
+  const [indexedSlugs, setIndexedSlugs] = useState<Record<string, { success: boolean; time: string; error?: string }>>({});
   const [bulkIndexing, setBulkIndexing] = useState(false);
   const [openActionsSlug, setOpenActionsSlug] = useState<string | null>(null);
-  const actionsRef = useRef<HTMLDivElement>(null);
+  const actionsRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Manual URL indexing state
+  const [manualUrl, setManualUrl] = useState("");
+  const [manualSubmitting, setManualSubmitting] = useState(false);
+  const [manualResult, setManualResult] = useState<{ success: boolean; error?: string } | null>(null);
+  const [statusUrl, setStatusUrl] = useState("");
+  const [statusChecking, setStatusChecking] = useState(false);
+  const [statusResult, setStatusResult] = useState<{ success: boolean; notifyTime?: string; error?: string } | null>(null);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://kolavistudio.com";
 
@@ -98,12 +106,12 @@ export default function ContentMaintenancePage() {
       const data = await res.json();
       setIndexedSlugs((prev) => ({
         ...prev,
-        [slug]: { success: data.success, time: new Date().toISOString() },
+        [slug]: { success: !!data.success, time: new Date().toISOString(), error: data.error },
       }));
-    } catch {
+    } catch (err) {
       setIndexedSlugs((prev) => ({
         ...prev,
-        [slug]: { success: false, time: new Date().toISOString() },
+        [slug]: { success: false, time: new Date().toISOString(), error: err instanceof Error ? err.message : "Request failed" },
       }));
     } finally {
       setIndexingSlug(null);
@@ -122,17 +130,19 @@ export default function ContentMaintenancePage() {
         body: JSON.stringify({ urls }),
       });
       const data = await res.json();
-      const results: Record<string, { success: boolean; time: string }> = {};
+      const now = new Date().toISOString();
+      const mapped: Record<string, { success: boolean; time: string; error?: string }> = {};
       if (data.results) {
-        data.results.forEach((r: { url: string; success: boolean }, i: number) => {
-          results[slugs[i]] = { success: r.success, time: new Date().toISOString() };
+        data.results.forEach((r: { url: string; success: boolean; error?: string }, i: number) => {
+          mapped[slugs[i]] = { success: r.success, time: now, error: r.error };
         });
       }
-      setIndexedSlugs((prev) => ({ ...prev, ...results }));
-    } catch {
-      // mark all as failed
-      const failed: Record<string, { success: boolean; time: string }> = {};
-      slugs.forEach((s) => { failed[s] = { success: false, time: new Date().toISOString() }; });
+      setIndexedSlugs((prev) => ({ ...prev, ...mapped }));
+    } catch (err) {
+      const now = new Date().toISOString();
+      const errMsg = err instanceof Error ? err.message : "Request failed";
+      const failed: Record<string, { success: boolean; time: string; error?: string }> = {};
+      slugs.forEach((s) => { failed[s] = { success: false, time: now, error: errMsg }; });
       setIndexedSlugs((prev) => ({ ...prev, ...failed }));
     } finally {
       setBulkIndexing(false);
@@ -143,7 +153,8 @@ export default function ContentMaintenancePage() {
   useEffect(() => {
     if (!openActionsSlug) return;
     const handler = (e: MouseEvent) => {
-      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+      const dropdownEl = actionsRefs.current[openActionsSlug];
+      if (dropdownEl && !dropdownEl.contains(e.target as Node)) {
         setOpenActionsSlug(null);
       }
     };
@@ -862,7 +873,8 @@ export default function ContentMaintenancePage() {
                           </span>
                         ) : idxState ? (
                           <span
-                            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+                            title={idxState.success ? `Indexed at ${new Date(idxState.time).toLocaleTimeString()}` : idxState.error || "Indexing failed"}
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium cursor-help ${
                               idxState.success
                                 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200"
                                 : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
@@ -875,7 +887,14 @@ export default function ContentMaintenancePage() {
                             )}
                           </span>
                         ) : (
-                          <span className="text-xs text-muted-foreground/50">—</span>
+                          <button
+                            type="button"
+                            onClick={() => handleIndexPost(post.slug)}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-muted-foreground/60 hover:bg-orange-50 hover:text-orange-600 dark:hover:bg-orange-900/20 dark:hover:text-orange-400 transition-colors"
+                            title="Request indexing"
+                          >
+                            <Zap className="h-3 w-3" /> Index
+                          </button>
                         )}
                       </td>
                       {/* Quick actions */}
@@ -890,7 +909,7 @@ export default function ContentMaintenancePage() {
                         </button>
                         {openActionsSlug === post.slug && (
                           <div
-                            ref={actionsRef}
+                            ref={(el) => { actionsRefs.current[post.slug] = el; }}
                             className="absolute right-3 top-12 z-30 w-48 rounded-lg border border-border bg-card py-1 shadow-lg"
                           >
                             <button
@@ -936,14 +955,14 @@ export default function ContentMaintenancePage() {
                               View on site
                             </Link>
                             <a
-                              href={`${process.env.NEXT_PUBLIC_WP_GRAPHQL_URL?.replace("/graphql", "")}/wp-admin/post.php?post=${post.slug}&action=edit`}
+                              href={`${(process.env.NEXT_PUBLIC_WP_GRAPHQL_URL || "").replace("/graphql", "")}/wp-admin/edit.php?s=${encodeURIComponent(post.slug)}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
                               onClick={() => setOpenActionsSlug(null)}
                             >
                               <ExternalLink className="h-3.5 w-3.5" />
-                              Edit in WordPress
+                              Find in WordPress
                             </a>
                           </div>
                         )}
@@ -990,6 +1009,104 @@ export default function ContentMaintenancePage() {
             )}
           </div>
         )}
+      </section>
+
+      {/* Manual Indexing section */}
+      <section className="rounded-xl border border-border/50 bg-card p-5 shadow-sm">
+        <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">Google Instant Indexing</h2>
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Submit URL */}
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-foreground">Submit URL</h3>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const url = manualUrl.trim();
+                if (!url) return;
+                setManualSubmitting(true);
+                setManualResult(null);
+                try {
+                  const res = await fetch("/api/indexing", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ url }),
+                  });
+                  const data = await res.json();
+                  setManualResult({ success: !!data.success, error: data.error });
+                } catch (err) {
+                  setManualResult({ success: false, error: err instanceof Error ? err.message : "Request failed" });
+                } finally {
+                  setManualSubmitting(false);
+                }
+              }}
+              className="flex gap-2"
+            >
+              <Input
+                type="url"
+                placeholder="https://kolavistudio.com/blog/..."
+                value={manualUrl}
+                onChange={(e) => setManualUrl(e.target.value)}
+                required
+                className="flex-1 h-9 rounded-lg border-border/50"
+              />
+              <Button type="submit" size="sm" disabled={manualSubmitting} className="gap-1.5">
+                {manualSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Index
+              </Button>
+            </form>
+            {manualResult && (
+              <p className={`mt-2 text-xs ${manualResult.success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                {manualResult.success ? "Successfully submitted for indexing" : `Failed: ${manualResult.error || "Unknown error"}`}
+              </p>
+            )}
+          </div>
+
+          {/* Check status */}
+          <div>
+            <h3 className="mb-2 text-sm font-medium text-foreground">Check Status</h3>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const url = statusUrl.trim();
+                if (!url) return;
+                setStatusChecking(true);
+                setStatusResult(null);
+                try {
+                  const res = await fetch(`/api/indexing?url=${encodeURIComponent(url)}`);
+                  const data = await res.json();
+                  setStatusResult({ success: data.success, notifyTime: data.latestUpdate?.notifyTime, error: data.error });
+                } catch (err) {
+                  setStatusResult({ success: false, error: err instanceof Error ? err.message : "Request failed" });
+                } finally {
+                  setStatusChecking(false);
+                }
+              }}
+              className="flex gap-2"
+            >
+              <Input
+                type="url"
+                placeholder="https://kolavistudio.com/blog/..."
+                value={statusUrl}
+                onChange={(e) => setStatusUrl(e.target.value)}
+                required
+                className="flex-1 h-9 rounded-lg border-border/50"
+              />
+              <Button type="submit" variant="outline" size="sm" disabled={statusChecking} className="gap-1.5">
+                {statusChecking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
+                Check
+              </Button>
+            </form>
+            {statusResult && (
+              <p className={`mt-2 text-xs ${statusResult.success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                {statusResult.success
+                  ? statusResult.notifyTime
+                    ? `Last notified: ${new Date(statusResult.notifyTime).toLocaleString()}`
+                    : "No notifications found for this URL"
+                  : `Error: ${statusResult.error || "Unknown error"}`}
+              </p>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* Post detail modal */}
@@ -1125,7 +1242,7 @@ export default function ContentMaintenancePage() {
                 <p className={`text-xs ${indexedSlugs[selectedPost.slug].success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                   {indexedSlugs[selectedPost.slug].success
                     ? `Indexed at ${new Date(indexedSlugs[selectedPost.slug].time).toLocaleTimeString()}`
-                    : "Indexing request failed"}
+                    : `Indexing failed${indexedSlugs[selectedPost.slug].error ? `: ${indexedSlugs[selectedPost.slug].error}` : ""}`}
                 </p>
               )}
             </div>
