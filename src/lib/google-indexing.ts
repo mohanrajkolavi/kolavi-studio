@@ -68,14 +68,18 @@ function getServiceAccount(): ServiceAccountKey {
 
 // Token cache — avoid fetching a new token for every single request.
 // Google OAuth2 tokens are valid for 1 hour; we cache for 50 minutes.
-let cachedToken: { token: string; expiresAt: number } | null = null;
+// Separate caches for different scopes.
+let cachedIndexingToken: { token: string; expiresAt: number } | null = null;
+let cachedWebmastersToken: { token: string; expiresAt: number } | null = null;
 const TOKEN_CACHE_MS = 50 * 60 * 1000; // 50 minutes
 
 /** Create a signed JWT and exchange it for a Google OAuth2 access token. */
-async function getAccessToken(): Promise<string> {
-  // Return cached token if still valid
-  if (cachedToken && Date.now() < cachedToken.expiresAt) {
-    return cachedToken.token;
+async function getAccessToken(scope: string = "https://www.googleapis.com/auth/indexing"): Promise<string> {
+  // Check scope-specific cache
+  const isWebmasters = scope.includes("webmasters");
+  const cached = isWebmasters ? cachedWebmastersToken : cachedIndexingToken;
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.token;
   }
 
   const sa = getServiceAccount();
@@ -85,7 +89,7 @@ async function getAccessToken(): Promise<string> {
   const payload = base64url(
     JSON.stringify({
       iss: sa.client_email,
-      scope: "https://www.googleapis.com/auth/indexing",
+      scope,
       aud: sa.token_uri || "https://oauth2.googleapis.com/token",
       iat: now,
       exp: now + 3600,
@@ -118,8 +122,13 @@ async function getAccessToken(): Promise<string> {
 
   const data = (await tokenRes.json()) as { access_token: string };
 
-  // Cache the token
-  cachedToken = { token: data.access_token, expiresAt: Date.now() + TOKEN_CACHE_MS };
+  // Cache the token per scope
+  const tokenObj = { token: data.access_token, expiresAt: Date.now() + TOKEN_CACHE_MS };
+  if (isWebmasters) {
+    cachedWebmastersToken = tokenObj;
+  } else {
+    cachedIndexingToken = tokenObj;
+  }
 
   return data.access_token;
 }
@@ -245,4 +254,99 @@ export async function getIndexingStatus(
  */
 export function isIndexingConfigured(): boolean {
   return !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+}
+
+// ---------------------------------------------------------------------------
+// URL Inspection API — check if a URL is actually in Google's index
+// ---------------------------------------------------------------------------
+
+export interface UrlInspectionResult {
+  url: string;
+  success: boolean;
+  /** "PASS" if indexed, "NEUTRAL", "FAIL", or "VERDICT_UNSPECIFIED" */
+  verdict?: string;
+  /** Human-readable coverage state, e.g. "Submitted and indexed" */
+  coverageState?: string;
+  /** Whether the page is actually indexed */
+  isIndexed?: boolean;
+  /** Last crawl time */
+  lastCrawlTime?: string;
+  /** Crawled as (mobile/desktop) */
+  crawledAs?: string;
+  /** Indexing state from Google */
+  indexingState?: string;
+  error?: string;
+}
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://kolavistudio.com";
+
+/**
+ * Inspect a URL using Google Search Console's URL Inspection API.
+ * Returns whether the URL is actually in Google's index.
+ */
+export async function inspectUrl(url: string): Promise<UrlInspectionResult> {
+  try {
+    const accessToken = await getAccessToken("https://www.googleapis.com/auth/webmasters.readonly");
+
+    const res = await fetch(
+      "https://searchconsole.googleapis.com/v1/urlInspection/index:inspect",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          inspectionUrl: url,
+          siteUrl: SITE_URL,
+        }),
+      }
+    );
+
+    const body = await res.json();
+
+    if (!res.ok) {
+      return {
+        url,
+        success: false,
+        error: `${res.status}: ${JSON.stringify(body)}`,
+      };
+    }
+
+    const result = body.inspectionResult?.indexStatusResult;
+    const verdict = result?.verdict as string | undefined;
+    const coverageState = result?.coverageState as string | undefined;
+    const isIndexed = verdict === "PASS";
+    const lastCrawlTime = result?.lastCrawlTime as string | undefined;
+    const crawledAs = result?.crawledAs as string | undefined;
+    const indexingState = result?.indexingState as string | undefined;
+
+    return {
+      url,
+      success: true,
+      verdict,
+      coverageState,
+      isIndexed,
+      lastCrawlTime,
+      crawledAs,
+      indexingState,
+    };
+  } catch (err) {
+    return {
+      url,
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
+ * Batch inspect multiple URLs. Runs sequentially to avoid rate limits.
+ */
+export async function inspectUrlBatch(urls: string[]): Promise<UrlInspectionResult[]> {
+  const results: UrlInspectionResult[] = [];
+  for (const url of urls) {
+    results.push(await inspectUrl(url));
+  }
+  return results;
 }

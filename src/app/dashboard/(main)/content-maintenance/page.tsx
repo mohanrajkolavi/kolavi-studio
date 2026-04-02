@@ -90,7 +90,7 @@ export default function ContentMaintenancePage() {
   const [manualResult, setManualResult] = useState<{ success: boolean; error?: string } | null>(null);
   const [statusUrl, setStatusUrl] = useState("");
   const [statusChecking, setStatusChecking] = useState(false);
-  const [statusResult, setStatusResult] = useState<{ success: boolean; notifyTime?: string; error?: string } | null>(null);
+  const [statusResult, setStatusResult] = useState<{ success: boolean; isIndexed?: boolean; coverageState?: string; lastCrawlTime?: string; error?: string } | null>(null);
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://kolavistudio.com";
 
@@ -1086,9 +1086,9 @@ export default function ContentMaintenancePage() {
             )}
           </div>
 
-          {/* Check status */}
+          {/* Check if on Google */}
           <div>
-            <h3 className="mb-2 text-sm font-medium text-foreground">Check Status</h3>
+            <h3 className="mb-2 text-sm font-medium text-foreground">Check if on Google</h3>
             <form
               onSubmit={async (e) => {
                 e.preventDefault();
@@ -1097,9 +1097,15 @@ export default function ContentMaintenancePage() {
                 setStatusChecking(true);
                 setStatusResult(null);
                 try {
-                  const res = await fetch(`/api/indexing?url=${encodeURIComponent(url)}`);
+                  const res = await fetch(`/api/indexing?url=${encodeURIComponent(url)}&mode=inspect`);
                   const data = await res.json();
-                  setStatusResult({ success: data.success, notifyTime: data.latestUpdate?.notifyTime, error: data.error });
+                  setStatusResult({
+                    success: data.success,
+                    isIndexed: data.isIndexed,
+                    coverageState: data.coverageState,
+                    lastCrawlTime: data.lastCrawlTime,
+                    error: data.error,
+                  });
                 } catch (err) {
                   setStatusResult({ success: false, error: err instanceof Error ? err.message : "Request failed" });
                 } finally {
@@ -1117,18 +1123,28 @@ export default function ContentMaintenancePage() {
                 className="flex-1 h-9 rounded-lg border-border/50"
               />
               <Button type="submit" variant="outline" size="sm" disabled={statusChecking} className="gap-1.5">
-                {statusChecking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clock className="h-3.5 w-3.5" />}
+                {statusChecking ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
                 Check
               </Button>
             </form>
             {statusResult && (
-              <p className={`mt-2 text-xs ${statusResult.success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
-                {statusResult.success
-                  ? statusResult.notifyTime
-                    ? `Last notified: ${new Date(statusResult.notifyTime).toLocaleString()}`
-                    : "No notifications found for this URL"
-                  : `Error: ${statusResult.error || "Unknown error"}`}
-              </p>
+              <div className={`mt-2 text-xs ${statusResult.success ? (statusResult.isIndexed ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400") : "text-red-600 dark:text-red-400"}`}>
+                {statusResult.success ? (
+                  <>
+                    <p className="font-medium">
+                      {statusResult.isIndexed ? "✓ URL is on Google" : "✗ URL is NOT on Google"}
+                    </p>
+                    {statusResult.coverageState && (
+                      <p className="mt-0.5">Status: {statusResult.coverageState}</p>
+                    )}
+                    {statusResult.lastCrawlTime && (
+                      <p className="mt-0.5">Last crawled: {new Date(statusResult.lastCrawlTime).toLocaleString()}</p>
+                    )}
+                  </>
+                ) : (
+                  <p>Error: {statusResult.error || "Unknown error"}</p>
+                )}
+              </div>
             )}
           </div>
         </div>

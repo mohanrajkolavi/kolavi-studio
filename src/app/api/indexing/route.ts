@@ -5,6 +5,7 @@ import {
   requestIndexing,
   requestIndexingBatch,
   getIndexingStatus,
+  inspectUrl,
   isIndexingConfigured,
   type IndexingAction,
 } from "@/lib/google-indexing";
@@ -115,7 +116,46 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "'url' query parameter is required" }, { status: 400 });
   }
 
+  const mode = request.nextUrl.searchParams.get("mode");
+
   try {
+    // mode=inspect uses URL Inspection API to check if actually on Google
+    if (mode === "inspect") {
+      const result = await inspectUrl(url.trim());
+      // Persist the real Google index status to DB
+      if (result.success) {
+        const match = url.trim().match(/\/blog\/([^/?#]+)/);
+        if (match) {
+          const slug = match[1];
+          try {
+            if (result.isIndexed) {
+              await sql`
+                INSERT INTO content_maintenance (post_slug, indexed_at, index_error, updated_at)
+                VALUES (${slug}, ${result.lastCrawlTime || new Date().toISOString()}::timestamptz, NULL, NOW())
+                ON CONFLICT (post_slug) DO UPDATE SET
+                  indexed_at = ${result.lastCrawlTime || new Date().toISOString()}::timestamptz,
+                  index_error = NULL,
+                  updated_at = NOW()
+              `;
+            } else {
+              await sql`
+                INSERT INTO content_maintenance (post_slug, index_error, updated_at)
+                VALUES (${slug}, ${result.coverageState || 'Not indexed'}, NOW())
+                ON CONFLICT (post_slug) DO UPDATE SET
+                  indexed_at = NULL,
+                  index_error = ${result.coverageState || 'Not indexed'},
+                  updated_at = NOW()
+              `;
+            }
+          } catch (dbErr) {
+            console.error("[api/indexing] Failed to persist inspection result:", dbErr);
+          }
+        }
+      }
+      return NextResponse.json(result, { status: result.success ? 200 : 502 });
+    }
+
+    // Default: check last notification time
     const result = await getIndexingStatus(url.trim());
     return NextResponse.json(result, { status: result.success ? 200 : 502 });
   } catch (e) {
