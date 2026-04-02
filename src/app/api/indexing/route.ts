@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
+import { sql } from "@/lib/db";
 import {
   requestIndexing,
   requestIndexingBatch,
@@ -7,6 +8,36 @@ import {
   isIndexingConfigured,
   type IndexingAction,
 } from "@/lib/google-indexing";
+
+/** Persist indexing result for a slug in content_maintenance table. */
+async function saveIndexResult(url: string, success: boolean, error?: string) {
+  // Extract slug from URL like https://kolavistudio.com/blog/my-post
+  const match = url.match(/\/blog\/([^/?#]+)/);
+  if (!match) return;
+  const slug = match[1];
+  try {
+    if (success) {
+      await sql`
+        INSERT INTO content_maintenance (post_slug, indexed_at, index_error, updated_at)
+        VALUES (${slug}, NOW(), NULL, NOW())
+        ON CONFLICT (post_slug) DO UPDATE SET
+          indexed_at = NOW(),
+          index_error = NULL,
+          updated_at = NOW()
+      `;
+    } else {
+      await sql`
+        INSERT INTO content_maintenance (post_slug, index_error, updated_at)
+        VALUES (${slug}, ${error || 'Unknown error'}, NOW())
+        ON CONFLICT (post_slug) DO UPDATE SET
+          index_error = ${error || 'Unknown error'},
+          updated_at = NOW()
+      `;
+    }
+  } catch (e) {
+    console.error("[api/indexing] Failed to persist index result:", e);
+  }
+}
 
 /**
  * POST /api/indexing — Submit URL(s) for Google Instant Indexing.
@@ -35,6 +66,7 @@ export async function POST(request: NextRequest) {
     // Single URL
     if (typeof body.url === "string" && body.url.trim()) {
       const result = await requestIndexing(body.url.trim(), action);
+      await saveIndexResult(body.url.trim(), result.success, result.error);
       return NextResponse.json(result, { status: result.success ? 200 : 502 });
     }
 
@@ -50,6 +82,8 @@ export async function POST(request: NextRequest) {
       }
 
       const results = await requestIndexingBatch(urls, action);
+      // Persist all results
+      await Promise.all(results.map((r) => saveIndexResult(r.url, r.success, r.error)));
       const allOk = results.every((r) => r.success);
       return NextResponse.json({ results }, { status: allOk ? 200 : 207 });
     }

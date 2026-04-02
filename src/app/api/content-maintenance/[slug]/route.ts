@@ -11,10 +11,14 @@ async function ensureContentMaintenanceTable() {
       status VARCHAR(50) DEFAULT 'unreviewed',
       note TEXT,
       last_reviewed_at TIMESTAMPTZ,
+      indexed_at TIMESTAMPTZ,
+      index_error TEXT,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_content_maintenance_status ON content_maintenance(status)`;
+  await sql`ALTER TABLE content_maintenance ADD COLUMN IF NOT EXISTS indexed_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE content_maintenance ADD COLUMN IF NOT EXISTS index_error TEXT`;
   tableEnsured = true;
 }
 

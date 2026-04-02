@@ -24,6 +24,8 @@ type PostMaintenance = {
   status: string;
   note: string | null;
   lastReviewedAt: string | null;
+  indexedAt: string | null;
+  indexError: string | null;
 };
 
 const STATUS_TABS = [
@@ -895,6 +897,20 @@ export default function ContentMaintenancePage() {
                               <><X className="h-3 w-3" /> Failed</>
                             )}
                           </span>
+                        ) : post.indexedAt ? (
+                          <span
+                            title={`Indexed on ${new Date(post.indexedAt).toLocaleDateString()}`}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium cursor-help bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200"
+                          >
+                            <CheckCircle2 className="h-3 w-3" /> Indexed
+                          </span>
+                        ) : post.indexError ? (
+                          <span
+                            title={post.indexError}
+                            className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium cursor-help bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
+                          >
+                            <X className="h-3 w-3" /> Failed
+                          </span>
                         ) : (
                           <button
                             type="button"
@@ -1238,7 +1254,7 @@ export default function ContentMaintenancePage() {
                   ) : (
                     <Zap className="h-4 w-4" />
                   )}
-                  {indexedSlugs[selectedPost.slug]?.success ? "Re-index" : "Request Indexing"}
+                  {(indexedSlugs[selectedPost.slug]?.success || selectedPost.indexedAt) ? "Re-index" : "Request Indexing"}
                 </Button>
                 <Link href={`/blog/${selectedPost.slug}`} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" size="sm" className="gap-2 rounded-lg border-border/50">
@@ -1247,13 +1263,21 @@ export default function ContentMaintenancePage() {
                   </Button>
                 </Link>
               </div>
-              {indexedSlugs[selectedPost.slug] && (
+              {indexedSlugs[selectedPost.slug] ? (
                 <p className={`text-xs ${indexedSlugs[selectedPost.slug].success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                   {indexedSlugs[selectedPost.slug].success
                     ? `Indexed at ${new Date(indexedSlugs[selectedPost.slug].time).toLocaleTimeString()}`
                     : `Indexing failed${indexedSlugs[selectedPost.slug].error ? `: ${indexedSlugs[selectedPost.slug].error}` : ""}`}
                 </p>
-              )}
+              ) : selectedPost.indexedAt ? (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  Indexed on {new Date(selectedPost.indexedAt).toLocaleDateString()}
+                </p>
+              ) : selectedPost.indexError ? (
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Last indexing failed: {selectedPost.indexError}
+                </p>
+              ) : null}
             </div>
           </div>
         </div>

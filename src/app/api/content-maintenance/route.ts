@@ -8,6 +8,8 @@ type MaintenanceRecordRow = {
   status: string;
   note: string | null;
   last_reviewed_at: Date | null;
+  indexed_at: Date | null;
+  index_error: string | null;
   updated_at: Date;
 };
 
@@ -21,10 +23,15 @@ async function ensureContentMaintenanceTable() {
       status VARCHAR(50) DEFAULT 'unreviewed',
       note TEXT,
       last_reviewed_at TIMESTAMPTZ,
+      indexed_at TIMESTAMPTZ,
+      index_error TEXT,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
   await sql`CREATE INDEX IF NOT EXISTS idx_content_maintenance_status ON content_maintenance(status)`;
+  // Add indexing columns if table already existed without them
+  await sql`ALTER TABLE content_maintenance ADD COLUMN IF NOT EXISTS indexed_at TIMESTAMPTZ`;
+  await sql`ALTER TABLE content_maintenance ADD COLUMN IF NOT EXISTS index_error TEXT`;
   tableEnsured = true;
 }
 
@@ -47,7 +54,7 @@ export async function GET(request: NextRequest) {
       await ensureContentMaintenanceTable();
       // Get maintenance records from database
       maintenanceRecords = (await sql`
-        SELECT post_slug, status, note, last_reviewed_at, updated_at
+        SELECT post_slug, status, note, last_reviewed_at, indexed_at, index_error, updated_at
         FROM content_maintenance
       `) as unknown as MaintenanceRecordRow[];
       databaseConnected = true;
@@ -64,6 +71,8 @@ export async function GET(request: NextRequest) {
           status: r.status,
           note: r.note,
           lastReviewedAt: r.last_reviewed_at,
+          indexedAt: r.indexed_at,
+          indexError: r.index_error,
           updatedAt: r.updated_at,
         },
       ])
@@ -88,6 +97,8 @@ export async function GET(request: NextRequest) {
         status: maintenance?.status || "unreviewed",
         note: maintenance?.note || null,
         lastReviewedAt: maintenance?.lastReviewedAt?.toISOString() || null,
+        indexedAt: maintenance?.indexedAt?.toISOString() || null,
+        indexError: maintenance?.indexError || null,
       };
     });
 
