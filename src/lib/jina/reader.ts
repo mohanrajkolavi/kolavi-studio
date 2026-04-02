@@ -160,10 +160,13 @@ export async function fetchViaJinaReader(url: string): Promise<FetchResult> {
 
     // Truncate very long content (downstream slices to 12k total; 5k per article is sufficient)
     const maxChars = 5000;
-    const truncated =
-      trimmed.length > maxChars
-        ? trimmed.slice(0, maxChars) + "\n\n[... content truncated for length ...]"
-        : trimmed;
+    let truncated = trimmed;
+    if (trimmed.length > maxChars) {
+      // Cut at last word boundary before maxChars to avoid mid-word splits
+      const lastSpace = trimmed.lastIndexOf(" ", maxChars);
+      const cutPoint = lastSpace > maxChars * 0.8 ? lastSpace : maxChars;
+      truncated = trimmed.slice(0, cutPoint) + "\n\n[... content truncated for length ...]";
+    }
 
     return {
       url: targetUrl,
@@ -188,7 +191,7 @@ export async function fetchCompetitorUrls(
   urls: string[],
   maxUrls = 3
 ): Promise<FetchResult[]> {
-  const toFetch = urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean);
+  const toFetch = [...new Set(urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean))];
   const sem = new Semaphore(JINA_CONCURRENCY);
   const promises = toFetch.map(async (url): Promise<FetchResult> => {
     await sem.acquire();
@@ -221,7 +224,7 @@ export async function fetchCompetitorContent(
   urls: string[],
   maxUrls = 3
 ): Promise<CompetitorArticle[]> {
-  const toFetch = urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean);
+  const toFetch = [...new Set(urls.slice(0, maxUrls).map((u) => u.trim()).filter(Boolean))];
   const sem = new Semaphore(JINA_CONCURRENCY);
   const promises = toFetch.map(async (url): Promise<FetchResult> => {
     await sem.acquire();

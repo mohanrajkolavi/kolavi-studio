@@ -266,7 +266,7 @@ export async function runResearchFetch(
   const primaryKeyword = input.primaryKeyword.trim();
   if (!primaryKeyword) throw new Error("primaryKeyword is required");
 
-  const urls = selectedUrls.slice(0, DEFAULT_MAX_COMPETITOR_URLS);
+  let urls = selectedUrls.slice(0, DEFAULT_MAX_COMPETITOR_URLS);
 
   // Load Step 1 data so we can include PAA, SERP features, Reddit threads in research chunk and result
   const researchSerp = await store.getChunkOutput(jobId, "research_serp") as
@@ -311,12 +311,14 @@ export async function runResearchFetch(
 
   // Validate competitor URLs are reachable; fail if all inaccessible
   const urlValidation = await validateSourceUrls(urls);
-  const accessibleCount = urlValidation.filter((v) => v.isAccessible).length;
-  if (urlValidation.length > 0 && accessibleCount === 0) {
+  const accessibleUrls = urlValidation.filter((v) => v.isAccessible).map((v) => v.url);
+  if (urlValidation.length > 0 && accessibleUrls.length === 0) {
     throw new Error("Selected URLs are not accessible");
   }
-  if (urlValidation.length > 0 && accessibleCount < urlValidation.length) {
-    logResearchFetch("info", { event: "research_fetch_url_validation", jobId, accessible: accessibleCount, total: urlValidation.length });
+  if (urlValidation.length > 0 && accessibleUrls.length < urlValidation.length) {
+    logResearchFetch("info", { event: "research_fetch_url_validation", jobId, accessible: accessibleUrls.length, total: urlValidation.length, inaccessible: urlValidation.filter((v) => !v.isAccessible).map((v) => v.url) });
+    // Only fetch URLs that passed validation
+    urls = accessibleUrls;
   }
 
   await store.setChunkRunning(jobId, "research");
@@ -415,6 +417,7 @@ export async function runResearchFetch(
     const validated = await validateSourceUrls(currentData.facts.map((f) => f.source));
     if (validated.length > 0) {
       const accessibleSet = new Set(validated.filter((v) => v.isAccessible).map((v) => v.url));
+      const originalCount = currentData.facts.length;
       currentData = {
         ...currentData,
         facts: currentData.facts.filter((f) => accessibleSet.has(f.source)),
@@ -424,6 +427,10 @@ export async function runResearchFetch(
           inaccessible: validated.filter((v) => !v.isAccessible).map((v) => v.url),
         },
       };
+      const removedCount = originalCount - currentData.facts.length;
+      if (removedCount > 0) {
+        emit("gemini-grounding", "started", `${removedCount} of ${originalCount} facts removed (inaccessible sources)`, 55);
+      }
     }
   }
 
@@ -991,13 +998,18 @@ export async function runDraftChunk(
 
     // -----------------------------------------------------------------------
     // Pre-allocate facts per section index (deterministic, no race conditions)
+    // Distribute evenly first, then give remainder to intro/FAQ sections
     // -----------------------------------------------------------------------
-    const statsPerSection = Math.max(1, Math.ceil(allFacts.length / Math.max(sectionCount - 1, 1)));
+    const basePerSection = sectionCount > 0 ? Math.floor(allFacts.length / sectionCount) : 0;
+    let remainder = sectionCount > 0 ? allFacts.length % sectionCount : 0;
     const factsPerSection: Array<typeof allFacts> = [];
     let factIdx = 0;
     for (let i = 0; i < sectionCount; i++) {
+      // Give remainder facts to intro (i=0) and FAQ (last) first, then other sections
       const isIntroOrFaq = i === 0 || i === sectionCount - 1;
-      const allocCount = isIntroOrFaq ? statsPerSection + 1 : statsPerSection;
+      const bonus = (isIntroOrFaq && remainder > 0) ? 1 : (!isIntroOrFaq && remainder > 0 && i < remainder) ? 1 : 0;
+      if (bonus > 0) remainder--;
+      const allocCount = basePerSection + bonus;
       const end = Math.min(factIdx + allocCount, allFacts.length);
       factsPerSection.push(allFacts.slice(factIdx, end));
       factIdx = end;
@@ -1044,8 +1056,11 @@ export async function runDraftChunk(
         factsPerSection[i], redditQuotes ?? [], brief.knowledgeEngine?.algorithmicInsights ?? []
       );
 
+      const safeHeading = section.heading
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
       const slug = section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      const html = `\n<h2 id="${slug}">${section.heading}</h2>\n${content}\n`;
+      const html = `\n<h2 id="${slug}">${safeHeading}</h2>\n${content}\n`;
 
       if (process.env.NODE_ENV !== "test") {
         console.log(`[pipeline] Section ${i + 1}/${sectionCount}: "${section.heading}" — ${wc} words, ${factsPerSection[i].length} stats allocated`);
@@ -1063,18 +1078,31 @@ export async function runDraftChunk(
 
     // -----------------------------------------------------------------------
     // Draft remaining sections in parallel batches of BATCH_SIZE
-    // Each batch uses section 0's HTML as shared context for repetition avoidance
+    // Each batch uses accumulated prior HTML as context for repetition avoidance
     // -----------------------------------------------------------------------
+    let accumulatedContext = section0Html;
     for (let batchStart = 1; batchStart < sectionCount; batchStart += BATCH_SIZE) {
       const batchEnd = Math.min(batchStart + BATCH_SIZE, sectionCount);
       const batchIndices = Array.from({ length: batchEnd - batchStart }, (_, j) => batchStart + j);
       const progressPct = Math.round((batchStart / sectionCount) * 80);
       emit("claude-draft", "started", `Writing sections ${batchStart + 1}-${batchEnd}/${sectionCount} (parallel)`, progressPct);
 
-      const batchResults = await Promise.all(
-        batchIndices.map(i => draftOneSection(i, section0Html))
+      const settled = await Promise.allSettled(
+        batchIndices.map(i => draftOneSection(i, accumulatedContext))
       );
-      sectionResults.push(...batchResults);
+      for (const result of settled) {
+        if (result.status === "fulfilled") {
+          sectionResults.push(result.value);
+        } else {
+          console.error("[pipeline] Section draft failed, skipping:", result.reason instanceof Error ? result.reason.message : result.reason);
+        }
+      }
+      // Update accumulated context with this batch's results for next batch
+      const batchHtml = sectionResults
+        .filter(r => batchIndices.includes(r.index))
+        .map(r => r.html)
+        .join("");
+      accumulatedContext += batchHtml;
     }
 
     // -----------------------------------------------------------------------
@@ -1138,6 +1166,8 @@ export async function runDraftChunk(
       );
       if (fixResult.success && typeof fixResult.data === "string" && fixResult.data.trim().length > 0) {
         assembledHtml = fixResult.data;
+      } else if (!fixResult.success) {
+        console.warn(`[pipeline] fixAuditIssues failed for ${level1Failures.length} Level 1 issue(s): ${fixResult.error ?? "unknown"}`);
       }
     }
 
@@ -1166,7 +1196,9 @@ export async function runDraftChunk(
       wordCount: totalWordCount,
     };
   } catch (err) {
-    await store.setChunkFailed(jobId, "draft", err instanceof Error ? err.message : "Draft failed");
+    const errMsg = err instanceof Error ? err.message : "Draft failed";
+    await store.setChunkFailed(jobId, "draft", errMsg);
+    await store.updatePhase(jobId, "failed", errMsg);
     throw err;
   }
 }
@@ -1198,7 +1230,7 @@ export type ValidationChunkOutput = {
 export async function runValidationChunk(
   jobId: string,
   store: JobStore,
-  budgetMs = 45_000, // Increased budget for possible auto-fix
+  budgetMs = 28_000, // Hard cap: validation must finish in <30s
   tokenUsage?: TokenUsageRecord[]
 ): Promise<ValidationChunkOutput> {
   const job = await store.getJob<PipelineInput>(jobId);
@@ -1225,27 +1257,22 @@ export async function runValidationChunk(
     let finalContent = draft.content;
 
     // Regex Nuke for Textbook Definitions (Claude habit)
+    const escapedKeyword = primaryKeyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     finalContent = finalContent
       .replace(/Local SEO is the process of optimizing your business'?s? online presence/gi, "If you want to dominate your neighborhood market, you have to master local search.")
-      .replace(new RegExp(`(?:<p>)?(?:<strong>)?${primaryKeyword}(?:<\\/strong>)?\\s+is the process of\\s+[^<]+(?:<\\/p>)?`, 'gi'), "");
+      .replace(new RegExp(`(?:<p>)?(?:<strong>)?${escapedKeyword}(?:<\\/strong>)?\\s+is the process of\\s+[^<]+(?:<\\/p>)?`, 'gi'), "");
 
     const faqEnforcement = enforceFaqCharacterLimit(finalContent, 300);
     if (!faqEnforcement.passed) finalContent = faqEnforcement.fixedHtml;
 
-    // Optional fact-check auto-fix (if input specifies)
-    let factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
-    if ((job.input as PipelineInput).autoFixHallucinations && factCheck.hallucinations.length > 0) {
-      try {
-        const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData, tokenUsage);
-        finalContent = fixResult.fixedHtml;
-        // Re-run fact check after fixes
-        factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
-      } catch (err) {
-        console.warn(`[chunks] fixHallucinations failed (non-fatal, proceeding with unfixed draft): ${err instanceof Error ? err.message : err}`);
-      }
-    }
+    // Helper: check if we've exceeded the hard deadline
+    const deadline = postprocessStartMs + budgetMs;
+    const hasTime = () => Date.now() < deadline;
 
-    // Run audit
+    // Fact-check (instant — no LLM)
+    let factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+
+    // Run audit + EEAT in parallel with fact-check result (both instant)
     let auditResult = auditArticle({
       title: draft.title ?? primaryKeyword,
       metaDescription: draft.metaDescription ?? "",
@@ -1262,60 +1289,13 @@ export async function runValidationChunk(
       currentData.facts
     );
 
-
-    // Auto-fix loop for editorial/SEO failures
-    let autoFixAttempts = 0;
-    const MAX_FIX_ATTEMPTS = 2;
-
-    while (autoFixAttempts < MAX_FIX_ATTEMPTS && auditResult.summary.fail > 0) {
-      const fixableFailures = auditResult.items
-        .filter((item) => item.severity === "fail" && item.level !== 3)
-        .map((item) => item.message);
-
-      if (fixableFailures.length === 0) break;
-
-      autoFixAttempts++;
-
-      try {
-        finalContent = await fixAuditIssues(finalContent, fixableFailures, tokenUsage);
-      } catch (err) {
-        if (process.env.NODE_ENV !== "test") {
-          console.warn("[pipeline] fixAuditIssues failed during validation; continuing with existing content", err);
-        }
-      }
-
-      // Re-audit (even if fix failed, to keep loop conditions consistent)
-      auditResult = auditArticle({
-        title: draft.title ?? primaryKeyword,
-        metaDescription: draft.metaDescription ?? "",
-        content: finalContent,
-        slug: draft.suggestedSlug,
-        focusKeyword: primaryKeyword,
-        extraValueThemes: brief?.extraValueThemes?.length ? brief.extraValueThemes : undefined,
-      });
-    }
-
-    // Compute semantic competitor diff dependencies
+    // Compute semantic competitor diff dependencies (needed for parallel block)
     const competitors = (research?.competitors as { url: string; content: string }[]) ?? [];
     const extractedTopics = brief?.outline?.sections?.flatMap(s => s.topics) ?? [];
 
-    // Compute independent outputs in parallel
-    const [
-      schemaMarkup,
-      contentDiff,
-      semanticSimilarity,
-      contentDecayRisk
-    ] = await Promise.all([
-      // 1. Schema Generation
-      Promise.resolve(auditResult.schemaMarkup ?? generateSchemaMarkup(
-        finalContent,
-        draft.title ?? primaryKeyword,
-        draft.metaDescription ?? "",
-        draft.suggestedSlug,
-        primaryKeyword
-      )),
-
-      // 2. Content Diff
+    // Start parallel non-LLM outputs immediately (don't wait for LLM fixes)
+    const parallelOpsPromise = Promise.all([
+      // 1. Content Diff
       Promise.resolve().then(() => {
         const competitorsWithContent = competitors.filter(
           (c) => typeof c.content === "string" && c.content.trim().length > 0
@@ -1323,9 +1303,12 @@ export async function runValidationChunk(
         return competitorsWithContent.length > 0
           ? generateContentDiff(finalContent, competitorsWithContent, extractedTopics)
           : undefined;
+      }).catch((err) => {
+        console.error("[validation] Content diff failed:", err instanceof Error ? err.message : err);
+        return undefined;
       }),
 
-      // 3. Semantic Similarity
+      // 2. Semantic Similarity
       Promise.resolve().then(() => {
         const competitorsWithContent = competitors.filter(
           (c) => typeof c.content === "string" && c.content.trim().length > 0
@@ -1333,11 +1316,77 @@ export async function runValidationChunk(
         return competitorsWithContent.length > 0
           ? computeSemanticSimilarity(finalContent, competitorsWithContent)
           : undefined;
+      }).catch((err) => {
+        console.error("[validation] Semantic similarity failed:", err instanceof Error ? err.message : err);
+        return undefined;
       }),
 
-      // 4. Content Decay Risk
-      Promise.resolve(assessContentDecay(new Date().toISOString(), primaryKeyword))
+      // 3. Content Decay Risk
+      Promise.resolve(assessContentDecay(new Date().toISOString(), primaryKeyword)).catch((err) => {
+        console.error("[validation] Content decay assessment failed:", err instanceof Error ? err.message : err);
+        return undefined;
+      }),
     ]);
+
+    // Optional hallucination auto-fix (if input specifies) — 10s timeout
+    if (hasTime() && (job.input as PipelineInput).autoFixHallucinations && factCheck.hallucinations.length > 0) {
+      try {
+        const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData, tokenUsage);
+        finalContent = fixResult.fixedHtml;
+        factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+      } catch (err) {
+        console.warn(`[chunks] fixHallucinations failed (non-fatal, proceeding with unfixed draft): ${err instanceof Error ? err.message : err}`);
+      }
+    }
+
+    // Auto-fix audit failures — single attempt only, skip if out of time
+    let autoFixAttempts = 0;
+
+    if (hasTime() && auditResult.summary.fail > 0) {
+      const fixableFailures = auditResult.items
+        .filter((item) => item.severity === "fail" && item.level !== 3)
+        .map((item) => item.message);
+
+      if (fixableFailures.length > 0) {
+        autoFixAttempts = 1;
+        const contentBefore = finalContent;
+
+        try {
+          finalContent = await fixAuditIssues(finalContent, fixableFailures, tokenUsage);
+        } catch (err) {
+          if (process.env.NODE_ENV !== "test") {
+            console.warn("[pipeline] fixAuditIssues failed during validation; continuing with existing content", err);
+          }
+        }
+
+        if (finalContent !== contentBefore) {
+          auditResult = auditArticle({
+            title: draft.title ?? primaryKeyword,
+            metaDescription: draft.metaDescription ?? "",
+            content: finalContent,
+            slug: draft.suggestedSlug,
+            focusKeyword: primaryKeyword,
+            extraValueThemes: brief?.extraValueThemes?.length ? brief.extraValueThemes : undefined,
+          });
+        }
+      }
+    }
+
+    // Await parallel ops (schema uses final auditResult, so compute it after fixes)
+    const [contentDiff, semanticSimilarity, contentDecayRisk] = await parallelOpsPromise;
+
+    const schemaMarkup = await Promise.resolve(
+      auditResult.schemaMarkup ?? generateSchemaMarkup(
+        finalContent,
+        draft.title ?? primaryKeyword,
+        draft.metaDescription ?? "",
+        draft.suggestedSlug,
+        primaryKeyword
+      )
+    ).catch((err) => {
+      console.error("[validation] Schema generation failed:", err instanceof Error ? err.message : err);
+      return undefined;
+    });
 
     const output: ValidationChunkOutput = {
       faqEnforcement: {
@@ -1352,7 +1401,7 @@ export async function runValidationChunk(
         issues: factCheck.issues,
         skippedRhetorical: factCheck.skippedRhetorical,
       },
-      schemaMarkup,
+      schemaMarkup: schemaMarkup ?? { article: {}, faq: null, breadcrumb: null, faqSchemaNote: "Schema generation failed" },
       finalContent,
       autoFixAttempts,
       contentDiff,

@@ -527,6 +527,11 @@ export const ResearchBriefSchema = z.object({
   clusterPosition: z.enum(["pillar", "spoke", "standalone"]).optional(),
   /** Broader cluster topic when this article is a "spoke". */
   clusterTopic: z.string().optional(),
+  /** Pre-structured FAQ Q&A pairs from the research brief for the FAQ section. */
+  faqPlan: z.array(z.object({
+    question: z.string(),
+    answer: z.string(),
+  })).optional(),
 });
 
 /** Used when GPT returns brief without currentData (merged server-side). */

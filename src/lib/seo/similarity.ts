@@ -5,11 +5,23 @@
 
 import { stripHtml } from "@/lib/seo/article-audit";
 
+const STOP_WORDS = new Set([
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+    "by", "from", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had",
+    "do", "does", "did", "will", "would", "could", "should", "may", "might", "shall",
+    "can", "this", "that", "these", "those", "it", "its", "not", "no", "nor", "so",
+    "if", "then", "than", "when", "where", "how", "what", "which", "who", "whom",
+    "all", "each", "every", "both", "few", "more", "most", "other", "some", "such",
+    "only", "own", "same", "too", "very", "just", "also", "now", "here", "there",
+    "about", "up", "out", "into", "over", "after", "before", "between", "under",
+    "your", "you", "they", "them", "their", "our", "his", "her", "we", "my",
+]);
+
 /**
- * Split text into individual words for basic term frequency.
+ * Split text into individual words for basic term frequency, filtering stop words.
  */
 function tokenize(text: string): string[] {
-    return text.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(w => w.length > 2);
+    return text.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(w => w.length > 2 && !STOP_WORDS.has(w));
 }
 
 /**

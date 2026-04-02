@@ -32,8 +32,9 @@ export function assessContentDecay(
     const ageMs = Date.now() - date.getTime();
     const ageMonths = ageMs / (1000 * 60 * 60 * 24 * 30);
 
-    // Fast-moving topics decay quicker (tech, news, SEO, marketing, AI)
-    const volatilityMultiplier = /\b(?:tech|technology|news|seo|marketing|ai)\b/i.test(topicCategory)
+    // Fast-moving topics decay quicker (tech, news, SEO, marketing, AI, social media, etc.)
+    // topicCategory may be an actual category or a keyword — match broadly
+    const volatilityMultiplier = /\b(?:tech|technology|news|seo|marketing|ai|artificial intelligence|machine learning|social media|crypto|blockchain|saas|software|digital|startup|algorithm|llm|gpt|chatgpt)\b/i.test(topicCategory)
         ? 1.5
         : 1.0;
     const adjustedAge = ageMonths * volatilityMultiplier;

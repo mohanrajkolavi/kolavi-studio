@@ -71,6 +71,21 @@ function getPath(url: string): string {
   }
 }
 
+/** Normalize URL for dedup: lowercase domain, strip trailing slash and common tracking params. */
+function normalizeUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    u.hostname = u.hostname.toLowerCase();
+    u.pathname = u.pathname.replace(/\/+$/, "");
+    u.searchParams.delete("utm_source");
+    u.searchParams.delete("utm_medium");
+    u.searchParams.delete("utm_campaign");
+    return u.toString();
+  } catch {
+    return url.trim();
+  }
+}
+
 /**
  * Returns true if the URL looks like an article (has substantive path, not homepage/category/file).
  */
@@ -217,7 +232,13 @@ export async function searchRedditDiscussions(
 
     if (!response.ok) return [];
 
-    const data = (await response.json()) as SerperResponse;
+    let data: SerperResponse;
+    try {
+      data = (await response.json()) as SerperResponse;
+    } catch {
+      console.warn("[serper] Reddit search returned invalid JSON");
+      return [];
+    }
     const organic = data.organic ?? [];
     const threads: RedditThread[] = [];
 
@@ -283,15 +304,24 @@ export async function searchCompetitorUrls(
     throw new Error(`Serper API error: ${response.status} ${response.statusText}. ${text || ""}`);
   }
 
-  const data = (await response.json()) as SerperResponse;
+  let data: SerperResponse;
+  try {
+    data = (await response.json()) as SerperResponse;
+  } catch (jsonErr) {
+    throw new Error(`Serper API returned invalid JSON: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`);
+  }
   const organic = data.organic ?? [];
   const beforeCount = organic.length;
 
   const filtered: SerpResult[] = [];
+  const seenUrls = new Set<string>();
   for (const item of organic) {
     const url = item.link?.trim();
     if (!url) continue;
+    const normalized = normalizeUrl(url);
+    if (seenUrls.has(normalized)) continue;
     if (!isArticleUrl(url)) continue;
+    seenUrls.add(normalized);
     filtered.push({
       url,
       title: item.title ?? "",
@@ -304,10 +334,10 @@ export async function searchCompetitorUrls(
 
   // Fill remaining slots with non-article URLs so we always return up to maxResults
   if (filtered.length < maxResults) {
-    const usedUrls = new Set(filtered.map((r) => r.url));
     for (const item of organic) {
       const url = item.link?.trim();
-      if (!url || usedUrls.has(url)) continue;
+      if (!url || seenUrls.has(normalizeUrl(url))) continue;
+      seenUrls.add(normalizeUrl(url));
       const domain = getDomain(url);
       if (NON_ARTICLE_DOMAINS.has(domain)) continue;
       filtered.push({
@@ -361,7 +391,12 @@ export async function searchCompetitorUrlsWithPaa(
     throw new Error(`Serper API error: ${mainResponse.status} ${mainResponse.statusText}. ${text || ""}`);
   }
 
-  const data = (await mainResponse.json()) as SerperResponse;
+  let data: SerperResponse;
+  try {
+    data = (await mainResponse.json()) as SerperResponse;
+  } catch (jsonErr) {
+    throw new Error(`Serper API returned invalid JSON: ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`);
+  }
   const organic = data.organic ?? [];
   const paaRaw = data.peopleAlsoAsk ?? data.people_also_ask ?? [];
   const paaQuestions = paaRaw
@@ -433,8 +468,10 @@ export async function searchCompetitorUrlsWithPaa(
   }
 
   const mergedRedditThreads = [...redditThreads];
+  const seenRedditUrls = new Set(mergedRedditThreads.map((t) => t.url));
   for (const r of organicReddit) {
-    if (!mergedRedditThreads.some((t) => t.url === r.url)) {
+    if (!seenRedditUrls.has(r.url)) {
+      seenRedditUrls.add(r.url);
       mergedRedditThreads.push(r);
     }
   }

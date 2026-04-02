@@ -194,7 +194,7 @@ Return as structured JSON (no other text):
   const seenFacts = new Set<string>();
   const mergedFacts: { fact: string; source: string; date?: string }[] = [];
   for (const f of [...mainFacts, ...statsFacts]) {
-    const key = f.fact?.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 100);
+    const key = f.fact?.toLowerCase().replace(/\s+/g, " ").trim().slice(0, 200);
     if (key && !seenFacts.has(key)) {
       seenFacts.add(key);
       mergedFacts.push(f);

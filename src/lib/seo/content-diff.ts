@@ -16,7 +16,7 @@ export type ContentDiffResult = {
  * In a production system, this could use NLP/embeddings to match semantic topics.
  */
 function extractKeyPhrases(text: string): Set<string> {
-    const words = text.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(w => w.length > 3);
+    const words = text.toLowerCase().replace(/[^\w\s]/g, "").split(/\s+/).filter(w => w.length > 1);
     const phrases = new Set<string>();
 
     // Extract 2-grams and 3-grams as simple proxies for topics

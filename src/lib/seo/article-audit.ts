@@ -1110,10 +1110,8 @@ function extractFaqBlock(html: string): { questions: string[]; answers: string[]
   for (let i = 0; i < qMatches.length; i++) {
     questions.push(stripHtml(qMatches[i][1]).trim());
     const afterH3 = qMatches[i].index! + qMatches[i][0].length;
-    const nextH3 = qMatches.slice(i + 1)[0];
-    const end = nextH3
-      ? qMatches[i].index! + block.slice(afterH3 - qMatches[i].index!).indexOf(nextH3[0])
-      : block.length;
+    const nextH3 = i + 1 < qMatches.length ? qMatches[i + 1] : undefined;
+    const end = nextH3 ? nextH3.index! : block.length;
     const rawAnswer = block.slice(afterH3, end);
     const pMatch = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(rawAnswer);
     const text = stripHtml(pMatch ? pMatch[1] : rawAnswer).trim();
@@ -1150,9 +1148,9 @@ export function enforceFaqCharacterLimit(
       const lastSpace = truncated.slice(0, maxChars - 1).lastIndexOf(" ");
       truncated = (lastSpace > 0 ? truncated.slice(0, lastSpace) : truncated.slice(0, maxChars - 1)).trim() + ".";
     }
-    if (qMatches[i]) {
+    if (i < qMatches.length && qMatches[i]) {
       const segmentStart = afterFaq + qMatches[i].index! + qMatches[i][0].length;
-      const segmentEnd = qMatches[i + 1] ? afterFaq + qMatches[i + 1].index! : articleHtml.length;
+      const segmentEnd = (i + 1 < qMatches.length && qMatches[i + 1]) ? afterFaq + qMatches[i + 1].index! : articleHtml.length;
       const segment = fixedHtml.slice(segmentStart, segmentEnd);
       const pMatch = segment.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
       if (pMatch) {
@@ -1417,8 +1415,8 @@ export function generateSchemaMarkup(
     for (let i = 0; i < qMatches.length; i++) {
       const name = stripHtml(qMatches[i][1]);
       const afterH3 = qMatches[i].index! + qMatches[i][0].length;
-      const nextH3 = qMatches.slice(i + 1)[0];
-      const end = nextH3 ? qMatches[i].index! + block.slice(afterH3 - qMatches[i].index!).indexOf(nextH3[0]) : block.length;
+      const nextH3 = i + 1 < qMatches.length ? qMatches[i + 1] : undefined;
+      const end = nextH3 ? nextH3.index! : block.length;
       const rawAnswer = block.slice(afterH3, end);
       const pMatch = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(rawAnswer);
       const text = stripHtml(pMatch ? pMatch[1] : rawAnswer).slice(0, GEO_FAQ_ANSWER_MAX_CHARS);
@@ -1959,9 +1957,14 @@ export function evaluateEEATScore(
   }
 
   // 4. Entity Signals (15 pts)
-  // Heuristic: Count capitalized words (not at the start of a sentence) to estimate Named Entities
-  const entityMatches = stripHtml(articleHtml).match(/(?<=\s)[A-Z][a-z]+/g) || [];
-  const entityScore = Math.min(15, entityMatches.length >= 15 ? 15 : entityMatches.length);
+  // Heuristic: Count capitalized words/acronyms (not sentence-initial common words) to estimate Named Entities
+  const plainText = stripHtml(articleHtml);
+  const allCapsAcronyms = plainText.match(/\b[A-Z]{2,}\b/g) || [];
+  const capitalizedWords = plainText.match(/(?<=\s)[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [];
+  const commonWords = new Set(["the", "a", "an", "this", "that", "these", "those", "it", "its", "but", "and", "or", "so", "if", "when", "while", "after", "before"]);
+  const filteredEntities = [...capitalizedWords, ...allCapsAcronyms].filter(e => !commonWords.has(e.toLowerCase()));
+  const uniqueEntities = new Set(filteredEntities.map(e => e.toLowerCase()));
+  const entityScore = Math.min(15, uniqueEntities.size >= 15 ? 15 : uniqueEntities.size);
   if (entityScore < 10) feedback.push("Low Entity Signals. Ensure proper nouns, tools, and brands are explicitly named rather than using pronouns.");
 
   // 5. Readability (15 pts)

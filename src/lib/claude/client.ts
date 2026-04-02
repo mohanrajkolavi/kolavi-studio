@@ -608,7 +608,7 @@ The following is a sample of the client's existing writing. Match the tone, voca
   - Each answer must teach something NEW (so-what, comparison, caveat, next step). NEVER repeat body content.
   - Google Featured Snippets, AI Overviews, Perplexity, and ChatGPT Search extract FAQ blocks directly. This section is the highest-value AI SEO asset in the article.
 ${brief.geoRequirements.faqStrategy ? `- FAQ strategy: ${brief.geoRequirements.faqStrategy}` : ""}
-${(brief as any).faqPlan?.length ? `- FAQ plan (use as basis):\n${((brief as any).faqPlan as { question: string; answer: string }[]).map((f: { question: string; answer: string }) => `  Q: ${f.question}`).join("\n")}` : ""}
+${brief.faqPlan?.length ? `- FAQ plan (use as basis):\n${brief.faqPlan.map((f) => `  Q: ${f.question}`).join("\n")}` : ""}
 
 ## WORD COUNT
 Target: ${brief.wordCount.target} words (±5% total). Section targetWords sum to ${brief.outline.estimatedWordCount}. Each section ±10%.
@@ -763,8 +763,8 @@ Enforce these in this specific section.`;
   const isFaqSection = /faq|frequently asked/i.test(section.heading);
 
   // Build FAQ plan block if available
-  const faqPlanBlock = isFaqSection && (brief as any).faqPlan?.length
-    ? `\n## FAQ PLAN (use these as basis — rephrase for natural voice)\n${((brief as any).faqPlan as { question: string; answer: string }[]).map((f: { question: string; answer: string }) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")}\n`
+  const faqPlanBlock = isFaqSection && brief.faqPlan?.length
+    ? `\n## FAQ PLAN (use these as basis — rephrase for natural voice)\n${brief.faqPlan.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n\n")}\n`
     : "";
 
   // FAQ-specific output instructions
@@ -861,7 +861,10 @@ Return ONLY valid JSON. No H2 tag for the section title. All sub-headings must u
 
   try {
     const parsed = JSON.parse(jsonText) as { content: string };
-    if (!parsed.content) return "";
+    if (!parsed.content) {
+      console.warn("[writeDraftSection] Claude returned empty or falsy content field — section will be blank");
+      return "";
+    }
     return parsed.content;
   } catch (err) {
     // If repair fails, fall back to tolerant extraction of the "content" string
@@ -982,9 +985,9 @@ ${draftHtml}`;
   if (!contentBlock || contentBlock.type !== "text") return draftHtml;
 
   let html = contentBlock.text.trim();
-  if (html.startsWith("```html")) html = html.slice(7);
-  else if (html.startsWith("```")) html = html.slice(3);
-  if (html.endsWith("```")) html = html.slice(0, -3);
+  if (html.startsWith("```html")) html = html.slice(7).replace(/^\n/, "");
+  else if (html.startsWith("```")) html = html.slice(3).replace(/^\n/, "");
+  if (html.endsWith("```")) html = html.slice(0, -3).replace(/\n$/, "");
 
   return html.trim() || draftHtml;
 }
@@ -1211,7 +1214,7 @@ OUTPUT FORMAT:
 3. JSON array: [{ "originalText": "...", "replacement": "...", "reason": "...", "replacedWithVerifiedFact": true/false }]
 No markdown code fences.`;
 
-const HALLUCINATION_FIX_TIMEOUT_MS = 90_000;
+const HALLUCINATION_FIX_TIMEOUT_MS = 10_000;
 
 export type FixHallucinationsResult = {
   fixedHtml: string;
@@ -1333,6 +1336,8 @@ ${draftHtml}`;
  * Receives the HTML and a list of failure messages from the audit.
  * Rewrites only what's necessary to fix the issues.
  */
+const AUDIT_FIX_TIMEOUT_MS = 12_000;
+
 export async function fixAuditIssues(
   draftHtml: string,
   auditFailures: string[],
@@ -1361,13 +1366,19 @@ FIX INSTRUCTIONS BY TYPE:
 
 Return ONLY the raw fixed HTML. No markdown blocks, no JSON wrapper, no explanation.`;
 
-  const stream = anthropic.messages.stream({
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), AUDIT_FIX_TIMEOUT_MS);
+  try {
+  const stream = anthropic.messages.stream(
+    {
     model: CLAUDE_DEFAULT_MODEL,
     max_tokens: 32000,
     temperature: 0.2,
     system: [{ type: "text" as const, text: system, cache_control: { type: "ephemeral" as const } }],
     messages: [{ role: "user", content: draftHtml }],
-  });
+    },
+    { signal: controller.signal }
+  );
   const message = await stream.finalMessage();
 
   const durationMs = Date.now() - startMs;
@@ -1385,11 +1396,21 @@ Return ONLY the raw fixed HTML. No markdown blocks, no JSON wrapper, no explanat
   if (!contentBlock || contentBlock.type !== "text") return draftHtml;
 
   let html = contentBlock.text.trim();
-  if (html.startsWith("```html")) html = html.slice(7);
-  else if (html.startsWith("```")) html = html.slice(3);
-  if (html.endsWith("```")) html = html.slice(0, -3);
+  if (html.startsWith("```html")) html = html.slice(7).replace(/^\n/, "");
+  else if (html.startsWith("```")) html = html.slice(3).replace(/^\n/, "");
+  if (html.endsWith("```")) html = html.slice(0, -3).replace(/\n$/, "");
 
   return html.trim() || draftHtml;
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      console.warn("[fixAuditIssues] Timeout — returning original content");
+    } else {
+      console.error("[fixAuditIssues]", err);
+    }
+    return draftHtml;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1675,7 +1696,7 @@ Required keys: keyword, outline, gaps, editorialStyle, editorialStyleFallback, g
 
   function hasBestVersionFields(n: Record<string, unknown>): boolean {
     const themes = n.extraValueThemes;
-    const hasThemes = Array.isArray(themes) && themes.length >= 2;
+    const hasThemes = Array.isArray(themes) && themes.length >= 3;
     const hasSummary = typeof n.similaritySummary === "string" && (n.similaritySummary as string).trim().length > 0;
     const hasFreshness = typeof n.freshnessNote === "string" && (n.freshnessNote as string).trim().length > 0;
     return hasThemes && (hasSummary || hasFreshness);
@@ -1717,7 +1738,12 @@ Required keys: keyword, outline, gaps, editorialStyle, editorialStyleFallback, g
         throw new Error("buildResearchBrief: empty response from Claude");
       }
       const raw = stripJsonMarkdown(content);
-      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      let parsed: Record<string, unknown>;
+      try {
+        parsed = JSON.parse(raw) as Record<string, unknown>;
+      } catch (jsonErr) {
+        throw new Error(`buildResearchBrief: JSON parse failed after markdown stripping (attempt ${attempt}): ${jsonErr instanceof Error ? jsonErr.message : String(jsonErr)}`);
+      }
       const normalized = normalizeBriefOutput(parsed, input.primaryKeyword);
 
       const validated = ResearchBriefWithoutCurrentDataSchema.safeParse(normalized);
@@ -1761,11 +1787,17 @@ Required keys: keyword, outline, gaps, editorialStyle, editorialStyleFallback, g
           brief = { ...brief, wordCount: wordCountOverride };
         }
 
-        if (attempt === 1 && !hasBestVersionFields(normalized)) {
-          if (process.env.NODE_ENV !== "test") {
-            console.warn("[claude] buildResearchBrief: best-version fields missing, retrying with hint");
+        if (!hasBestVersionFields(normalized)) {
+          if (attempt === 1) {
+            if (process.env.NODE_ENV !== "test") {
+              console.warn("[claude] buildResearchBrief: best-version fields missing, retrying with hint");
+            }
+            continue;
           }
-          continue;
+          // Attempt 2: log warning but return what we have rather than looping forever
+          if (process.env.NODE_ENV !== "test") {
+            console.warn("[claude] buildResearchBrief: best-version fields still missing after retry, proceeding anyway");
+          }
         }
         return brief;
       }

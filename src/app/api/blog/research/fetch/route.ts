@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     serpResults?: Array<{ position?: number; title?: string; url: string }>;
   };
   const jobId = parsed?.jobId;
-  const selectedUrls = Array.isArray(parsed?.selectedUrls) ? parsed.selectedUrls : [];
+  const selectedUrls = Array.isArray(parsed?.selectedUrls) ? [...new Set(parsed.selectedUrls.map((u: string) => u.trim()).filter(Boolean))] : [];
   const clientInput = parsed?.input;
   const clientSerpResults = Array.isArray(parsed?.serpResults) ? parsed.serpResults : [];
 
