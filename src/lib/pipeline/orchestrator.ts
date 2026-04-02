@@ -26,6 +26,7 @@ import {
   type SchemaMarkup,
   type TokenUsageRecord,
   RETRY_FAST,
+  RETRY_JINA,
   RETRY_STANDARD,
   RETRY_STANDARD_FAST,
   RETRY_EXPENSIVE,
@@ -34,8 +35,9 @@ import {
 import { searchCompetitorUrlsWithPaa } from "@/lib/serper/client";
 import { fetchCompetitorContent } from "@/lib/jina/reader";
 import { fetchCurrentData } from "@/lib/gemini/client";
-import { extractTopicsAndStyle, buildResearchBrief } from "@/lib/openai/client";
-import { writeDraft, fixHallucinationsInContent } from "@/lib/claude/client";
+import { extractTopicsAndStyle } from "@/lib/openai/client";
+import { writeDraft, fixHallucinationsInContent, buildResearchBrief } from "@/lib/claude/client";
+import { lintDraft, fixDefinitionOpening } from "@/lib/pipeline/content-registry";
 import {
   auditArticle,
   generateSchemaMarkup,
@@ -97,12 +99,13 @@ class TimeBudget {
     return Math.max(0, this.budgetMs - this.elapsed());
   }
   /** Return the lesser of requested timeout and remaining budget (minus 5s safety margin). */
-  cap(requestedMs: number): number {
+  cap(requestedMs: number, minMs?: number): number {
     const remaining = this.remaining();
     // If less than 10s left, don't allocate time (the 5s floor would violate the safety margin)
     if (remaining < 10_000) return Math.max(remaining - 2_000, 1_000);
     const capped = Math.min(requestedMs, remaining - 5_000);
-    return Math.max(capped, 5_000); // floor at 5s so a step can at least try
+    const floor = minMs ?? 5_000;
+    return Math.max(capped, floor); // floor at 5s (or minMs) so a step can at least try
   }
   isExhausted(): boolean {
     return this.remaining() <= 10_000; // <10s left = exhausted
@@ -284,7 +287,7 @@ export async function runPipeline(
       const t0 = Date.now();
       const r = await withRetry(
         async () => fetchCompetitorContent(urls, DEFAULT_MAX_COMPETITOR_URLS),
-        { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
+        { ...RETRY_JINA, timeoutMs: budget.cap(RETRY_JINA.timeoutMs) },
         "jina"
       );
       jinaDurationMs = Date.now() - t0;
@@ -389,7 +392,7 @@ export async function runPipeline(
   emit("gpt-brief", "started", "Building strategic research brief...", 30);
   const briefResult = await withRetry(
     async () => buildResearchBrief(topicExtraction, currentData, input, undefined, tokenUsage),
-    { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
+    { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(120000, 120_000) },
     "gpt-brief"
   );
   if (!briefResult.success || !briefResult.data) {
@@ -450,7 +453,11 @@ export async function runPipeline(
   emit("faq-enforcement", "started", "Enforcing FAQ character limits...", 82);
   let finalContent = draft.content;
 
-  // Regex Nuke for Textbook Definitions (Claude habit)
+  // --- Phase 5: Style Linter + Definition Nuke ---
+  // Programmatic fix for definition openings (prompt-engineering cannot prevent this)
+  finalContent = fixDefinitionOpening(finalContent, primaryKeyword);
+
+  // Legacy regex nuke (kept as fallback for edge cases the new fixer misses)
   finalContent = finalContent
     .replace(
       /Local SEO is the process of optimizing your business'?s? online presence/gi,
@@ -463,6 +470,15 @@ export async function runPipeline(
       ),
       ""
     );
+
+  // Run style linter (non-blocking — log violations for monitoring)
+  const styleViolations = lintDraft(finalContent, primaryKeyword);
+  if (styleViolations.length > 0 && process.env.NODE_ENV !== "test") {
+    console.log(`[style-linter] ${styleViolations.length} violation(s) detected:`);
+    for (const v of styleViolations) {
+      console.log(`  [${v.type}] ${v.location}: ${v.evidence.slice(0, 100)}`);
+    }
+  }
 
   const faqEnforcement = enforceFaqCharacterLimit(finalContent, 300);
   if (!faqEnforcement.passed) {

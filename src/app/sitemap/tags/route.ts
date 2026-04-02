@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { SITE_URL } from "@/lib/constants";
 import { getTagEntries, buildUrlsetXml } from "@/lib/sitemap";
 
+export const revalidate = 3600;
+
 export async function GET() {
   const entries = await getTagEntries();
   const xml = buildUrlsetXml(entries, SITE_URL);

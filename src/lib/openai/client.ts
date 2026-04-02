@@ -1,6 +1,8 @@
 /**
  * OpenAI API client — Step 2 (topic extraction) + Step 3 (strategic brief), GPT-4.1.
  * GPT-4.1 is faster than Claude Sonnet for structured JSON extraction with large payloads.
+ * Brief building (Step 3) also available via claude/client.ts (Claude Opus).
+ * Exports shared helpers: normalizeBriefOutput, normalizeMetaOption, getIntentGuidanceForMeta, types.
  */
 
 import OpenAI from "openai";
@@ -96,40 +98,40 @@ export async function extractTopicsAndStyle(
         .join("\n\n---\n\n")
       : "No competitor content provided. Generate expected topics and a default editorial style for a generic blog article.";
 
-  const rootKeys = hasPaa
-    ? "topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount, paaAnalysis"
-    : "topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount";
+  // Always include paaAnalysis in expected keys (empty array when no PAA provided) to avoid schema fragility
+  const rootKeys = "topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount, paaAnalysis";
 
-  const systemPrompt = `You are analyzing competitor articles for a content strategy. EXTRACT and REPORT the following. Do NOT decide the final outline — only report what you observe.
+  const systemPrompt = `You are the extraction engine in a content pipeline. EXTRACT and REPORT only — do NOT decide the final outline. Your output feeds directly into the brief-building model (Step 3) and the Knowledge Engine.
 
-A) TOPIC EXTRACTION
-- Extract 15-25 SEMANTIC TOPICS (concepts, not single keywords).
-- Good: "budgeting and cost planning", "hiring and retention strategies", "compliance and legal considerations". Bad: "budget", "hiring", "compliance" (single keywords).
-- For each topic: importance = "essential" (4-5/5 cover it), "recommended" (2-3/5), "differentiator" (0-1/5). coverageCount, keyTerms, exampleContent, recommendedDepth.
+A) TOPIC EXTRACTION (15-25 semantic topics)
+- Extract concepts, not single keywords. Good: "budgeting and cost planning". Bad: "budget".
+- If two topics are semantically identical (e.g., "cost planning" and "budgeting"), merge under the more specific name.
+- If a topic appears across 4+ competitors with identical framing, mark importance as "essential" and flag it as saturated in exampleContent.
+- Per topic: importance ("essential" = 4-5/5 cover, "recommended" = 2-3/5, "differentiator" = 0-1/5), coverageCount, keyTerms, exampleContent, recommendedDepth.
 
 B) GAP IDENTIFICATION
-- A gap qualifies ONLY if: (1) real reader demand, (2) missing from MOST competitors, (3) concrete actionable angle.
-- For EACH gap cite specific evidence: which URLs fall short and how (e.g. "URL X only mentions Y in one sentence"). Include evidence (array of strings), readerDemand, actionableAngle. No vague gaps.
+- A gap qualifies ONLY if ALL THREE: (1) real reader demand (search volume signal or PAA evidence), (2) missing from MOST competitors, (3) concrete actionable angle (not vague).
+- Per gap: cite specific evidence (which URLs fall short, how). Include evidence (string[]), readerDemand, actionableAngle. The brief builder uses these to decide H2 vs H3 placement.
 
-C) HEADING PATTERN EXTRACTION (raw data only)
-- For EACH competitor: list their H2 and H3 headings exactly as used. competitorHeadings: array of { url, h2s: string[], h3s: string[] }. Do NOT create a "recommended outline".
+C) HEADING PATTERNS (raw data, no recommendations)
+- Per competitor: { url, h2s: string[], h3s: string[] }. Report exact headings. Do NOT create a recommended outline.
 
-D) EDITORIAL STYLE ANALYSIS
+D) EDITORIAL STYLE (the writer model enforces these as constraints)
 - sentenceLength (average, distribution %), paragraphLength (averageSentences, distribution %).
-- tone: MUST be specific (e.g. "authoritative but approachable with short how-to lists") — NOT generic like "professional" or "informative" alone.
-- readingLevel, contentMix (prose/lists %), dataDensity (how data-heavy — specific, not generic).
-- pointOfView: "first" | "second" | "third" | "mixed". realExamplesFrequency: how often competitors use real examples (specific, e.g. "one case study per article"). introStyle, ctaStyle.
+- tone: MUST be specific ("authoritative but approachable with short how-to lists") — NOT generic ("professional", "informative").
+- readingLevel, contentMix (prose/lists %), dataDensity (specific: "1 stat per 150 words" not "data-heavy").
+- pointOfView: "first"|"second"|"third"|"mixed". realExamplesFrequency (specific: "one case study per article"). introStyle, ctaStyle.
 
 E) COMPETITOR ANALYSIS
-- Per competitor: url, strengths, weaknesses, aiLikelihood: "likely_human" | "uncertain" | "likely_ai".
+- Per competitor: url, strengths, weaknesses, aiLikelihood: "likely_human"|"uncertain"|"likely_ai". The brief builder uses aiLikelihood to generate competitor differentiation instructions.
 
 F) WORD COUNT
-- competitorAverage, recommended (avg + 15%), note including: "STRICT — the target MUST be met within ±5%. Do not pad; do not fall short."
-${hasPaa ? `
-G) PAA (PEOPLE ALSO ASK) ANALYSIS
-- For each PAA question provided, check if competitors answer it and how well. Output paaAnalysis: array of { question, answeredBy (URLs that address it), quality: "full"|"partial"|"missing", gapCandidate: true if missing or partial, note? }.` : ""}
+- competitorAverage, recommended (avg + 15%), note: "STRICT — target must be met within ±5%."
 
-Return ONLY valid JSON. Root keys: ${rootKeys}. No wrapper keys, no markdown fences. Gaps must include evidence, readerDemand, actionableAngle. EditorialStyle must include pointOfView, realExamplesFrequency.`;
+G) PAA ANALYSIS${hasPaa ? "" : " (no PAA questions provided — output empty array)"}
+${hasPaa ? `- Per PAA question: { question, answeredBy (URLs), quality: "full"|"partial"|"missing", gapCandidate: true if missing/partial, note? }. The brief builder maps gapCandidate=true items to outline sections.` : "- paaAnalysis: []"}
+
+Return ONLY valid JSON. Root keys: topics, competitorHeadings, gaps, competitorStrengths, editorialStyle, wordCount, paaAnalysis. No wrapper keys, no markdown fences.`;
 
   const paaBlock = hasPaa
     ? `\n--- PAA QUESTIONS (analyze coverage for each) ---\n${paaQuestions.map((q) => `- ${q}`).join("\n")}\n\n`
@@ -177,9 +179,7 @@ ${payload}`;
 
   // GPT sometimes wraps the result in a single top-level key (e.g. "extraction", "data", "result").
   // Unwrap if the expected keys are missing at the top level but present one level down.
-  const EXPECTED_KEYS = hasPaa
-    ? ["topics", "competitorHeadings", "gaps", "competitorStrengths", "editorialStyle", "wordCount", "paaAnalysis"]
-    : ["topics", "competitorHeadings", "gaps", "competitorStrengths", "editorialStyle", "wordCount"];
+  const EXPECTED_KEYS = ["topics", "competitorHeadings", "gaps", "competitorStrengths", "editorialStyle", "wordCount", "paaAnalysis"];
   if (parsed != null && typeof parsed === "object" && !Array.isArray(parsed)) {
     const obj = parsed as Record<string, unknown>;
     const hasExpected = EXPECTED_KEYS.every((k) => k in obj);
@@ -236,7 +236,7 @@ ${payload}`;
 }
 
 /** Normalize GPT response into our brief schema (GPT often returns different shapes). */
-function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: string): Record<string, unknown> {
+export function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: string): Record<string, unknown> {
   const keyword =
     parsed.keyword != null && typeof parsed.keyword === "object" && !Array.isArray(parsed.keyword)
       ? {
@@ -364,22 +364,47 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
     ctaStyle: "Soft recommendation with next step suggestion",
   };
   const rawStyle = parsed.editorialStyle;
+  // Deep-merge editorialStyle with defaults — Opus sometimes omits nested sub-fields
+  // (e.g., returns sentenceLength without distribution), causing Zod schema validation failure.
+  // This ensures every required sub-field has a fallback value.
+  const deepMergeStyle = (raw: Record<string, unknown>): typeof defaultEditorialStyle => {
+    const rawSL = raw.sentenceLength as Record<string, unknown> | undefined;
+    const rawPL = raw.paragraphLength as Record<string, unknown> | undefined;
+    const rawCM = normalizeContentMix(raw.contentMix);
+    return {
+      sentenceLength: {
+        average: Number(rawSL?.average ?? defaultEditorialStyle.sentenceLength.average),
+        distribution: {
+          short: Number((rawSL?.distribution as Record<string, unknown> | undefined)?.short ?? defaultEditorialStyle.sentenceLength.distribution.short),
+          medium: Number((rawSL?.distribution as Record<string, unknown> | undefined)?.medium ?? defaultEditorialStyle.sentenceLength.distribution.medium),
+          long: Number((rawSL?.distribution as Record<string, unknown> | undefined)?.long ?? defaultEditorialStyle.sentenceLength.distribution.long),
+          veryLong: Number((rawSL?.distribution as Record<string, unknown> | undefined)?.veryLong ?? defaultEditorialStyle.sentenceLength.distribution.veryLong),
+        },
+      },
+      paragraphLength: {
+        averageSentences: Number(rawPL?.averageSentences ?? defaultEditorialStyle.paragraphLength.averageSentences),
+        distribution: {
+          single: Number((rawPL?.distribution as Record<string, unknown> | undefined)?.single ?? defaultEditorialStyle.paragraphLength.distribution.single),
+          standard: Number((rawPL?.distribution as Record<string, unknown> | undefined)?.standard ?? defaultEditorialStyle.paragraphLength.distribution.standard),
+          long: Number((rawPL?.distribution as Record<string, unknown> | undefined)?.long ?? defaultEditorialStyle.paragraphLength.distribution.long),
+          veryLong: Number((rawPL?.distribution as Record<string, unknown> | undefined)?.veryLong ?? defaultEditorialStyle.paragraphLength.distribution.veryLong),
+        },
+      },
+      tone: String(raw.tone ?? defaultEditorialStyle.tone),
+      readingLevel: String(raw.readingLevel ?? defaultEditorialStyle.readingLevel),
+      contentMix: rawCM ?? defaultEditorialStyle.contentMix,
+      dataDensity: String(raw.dataDensity ?? defaultEditorialStyle.dataDensity),
+      pointOfView: (["first", "second", "third", "mixed"] as const).includes(raw.pointOfView as "first" | "second" | "third" | "mixed")
+        ? (raw.pointOfView as typeof defaultEditorialStyle.pointOfView)
+        : defaultEditorialStyle.pointOfView,
+      realExamplesFrequency: String(raw.realExamplesFrequency ?? defaultEditorialStyle.realExamplesFrequency),
+      introStyle: String(raw.introStyle ?? defaultEditorialStyle.introStyle),
+      ctaStyle: String(raw.ctaStyle ?? defaultEditorialStyle.ctaStyle),
+    };
+  };
   const editorialStyle =
     rawStyle != null && typeof rawStyle === "object" && !Array.isArray(rawStyle)
-      ? {
-        sentenceLength: (rawStyle as Record<string, unknown>).sentenceLength ?? defaultEditorialStyle.sentenceLength,
-        paragraphLength: (rawStyle as Record<string, unknown>).paragraphLength ?? defaultEditorialStyle.paragraphLength,
-        tone: String((rawStyle as Record<string, unknown>).tone ?? defaultEditorialStyle.tone),
-        readingLevel: String((rawStyle as Record<string, unknown>).readingLevel ?? defaultEditorialStyle.readingLevel),
-        contentMix: normalizeContentMix((rawStyle as Record<string, unknown>).contentMix) ?? defaultEditorialStyle.contentMix,
-        dataDensity: String((rawStyle as Record<string, unknown>).dataDensity ?? defaultEditorialStyle.dataDensity),
-        pointOfView: (["first", "second", "third", "mixed"] as const).includes((rawStyle as Record<string, unknown>).pointOfView as "first" | "second" | "third" | "mixed")
-          ? (rawStyle as Record<string, unknown>).pointOfView
-          : defaultEditorialStyle.pointOfView,
-        realExamplesFrequency: String((rawStyle as Record<string, unknown>).realExamplesFrequency ?? defaultEditorialStyle.realExamplesFrequency),
-        introStyle: String((rawStyle as Record<string, unknown>).introStyle ?? defaultEditorialStyle.introStyle),
-        ctaStyle: String((rawStyle as Record<string, unknown>).ctaStyle ?? defaultEditorialStyle.ctaStyle),
-      }
+      ? deepMergeStyle(rawStyle as Record<string, unknown>)
       : defaultEditorialStyle;
 
   const similaritySummary =
@@ -434,10 +459,10 @@ function normalizeBriefOutput(parsed: Record<string, unknown>, primaryKeyword: s
 export type WordCountOverride = { target: number; note: string };
 
 /**
- * Step 3 — Brief: build strategic research brief (outline, H2/H3, word count from intent, keyword rules).
- * Validates with ResearchBriefSchema; retries once on schema failure.
+ * Step 3 — Brief: DEPRECATED. Moved to claude/client.ts (uses Claude Opus).
+ * Kept normalizeBriefOutput() and helper types for the Claude version.
  */
-export async function buildResearchBrief(
+async function _deprecatedBuildResearchBrief(
   topics: TopicExtractionResult,
   currentData: CurrentData,
   input: PipelineInput,
@@ -451,78 +476,119 @@ export async function buildResearchBrief(
   const pasf = input.peopleAlsoSearchFor ?? [];
   const secondary = input.secondaryKeywords ?? [];
 
-  const systemPrompt = `You are the strategist for a blog content pipeline. Your ONLY job is to produce a compact ResearchBrief as JSON. The writer (another model) will receive this brief as its ONLY input — no raw competitor content. So your brief must be self-contained and decisive.
+  const systemPrompt = `You are the strategist for a blog content pipeline. Your ONLY job is to produce a compact ResearchBrief as JSON. The writer (another model) will receive this brief as its ONLY input, no raw competitor content. So your brief must be self-contained and decisive.
 
-MANDATORY USE OF STEP 2 EXTRACTION — do not ignore any of these. The extraction provides: paaAnalysis (which PAA questions are gap candidates), gaps (with evidence, readerDemand, actionableAngle), topics (importance, recommendedDepth), competitorStrengths (aiLikelihood), editorialStyle (pointOfView, tone, realExamplesFrequency, dataDensity). You MUST use all of them when building the outline, word distribution, editorial style, and competitorDifferentiation.
+MANDATORY USE OF STEP 2 EXTRACTION. The extraction provides: paaAnalysis (which PAA questions are gap candidates), gaps (with evidence, readerDemand, actionableAngle), topics (importance, recommendedDepth), competitorStrengths (aiLikelihood), editorialStyle (pointOfView, tone, realExamplesFrequency, dataDensity). You MUST use all of them when building the outline, word distribution, editorial style, and competitorDifferentiation.
+
+---
+
+## FATAL ERRORS (these cause audit failures — address first)
+
+RANK MATH SEO (body content only; title/meta/slug are generated separately):
+- FATAL ERROR: You MUST ensure that at least one outline section heading (H2) includes the EXACT primary keyword. Do not use just a natural variant.
+- Keyword in first 10% of body and in at least one subheading.
+- Paragraphs: never exceed 120 words.
+- No keyword stuffing (< 3% density).
+
+GEO / AI OVERVIEW TARGETS (required, per-H2 aiOverviewTarget):
+- For every H2, generate a 40-50 word "Information Payload" as the aiOverviewTarget.
+- This payload MUST start with a direct definition, followed immediately by a specific statistic from 'currentData', and ending with a definitive rule or mechanism.
+- Example format: "[Concept] is a [category] that achieves [outcome]. According to [Source], it accounts for [Stat]. It functions by [Mechanism 1] and [Mechanism 2]."
+- This is what AI Overviews will scrape. It must be brutally efficient and completely devoid of marketing language.
+- Additionally, note in each section's geoNote that the writer must include one "citation-ready sentence" per H2: a standalone factual assertion (entity + verb + data point) that AI engines can extract verbatim.
+
+TYPOGRAPHY: The writer must use straight quotes/apostrophes only. ZERO em-dash, en-dash, or curly quotes, any instance fails the audit. No excessive symbols: no !! or !!!, no repeated ellipses (...). Single punctuation only. Avoid AI-typical phrases in section guidance: delve, leverage, comprehensive, crucial, seamless, robust.
+
+FACT CHECK: Every specific number must trace to currentData. The writer cannot invent stats. If the brief lacks data for a section, note in that section's geoNote that the writer should use qualitative language.
+
+POV / INFORMATION GAIN (Semantic Novelty):
+- Do not just disagree with competitors (e.g., "They say X is fast, but it's actually slow").
+- Incorporate the 'Algorithmic Insights' to guarantee real Information Gain.
+- Introduce a completely new, parallel concept or cross-disciplinary metric that ZERO competitors mentioned.
+- Specifically ensure that you construct an outline that incorporates the 'Proprietary Framework' if it is provided. This framework MUST be the core paradigm of the article. Do NOT rely strictly on competitor heading patterns if they conflict with the proprietary framework.
+- Output as povInsights: array of { topic, conventionalView, contrarian, source }.
+- FATAL ERROR: Ensure contrarian angles are described using raw, declarative facts or bullet points. Do NOT use conversational framing like "One practitioner noted" or "Experts say". Output raw data only.
+
+---
+
+## OUTLINE CONSTRUCTION
 
 RULES:
-1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition → how-to → advanced → FAQ; commercial: overview → comparison → pros/cons → pricing → recommendation; transactional: value prop → features → pricing → CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't). Every outline section must have enough topics and targetWords so the writer can hit the total word count without padding. NEVER use "What is [Topic]?" or dictionary-style headings. Use benefit-driven or curiosity-driven headings (e.g., instead of "What is Local SEO?", use "The Mechanics of Local Search" or "Why Local Search Behaves Differently").
+1. BUILD THE OPTIMAL OUTLINE from competitor heading patterns. KEEP headings 3+ competitors use; DROP headings only 1 uses unless they cover a gap; ADD new sections for gap topics; ORDER by intent (informational: definition, how-to, advanced, FAQ; commercial: overview, comparison, pros/cons, pricing, recommendation; transactional: value prop, features, pricing, CTA). Every H2 must map to either a competitor theme (what top results cover) or a gap (what we add that they don't). Every outline section must have enough topics and targetWords so the writer can hit the total word count without padding. NEVER use "What is [Topic]?" or dictionary-style headings. Use benefit-driven or curiosity-driven headings (e.g., instead of "What is Local SEO?", use "The Mechanics of Local Search" or "Why Local Search Behaves Differently").
 2. For each outline section: heading, level (h2|h3), reason, topics (from checklist), targetWords, optional geoNote, optional visualSuggestion (e.g., "Comparison Table", "Step-by-step Diagram" if a visual adds high value), and REQUIRED sectionHook (string). The sectionHook tells the writer HOW to open the section. It must be one of: "pain_point" (open with a problem the reader recognizes), "failure_story" (open with what goes wrong), "bold_claim" (open with a strong opinion), "financial_outcome" (open with money/ROI impact), "question" (open with a provocative question to the reader), "counter_intuitive" (open with something that contradicts expectations). NEVER use "define" or "explain" as a hook. The writer is FORBIDDEN from opening any section with a definition pattern like "[Topic] means..." or "[Topic] is...". Include H3 subsections where competitors commonly do. Where a PAA question is a gap candidate, either add an H3 for it under the relevant H2 or add an explicit "must answer: [question]" in that section's topics or geoNote.
 3. BEST-VERSION FIELDS (required in your JSON): (a) similaritySummary: 2-4 sentences summarizing what the top 5 competitors collectively cover and how they're similar. (b) extraValueThemes: array of 3-6 short strings, each 5-12 words, actionable (e.g. "Include 2025 pricing benchmarks from currentData" or "Add comparison table as bulleted lists" — not vague like "Be fresh"). These are concrete themes the writer must clearly cover. (c) freshnessNote: 1-2 sentences on how to position for freshness (e.g. "Lead with currentData numbers; avoid pre-2024 framing; mention [recent development] where relevant.").
 
 GAP PRIORITIZATION (use extraction.gaps: readerDemand + actionableAngle):
-- Strong reader demand AND strong actionable angle → give the gap its own H2.
-- Moderate (e.g. one of the two is weak) → fold into an existing section: add as H3 or as topics/geoNote under the closest H2; do not create a standalone H2.
-- Weak or vague readerDemand/actionableAngle → skip the gap; do not add a section for it.
+- Strong reader demand AND strong actionable angle: give the gap its own H2.
+- Moderate (e.g. one of the two is weak): fold into an existing section as H3 or as topics/geoNote under the closest H2; do not create a standalone H2.
+- Weak or vague readerDemand/actionableAngle: skip the gap; do not add a section for it.
 List in your output "gaps" only the gap topics you are actually addressing (own H2 or folded); the writer will use this list.
 
 PAA INTEGRATION INTO OUTLINE:
 - For each item in paaAnalysis where gapCandidate is true, the outline MUST account for it: either (a) an H3 heading that answers that question, or (b) in the section's topics or geoNote an explicit instruction like "Must answer: [exact PAA question]". No PAA gap candidate may be left unmapped to a section.
 
-WORD COUNT DISTRIBUTION (not a single target):
-- Total word count = extraction.wordCount.recommended (or override when provided). You MUST distribute this total across outline sections. Set each section's targetWords using: (1) topic importance from extraction (essential topics → more words; differentiator → fewer unless it's a gap H2), (2) recommendedDepth from extraction for topics in that section. Sum of all section targetWords must equal the total target. The writer will use these per-section targets to proportion content. Include in outline: estimatedWordCount = sum(section.targetWords).
-
-EDITORIAL STYLE ENFORCEMENT:
-- If 3+ competitors are rated "likely_ai", set editorialStyleFallback: true and use hardcoded human-like defaults. Otherwise set editorialStyleFallback: false and COPY the extraction's editorialStyle into your output unchanged: pointOfView, tone (use the specific tone from extraction, not generic "professional"), realExamplesFrequency, dataDensity. The writer (Step 4) will enforce these as writing constraints; do not dilute them.
-
-COMPETITOR DIFFERENTIATION:
-- From competitorStrengths, identify every competitor with aiLikelihood "likely_ai". Output competitorDifferentiation: 2-4 sentences or short bullet points instructing the writer to DELIBERATELY AVOID the patterns those competitors use — e.g. generic intros ("In today's world...", "When it comes to..."), specific AI-typical phrases they use, section structures or list styles that mirror those URLs. Be concrete so the writer can avoid them. If none are likely_ai, omit competitorDifferentiation or set to empty.
-
-CONTENT MIX — MANDATORY STRUCTURE (applies to every article). Do NOT use HTML table tags — the frontend does not format tables. Use only lists (ul/ol).
-1. SUMMARY ELEMENT (required, non-optional): Place a scannable "Bottom Line Up Front" (BLUF) section immediately after the intro. This MUST consist of two H3s:
-  - H3: "The Short Version" (A 3-bullet list of the exact answer/takeaway)
-  - H3: "Why It Matters in 2026" (A 2-sentence explanation of the market shift or primary benefit).
-Must render as actual HTML lists (ul/ol only). This satisfies Search Engine "Quick Answer" intent before the deep dive begins.
-2. INLINE LISTS IN EVERY H2 SECTION: Every H2 section that exceeds 200 words MUST contain at least one of: bulleted list (3-7 items) or numbered list. Place after the section makes its main argument. Pattern: 2-3 paragraphs of prose, then bulleted list of key data points or takeaways, then 1 closing paragraph.
-3. TARGET MIX: ~75% prose, ~25% lists. Minimum 3-4 bulleted or numbered lists spread across H2 sections. No tables — use lists only.
-
-H3 SUBSECTION REQUIREMENT — applies to every article regardless of type:
-Any H2 section that covers 3 or more distinct sub-points MUST break them into H3 subsections — one H3 per distinct point. Do NOT produce flat prose blocks where multiple separate ideas sit under a single H2 with no heading structure.
-How this applies: H2 about strengths/advantages → H3 per strength; H2 about features → H3 per feature; H2 about process steps → H3 per phase; H2 about pros or cons → H3 per pro or con; H2 about list items → H3 per item; H2 about key factors → H3 per factor.
+H3 SUBSECTION REQUIREMENT (applies to every article regardless of type):
+Any H2 section that covers 3 or more distinct sub-points MUST break them into H3 subsections, one H3 per distinct point. Do NOT produce flat prose blocks where multiple separate ideas sit under a single H2 with no heading structure.
+How this applies: H2 about strengths/advantages: H3 per strength; H2 about features: H3 per feature; H2 about process steps: H3 per phase; H2 about pros or cons: H3 per pro or con; H2 about list items: H3 per item; H2 about key factors: H3 per factor.
 Each H3 gets its own topics, word target, and optional geoNote in the OutlineSection. If an H2 covers 3+ things, subdivide it.
 
-4. GEO: directAnswer — Intro opens with a direct factual answer (primary keyword + specific claim in first 30-40 words), then a hook (15-25 words). User value first; banned openings (e.g. 'In this article we will...'). statDensity, entities (1 primary + 3-6 supporting), qaBlocks, faqStrategy.
-5. SEO: keywordInTitle, keywordInFirst10Percent: true, keywordInSubheadings: true, maxParagraphWords: 120, faqCount: "5-8".
-6. wordCount: target = total (from competitor recommended or override). Note: STRICT — the target MUST be met within ±5%. Section targetWords must sum to this total.
+---
 
-POST-GENERATION VALIDATION AWARENESS — design the brief so the writer can pass these checks:
+## WORD COUNT DISTRIBUTION
 
-POV / INFORMATION GAIN (Semantic Novelty):
-- Do not just disagree with competitors (e.g., "They say X is fast, but it's actually slow"). 
-- Incorporate the 'Algorithmic Insights' to guarantee real Information Gain. 
-- Introduce a completely new, parallel concept or cross-disciplinary metric that ZERO competitors mentioned. 
-- Specifically ensure that you construct an outline that incorporates the 'Proprietary Framework' if it is provided. This framework MUST be the core paradigm of the article. Do NOT rely strictly on competitor heading patterns if they conflict with the proprietary framework.
-- Output as povInsights: array of { topic, conventionalView, contrarian, source }. 
-- FATAL ERROR: Ensure contrarian angles are described using raw, declarative facts or bullet points. Do NOT use conversational framing like "One practitioner noted" or "Experts say". Output raw data only.
+Total word count = extraction.wordCount.recommended (or override when provided). You MUST distribute this total across outline sections. Set each section's targetWords using: (1) topic importance from extraction (essential topics: more words; differentiator: fewer unless it's a gap H2), (2) recommendedDepth from extraction for topics in that section. Sum of all section targetWords must equal the total target. The writer will use these per-section targets to proportion content. Include in outline: estimatedWordCount = sum(section.targetWords).
+wordCount: target = total (from competitor recommended or override). Note: STRICT, the target MUST be met within +/-5%. Section targetWords must sum to this total.
 
-GEO / AI OVERVIEW TARGETS (required — per-H2 aiOverviewTarget):
-- For every H2, generate a 40-50 word "Information Payload" as the aiOverviewTarget.
-- This payload MUST start with a direct definition, followed immediately by a specific statistic from 'currentData', and ending with a definitive rule or mechanism.
-- Example format: "[Concept] is a [category] that achieves [outcome]. According to [Source], it accounts for [Stat]. It functions by [Mechanism 1] and [Mechanism 2]."
-- This is what AI Overviews will scrape. It must be brutally efficient and completely devoid of marketing language.
+---
+
+## CLUSTER POSITION STRATEGY (topical authority)
+
+When input.clusterPosition is provided, adapt the outline strategy:
+- "pillar": Comprehensive, wide coverage. Target 20-30% more words than competitor average. Cover ALL essential and recommended topics. Establish topical authority: this page should be the definitive resource. Use broader headings that cover the full scope.
+- "spoke": Focused depth on the specific subtopic. Reference the broader cluster topic (input.clusterTopic) naturally 1-2 times in the outline's geoNotes. Go deeper than a pillar would on this specific angle. Target standard word count. Headings should be narrow and specific.
+- "standalone": Default behavior. No cluster awareness needed.
+Pass clusterPosition and clusterTopic through to the brief output so the writer can adapt.
+
+---
+
+## GEO REQUIREMENTS
+
+directAnswer: Intro opens with a direct factual answer (primary keyword + specific claim in first 30-40 words), then a hook (15-25 words). User value first; banned openings (e.g. 'In this article we will...'). statDensity, entities (1 primary + 3-6 supporting), qaBlocks, faqStrategy.
 
 GOOGLE SEARCH CENTRAL ALIGNMENT:
 - The article must pass Google's Helpful Content self-assessment: original analysis, substantial value beyond competitors, complete intent satisfaction, would-be-bookmarked quality.
 - Design the outline to cover the topic comprehensively. Every H2 should earn its place by answering a real user question or providing unique value.
 
-RANK MATH SEO AUDIT (body content only; title/meta/slug are generated separately):
-- Paragraphs: never exceed 120 words.
-- Keyword in first 10% of body and in at least one subheading. FATAL ERROR: You MUST ensure that at least one outline section heading (H2) includes the EXACT primary keyword. Do not use just a natural variant.
-- No keyword stuffing (< 3% density).
+SEO: keywordInTitle, keywordInFirst10Percent: true, keywordInSubheadings: true, maxParagraphWords: 120, faqCount: "5-8".
 
-TYPOGRAPHY: The writer must use straight quotes/apostrophes only. ZERO em-dash, en-dash, or curly quotes — any instance fails the audit. No excessive symbols: no !! or !!!, no repeated ellipses (...). Single punctuation only. Avoid AI-typical phrases in section guidance where possible: delve, leverage, comprehensive, crucial, seamless, robust — the writer is instructed to prefer specific language.
+---
 
-FACT CHECK: Every specific number must trace to currentData. The writer cannot invent stats. If the brief lacks data for a section, note in that section's geoNote that the writer should use qualitative language.
+## CONTENT MIX — MANDATORY STRUCTURE
+
+Do NOT use HTML table tags, the frontend does not format tables. Use only lists (ul/ol).
+
+1. SUMMARY ELEMENT (required, non-optional): Place a scannable "Bottom Line Up Front" (BLUF) section immediately after the intro. This MUST consist of two H3s:
+  - H3: "The Short Version" (A 3-bullet list of the exact answer/takeaway)
+  - H3: "Why It Matters in 2026" (A 2-sentence explanation of the market shift or primary benefit).
+Must render as actual HTML lists (ul/ol only). This satisfies Search Engine "Quick Answer" intent before the deep dive begins.
+2. INLINE LISTS IN EVERY H2 SECTION: Every H2 section that exceeds 200 words MUST contain at least one of: bulleted list (3-7 items) or numbered list. Place after the section makes its main argument. Pattern: 2-3 paragraphs of prose, then bulleted list of key data points or takeaways, then 1 closing paragraph.
+3. TARGET MIX: ~75% prose, ~25% lists. Minimum 3-4 bulleted or numbered lists spread across H2 sections. No tables, use lists only.
+
+---
+
+## EDITORIAL STYLE & DIFFERENTIATION
+
+EDITORIAL STYLE ENFORCEMENT:
+- If 3+ competitors are rated "likely_ai", set editorialStyleFallback: true and use hardcoded human-like defaults. Otherwise set editorialStyleFallback: false and COPY the extraction's editorialStyle into your output unchanged: pointOfView, tone (use the specific tone from extraction, not generic "professional"), realExamplesFrequency, dataDensity. The writer (Step 4) will enforce these as writing constraints; do not dilute them.
+
+COMPETITOR DIFFERENTIATION:
+- From competitorStrengths, identify every competitor with aiLikelihood "likely_ai". Output competitorDifferentiation: 2-4 sentences or short bullet points instructing the writer to DELIBERATELY AVOID the patterns those competitors use, e.g. generic intros ("In today's world...", "When it comes to..."), specific AI-typical phrases they use, section structures or list styles that mirror those URLs. Be concrete so the writer can avoid them. If none are likely_ai, omit competitorDifferentiation or set to empty.
+
+BEST-VERSION FIELDS (required in your JSON): (a) similaritySummary: 2-4 sentences summarizing what the top 5 competitors collectively cover and how they're similar. (b) extraValueThemes: array of 3-6 short strings, each 5-12 words, actionable (e.g. "Include 2025 pricing benchmarks from currentData" or "Add comparison table as bulleted lists", not vague like "Be fresh"). These are concrete themes the writer must clearly cover. (c) freshnessNote: 1-2 sentences on how to position for freshness (e.g. "Lead with currentData numbers; avoid pre-2024 framing; mention [recent development] where relevant.").
+
+---
+
+## POST-GENERATION AWARENESS
 
 E-E-A-T QUALITY SCORING:
 - Experience signals: 2-3 per article. Include geoNotes to encourage experience signals in at least 2 sections.
@@ -531,7 +597,9 @@ E-E-A-T QUALITY SCORING:
 - Readability variance: varied sentence patterns (no monotony).
 - Sentence start variety: no 3+ sentences starting the same way.
 
-Output ONLY valid JSON. Do NOT include "currentData" in your output — it will be merged server-side. Include: keyword, outline, gaps, editorialStyle, editorialStyleFallback, geoRequirements, seoRequirements, wordCount, similaritySummary, extraValueThemes, freshnessNote, competitorDifferentiation (when applicable), povInsights. No markdown fences.
+---
+
+Output ONLY valid JSON. Do NOT include "currentData" in your output, it will be merged server-side. Include: keyword, outline, gaps, editorialStyle, editorialStyleFallback, geoRequirements, seoRequirements, wordCount, similaritySummary, extraValueThemes, freshnessNote, competitorDifferentiation (when applicable), povInsights. No markdown fences.
 
 Constraint: You must limit the currentData.facts array to a MAXIMUM of 5 distinct, high-impact statistics. Do not pass redundant data.`;
 
@@ -567,6 +635,8 @@ Constraint: You must limit the currentData.facts array to a MAXIMUM of 5 distinc
       secondaryKeywords: secondary,
       peopleAlsoSearchFor: pasf,
       intent,
+      clusterPosition: input.clusterPosition ?? "standalone",
+      clusterTopic: input.clusterTopic,
     },
     knowledgeEngine: {
       topicGraph,
@@ -625,7 +695,13 @@ Constraint: You must limit the currentData.facts array to a MAXIMUM of 5 distinc
 
       const validated = ResearchBriefWithoutCurrentDataSchema.safeParse(normalized);
       if (validated.success) {
-        let brief = { ...validated.data, currentData, knowledgeEngine: { topicGraph, algorithmicInsights, proprietaryFramework } } as ResearchBrief;
+        let brief = {
+          ...validated.data,
+          currentData,
+          knowledgeEngine: { topicGraph, algorithmicInsights, proprietaryFramework },
+          clusterPosition: input.clusterPosition ?? "standalone",
+          ...(input.clusterTopic && { clusterTopic: input.clusterTopic }),
+        } as ResearchBrief;
 
         // When a wordCountOverride is provided (revise flow), align the per-section
         // targetWords with the new total target so the outline and UI stay in sync.
@@ -740,11 +816,10 @@ export function normalizeMetaOption(
 }
 
 /**
- * Generate 2 SEO-optimized title/meta/slug options from draft content.
- * Aligned with article audit system: Google Search Central + Rank Math (src/lib/seo/article-audit.ts).
- * Use this after the draft is written so meta reflects the actual article.
+ * DEPRECATED — Moved to claude/client.ts (uses Claude Opus).
+ * Kept for reference. The Claude version is imported by /api/blog/meta/route.ts.
  */
-export async function generateTitleMetaSlugFromContent(
+async function _deprecatedGenerateTitleMetaSlugFromContent(
   primaryKeyword: string,
   intent: string,
   content: string,
@@ -778,6 +853,8 @@ ${auditRules}
 VARIANT STRATEGY:
 • optionA: Lead with sentiment + power words. E.g. "Proven Guide to…", "Discover the Best…", "Avoid These [X] Mistakes…"
 • optionB: Lead with numbers + action. E.g. "7 Tips for…", "How to [X] in 5 Steps", "[N] Ways to…"
+
+ACCURACY RULE: Title must accurately represent content. No exaggeration, no false promises. Every power word must be earned by the content. If the article covers 5 tips, do not claim 10. Superlatives ("best", "ultimate", "complete") must be justified by the article's actual scope and depth.
 
 ADDITIONAL GUIDANCE:
 • Match the article's actual content — never mislead

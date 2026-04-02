@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TagInput } from "@/components/dashboard/TagInput";
 import { useBlogGeneration } from "@/components/dashboard/BlogGenerationProvider";
-import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown, ChevronUp, GripVertical, Trash2, Plus, Save, Search, PenLine } from "lucide-react";
+import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown, ChevronUp, GripVertical, Trash2, Plus, Save, Search, PenLine, MessageSquare, Send } from "lucide-react";
 import { GenerationLoadingOverlay } from "@/components/dashboard/GenerationLoadingOverlay";
 import { SEO } from "@/lib/constants";
 import { auditArticle, MIN_PUBLISH_SCORE } from "@/lib/seo/article-audit";
@@ -658,6 +658,8 @@ export default function BlogMakerPage() {
   const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("opus-4.6");
   const [voice, setVoice] = useState<"conversational-expert" | "authoritative-practitioner" | "friendly-guide" | "newsletter-editorial">("authoritative-practitioner");
   const [fieldNotes, setFieldNotes] = useState<string>("");
+  const [clusterPosition, setClusterPosition] = useState<"standalone" | "pillar" | "spoke">("standalone");
+  const [clusterTopic, setClusterTopic] = useState("");
   /** Intent array sent to API (1 or 2; default informational if none selected). */
   const intent = useMemo(
     () => (selectedIntents.length > 0 ? selectedIntents : (["informational"] as IntentType[])),
@@ -667,6 +669,26 @@ export default function BlogMakerPage() {
   const [sampleResult, setSampleResult] = useState<ResultState | null>(null);
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
   const [contentView, setContentView] = useState<"preview" | "outline">("preview");
+  // Section chat state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatSection, setChatSection] = useState("");
+  const [chatMessage, setChatMessage] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [chatFeedback, setChatFeedback] = useState<{
+    auditScore?: number;
+    publishable?: boolean;
+    level1Failures?: string[];
+    factCheckVerified?: boolean;
+    hallucinations?: number;
+  } | null>(null);
+  const [chatHistory, setChatHistory] = useState<Array<{
+    section: string;
+    message: string;
+    timestamp: number;
+    auditScore?: number;
+  }>>([]);
+  const [chatSuccess, setChatSuccess] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   /** Demo workflow: same as production (research → brief → draft → validate) with sample data, ~10s per stage. */
   const [demoRunning, setDemoRunning] = useState(false);
@@ -1447,8 +1469,67 @@ export default function BlogMakerPage() {
       draftModel,
       voice,
       ...(fieldNotes.trim() && { fieldNotes: fieldNotes.trim() }),
+      ...(clusterPosition !== "standalone" && { clusterPosition }),
+      ...(clusterPosition === "spoke" && clusterTopic.trim() && { clusterTopic: clusterTopic.trim() }),
     });
     setContentView("preview");
+  }
+
+  async function handleSectionChat() {
+    if (!chatSection.trim() || !chatMessage.trim() || !jobId) return;
+    setChatLoading(true);
+    setChatError(null);
+    setChatFeedback(null);
+    setChatSuccess(false);
+    try {
+      const res = await fetch("/api/blog/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          jobId,
+          sectionHeading: chatSection.trim(),
+          message: chatMessage.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setChatError(data.error ?? "Section regeneration failed");
+        return;
+      }
+      // Update the editing content with the regenerated article
+      if (data.updatedContent && editing) {
+        setEditing({ ...editing, content: data.updatedContent });
+      }
+      // Show audit + fact-check feedback
+      if (data.auditDelta || data.factCheck) {
+        setChatFeedback({
+          auditScore: data.auditDelta?.score,
+          publishable: data.auditDelta?.publishable,
+          level1Failures: data.auditDelta?.level1Failures,
+          factCheckVerified: data.factCheck?.verified,
+          hallucinations: data.factCheck?.hallucinations?.length ?? 0,
+        });
+      }
+      // Add to chat history
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          section: chatSection.trim(),
+          message: chatMessage.trim(),
+          timestamp: Date.now(),
+          auditScore: data.auditDelta?.score,
+        },
+      ]);
+      setChatMessage("");
+      setChatError(null);
+      // Show success indicator (auto-dismiss after 3s)
+      setChatSuccess(true);
+      setTimeout(() => setChatSuccess(false), 3000);
+    } catch (err) {
+      setChatError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setChatLoading(false);
+    }
   }
 
   // Cache SERP when we have it so "Back to previous section" from step 2 still has data for step 1
@@ -2824,6 +2905,56 @@ export default function BlogMakerPage() {
                   )}
                 </div>
 
+                {/* Cluster position — topical authority */}
+                <div className="p-8 sm:p-10 border-t border-border/50">
+                  <div className="space-y-2.5">
+                    <div className="flex items-baseline justify-between">
+                      <p className="text-sm font-semibold text-foreground tracking-tight">Content cluster</p>
+                      <span className="text-[11px] text-muted-foreground">Topical authority</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">Position this article within a content cluster for better topical authority signals.</p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {([
+                        { value: "standalone" as const, label: "Standalone", desc: "Independent article" },
+                        { value: "pillar" as const, label: "Pillar", desc: "Comprehensive hub" },
+                        { value: "spoke" as const, label: "Spoke", desc: "Deep subtopic" },
+                      ]).map(({ value, label, desc }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setClusterPosition(value)}
+                          disabled={generating || demoRunning}
+                          aria-pressed={clusterPosition === value}
+                          className={`inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-all duration-150 ${clusterPosition === value
+                            ? "bg-orange-600 text-white shadow-sm shadow-orange-500/25 dark:bg-orange-500"
+                            : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                            } ${generating || demoRunning ? "pointer-events-none opacity-60" : ""}`}
+                        >
+                          {clusterPosition === value && <span className="inline-block h-1.5 w-1.5 rounded-full bg-white/70" />}
+                          <span>{label}</span>
+                          <span className={`text-[10px] leading-none font-semibold tracking-wide px-1.5 py-1 rounded-full ${clusterPosition === value ? "bg-white/20 text-white" : "bg-muted text-muted-foreground"}`}>
+                            {desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    {clusterPosition === "spoke" && (
+                      <div className="pt-2">
+                        <label htmlFor="cluster-topic-input" className="text-xs text-muted-foreground mb-1 block">Broader cluster topic</label>
+                        <input
+                          id="cluster-topic-input"
+                          type="text"
+                          value={clusterTopic}
+                          onChange={(e) => setClusterTopic(e.target.value)}
+                          placeholder="e.g. Content Marketing"
+                          disabled={generating || demoRunning}
+                          className="w-full max-w-sm h-9 rounded-lg border border-border/50 bg-background px-3 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-500/50"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
               </section>
             )}
 
@@ -3750,6 +3881,120 @@ export default function BlogMakerPage() {
                             />
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Section Chat — post-generation editor */}
+                  <div className="border-t border-border">
+                    <button
+                      type="button"
+                      onClick={() => setChatOpen(!chatOpen)}
+                      className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/30 transition-colors"
+                    >
+                      <span className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-orange-500" />
+                        Edit sections with AI
+                      </span>
+                      {chatOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+                    {chatOpen && (
+                      <div className="px-4 pb-4 space-y-3">
+                        <p className="text-xs text-muted-foreground">Select a section and describe your changes. The AI will regenerate only that section.</p>
+
+                        {/* Chat history log */}
+                        {chatHistory.length > 0 && (
+                          <div className="max-h-24 overflow-y-auto rounded-lg bg-muted/30 p-2 space-y-1">
+                            {chatHistory.map((h, i) => (
+                              <div key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                                <span className="text-emerald-500">✓</span>
+                                <span className="font-medium truncate max-w-[120px]">{h.section}</span>
+                                <span className="truncate flex-1 opacity-70">&ldquo;{h.message.slice(0, 50)}{h.message.length > 50 ? "..." : ""}&rdquo;</span>
+                                {h.auditScore != null && (
+                                  <span className={`ml-auto shrink-0 font-mono ${h.auditScore >= 70 ? "text-emerald-500" : h.auditScore >= 50 ? "text-amber-500" : "text-red-500"}`}>
+                                    {h.auditScore}%
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        <select
+                          value={chatSection}
+                          onChange={(e) => { setChatSection(e.target.value); setChatFeedback(null); }}
+                          className="w-full h-9 rounded-lg border border-border/50 bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30"
+                        >
+                          <option value="">Select a section...</option>
+                          {editing.outline.map((heading, i) => (
+                            <option key={i} value={heading}>{heading}</option>
+                          ))}
+                        </select>
+                        <Textarea
+                          value={chatMessage}
+                          onChange={(e) => setChatMessage(e.target.value)}
+                          placeholder='e.g. "Update the revenue figure to $4.2B" or "Add a case study about Company X"'
+                          rows={3}
+                          className="resize-y rounded-lg border-border bg-background text-sm leading-snug focus:ring-2 focus:ring-orange-500/20"
+                        />
+                        {chatError && (
+                          <p className="text-xs text-red-500">{chatError}</p>
+                        )}
+
+                        {/* Success indicator */}
+                        {chatSuccess && (
+                          <p className="text-xs text-emerald-500 font-medium">Section updated ✓</p>
+                        )}
+
+                        {/* Audit + fact-check feedback */}
+                        {chatFeedback && (
+                          <div className="rounded-lg bg-muted/40 p-2.5 space-y-1.5">
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="font-medium text-muted-foreground">Audit:</span>
+                              <span className={`font-mono font-bold ${(chatFeedback.auditScore ?? 0) >= 70 ? "text-emerald-500" : (chatFeedback.auditScore ?? 0) >= 50 ? "text-amber-500" : "text-red-500"}`}>
+                                {chatFeedback.auditScore ?? "—"}%
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${chatFeedback.publishable ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"}`}>
+                                {chatFeedback.publishable ? "Publishable" : "Not publishable"}
+                              </span>
+                            </div>
+                            {(chatFeedback.level1Failures?.length ?? 0) > 0 && (
+                              <p className="text-[10px] text-red-500">
+                                {chatFeedback.level1Failures!.length} critical issue{chatFeedback.level1Failures!.length > 1 ? "s" : ""}: {chatFeedback.level1Failures!.join(", ")}
+                              </p>
+                            )}
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className="font-medium text-muted-foreground">Fact-check:</span>
+                              {chatFeedback.factCheckVerified ? (
+                                <span className="text-emerald-500">Verified</span>
+                              ) : (
+                                <span className="text-amber-500">{chatFeedback.hallucinations ?? 0} hallucination{(chatFeedback.hallucinations ?? 0) !== 1 ? "s" : ""} found</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={!chatSection || !chatMessage.trim() || chatLoading || !jobId}
+                            onClick={handleSectionChat}
+                            className="h-8 rounded-lg bg-orange-600 px-4 text-[11px] font-medium text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600"
+                          >
+                            {chatLoading ? (
+                              <>
+                                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                Regenerating...
+                              </>
+                            ) : (
+                              <>
+                                <Send className="mr-1.5 h-3.5 w-3.5" />
+                                Regenerate section
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>

@@ -24,16 +24,15 @@ import type { ChunkCost } from "./jobs/types";
 import type { PipelineProgressEvent } from "./orchestrator";
 import { buildChunkCost } from "./cost";
 import { withRetry, validateSourceUrls } from "./orchestrator";
-import { RETRY_FAST, RETRY_STANDARD_FAST, RETRY_CLAUDE_DRAFT } from "./types";
+import { RETRY_FAST, RETRY_JINA, RETRY_STANDARD_FAST, RETRY_CLAUDE_DRAFT } from "./types";
 import { searchCompetitorUrlsWithPaa, searchRedditDiscussions, type RedditThread, type PaaItem } from "@/lib/serper/client";
 import { fetchCompetitorContent } from "@/lib/jina/reader";
 import { fetchCurrentData, extractQuotesFromReddit } from "@/lib/gemini/client";
 import {
   extractTopicsAndStyle,
-  buildResearchBrief,
   type WordCountOverride,
 } from "@/lib/openai/client";
-import { writeDraft, writeDraftSection, humanizeContent, fixAuditIssues, fixHallucinationsInContent } from "@/lib/claude/client";
+import { writeDraft, writeDraftSection, fixAuditIssues, fixHallucinationsInContent, buildResearchBrief, humanizeContent } from "@/lib/claude/client";
 import { generateContentDiff, type ContentDiffResult } from "@/lib/seo/content-diff";
 import { computeSemanticSimilarity } from "@/lib/seo/similarity";
 import { assessContentDecay, type ContentDecayResult } from "@/lib/seo/content-decay";
@@ -50,6 +49,7 @@ import {
 import { buildTopicGraph } from "@/lib/knowledge/topic-graph";
 import { generateAlgorithmicInsights } from "@/lib/knowledge/insight-generator";
 import { synthesizeProprietaryFramework } from "@/lib/knowledge/framework-generator";
+import { ContentRegistry, lintDraft, fixDefinitionOpening } from "@/lib/pipeline/content-registry";
 
 /** Thrown when topic extraction fails after store updates; catch should not re-call store.setChunkFailed/updatePhase. */
 class TopicExtractionError extends Error {
@@ -75,12 +75,18 @@ class TimeBudget {
   remaining(): number {
     return Math.max(0, this.budgetMs - this.elapsed());
   }
-  cap(requestedMs: number): number {
+  cap(requestedMs: number, minMs?: number): number {
     const remaining = this.remaining();
     if (remaining < 10_000) return Math.max(remaining - 2_000, 1_000);
     const capped = Math.min(requestedMs, remaining - 5_000);
-    return Math.max(capped, 5_000);
+    const floor = minMs ?? 5_000;
+    return Math.max(capped, floor);
   }
+}
+
+/** Check if keyword implies strategic/methodology content (gates proprietary framework for commercial intent). */
+function isStrategyKeyword(keyword: string): boolean {
+  return /\b(strateg(y|ies)|methodology|framework|approach|playbook|blueprint|model|system|process)\b/i.test(keyword);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,7 +341,7 @@ export async function runResearchFetch(
       const t0 = Date.now();
       const r = await withRetry(
         async () => fetchCompetitorContent(urls, urls.length),
-        { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
+        { ...RETRY_JINA, timeoutMs: budget.cap(RETRY_JINA.timeoutMs) },
         "jina"
       );
       jinaDurationMs = Date.now() - t0;
@@ -392,11 +398,14 @@ export async function runResearchFetch(
       };
 
   const articleCount = competitors.filter((c) => c.fetchSuccess).length;
-  if (articleCount === 0) {
-    const message = "We couldn't fetch content from the selected links. Try different sources or retry.";
+  if (articleCount === 0 && currentData.facts.length === 0) {
+    const message = "We couldn't fetch content from the selected links and no current data available. Try different sources or retry.";
     await store.setChunkFailed(jobId, "research", message);
     logResearchFetch("error", { event: "research_fetch_failed", jobId, reason: "no_articles_fetched", durationMs: Date.now() - researchStartMs });
     throw new Error(message);
+  }
+  if (articleCount === 0 && currentData.facts.length > 0) {
+    console.warn(`[chunks] No competitor articles fetched, but ${currentData.facts.length} current data facts available — proceeding with reduced context.`);
   }
 
   emit("jina", jinaResult.success ? "completed" : "failed", `${articleCount} articles fetched`, 50);
@@ -527,7 +536,7 @@ export async function runResearchChunk(
         const t0 = Date.now();
         const r = await withRetry(
           async () => fetchCompetitorContent(urls, DEFAULT_MAX_COMPETITOR_URLS),
-          { ...RETRY_FAST, timeoutMs: budget.cap(RETRY_FAST.timeoutMs) },
+          { ...RETRY_JINA, timeoutMs: budget.cap(RETRY_JINA.timeoutMs) },
           "jina"
         );
         jinaDurationMs = Date.now() - t0;
@@ -726,7 +735,12 @@ export async function runBriefChunk(
       const algorithmicInsights = await generateAlgorithmicInsights(input.primaryKeyword!, topicGraph, factsStrings);
 
       emit("topic-extraction", "started", "Synthesizing Proprietary Framework...", 30);
-      const proprietaryFramework = await synthesizeProprietaryFramework(input.primaryKeyword!, topicGraph, algorithmicInsights);
+      const intentList = Array.isArray(input.intent) ? input.intent : [input.intent ?? "informational"];
+      const skipFramework = intentList.some(i => i === "transactional" || i === "navigational") ||
+        (intentList.includes("commercial") && !isStrategyKeyword(input.primaryKeyword!));
+      const proprietaryFramework = skipFramework
+        ? null
+        : await synthesizeProprietaryFramework(input.primaryKeyword!, topicGraph, algorithmicInsights);
 
       await store.saveChunkOutput(jobId, "topic_extraction", {
         competitorUrlHash,
@@ -785,7 +799,7 @@ export async function runBriefChunk(
         cachedTopic?.algorithmicInsights,
         cachedTopic?.proprietaryFramework
       ),
-      { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(60000) },
+      { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(120000, 120_000) },
       "gpt-brief"
     );
     if (!briefResult.success || !briefResult.data) {
@@ -989,6 +1003,9 @@ export async function runDraftChunk(
       factIdx = end;
     }
 
+    // --- ContentRegistry — track consumed stats/quotes/insights post-draft ---
+    const registry = new ContentRegistry();
+
     // -----------------------------------------------------------------------
     // Helper: draft a single section
     // -----------------------------------------------------------------------
@@ -1002,11 +1019,13 @@ export async function runDraftChunk(
         currentData: { ...brief.currentData, facts: factsPerSection[i] },
       };
 
+      const jobInput = job.input as PipelineInput;
+      const primaryIntent = Array.isArray(jobInput.intent) ? jobInput.intent[0] : (jobInput.intent ?? "informational");
       const draftResult = await withRetry(
         async () => writeDraftSection(
           sectionBrief, section, previousContext, tokenUsage, draftModel,
           fieldNotes, toneExamples, redditQuotes, i === 0, primaryKeyword,
-          voice, customVoiceDescription
+          voice, customVoiceDescription, primaryIntent
         ),
         { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
         "claude-draft-section"
@@ -1018,6 +1037,13 @@ export async function runDraftChunk(
 
       const content = draftResult.data;
       const wc = content.split(/\s+/).filter(Boolean).length;
+
+      // Registry: track consumed items for logging (facts pre-allocated, so no dynamic splicing needed)
+      registry.markUsedAndFilter(
+        content, i, section.heading,
+        factsPerSection[i], redditQuotes ?? [], brief.knowledgeEngine?.algorithmicInsights ?? []
+      );
+
       const slug = section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       const html = `\n<h2 id="${slug}">${section.heading}</h2>\n${content}\n`;
 
@@ -1058,6 +1084,23 @@ export async function runDraftChunk(
     let assembledHtml = sectionResults.map(r => r.html).join("");
     let totalWordCount = sectionResults.reduce((sum, r) => sum + r.wordCount, 0);
 
+    if (process.env.NODE_ENV !== "test") {
+      console.log(`[registry] ${registry.getSummary()}`);
+    }
+
+    // --- Phase 5 (lightweight): Style Linter + Definition Nuke ---
+    // Fix definition openings programmatically (the AI cannot be prompt-engineered out of this)
+    assembledHtml = fixDefinitionOpening(assembledHtml, primaryKeyword);
+
+    // Run style linter and log violations (non-blocking for now — informational)
+    const styleViolations = lintDraft(assembledHtml, primaryKeyword);
+    if (styleViolations.length > 0 && process.env.NODE_ENV !== "test") {
+      console.log(`[style-linter] ${styleViolations.length} violation(s) detected:`);
+      for (const v of styleViolations) {
+        console.log(`  [${v.type}] ${v.location}: ${v.evidence.slice(0, 100)}`);
+      }
+    }
+
     // Humanize pass: skipped by default (voice presets + section hooks handle tone).
     // Set skipHumanize: false in PipelineInput to enable.
     const skipHumanize = (job.input as PipelineInput).skipHumanize !== false;
@@ -1071,6 +1114,30 @@ export async function runDraftChunk(
 
       if (humanizeResult.success && typeof humanizeResult.data === "string") {
         assembledHtml = humanizeResult.data;
+      }
+    }
+
+    // Audit-to-rewrite loop: catch Level 1 failures (typography, structure) before validation chunk
+    emit("claude-draft", "started", "Running pre-validation audit...", 88);
+    const preAudit = auditArticle({
+      title: titleMetaSlug.title,
+      content: assembledHtml,
+      slug: titleMetaSlug.suggestedSlug,
+      focusKeyword: primaryKeyword,
+    });
+    const level1Failures = preAudit.items
+      .filter((item) => item.level === 1 && item.severity === "fail")
+      .map((item) => `[Level 1] ${item.label}: ${item.message}`);
+
+    if (level1Failures.length > 0 && !preAudit.publishable) {
+      emit("claude-draft", "started", `Fixing ${level1Failures.length} Level 1 audit issue(s)...`, 92);
+      const fixResult = await withRetry(
+        async () => fixAuditIssues(assembledHtml, level1Failures, tokenUsage),
+        { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
+        "fix-audit-issues"
+      );
+      if (fixResult.success && typeof fixResult.data === "string" && fixResult.data.trim().length > 0) {
+        assembledHtml = fixResult.data;
       }
     }
 
@@ -1168,10 +1235,14 @@ export async function runValidationChunk(
     // Optional fact-check auto-fix (if input specifies)
     let factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
     if ((job.input as PipelineInput).autoFixHallucinations && factCheck.hallucinations.length > 0) {
-      const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData, tokenUsage);
-      finalContent = fixResult.fixedHtml;
-      // Re-run fact check after fixes
-      factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+      try {
+        const fixResult = await fixHallucinationsInContent(finalContent, factCheck.hallucinations, currentData, tokenUsage);
+        finalContent = fixResult.fixedHtml;
+        // Re-run fact check after fixes
+        factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
+      } catch (err) {
+        console.warn(`[chunks] fixHallucinations failed (non-fatal, proceeding with unfixed draft): ${err instanceof Error ? err.message : err}`);
+      }
     }
 
     // Run audit

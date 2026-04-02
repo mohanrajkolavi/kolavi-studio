@@ -113,6 +113,13 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
       ? toneExamples.trim().slice(0, 3000)
       : undefined;
 
+  // Cluster position for topical authority building
+  const clusterPositionRaw = typeof b.clusterPosition === "string" ? b.clusterPosition.trim().toLowerCase() : undefined;
+  const clusterPosition = (clusterPositionRaw === "pillar" || clusterPositionRaw === "spoke")
+    ? clusterPositionRaw as "pillar" | "spoke"
+    : "standalone" as const;
+  const clusterTopic = typeof b.clusterTopic === "string" ? b.clusterTopic.trim() || undefined : undefined;
+
   const pipelineInput: PipelineInput = {
     primaryKeyword,
     secondaryKeywords: secondaryKeywords?.length ? secondaryKeywords : undefined,
@@ -124,6 +131,8 @@ export function parseGenerateBody(body: unknown): ParseGenerateBodyResult {
     ...(resolvedCustomVoice != null && { customVoiceDescription: resolvedCustomVoice }),
     ...(resolvedFieldNotes != null && { fieldNotes: resolvedFieldNotes }),
     ...(resolvedToneExamples != null && { toneExamples: resolvedToneExamples }),
+    clusterPosition,
+    ...(clusterTopic && { clusterTopic }),
   };
 
   return { pipelineInput };

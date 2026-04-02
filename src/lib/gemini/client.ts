@@ -122,22 +122,24 @@ export async function fetchCurrentData(
       ? ` and related terms: ${secondaryKeywords.slice(0, 3).join(", ")}`
       : "";
 
-  const systemInstruction = `You are a fact-checking research assistant. Your only job is to search for current information and return structured JSON.
+  const systemInstruction = `You are the fact-gathering engine in a content pipeline. Your output feeds the Brief Builder and Writer models — they use your facts as the ONLY source of statistics. Accuracy is critical; hallucinated numbers will be caught by the fact-verification audit.
 
-RULES (strict):
-- Use ONLY information from the search results. Do NOT use numbers or stats from training data.
-- Every fact must have a "source" field with the full URL from search. Include optional "date" when available.
-- If you cannot find a current statistic, omit it or set fact text to "No current data found". Never invent numbers.
-- If no facts are found, return: {"facts": [], "recentDevelopments": [], "lastUpdated": "No recent data found"}.
-- Output ONLY valid JSON. No markdown code fences, no explanation before or after. The response must parse as JSON.`;
+RULES:
+- Use ONLY information from search results. NEVER use training data for statistics.
+- Every fact must include a "source" field with the full URL. Include "date" when available.
+- If search results don't contain the requested data type, return an empty array for that field. Never invent numbers.
+- If no facts are found at all: {"facts": [], "recentDevelopments": [], "lastUpdated": "No recent data found"}.
+- Prefer the most recent data. If only pre-2024 data exists, include it but note the year in the fact text.
+- If the same fact appears from multiple sources, include it only once (use the most authoritative source).
+- Output ONLY valid JSON. No markdown, no explanation.`;
 
   const currentYear = new Date().getFullYear();
-  const mainPrompt = `Search for current, up-to-date information about "${primaryKeyword}"${keywordContext}. Find:
-1) Latest statistics, financial data, or metrics (with specific numbers)
-2) Specific Case Studies: Find at least one specific company or individual who achieved a specific outcome using this.
+  const mainPrompt = `Search for current information about "${primaryKeyword}"${keywordContext}. Find:
+1) Latest statistics, financial data, or metrics (specific numbers with sources)
+2) Case studies: specific companies or individuals who achieved measurable outcomes. If no case studies exist in search results, return an empty array for that category.
 3) Industry benchmarks and pricing changes in the past 6 months
 
-Return as structured JSON with this exact format (no other text):
+Return as structured JSON (no other text):
 {
   "facts": [{"fact": "string", "source": "full URL", "date": "optional date"}],
   "recentDevelopments": ["string"],
@@ -145,10 +147,12 @@ Return as structured JSON with this exact format (no other text):
 }`;
   const statsPrompt = `Search for the latest statistics and data about "${primaryKeyword}" in ${currentYear}. Focus on:
 1) Market size, revenue, or growth statistics for ${currentYear}
-2) Industry benchmarks, pricing changes, and practitioner friction points.
-3) Recent survey results or research findings (first-party data)
+2) Industry benchmarks, pricing changes, and practitioner friction points
+3) Recent survey results or research findings (first-party data preferred)
 
-Return as structured JSON with this exact format (no other text):
+If only pre-2024 data exists for any category, include it but note the year. Do not duplicate facts from the main query.
+
+Return as structured JSON (no other text):
 {
   "facts": [{"fact": "string", "source": "full URL", "date": "optional date"}],
   "recentDevelopments": ["string"],
@@ -493,19 +497,21 @@ export async function extractQuotesFromReddit(
   const ai = getClient();
   const threadText = threads.map(t => `TITLE: ${t.title}\nSNIPPET: ${t.snippet}`).join("\n\n");
 
-  const prompt = `You are an expert researcher gathering community insights for an article about "${keyword}".
-Extract 3 to 5 distinct, high-quality, real-world quotes or tips from the following Reddit discussion snippets.
+  const prompt = `Extract 3-5 high-quality, real-world quotes from these community discussions about "${keyword}". These quotes feed into the Writer model as E-E-A-T experience signals.
 
-Rules:
-1. Target "Friction": Prioritize quotes that describe a painful, annoying, or highly specific problem the user experienced while trying to implement this. (e.g. "We spent 3 days trying to debug the API rate limit...")
-2. Target "Hidden Workarounds": Look for hacky or unofficial solutions that aren't in official documentation.
-3. Remove generic praise or basic definitions. Focus strictly on experiential grit.
-4. Format each quote as a simple string in a JSON array.
+PRIORITIZE:
+1. **Friction quotes**: Specific problems during implementation ("We spent 3 days debugging the API rate limit...", "The migration broke because...")
+2. **Hidden workarounds**: Unofficial solutions not in documentation
+3. **Specific metrics or timelines**: Concrete outcomes ("reduced load time by 40%", "took 3 weeks to stabilize")
+
+SKIP: Quotes that could apply to any product without modification ("it's really good", "highly recommended", "I love this tool"). Keep only quotes with specific details (tool names, metrics, workflows, timelines).
+
+Preserve the original poster's voice. Do not polish grammar — the raw authenticity is the value. If fewer than 3 quality quotes exist, return what you have rather than lowering the bar.
 
 Snippets:
 ${threadText}
 
-Return ONLY valid JSON like this: { "quotes": ["...", "...", "..."] }`;
+Return ONLY valid JSON: { "quotes": ["...", "...", "..."] }`;
 
   try {
     const response = await ai.models.generateContent({

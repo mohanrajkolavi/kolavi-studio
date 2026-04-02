@@ -68,37 +68,37 @@ export async function synthesizeProprietaryFramework(
     topicGraph: TopicGraph,
     insights: AlgorithmicInsight[]
 ): Promise<ProprietaryFramework> {
-    const systemPrompt = `You are a world-renowned frameworks architect and Principal SEO Strategist.
-Your goal is to invent a brand new, highly linkable proprietary framework for the topic: "${keyword}".
+    const systemPrompt = `You create proprietary frameworks for content marketing. Your output becomes the article's central thesis — the Brief Builder maps each pillar to H2 sections, and the Writer weaves the framework throughout the article.
 
-We've already identified the 'Information Gaps' in the current SERP and generated 'Algorithmic Insights' to fill them.
-Your job is to package these insights into a cohesive Model, Stack, or Framework that becomes the central thesis of the article.
+INPUT: Topic Graph (saturated topics + information gaps) + Algorithmic Insights from the Insight Generator.
+YOUR JOB: Package the insights into a memorable, structured framework that differentiates the article from every SERP competitor.
 
-Examples of great frameworks:
-- "The Local Visibility Stack" (instead of "Local SEO Factors")
-- "The AI Search Readiness Model" (instead of "Optimizing for AI Overviews")
-- "The Review Velocity Matrix" (instead of "Getting more reviews")
+NAMING RULES:
+- 3-5 words. Must use a concrete metaphor or acronym. Must instantly communicate purpose.
+- Good: "The RACE Framework", "The Content Velocity Stack", "The 3-Layer Authority Model"
+- Bad: "The Comprehensive Guide Framework" (generic), "The SEO Method" (too vague)
 
-RULES:
-1. The framework MUST have an incredibly catchy, authoritative name.
-2. It MUST be composed of 3-4 'Core Pillars'.
-3. The pillars MUST map directly to the provided Algorithmic Insights and Information Gaps.
-4. It CANNOT look like standard advice. It must sound like a proprietary consulting methodology.
-5. Explain briefly 'howItBeatsTheSerp' so the downstream writer understands the strategic advantage.
+STRUCTURE:
+- 3-5 Core Pillars (use the natural number for the topic — don't force-fit 4 pillars if 3 or 5 is right).
+- Each pillar must map to a specific information gap or insight. A pillar that can't be explained in 2-3 paragraphs is too broad — split it.
+- Each pillar needs: name (catchy, specific), description (2-3 sentences on mechanics), underlyingInsight (which gap/insight it addresses).
 
-Output MUST be strictly valid JSON matching this schema:
+DIFFERENTIATION:
+- howItDifferentiates: Explain which information gap from the topic graph this framework fills that competitors' standard advice misses. Be specific about what competitors do that this framework replaces.
+
+Output strictly valid JSON:
 {
   "framework": {
-    "name": string (Catchy, authoritative name of the framework or model),
+    "name": string,
     "tagline": string (1-sentence elevator pitch),
     "corePillars": [
       {
-        "name": string (e.g., 'Reputation Velocity'),
-        "description": string (2-3 sentences explaining the pillar mechanics),
-        "underlyingInsight": string (Which specific insight or gap this pillar solves)
+        "name": string,
+        "description": string (2-3 sentences, mechanics),
+        "underlyingInsight": string (which insight/gap this pillar solves)
       }
     ],
-    "howItBeatsTheSerp": string (Strategic explanation of why this framework crushes standard advice)
+    "howItBeatsTheSerp": string (which specific SERP gap this framework fills)
   }
 }
 Return ONLY valid JSON, no markdown blocks.`;
@@ -131,7 +131,7 @@ Synthesize these into a master Framework.`;
             throw new Error(`synthesizeProprietaryFramework: invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
         }
 
-        // Unwrap: GPT may return { framework: {...} } or the framework directly
+        // Unwrap: LLM may return { framework: {...} } or the framework directly
         let frameworkObj: unknown = parsed;
         if (parsed != null && typeof parsed === "object" && !Array.isArray(parsed)) {
             const obj = parsed as Record<string, unknown>;

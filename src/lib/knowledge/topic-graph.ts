@@ -77,23 +77,28 @@ export async function buildTopicGraph(
     const paaContext = paaQuestions && paaQuestions.length ? `People Also Ask:\n${paaQuestions.join("\n")}` : "";
     const redditContext = redditThreads && redditThreads.length ? `Reddit Discussions:\n${redditThreads.map(r => r.title).join("\n")}` : "";
 
-    const systemPrompt = `You are a world-class Semantic SEO Architect and Knowledge Graph extraction engine.
-Your goal is to build a "Topic Graph" for the keyword: "${keyword}".
+    const systemPrompt = `You build semantic topic graphs for content strategy. Your output feeds the Insight Generator (which finds non-obvious angles) and the Brief Builder (which constructs the article outline).
 
-1. Identify the IDEAL universe of topics, entities, and concepts that SHOULD be covered in a definitive master guide on this subject.
-2. Analyze the provided competitor content, PAA questions, and Reddit discussions to determine current SERP coverage.
-3. Calculate the 'competitorCoverage' (0-100%) for each ideal topic based on how well the provided competitors cover it.
-4. Identify 'informationGaps': Topics that have high relevance (>7) but low competitor coverage (<30%). THIS IS CRITICAL for Information Gain.
-5. Identify 'saturatedTopics': Topics that all competitors are covering heavily (>80% coverage).
+For the keyword "${keyword}":
 
-Output this as a strictly formatted JSON object matching this schema:
+1. Map the IDEAL topic universe for a definitive guide on this subject.
+2. Score each topic against the provided competitor content, PAA questions, and Reddit discussions.
+3. Scoring guide:
+   - relevanceScore (1-10): 10 = directly answers the search query, 7 = important supporting concept, 4 = tangentially related, 1 = barely relevant.
+   - competitorCoverage (0-100%): percentage of top competitors that meaningfully cover this topic (1+ substantive paragraphs, not just a mention).
+4. informationGaps: Topics with relevance >= 7 AND competitorCoverage <= 30%. These are high-value content opportunities the article MUST address.
+5. saturatedTopics: Topics with competitorCoverage >= 80%. The writer must differentiate on these, not duplicate.
+
+Prioritize unique angles from PAA and Reddit data that competitors missed. These become the raw material for the Insight Generator downstream.
+
+Output strictly formatted JSON:
 {
   "nodes": [{ "topic": string, "category": "core"|"entity"|"strategy"|"tactic"|"concept", "relevanceScore": number (1-10), "competitorCoverage": number (0-100) }],
   "edges": [{ "source": string, "target": string, "relationship": string }],
   "informationGaps": [string],
   "saturatedTopics": [string]
 }
-Focus highly on unique angles from PAA and Reddit data that competitors missed. Return ONLY valid JSON, no markdown blocks.`;
+Return ONLY valid JSON, no markdown blocks.`;
 
     const simpleSystemPrompt = `You are a Semantic SEO Architect. Build a topic graph for "${keyword}".
 Return valid JSON with keys: nodes (array of {topic, category, relevanceScore, competitorCoverage}), edges (array of {source, target, relationship}), informationGaps (string[]), saturatedTopics (string[]).`;
@@ -113,7 +118,7 @@ Return valid JSON with keys: nodes (array of {topic, category, relevanceScore, c
             throw new Error(`buildTopicGraph: invalid JSON: ${e instanceof Error ? e.message : String(e)}`);
         }
 
-        // Unwrap if GPT nests under a key like "topicGraph" or "graph"
+        // Unwrap if LLM nests under a key like "topicGraph" or "graph"
         if (parsed != null && typeof parsed === "object" && !Array.isArray(parsed)) {
             const obj = parsed as Record<string, unknown>;
             if (!("nodes" in obj)) {

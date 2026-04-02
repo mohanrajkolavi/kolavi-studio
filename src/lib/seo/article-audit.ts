@@ -421,6 +421,48 @@ function auditAiPhrases(plainText: string): AuditItem[] {
   return items;
 }
 
+/** Verify title number claims match actual content (e.g., "7 Tips" should have ~7 H3s or list items). */
+function auditTitleNumberAccuracy(title: string, html: string): AuditItem[] {
+  const numMatch = title.match(/\b(\d{1,2})\s+(tips?|ways?|steps?|strategies|methods|reasons?|mistakes?|factors?|examples?|tools?|tricks?|secrets?|benefits?|techniques?|ideas?|hacks?|practices?|principles?|lessons?|rules?|signs?)\b/i);
+  if (!numMatch) return [];
+
+  const claimedCount = parseInt(numMatch[1], 10);
+  if (claimedCount < 3 || claimedCount > 50) return [];
+
+  // Count H3 headings as the primary signal (each tip/step usually gets an H3)
+  const h3Matches = html.match(/<h3[^>]*>/gi) || [];
+  const h3Count = h3Matches.length;
+
+  // Also count top-level <li> items in ordered/unordered lists as a secondary signal
+  const liMatches = html.match(/<li[^>]*>/gi) || [];
+  const liCount = liMatches.length;
+
+  const bestCount = Math.max(h3Count, Math.round(liCount / 2));
+
+  if (bestCount > 0 && bestCount < claimedCount * 0.6) {
+    return [{
+      id: "title-number-accuracy",
+      severity: "warn",
+      level: 2,
+      source: "editorial",
+      label: "Title number accuracy",
+      message: `Title claims "${claimedCount} ${numMatch[2]}" but content has ~${h3Count} H3 subsections and ~${liCount} list items. Verify the title number matches actual content.`,
+      value: claimedCount,
+      threshold: bestCount,
+      guideline: "Anti-clickbait: title numbers must accurately represent content. No exaggeration.",
+    }];
+  }
+
+  return [{
+    id: "title-number-accuracy",
+    severity: "pass",
+    level: 3,
+    source: "editorial",
+    label: "Title number accuracy",
+    message: `Title claims "${claimedCount} ${numMatch[2]}" — content structure supports this.`,
+  }];
+}
+
 // --- Level 1: Publication Blockers ---
 
 function auditTitle(input: ArticleAuditInput): AuditItem[] {
@@ -1301,6 +1343,48 @@ export type SchemaValidationSummary = {
 const GEO_FAQ_ANSWER_MAX_CHARS = 300;
 
 /**
+ * Detect procedural content (ordered lists with 3+ steps under H2s) and generate HowTo JSON-LD.
+ * Returns null if no procedural content is found.
+ */
+function detectProceduralContent(articleHtml: string, title: string): object | null {
+  // Find <ol> elements that follow an H2 heading and have 3+ <li> items
+  const h2OlPattern = /<h2[^>]*>([\s\S]*?)<\/h2>[\s\S]*?<ol[^>]*>([\s\S]*?)<\/ol>/gi;
+  let match: RegExpExecArray | null;
+  const steps: { "@type": string; text: string; position: number }[] = [];
+  let howToName = title;
+
+  while ((match = h2OlPattern.exec(articleHtml)) !== null) {
+    const headingText = stripHtml(match[1]).trim();
+    const olContent = match[2];
+    const liMatches = [...olContent.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi)];
+
+    if (liMatches.length >= 3) {
+      // Use the first matching H2 as the HowTo name
+      if (steps.length === 0 && headingText) {
+        howToName = headingText;
+      }
+      for (const li of liMatches) {
+        steps.push({
+          "@type": "HowToStep",
+          text: stripHtml(li[1]).trim(),
+          position: steps.length + 1,
+        });
+      }
+      break; // Use the first procedural block found
+    }
+  }
+
+  if (steps.length < 3) return null;
+
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name: howToName,
+    step: steps,
+  };
+}
+
+/**
  * Generate JSON-LD schema markup from article HTML. Parses FAQ (H2 FAQ + H3 Q / P A) and
  * step-by-step patterns. Author/publisher/image added by CMS.
  */
@@ -1369,7 +1453,21 @@ export function generateSchemaMarkup(
     ],
   };
 
-  return { article, faq, breadcrumb, faqSchemaNote };
+  // Speakable schema: mark intro paragraph and FAQ answers for voice assistants
+  const speakable = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: title || "Article",
+    speakable: {
+      "@type": "SpeakableSpecification",
+      cssSelector: ["article > p:first-of-type", ".faq-answer", "h2 + p"],
+    },
+  };
+
+  // HowTo schema: detect procedural content (ordered lists with 3+ steps under an H2)
+  const howTo = detectProceduralContent(articleHtml, title);
+
+  return { article, faq, breadcrumb, faqSchemaNote, speakable, howTo };
 }
 
 /**
@@ -1535,6 +1633,8 @@ export function auditArticle(
     ...auditRankMathSubheadingKeyword(input.content, input.focusKeyword),
     ...auditRankMathTitleKeywordPosition(input.title, input.focusKeyword),
     ...auditRankMathNumberInTitle(input.title),
+    // Level 2/3 — Title number accuracy (anti-clickbait)
+    ...auditTitleNumberAccuracy(input.title ?? "", input.content),
     // Level 3 — Differentiation (optional; from brief extra-value themes)
     ...(input.extraValueThemes?.length ? auditExtraValueCoverage(plainContent, input.extraValueThemes) : []),
   ];

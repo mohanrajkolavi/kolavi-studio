@@ -8,6 +8,7 @@
 
 import { unstable_cache } from "next/cache";
 import { SITE_URL, WP_GRAPHQL_URL, getSitemapBuildDate } from "@/lib/constants";
+import { MARKDOWN_TOOLS } from "@/lib/markdown/tools-data";
 import { request } from "@/lib/graphql/client";
 import {
   getPosts,
@@ -124,6 +125,20 @@ const STATIC_ROUTES: { path: string; priority: number; changeFrequency: UrlEntry
   { path: "/tools/roi-calculator", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "/tools/treatment-visualizer", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "/tools/competitor-comparison", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/markdown-tools", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/markdown-editor", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/markdown-table-generator", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/markdown-to-pdf", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/markdown-to-html", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/markdown-formatter", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/markdown-cheat-sheet", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  { path: "/markdown-syntax", priority: 0.9, changeFrequency: "monthly" as const },
+  { path: "/markdown-extended-syntax", priority: 0.9, changeFrequency: "monthly" as const },
+  { path: "/markdown-guide", priority: 0.9, changeFrequency: "monthly" as const },
+  { path: "/markdown-hacks", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/discord-markdown", priority: 0.8, changeFrequency: "monthly" as const },
+  { path: "/slack-markdown", priority: 0.7, changeFrequency: "monthly" as const },
+  { path: "/github-markdown", priority: 0.7, changeFrequency: "monthly" as const },
   { path: "/partner", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   { path: "/partner/apply", priority: 0.8, changeFrequency: "monthly" as const },
   { path: "/partner/terms", priority: 0.5, changeFrequency: "yearly" as const },
@@ -168,12 +183,25 @@ function getCategoryTagLastModFromPosts(
 /** Static pages: use build/deploy date for lastmod when set (BUILD_TIMESTAMP / VERCEL_BUILD_COMMIT_TIMESTAMP). */
 export function getStaticEntries(): UrlEntry[] {
   const lastModified = getSitemapBuildDate() ?? new Date();
-  return STATIC_ROUTES.map(({ path, priority, changeFrequency }) => ({
+
+  const staticEntries = STATIC_ROUTES.map(({ path, priority, changeFrequency }) => ({
     path: path || "/",
     lastModified,
     changeFrequency,
     priority,
   }));
+
+  // Dynamic markdown tool pages from tools-data.ts
+  const toolEntries: UrlEntry[] = MARKDOWN_TOOLS
+    .filter((tool) => !tool.externalPath)
+    .map((tool) => ({
+      path: `/markdown-tools/${tool.slug}`,
+      lastModified,
+      changeFrequency: "monthly" as const,
+      priority: 0.7,
+    }));
+
+  return [...staticEntries, ...toolEntries];
 }
 
 export async function getPostEntries(): Promise<UrlEntry[]> {
