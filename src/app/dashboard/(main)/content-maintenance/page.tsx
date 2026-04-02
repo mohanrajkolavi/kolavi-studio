@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-import { FileText, ExternalLink, X, RefreshCw, Loader2, AlertCircle, Calendar, Tag, ChevronUp, ChevronDown, Download } from "lucide-react";
+import { FileText, ExternalLink, X, RefreshCw, Loader2, AlertCircle, Calendar, Tag, ChevronUp, ChevronDown, Download, Zap, MoreHorizontal, CheckCircle2, Globe } from "lucide-react";
 
 const PAGE_SIZE = 20;
 const CATEGORY_DEBOUNCE_MS = 300;
@@ -74,6 +74,82 @@ export default function ContentMaintenancePage() {
   const modalRef = useRef<HTMLDivElement>(null);
   const modalContentRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+
+  // Indexing state
+  const [indexingSlug, setIndexingSlug] = useState<string | null>(null);
+  const [indexedSlugs, setIndexedSlugs] = useState<Record<string, { success: boolean; time: string }>>({});
+  const [bulkIndexing, setBulkIndexing] = useState(false);
+  const [openActionsSlug, setOpenActionsSlug] = useState<string | null>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://kolavistudio.com";
+
+  const getPostUrl = useCallback((slug: string) => `${siteUrl}/blog/${slug}`, [siteUrl]);
+
+  const handleIndexPost = useCallback(async (slug: string) => {
+    const url = getPostUrl(slug);
+    setIndexingSlug(slug);
+    try {
+      const res = await fetch("/api/indexing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json();
+      setIndexedSlugs((prev) => ({
+        ...prev,
+        [slug]: { success: data.success, time: new Date().toISOString() },
+      }));
+    } catch {
+      setIndexedSlugs((prev) => ({
+        ...prev,
+        [slug]: { success: false, time: new Date().toISOString() },
+      }));
+    } finally {
+      setIndexingSlug(null);
+    }
+  }, [getPostUrl]);
+
+  const handleBulkIndex = useCallback(async () => {
+    const slugs = Array.from(selectedSlugs);
+    if (slugs.length === 0) return;
+    setBulkIndexing(true);
+    const urls = slugs.map(getPostUrl);
+    try {
+      const res = await fetch("/api/indexing", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ urls }),
+      });
+      const data = await res.json();
+      const results: Record<string, { success: boolean; time: string }> = {};
+      if (data.results) {
+        data.results.forEach((r: { url: string; success: boolean }, i: number) => {
+          results[slugs[i]] = { success: r.success, time: new Date().toISOString() };
+        });
+      }
+      setIndexedSlugs((prev) => ({ ...prev, ...results }));
+    } catch {
+      // mark all as failed
+      const failed: Record<string, { success: boolean; time: string }> = {};
+      slugs.forEach((s) => { failed[s] = { success: false, time: new Date().toISOString() }; });
+      setIndexedSlugs((prev) => ({ ...prev, ...failed }));
+    } finally {
+      setBulkIndexing(false);
+    }
+  }, [selectedSlugs, getPostUrl]);
+
+  // Close actions dropdown when clicking outside
+  useEffect(() => {
+    if (!openActionsSlug) return;
+    const handler = (e: MouseEvent) => {
+      if (actionsRef.current && !actionsRef.current.contains(e.target as Node)) {
+        setOpenActionsSlug(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openActionsSlug]);
 
   // Debounce category filter
   useEffect(() => {
@@ -598,9 +674,56 @@ export default function ContentMaintenancePage() {
         ) : (
           <div className="overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm">
             <div className="overflow-x-auto">
+              {/* Bulk actions bar */}
+              {selectedSlugs.size > 0 && (
+                <div className="flex items-center gap-3 border-b border-border/50 bg-muted/30 px-5 py-3">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    {selectedSlugs.size} selected
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkIndex}
+                    disabled={bulkIndexing || bulkUpdating}
+                    className="gap-1.5"
+                  >
+                    {bulkIndexing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                    Index All
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBulkMarkReviewed}
+                    disabled={bulkUpdating || bulkIndexing}
+                    className="gap-1.5"
+                  >
+                    {bulkUpdating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                    Mark Reviewed
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSlugs(new Set())}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border/50">
+                    <th className="w-10 px-3 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={paginatedPosts.length > 0 && selectedSlugs.size === paginatedPosts.length}
+                        onChange={toggleSelectAll}
+                        className="h-4 w-4 rounded border-border accent-orange-600"
+                        aria-label="Select all"
+                      />
+                    </th>
                     <th className="px-5 py-3.5 text-left">
                       <button
                         type="button"
@@ -639,13 +762,21 @@ export default function ContentMaintenancePage() {
                         {sortKey === "lastReviewed" && (sortDir === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />)}
                       </button>
                     </th>
-                    <th className="w-36 px-5 py-3.5 text-left">
-                      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Status</span>
+                    <th className="w-24 px-5 py-3.5 text-left">
+                      <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                        <Zap className="h-3.5 w-3.5 opacity-60" />
+                        Indexed
+                      </span>
+                    </th>
+                    <th className="w-16 px-3 py-3.5 text-left">
+                      <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Actions</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedPosts.map((post) => (
+                  {paginatedPosts.map((post) => {
+                    const idxState = indexedSlugs[post.slug];
+                    return (
                     <tr
                       key={post.slug}
                       role="button"
@@ -665,6 +796,17 @@ export default function ContentMaintenancePage() {
                         }
                       }}
                     >
+                      {/* Checkbox */}
+                      <td className="w-10 px-3 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedSlugs.has(post.slug)}
+                          onChange={() => toggleSelect(post.slug)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="h-4 w-4 rounded border-border accent-orange-600"
+                          aria-label={`Select ${post.title}`}
+                        />
+                      </td>
                       <td className="px-5 py-4">
                         <Link
                           href={`/blog/${post.slug}`}
@@ -711,25 +853,104 @@ export default function ContentMaintenancePage() {
                           ? new Date(post.lastReviewedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
                           : "—"}
                       </td>
-                      <td className="w-36 px-5 py-4 align-top">
-                        <select
-                          value={post.status}
-                          onChange={(e) => handleStatusChange(post.slug, e.target.value)}
-                          disabled={updating === post.slug}
-                          onClick={(e) => e.stopPropagation()}
-                          className={`h-8 w-full min-w-0 rounded-md border-0 px-2.5 text-xs font-medium focus:ring-2 focus:ring-ring focus:ring-offset-1 ${
-                            statusStyles[post.status] || statusStyles.unreviewed
-                          }`}
+                      {/* Indexing status */}
+                      <td className="w-24 px-5 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+                        {indexingSlug === post.slug ? (
+                          <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Sending...
+                          </span>
+                        ) : idxState ? (
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
+                              idxState.success
+                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200"
+                                : "bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-200"
+                            }`}
+                          >
+                            {idxState.success ? (
+                              <><CheckCircle2 className="h-3 w-3" /> Indexed</>
+                            ) : (
+                              <><X className="h-3 w-3" /> Failed</>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground/50">—</span>
+                        )}
+                      </td>
+                      {/* Quick actions */}
+                      <td className="relative w-16 px-3 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenActionsSlug(openActionsSlug === post.slug ? null : post.slug)}
+                          className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                          aria-label="Actions"
                         >
-                          {STATUS_TABS.slice(1).map((t) => (
-                            <option key={t.value} value={t.value}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                        {openActionsSlug === post.slug && (
+                          <div
+                            ref={actionsRef}
+                            className="absolute right-3 top-12 z-30 w-48 rounded-lg border border-border bg-card py-1 shadow-lg"
+                          >
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                              onClick={() => {
+                                handleIndexPost(post.slug);
+                                setOpenActionsSlug(null);
+                              }}
+                            >
+                              <Zap className="h-3.5 w-3.5 text-orange-500" />
+                              Request Indexing
+                            </button>
+                            {STATUS_TABS.slice(1).map((t) => (
+                              <button
+                                key={t.value}
+                                type="button"
+                                className={`flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted ${
+                                  post.status === t.value ? "font-medium text-foreground" : ""
+                                }`}
+                                onClick={() => {
+                                  handleStatusChange(post.slug, t.value);
+                                  setOpenActionsSlug(null);
+                                }}
+                              >
+                                <span className={`h-2 w-2 rounded-full ${
+                                  t.value === "up_to_date" ? "bg-emerald-500" :
+                                  t.value === "needs_review" ? "bg-amber-500" :
+                                  t.value === "planned_refresh" ? "bg-slate-400" : "bg-muted-foreground/40"
+                                }`} />
+                                {t.label}
+                              </button>
+                            ))}
+                            <div className="my-1 border-t border-border/50" />
+                            <Link
+                              href={`/blog/${post.slug}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                              onClick={() => setOpenActionsSlug(null)}
+                            >
+                              <Globe className="h-3.5 w-3.5" />
+                              View on site
+                            </Link>
+                            <a
+                              href={`${process.env.NEXT_PUBLIC_WP_GRAPHQL_URL?.replace("/graphql", "")}/wp-admin/post.php?post=${post.slug}&action=edit`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                              onClick={() => setOpenActionsSlug(null)}
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              Edit in WordPress
+                            </a>
+                          </div>
+                        )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -879,6 +1100,20 @@ export default function ContentMaintenancePage() {
                 >
                   Mark as reviewed
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleIndexPost(selectedPost.slug)}
+                  disabled={indexingSlug === selectedPost.slug}
+                  className="gap-2 rounded-lg border-border/50"
+                >
+                  {indexingSlug === selectedPost.slug ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                  {indexedSlugs[selectedPost.slug]?.success ? "Re-index" : "Request Indexing"}
+                </Button>
                 <Link href={`/blog/${selectedPost.slug}`} target="_blank" rel="noopener noreferrer">
                   <Button variant="outline" size="sm" className="gap-2 rounded-lg border-border/50">
                     <ExternalLink className="h-4 w-4" />
@@ -886,6 +1121,13 @@ export default function ContentMaintenancePage() {
                   </Button>
                 </Link>
               </div>
+              {indexedSlugs[selectedPost.slug] && (
+                <p className={`text-xs ${indexedSlugs[selectedPost.slug].success ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                  {indexedSlugs[selectedPost.slug].success
+                    ? `Indexed at ${new Date(indexedSlugs[selectedPost.slug].time).toLocaleTimeString()}`
+                    : "Indexing request failed"}
+                </p>
+              )}
             </div>
           </div>
         </div>
