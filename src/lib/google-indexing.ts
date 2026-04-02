@@ -279,8 +279,8 @@ export interface UrlInspectionResult {
 }
 
 // GSC property can be URL-prefix ("https://kolavistudio.com") or domain ("sc-domain:kolavistudio.com").
-// Set GOOGLE_SEARCH_CONSOLE_SITE_URL to match your exact GSC property format.
-const SITE_URL = process.env.GOOGLE_SEARCH_CONSOLE_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL || "sc-domain:kolavistudio.com";
+// Set GOOGLE_SEARCH_CONSOLE_SITE_URL to override. Defaults to domain property format.
+const GSC_SITE_URL = process.env.GOOGLE_SEARCH_CONSOLE_SITE_URL || "sc-domain:kolavistudio.com";
 
 /**
  * Inspect a URL using Google Search Console's URL Inspection API.
@@ -300,7 +300,7 @@ export async function inspectUrl(url: string): Promise<UrlInspectionResult> {
         },
         body: JSON.stringify({
           inspectionUrl: url,
-          siteUrl: SITE_URL,
+          siteUrl: GSC_SITE_URL,
         }),
       }
     );
