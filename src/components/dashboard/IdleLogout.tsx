@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 // Ops/env config:
 // - `NEXT_PUBLIC_IDLE_LOGOUT_MS`: idle timeout (milliseconds) before dashboard auto-logout.
 //   Must be a positive number. If unset/invalid, defaults to 15 minutes.
-const DEFAULT_IDLE_MS = 15 * 60 * 1000;
+const DEFAULT_IDLE_MS = 2 * 60 * 60 * 1000; // 2 hours (was 15 min — too short for pipeline runs)
 const IDLE_MS = (() => {
   const raw = process.env.NEXT_PUBLIC_IDLE_LOGOUT_MS;
   if (raw == null || raw.trim() === "") return DEFAULT_IDLE_MS;

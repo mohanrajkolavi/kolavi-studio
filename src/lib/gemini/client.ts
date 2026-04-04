@@ -98,13 +98,70 @@ async function validateSourceUrls(
 }
 
 /**
+ * Extract basic facts from competitor article text when Gemini grounding is unavailable.
+ * Looks for sentences containing statistics, percentages, dollar amounts, or attribution phrases.
+ */
+function extractFactsFromCompetitorContent(
+  competitors: { text: string; url: string }[]
+): { fact: string; source: string }[] {
+  const facts: { fact: string; source: string }[] = [];
+  const seenFacts = new Set<string>();
+
+  // Patterns that indicate a sentence contains a citable fact
+  const statPatterns = [
+    /\d+(\.\d+)?%/,                          // percentages
+    /\$[\d,.]+\s*(billion|million|trillion|B|M|T|k)?/i, // dollar amounts
+    /\d+(\.\d+)?\s*(billion|million|trillion)/i,        // large numbers
+  ];
+  const attributionPatterns = [
+    /according to/i,
+    /research shows/i,
+    /study found/i,
+    /survey (found|shows|reveals|indicates)/i,
+    /data (from|shows|indicates|reveals|suggests)/i,
+    /report(ed)?\s+by/i,
+    /published (by|in)/i,
+    /estimates? (that|from)/i,
+  ];
+
+  for (const { text, url } of competitors) {
+    if (!text) continue;
+    // Split into sentences (rough but functional)
+    const sentences = text.match(/[^.!?]+[.!?]+/g) ?? [];
+    for (const raw of sentences) {
+      const sentence = raw.trim();
+      // Skip very short or very long sentences
+      if (sentence.length < 30 || sentence.length > 500) continue;
+
+      const hasStat = statPatterns.some((p) => p.test(sentence));
+      const hasAttribution = attributionPatterns.some((p) => p.test(sentence));
+
+      if (hasStat || hasAttribution) {
+        const key = sentence.toLowerCase().replace(/\s+/g, " ").slice(0, 200);
+        if (!seenFacts.has(key)) {
+          seenFacts.add(key);
+          facts.push({ fact: sentence, source: url });
+        }
+      }
+
+      // Cap at 20 facts to avoid flooding the pipeline
+      if (facts.length >= 20) break;
+    }
+    if (facts.length >= 20) break;
+  }
+
+  return facts;
+}
+
+/**
  * Step 2 — Current data: fetch grounded facts for keyword using Gemini with Google Search.
  * Runs 2 parallel queries (general + stats-focused) for richer data, then merges and deduplicates.
  * Returns structured facts with source URLs. Validates grounding and source URLs.
  */
 export async function fetchCurrentData(
   primaryKeyword: string,
-  secondaryKeywords: string[] = []
+  secondaryKeywords: string[] = [],
+  fallbackContent?: { text: string; url: string }[]
 ): Promise<CurrentData> {
   const serializedSecondary = secondaryKeywords.length > 0 ? [...secondaryKeywords].sort().join("|").toLowerCase().trim() : "";
   const cacheKey = `${primaryKeyword.toLowerCase().trim()}:${serializedSecondary}`;
@@ -225,6 +282,24 @@ Return as structured JSON (no other text):
     if (process.env.NODE_ENV !== "test") {
       console.warn("[gemini] fetchCurrentData: Zod validation failed", validated.error.flatten());
     }
+    // Attempt fallback extraction from competitor content
+    if (fallbackContent && fallbackContent.length > 0) {
+      const fallbackFacts = extractFactsFromCompetitorContent(fallbackContent);
+      if (fallbackFacts.length > 0) {
+        if (process.env.NODE_ENV !== "test") {
+          console.warn(
+            `[gemini] Using competitor content fallback - extracted ${fallbackFacts.length} facts from competitor articles`
+          );
+        }
+        return {
+          facts: fallbackFacts,
+          recentDevelopments: [],
+          lastUpdated: "Unknown",
+          groundingVerified: false,
+          sourceUrlValidation: { total: 0, accessible: 0, inaccessible: [] },
+        };
+      }
+    }
     return {
       facts: [],
       recentDevelopments: [],
@@ -269,8 +344,23 @@ Return as structured JSON (no other text):
     return dateB - dateA; // newest first
   });
 
+  // Fallback: if Gemini returned 0 facts, extract from competitor content
+  let finalFacts = sortedFacts;
+  if (sortedFacts.length === 0 && fallbackContent && fallbackContent.length > 0) {
+    const fallbackFacts = extractFactsFromCompetitorContent(fallbackContent);
+    if (fallbackFacts.length > 0) {
+      finalFacts = fallbackFacts;
+      groundingVerified = false;
+      if (process.env.NODE_ENV !== "test") {
+        console.warn(
+          `[gemini] Using competitor content fallback - extracted ${fallbackFacts.length} facts from competitor articles`
+        );
+      }
+    }
+  }
+
   const finalData: CurrentData = {
-    facts: sortedFacts,
+    facts: finalFacts,
     recentDevelopments: validated.data.recentDevelopments,
     lastUpdated: validated.data.lastUpdated,
     groundingVerified,

@@ -60,6 +60,10 @@ export type ArticleAuditInput = {
   focusKeyword?: string;
   /** Optional: brief extra-value themes for differentiation coverage check (non-blocking) */
   extraValueThemes?: string[];
+  /** Author name for JSON-LD schema Person type. */
+  authorName?: string;
+  /** Author page URL for JSON-LD schema. */
+  authorUrl?: string;
 };
 
 export type ArticleAuditResult = {
@@ -1187,6 +1191,15 @@ function isRhetoricalNumber(snippet: string, num: string): boolean {
   if (/(?:up\s+to|starting\s+at|priced\s+at|around|roughly|about)\s+\$[\d,]+/.test(lower)) return true;
   // Timeframe references (not stat claims)
   if (/\d+[-\s](?:year|month|week|day|quarter|decade)/.test(lower)) return true;
+  // Calendar years (1990-2030 range) — common knowledge, not stat claims
+  if (/\b(19[5-9]\d|20[0-3]\d)\b/.test(num)) return true;
+  // Version numbers (v1.0, 2.0, 3.x, etc.)
+  if (/\bv?\d+\.\d+(?:\.\d+)?/.test(num)) return true;
+  // Small counts in instructional context (e.g., "5 items", "3 columns", "2 paragraphs")
+  const numVal = parseFloat(num.replace(/[^0-9.]/g, ""));
+  if (numVal >= 1 && numVal <= 20 && /\d+\s*(?:items?|steps?|sections?|columns?|rows?|paragraphs?|sentences?|characters?|levels?|types?|ways?|tips?|rules?|methods?|tools?|options?|examples?|minutes?|hours?|points?|questions?|answers?)/.test(lower)) return true;
+  // Character/word count limits (e.g., "300 characters", "2000 words")
+  if (/\d+\s*(?:characters?|words?|bytes?|pixels?|kb|mb|gb)/.test(lower)) return true;
   return false;
 }
 
@@ -1391,10 +1404,12 @@ export function generateSchemaMarkup(
   title: string,
   metaDescription: string,
   slug: string,
-  keyword: string
+  keyword: string,
+  authorName?: string,
+  authorUrl?: string,
 ): SchemaMarkup {
   const now = new Date().toISOString().slice(0, 10);
-  const article = {
+  const article: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "Article",
     headline: title || "Article",
@@ -1403,6 +1418,15 @@ export function generateSchemaMarkup(
     datePublished: now,
     dateModified: now,
   };
+
+  // Add author as Person when provided, otherwise omit (CMS handles it)
+  if (authorName) {
+    article.author = {
+      "@type": "Person",
+      name: authorName,
+      ...(authorUrl ? { url: authorUrl } : {}),
+    };
+  }
 
   let faq: SchemaMarkup["faq"] = null;
   const faqH2 = /<h2[^>]*>([^<]*(?:FAQ|Frequently Asked)[^<]*)<\/h2>/i.exec(articleHtml);
@@ -1599,6 +1623,757 @@ function auditExtraValueCoverage(plainContent: string, themes: string[]): AuditI
   ];
 }
 
+// =============================================================================
+// Citation Density Audit
+// =============================================================================
+
+import { validateCitations } from "@/lib/seo/citation-validator";
+
+function auditCitationDensity(html: string, sourceUrls: string[] = []): AuditItem[] {
+  const result = validateCitations(html, sourceUrls);
+  const items: AuditItem[] = [];
+
+  // Citation count check
+  items.push({
+    id: "citation-density",
+    severity: result.citationCount >= 8 ? "pass" : result.citationCount >= 4 ? "warn" : "fail",
+    label: "Inline citations",
+    message: result.citationCount >= 8
+      ? `${result.citationCount} inline citations found (${result.citationDensity.toFixed(1)} per 1000 words)`
+      : `Only ${result.citationCount} inline citations. Target 8-15 per 2000 words for trust and AI citation boost.`,
+    level: 2,
+    source: "google",
+    value: result.citationCount,
+    threshold: "8-15 per 2000 words",
+    guideline: "Inline citations boost AI engine citation by 31% and are a key E-E-A-T trust signal per Google Quality Rater Guidelines.",
+  });
+
+  // References section check
+  items.push({
+    id: "references-section",
+    severity: result.hasReferencesSection ? "pass" : result.citationCount > 0 ? "fail" : "warn",
+    label: "References section",
+    message: result.hasReferencesSection
+      ? `References section found with ${result.referencesCount} entries`
+      : result.citationCount > 0
+        ? "Article has inline citations but no References section — add a numbered list at the end"
+        : "No citations or references found. Add inline citations with a References section for trust.",
+    level: 2,
+    source: "google",
+    guideline: "A numbered References section at the end of the article matches inline citations and builds reader trust.",
+  });
+
+  // Orphan citations (hallucinated URLs)
+  if (result.orphanCitations.length > 0) {
+    items.push({
+      id: "citation-url-validity",
+      severity: "warn",
+      label: "Citation URL validity",
+      message: `${result.orphanCitations.length} citation(s) have URLs not found in source data`,
+      level: 1,
+      source: "google",
+      value: result.orphanCitations.length,
+      guideline: "All citation URLs should trace back to research sources to avoid hallucinated references.",
+    });
+  }
+
+  return items;
+}
+
+// =============================================================================
+// Anti-Textbook Writing Audit
+// =============================================================================
+
+import { TEXTBOOK_OPENERS } from "@/lib/constants/banned-phrases";
+
+function auditWritingQuality(html: string): AuditItem[] {
+  const items: AuditItem[] = [];
+  const plainText = stripHtml(html);
+  const paragraphs = plainText.split(/\n\s*\n/).filter((p) => p.trim().length > 20);
+
+  // 1. Weak/textbook paragraph openers
+  let weakOpenerCount = 0;
+  const weakOpenerExamples: string[] = [];
+  for (const para of paragraphs) {
+    const firstSentence = para.trim().split(/[.!?]/)[0]?.toLowerCase().trim() ?? "";
+    for (const opener of TEXTBOOK_OPENERS) {
+      if (firstSentence.startsWith(opener.toLowerCase())) {
+        weakOpenerCount++;
+        if (weakOpenerExamples.length < 3) {
+          weakOpenerExamples.push(firstSentence.slice(0, 60) + "...");
+        }
+        break;
+      }
+    }
+  }
+
+  items.push({
+    id: "textbook-openers",
+    severity: weakOpenerCount === 0 ? "pass" : weakOpenerCount <= 2 ? "warn" : "fail",
+    label: "Textbook openers",
+    message: weakOpenerCount === 0
+      ? "No textbook-style paragraph openers detected"
+      : `${weakOpenerCount} paragraph(s) start with weak/textbook openers${weakOpenerExamples.length ? ": " + weakOpenerExamples.map(e => `"${e}"`).join(", ") : ""}`,
+    level: 2,
+    source: "editorial",
+    value: weakOpenerCount,
+    threshold: 0,
+    guideline: "Every paragraph should open with a specific claim, data point, or insight — not a vague setup like 'There are several...' or 'It is important to...'",
+  });
+
+  // 2. Passive voice ratio
+  const sentences = splitSentences(plainText);
+  const passivePatterns = [
+    /\b(?:is|are|was|were|been|being|be)\s+\w+ed\b/i,
+    /\b(?:is|are|was|were|been|being|be)\s+\w+en\b/i,
+    /\b(?:has|have|had)\s+been\s+\w+ed\b/i,
+  ];
+  let passiveCount = 0;
+  for (const sentence of sentences) {
+    if (passivePatterns.some((p) => p.test(sentence))) {
+      passiveCount++;
+    }
+  }
+  const passiveRatio = sentences.length > 0 ? passiveCount / sentences.length : 0;
+
+  items.push({
+    id: "passive-voice",
+    severity: passiveRatio <= 0.15 ? "pass" : passiveRatio <= 0.25 ? "warn" : "fail",
+    label: "Active voice",
+    message: passiveRatio <= 0.15
+      ? `Active voice dominant (${Math.round(passiveRatio * 100)}% passive)`
+      : `${Math.round(passiveRatio * 100)}% passive voice detected. Target under 15% for engaging, clear writing.`,
+    level: 2,
+    source: "editorial",
+    value: `${Math.round(passiveRatio * 100)}%`,
+    threshold: "≤15%",
+    guideline: "Active voice is clearer, more engaging, and builds trust. Passive voice obscures agency and feels textbook-like.",
+  });
+
+  // 3. Paragraph length variance (anti-monotony)
+  const paraWordCounts = paragraphs.map((p) => p.split(/\s+/).filter(Boolean).length);
+  if (paraWordCounts.length >= 4) {
+    const mean = paraWordCounts.reduce((a, b) => a + b, 0) / paraWordCounts.length;
+    const variance = paraWordCounts.reduce((sum, wc) => sum + (wc - mean) ** 2, 0) / paraWordCounts.length;
+    const stdDev = Math.sqrt(variance);
+
+    items.push({
+      id: "paragraph-variety",
+      severity: stdDev >= 15 ? "pass" : stdDev >= 8 ? "warn" : "fail",
+      label: "Paragraph variety",
+      message: stdDev >= 15
+        ? `Good paragraph length variety (std dev: ${Math.round(stdDev)} words)`
+        : `Paragraph lengths are too uniform (std dev: ${Math.round(stdDev)} words). Mix short punchy paragraphs with longer ones.`,
+      level: 3,
+      source: "editorial",
+      value: Math.round(stdDev),
+      threshold: "≥15",
+      guideline: "Varying paragraph length creates rhythm that holds attention and signals human authorship. Uniform lengths feel robotic.",
+    });
+  }
+
+  // 4. Bucket brigade presence
+  const bucketBrigades = [
+    "here's the thing", "but here's what", "here's where", "the real question",
+    "so what does this mean", "but it gets", "the bottom line", "think about it",
+    "now here's the catch", "picture this", "want to know",
+  ];
+  let bucketCount = 0;
+  const lowerText = plainText.toLowerCase();
+  for (const bb of bucketBrigades) {
+    const regex = new RegExp(bb.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const matches = lowerText.match(regex);
+    if (matches) bucketCount += matches.length;
+  }
+  const wordCount = plainText.split(/\s+/).filter(Boolean).length;
+  const bbPer1000 = wordCount > 0 ? (bucketCount / wordCount) * 1000 : 0;
+
+  items.push({
+    id: "bucket-brigades",
+    severity: bbPer1000 >= 3 ? "pass" : bbPer1000 >= 1.5 ? "warn" : "fail",
+    label: "Engagement hooks",
+    message: bbPer1000 >= 2
+      ? `${bucketCount} engagement hooks found (${bbPer1000.toFixed(1)} per 1000 words)`
+      : `Only ${bucketCount} engagement hooks. Target 3-5 per 1000 words to maintain reader attention.`,
+    level: 3,
+    source: "editorial",
+    value: bucketCount,
+    threshold: "3-5 per 1000 words",
+    guideline: "Bucket brigades and curiosity hooks reduce bounce rate by 15-30% (NNGroup research).",
+  });
+
+  return items;
+}
+
+// =============================================================================
+// Sentence Length Variety — Anti-AI Detection Signal
+// =============================================================================
+
+/**
+ * Measure sentence length standard deviation. Human writing naturally varies
+ * sentence length (SD ≥ 4.5 words). AI text tends toward uniform lengths.
+ */
+function auditSentenceVariety(html: string): AuditItem[] {
+  const items: AuditItem[] = [];
+  const plainText = stripHtml(html);
+  const sentences = splitSentences(plainText).filter((s) => s.split(/\s+/).filter(Boolean).length >= 3);
+
+  if (sentences.length < 10) return items;
+
+  const lengths = sentences.map((s) => s.split(/\s+/).filter(Boolean).length);
+  const mean = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+  const variance = lengths.reduce((sum, l) => sum + (l - mean) ** 2, 0) / lengths.length;
+  const stdDev = Math.sqrt(variance);
+
+  items.push({
+    id: "sentence-variety",
+    severity: stdDev >= 4.5 ? "pass" : stdDev >= 3 ? "warn" : "fail",
+    label: "Sentence length variety",
+    message: stdDev >= 4.5
+      ? `Sentence length SD: ${stdDev.toFixed(1)} words — natural human rhythm`
+      : `Sentence length SD: ${stdDev.toFixed(1)} words (target ≥4.5). Vary between short punchy sentences and longer complex ones.`,
+    level: 2,
+    source: "editorial",
+    value: Math.round(stdDev * 10) / 10,
+    threshold: "SD ≥ 4.5",
+    guideline: "Uniform sentence lengths are a strong AI detection signal. Human writers naturally vary between 5-word punches and 25-word explanations.",
+  });
+
+  // Also check for extremely long sentences (>40 words) which hurt readability
+  const longSentences = lengths.filter((l) => l > 40).length;
+  const longRatio = longSentences / lengths.length;
+  if (longRatio > 0.1) {
+    items.push({
+      id: "sentence-length-max",
+      severity: "warn",
+      label: "Overly long sentences",
+      message: `${longSentences} sentence(s) exceed 40 words (${Math.round(longRatio * 100)}%). Break these up for clarity.`,
+      level: 3,
+      source: "editorial",
+      value: longSentences,
+      threshold: "≤10% over 40 words",
+      guideline: "Long sentences reduce cognitive fluency — readers literally perceive shorter, clearer content as more truthful.",
+    });
+  }
+
+  return items;
+}
+
+// =============================================================================
+// Inverted Pyramid Audit — Value Front-Loading at Every Level
+// =============================================================================
+
+/**
+ * Verify that content front-loads answers at article, section, and paragraph levels:
+ * - Article: first 100 words contain a definitive statement (not just intro fluff)
+ * - Sections: first paragraph after each H2 starts with a direct claim/answer
+ * - Paragraphs: first sentence carries information (not throat-clearing)
+ */
+function auditInvertedPyramid(html: string, focusKeyword?: string): AuditItem[] {
+  const items: AuditItem[] = [];
+  const plainText = stripHtml(html);
+
+  // 1. Article-level: first 100 words should contain a definitive statement
+  const first100 = plainText.split(/\s+/).slice(0, 100).join(" ");
+  const definitivePatterns = [
+    /\b(?:is|are|means?|refers?\s+to|defined?\s+as|involves?)\b/i,
+    /\b(?:here(?:'s| is)|the (?:answer|solution|key|secret|reason))\b/i,
+    /\b(?:you (?:need|should|can|must)|the best|the most|step \d)\b/i,
+    /\b\d+(?:\.\d+)?%/,  // contains a stat
+    /\$\d/,               // contains a dollar figure
+  ];
+  const hasDefinitiveOpening = definitivePatterns.some((p) => p.test(first100));
+
+  items.push({
+    id: "inverted-pyramid-opening",
+    severity: hasDefinitiveOpening ? "pass" : "warn",
+    label: "Answer-first opening",
+    message: hasDefinitiveOpening
+      ? "Article opens with a definitive statement in the first 100 words"
+      : "First 100 words lack a definitive answer or claim. Front-load the value — readers and Google reward answer-first content.",
+    level: 2,
+    source: "editorial",
+    value: hasDefinitiveOpening ? 1 : 0,
+    threshold: "definitive statement in first 100 words",
+    guideline: "Inverted pyramid + scannability = 124% usability improvement (NNGroup). Answer first, explain second.",
+  });
+
+  // 2. Section-level: check first paragraph after each H2
+  const sections = html.split(/<h2[^>]*>/i).slice(1); // skip content before first H2
+  let weakSectionOpeners = 0;
+  const weakSectionExamples: string[] = [];
+
+  for (const section of sections) {
+    // Get first paragraph text
+    const firstParaMatch = section.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    if (!firstParaMatch) continue;
+    const firstPara = stripHtml(firstParaMatch[1]).trim();
+    const firstSentence = firstPara.split(/[.!?]/)[0]?.trim() ?? "";
+
+    // Check if first sentence is a weak setup rather than a direct answer
+    const weakSetups = [
+      /^(?:in this section|this section|here,? we|let(?:'s| us) (?:explore|discuss|look|dive|examine|start))/i,
+      /^(?:before we|to understand|in order to|when it comes to)/i,
+      /^(?:as (?:we|you) (?:know|mentioned|discussed|saw))/i,
+    ];
+    const isWeak = weakSetups.some((p) => p.test(firstSentence));
+    if (isWeak) {
+      weakSectionOpeners++;
+      if (weakSectionExamples.length < 2) {
+        weakSectionExamples.push(firstSentence.slice(0, 60) + "...");
+      }
+    }
+  }
+
+  if (sections.length > 0) {
+    items.push({
+      id: "inverted-pyramid-sections",
+      severity: weakSectionOpeners === 0 ? "pass" : weakSectionOpeners <= 1 ? "warn" : "fail",
+      label: "Section answer-first",
+      message: weakSectionOpeners === 0
+        ? "All sections open with direct answers/claims — no setup fluff"
+        : `${weakSectionOpeners} section(s) open with setup instead of a direct answer${weakSectionExamples.length ? ": " + weakSectionExamples.map(e => `"${e}"`).join(", ") : ""}`,
+      level: 2,
+      source: "editorial",
+      value: weakSectionOpeners,
+      threshold: 0,
+      guideline: "Each H2 section should open with the answer capsule — the direct claim or insight — not with 'In this section, we'll explore...'",
+    });
+  }
+
+  return items;
+}
+
+// ---------------------------------------------------------------------------
+// SERP Intelligence — Featured snippet audit, Title CTR scoring, ToC generation
+// ---------------------------------------------------------------------------
+
+/** Check if article has a concise definition suitable for featured snippet extraction. */
+function auditFeaturedSnippet(html: string, focusKeyword?: string): AuditItem[] {
+  const items: AuditItem[] = [];
+  const plainText = stripHtml(html);
+
+  // Check first 300 words for a definition-style answer
+  const first300Words = plainText.split(/\s+/).slice(0, 300).join(" ");
+  const wordCount = plainText.split(/\s+/).filter(Boolean).length;
+
+  // Look for a concise answer paragraph (40-60 words)
+  const paragraphs = html.match(/<p[^>]*>(.*?)<\/p>/gi) ?? [];
+  const earlyParagraphs = paragraphs.slice(0, 5);
+  let hasSnippetCandidate = false;
+
+  for (const p of earlyParagraphs) {
+    const pText = p.replace(/<[^>]+>/g, "").trim();
+    const pWords = pText.split(/\s+/).filter(Boolean).length;
+    if (pWords >= 30 && pWords <= 70) {
+      // Check if it contains the focus keyword and reads like a definition
+      if (!focusKeyword || pText.toLowerCase().includes(focusKeyword.toLowerCase().split(/\s+/)[0])) {
+        hasSnippetCandidate = true;
+        break;
+      }
+    }
+  }
+
+  items.push({
+    id: "serp-featured-snippet",
+    severity: hasSnippetCandidate ? "pass" : "warn",
+    label: "Featured snippet candidate",
+    message: hasSnippetCandidate
+      ? "Concise definition paragraph found in first 5 paragraphs — eligible for Google Featured Snippet"
+      : "No concise 30-70 word definition paragraph found in the introduction. Add one to target Google's Featured Snippet box.",
+    level: 2,
+    source: "google",
+    value: hasSnippetCandidate ? 1 : 0,
+    threshold: "30-70 word definition in first 300 words",
+    guideline: "Google Featured Snippets typically extract 40-60 word definitions from the first section.",
+  });
+
+  // Check for a structured list (5-8 items) suitable for list snippet
+  const listItems = html.match(/<li[^>]*>/gi) ?? [];
+  const hasStructuredList = listItems.length >= 5 && listItems.length <= 15;
+  items.push({
+    id: "serp-list-snippet",
+    severity: hasStructuredList ? "pass" : wordCount < 800 ? "pass" : "warn",
+    label: "List snippet potential",
+    message: hasStructuredList
+      ? `${listItems.length} list items found — structured for Google list snippets`
+      : "No structured list with 5+ items found. Consider adding a numbered/bulleted list for list snippet eligibility.",
+    level: 3,
+    source: "google",
+    value: listItems.length,
+    threshold: "5-15 items",
+    guideline: "Google list snippets extract ordered/unordered lists with 5-8 items from well-structured content.",
+  });
+
+  return items;
+}
+
+/** Score title for click-through rate potential. */
+function auditTitleCTR(title: string): AuditItem[] {
+  const items: AuditItem[] = [];
+  if (!title) return items;
+
+  let ctrScore = 50; // Base score
+  const reasons: string[] = [];
+
+  // 1. Has a number (+10)
+  if (/\d+/.test(title)) {
+    ctrScore += 10;
+    reasons.push("number present");
+  }
+
+  // 2. Power words (+10)
+  const powerWords = ["guide", "tips", "how to", "best", "ultimate", "proven", "essential", "step-by-step", "complete", "top", "ways", "strategies", "mistakes", "secrets"];
+  const titleLower = title.toLowerCase();
+  const hasPowerWord = powerWords.some((w) => titleLower.includes(w));
+  if (hasPowerWord) {
+    ctrScore += 10;
+    reasons.push("power word");
+  }
+
+  // 3. Emotion/sentiment word (+10)
+  const emotionWords = ["amazing", "surprising", "warning", "avoid", "never", "always", "actually", "finally", "honest", "real", "truth"];
+  const hasEmotion = emotionWords.some((w) => titleLower.includes(w));
+  if (hasEmotion) {
+    ctrScore += 10;
+    reasons.push("emotion word");
+  }
+
+  // 4. Optimal length 50-60 chars (+10)
+  if (title.length >= 45 && title.length <= 65) {
+    ctrScore += 10;
+    reasons.push("optimal length");
+  }
+
+  // 5. Keyword in first half (+10)
+  // (Already checked in Rank Math audit, but contributes to CTR score)
+  const firstHalf = title.slice(0, Math.ceil(title.length / 2));
+  if (firstHalf.length >= 10) {
+    ctrScore += 5;
+    reasons.push("front-loaded");
+  }
+
+  // 6. Year present (+5)
+  if (/20\d{2}/.test(title)) {
+    ctrScore += 5;
+    reasons.push("year present");
+  }
+
+  // Cap at 100
+  ctrScore = Math.min(100, ctrScore);
+
+  items.push({
+    id: "serp-title-ctr",
+    severity: ctrScore >= 70 ? "pass" : ctrScore >= 50 ? "warn" : "fail",
+    label: `Title CTR score: ${ctrScore}/100`,
+    message: ctrScore >= 70
+      ? `Strong CTR potential (${reasons.join(", ")})`
+      : `CTR score ${ctrScore}/100. Improve by adding: ${!hasPowerWord ? "power word, " : ""}${!/\d+/.test(title) ? "number, " : ""}${!hasEmotion ? "emotion word, " : ""}${title.length < 45 || title.length > 65 ? "optimize length (50-60 chars), " : ""}`.replace(/, $/, "."),
+    level: 3,
+    source: "google",
+    value: ctrScore,
+    threshold: "≥70",
+    guideline: "Titles with numbers, power words, and emotion words see 20-37% higher CTR (Backlinko).",
+  });
+
+  return items;
+}
+
+/** Generate a table of contents from H2/H3 headings for articles > 2000 words. */
+export function generateTableOfContents(html: string): { html: string; headings: { level: number; text: string; id: string }[] } | null {
+  const wordCount = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  if (wordCount < 2000) return null;
+
+  const headings: { level: number; text: string; id: string }[] = [];
+  const headingRegex = /<h([23])[^>]*>(.*?)<\/h\1>/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = headingRegex.exec(html)) !== null) {
+    const text = match[2].replace(/<[^>]+>/g, "").trim();
+    const id = text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .slice(0, 60);
+    headings.push({
+      level: parseInt(match[1], 10),
+      text,
+      id,
+    });
+  }
+
+  if (headings.length < 3) return null;
+
+  const tocItems = headings
+    .map((h) => {
+      const indent = h.level === 3 ? '  ' : '';
+      return `${indent}<li><a href="#${h.id}">${h.text}</a></li>`;
+    })
+    .join("\n");
+
+  const tocHtml = `<nav class="table-of-contents" aria-label="Table of Contents">\n<h2>Table of Contents</h2>\n<ol>\n${tocItems}\n</ol>\n</nav>`;
+
+  return { html: tocHtml, headings };
+}
+
+// ---------------------------------------------------------------------------
+// Helpful Content Audit — Google's self-assessment questions distilled into
+// automated checks. Based on developers.google.com/search/docs/fundamentals/creating-helpful-content
+// ---------------------------------------------------------------------------
+
+function auditHelpfulContent(
+  html: string,
+  input: ArticleAuditInput,
+  sourceUrls: string[] = [],
+): AuditItem[] {
+  const items: AuditItem[] = [];
+  const plainText = stripHtml(html);
+  const wordCount = plainText.split(/\s+/).filter(Boolean).length;
+
+  // 1. First-hand experience signals (failure narratives, time/cost references, sensory detail)
+  const experiencePatterns = [
+    /\b(?:I|we)\s+(?:found|discovered|noticed|learned|realized|saw|experienced|tested|tried|built|ran|measured)/gi,
+    /\b(?:in my experience|from my experience|what I've seen|when I tested|after testing|we measured)/gi,
+    /\b\d+\s*(?:months?|weeks?|years?|hours?|days?)\s+(?:ago|later|of|spent)/gi,
+    /\$\d[\d,.]*(?:\s*(?:per|\/|a)\s*(?:month|year|hour|day))?/gi,
+    /\b(?:mistake|lesson|failure|struggled|broke|crashed|regret|surprised|unexpected)/gi,
+  ];
+  let experienceSignals = 0;
+  for (const p of experiencePatterns) {
+    const matches = plainText.match(p);
+    if (matches) experienceSignals += matches.length;
+  }
+  items.push({
+    id: "helpful-experience",
+    severity: experienceSignals >= 5 ? "pass" : experienceSignals >= 2 ? "warn" : "fail",
+    label: "First-hand experience signals",
+    message: experienceSignals >= 5
+      ? `${experienceSignals} experience signals found (failure narratives, time/cost refs, personal observations)`
+      : `Only ${experienceSignals} experience signal(s). Add practitioner anecdotes, specific time/cost data, or lessons learned.`,
+    level: 1,
+    source: "google",
+    value: experienceSignals,
+    threshold: "≥5",
+    guideline: "Google E-E-A-T: first-hand experience is the strongest trust signal for Helpful Content.",
+  });
+
+  // 2. Comprehensive coverage — check heading count + word count as proxy for topic depth
+  const h2Count = (html.match(/<h2[^>]*>/gi) || []).length;
+  const h3Count = (html.match(/<h3[^>]*>/gi) || []).length;
+  const headingCoverage = h2Count + h3Count;
+  items.push({
+    id: "helpful-coverage",
+    severity: headingCoverage >= 8 && wordCount >= 1500 ? "pass" : headingCoverage >= 5 ? "warn" : "fail",
+    label: "Comprehensive coverage",
+    message: headingCoverage >= 8 && wordCount >= 1500
+      ? `${headingCoverage} sections covering the topic thoroughly (${wordCount} words)`
+      : `${headingCoverage} sections, ${wordCount} words. Ensure the topic is covered comprehensively so readers don't need to search again.`,
+    level: 1,
+    source: "google",
+    value: headingCoverage,
+    threshold: "≥8 sections",
+    guideline: "Google: content should be substantially valuable so readers feel satisfied after reading.",
+  });
+
+  // 3. Non-clickbait title — flag exaggeration words without data backing
+  const title = (input.title ?? "").toLowerCase();
+  const clickbaitWords = ["shocking", "unbelievable", "mind-blowing", "you won't believe", "secret", "hack"];
+  const clickbaitFound = clickbaitWords.filter((w) => title.includes(w));
+  items.push({
+    id: "helpful-non-clickbait",
+    severity: clickbaitFound.length === 0 ? "pass" : "warn",
+    label: "Non-clickbait title",
+    message: clickbaitFound.length === 0
+      ? "Title doesn't use exaggeration or clickbait language"
+      : `Title contains clickbait language: ${clickbaitFound.join(", ")}. Google flags exaggerated titles that don't deliver.`,
+    level: 2,
+    source: "google",
+    value: clickbaitFound.length,
+    threshold: "0",
+    guideline: "Google: avoid exaggerating or being shocking in title when content doesn't deliver.",
+  });
+
+  // 4. Factual accuracy — all quantitative claims should have citations
+  const citationRegex = /<sup>\s*<a\s+[^>]*href=["'][^"']+["'][^>]*>\s*\[\d+\]\s*<\/a>\s*<\/sup>/gi;
+  const citationCount = (html.match(citationRegex) || []).length;
+  const quantClaimPatterns = [
+    /\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*%/g,
+    /\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g,
+    /\b\d+(?:\.\d+)?x\b/g,
+  ];
+  let quantClaims = 0;
+  for (const p of quantClaimPatterns) {
+    const m = plainText.match(p);
+    if (m) quantClaims += m.length;
+  }
+  const citationRatio = quantClaims > 0 ? citationCount / quantClaims : 1;
+  items.push({
+    id: "helpful-factual",
+    severity: citationRatio >= 0.6 ? "pass" : citationRatio >= 0.3 ? "warn" : "fail",
+    label: "Factual accuracy (citation coverage)",
+    message: citationRatio >= 0.6
+      ? `${citationCount} citations for ~${quantClaims} quantitative claims (${Math.round(citationRatio * 100)}% coverage)`
+      : `Only ${citationCount} citations for ~${quantClaims} quantitative claims. Cite your data sources for trust.`,
+    level: 1,
+    source: "google",
+    value: Math.round(citationRatio * 100),
+    threshold: "≥60%",
+    guideline: "Google E-E-A-T: clear sourcing and citation practices are a trust signal.",
+  });
+
+  // 5. Reader leaves satisfied — check for FAQ section (PAA questions addressed)
+  const hasFaq = /<h2[^>]*>.*?(?:faq|frequently asked|common questions)/i.test(html);
+  items.push({
+    id: "helpful-faq",
+    severity: hasFaq ? "pass" : "warn",
+    label: "FAQ section for reader satisfaction",
+    message: hasFaq
+      ? "FAQ section present — addresses People Also Ask queries"
+      : "No FAQ section detected. Adding FAQs helps readers find specific answers and targets Google's PAA box.",
+    level: 2,
+    source: "google",
+    value: hasFaq ? 1 : 0,
+    threshold: "present",
+    guideline: "Google: content should leave readers feeling they've learned enough without needing to search again.",
+  });
+
+  // 6. Substantial unique value — check for unique frameworks, proprietary terminology, or original analysis markers
+  const uniqueValuePatterns = [
+    /\b(?:framework|model|methodology|approach|system|formula|strategy|playbook)\b/gi,
+    /\b(?:our data shows|our analysis|our research|our testing|we found that|our results)/gi,
+    /\b(?:step[- ]by[- ]step|how[- ]to|walkthrough|tutorial|checklist)\b/gi,
+  ];
+  let uniqueMarkers = 0;
+  for (const p of uniqueValuePatterns) {
+    const m = plainText.match(p);
+    if (m) uniqueMarkers += m.length;
+  }
+  items.push({
+    id: "helpful-unique-value",
+    severity: uniqueMarkers >= 4 ? "pass" : uniqueMarkers >= 2 ? "warn" : "fail",
+    label: "Unique value / original analysis",
+    message: uniqueMarkers >= 4
+      ? `${uniqueMarkers} original analysis markers found (frameworks, proprietary data, step-by-step guides)`
+      : `Only ${uniqueMarkers} unique value markers. Add original frameworks, proprietary data, or actionable guides.`,
+    level: 2,
+    source: "google",
+    value: uniqueMarkers,
+    threshold: "≥4",
+    guideline: "Google: does the content provide substantial additional value compared to other pages in search results?",
+  });
+
+  // 7. Not keyword-stuffed (already checked elsewhere, but include in helpful content panel)
+  const keyword = input.focusKeyword?.toLowerCase() ?? "";
+  const words = plainText.toLowerCase().split(/\s+/).filter(Boolean);
+  const kwCount = keyword ? words.filter((w) => w.includes(keyword.split(/\s+/)[0])).length : 0;
+  const kwDensity = words.length > 0 ? (kwCount / words.length) * 100 : 0;
+  items.push({
+    id: "helpful-not-stuffed",
+    severity: kwDensity <= 3 ? "pass" : kwDensity <= 4 ? "warn" : "fail",
+    label: "Not keyword-stuffed",
+    message: kwDensity <= 3
+      ? `Keyword density ${kwDensity.toFixed(1)}% — natural and reader-friendly`
+      : `Keyword density ${kwDensity.toFixed(1)}% is too high. Reduce to ≤3% for natural reading.`,
+    level: 2,
+    source: "google",
+    value: Math.round(kwDensity * 10) / 10,
+    threshold: "≤3%",
+    guideline: "Google: content created primarily for search engines rather than people will be demoted.",
+  });
+
+  // 8. Clear sourcing — citation count (already detailed in citationDensity audit, this is the helpful content check)
+  items.push({
+    id: "helpful-sourcing",
+    severity: citationCount >= 8 ? "pass" : citationCount >= 4 ? "warn" : "fail",
+    label: "Clear sourcing practices",
+    message: citationCount >= 8
+      ? `${citationCount} inline citations — strong sourcing`
+      : citationCount >= 4
+        ? `${citationCount} inline citations — acceptable, but aim for 8+ per 2000 words`
+        : `Only ${citationCount} inline citations. Readers and search engines expect clear sourcing for trust.`,
+    level: 2,
+    source: "google",
+    value: citationCount,
+    threshold: "≥8 per 2000 words",
+    guideline: "Google Quality Raters evaluate 'clear sourcing and citation practices' as a trust signal.",
+  });
+
+  // 9. Author attribution present
+  items.push({
+    id: "helpful-author",
+    severity: input.authorName ? "pass" : "warn",
+    label: "Author attribution",
+    message: input.authorName
+      ? `Author "${input.authorName}" attributed — enables E-E-A-T Person schema`
+      : "No author name set. Adding author attribution strengthens E-E-A-T trust signals.",
+    level: 2,
+    source: "google",
+    value: input.authorName ? 1 : 0,
+    threshold: "present",
+    guideline: "Google E-E-A-T: content should have clear author attribution with relevant expertise.",
+  });
+
+  // 10. Direct answer in first 100 words (inverted pyramid)
+  const first100Words = plainText.split(/\s+/).filter(Boolean).slice(0, 100).join(" ");
+  const keywordLower = keyword.toLowerCase();
+  const first100Lower = first100Words.toLowerCase();
+  // Check full keyword phrase first, then fall back to checking all individual words
+  const hasDirectAnswer = keyword
+    ? first100Lower.includes(keywordLower) ||
+      keywordLower.split(/\s+/).filter(Boolean).every((w) => first100Lower.includes(w))
+    : true;
+  items.push({
+    id: "helpful-direct-answer",
+    severity: hasDirectAnswer ? "pass" : "warn",
+    label: "Direct answer in introduction",
+    message: hasDirectAnswer
+      ? "Primary keyword/topic addressed in the first 100 words"
+      : "Primary keyword not found in first 100 words. Front-load the answer for featured snippets and reader satisfaction.",
+    level: 2,
+    source: "google",
+    value: hasDirectAnswer ? 1 : 0,
+    threshold: "present in first 100 words",
+    guideline: "Google: content should demonstrate that it was written to help people, not to manipulate rankings.",
+  });
+
+  // 11. Readability + formatting — check for mixed content types (paragraphs, lists, headings)
+  const hasParagraphs = /<p[^>]*>/i.test(html);
+  const hasLists = /<(?:ul|ol)[^>]*>/i.test(html);
+  const hasSubheadings = /<h3[^>]*>/i.test(html);
+  const formatScore = [hasParagraphs, hasLists, hasSubheadings].filter(Boolean).length;
+  items.push({
+    id: "helpful-formatting",
+    severity: formatScore >= 3 ? "pass" : formatScore >= 2 ? "warn" : "fail",
+    label: "Content formatting quality",
+    message: formatScore >= 3
+      ? "Good mix of paragraphs, lists, and subheadings — scannable and readable"
+      : "Content lacks formatting variety. Mix paragraphs, lists, and subheadings for scannability.",
+    level: 3,
+    source: "google",
+    value: formatScore,
+    threshold: "3 content types",
+    guideline: "Google: content should be well-organized and easy to read — 79% of web users scan (NNGroup).",
+  });
+
+  // 12. Bookmark test — is the article long enough and substantial enough that a reader might bookmark it?
+  const bookmarkWorthy = wordCount >= 1200 && headingCoverage >= 6 && experienceSignals >= 3;
+  items.push({
+    id: "helpful-bookmark-test",
+    severity: bookmarkWorthy ? "pass" : "warn",
+    label: "Bookmark-worthy (would you save this?)",
+    message: bookmarkWorthy
+      ? "Content passes the bookmark test — substantial, well-structured, and experience-backed"
+      : "Content may not pass the bookmark test. Would a reader save this for future reference? Increase depth, experience signals, or structure.",
+    level: 3,
+    source: "google",
+    value: bookmarkWorthy ? 1 : 0,
+    threshold: "≥1200 words, ≥6 sections, ≥3 experience signals",
+    guideline: "Google self-assessment: would you bookmark this or recommend it to a friend?",
+  });
+
+  return items;
+}
+
 /**
  * Run full article audit per Google Search Central priority stack.
  * Schema markup is auto-generated when title/meta/slug/keyword are available.
@@ -1607,6 +2382,7 @@ function auditExtraValueCoverage(plainContent: string, themes: string[]): AuditI
  */
 export function auditArticle(
   input: ArticleAuditInput,
+  sourceUrls: string[] = [],
 ): ArticleAuditResult {
   const plainContent = stripHtml(input.content);
 
@@ -1635,6 +2411,19 @@ export function auditArticle(
     ...auditTitleNumberAccuracy(input.title ?? "", input.content),
     // Level 3 — Differentiation (optional; from brief extra-value themes)
     ...(input.extraValueThemes?.length ? auditExtraValueCoverage(plainContent, input.extraValueThemes) : []),
+    // Level 2 — Citation density and References section
+    ...auditCitationDensity(input.content, sourceUrls),
+    // Level 2/3 — Writing quality (anti-textbook, passive voice, variety, engagement hooks)
+    ...auditWritingQuality(input.content),
+    // Level 2 — Sentence length variety (anti-AI detection signal)
+    ...auditSentenceVariety(input.content),
+    // Level 2 — Inverted pyramid (answer-first at article, section, and paragraph levels)
+    ...auditInvertedPyramid(input.content, input.focusKeyword),
+    // Level 1-3 — Helpful Content (Google's self-assessment questions, 12 automated checks)
+    ...auditHelpfulContent(input.content, input, sourceUrls),
+    // Level 2/3 — SERP Intelligence (featured snippet, list snippet, title CTR)
+    ...auditFeaturedSnippet(input.content, input.focusKeyword),
+    ...auditTitleCTR(input.title ?? ""),
   ];
 
   const sorted = [...all].sort(byLevelThenSeverity);
@@ -1660,7 +2449,9 @@ export function auditArticle(
         input.title,
         input.metaDescription ?? "",
         input.slug ?? "",
-        input.focusKeyword ?? ""
+        input.focusKeyword ?? "",
+        input.authorName,
+        input.authorUrl,
       )
       : undefined;
 

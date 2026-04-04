@@ -72,6 +72,8 @@ export type PipelineResult = {
   contentDiff?: import("@/lib/seo/content-diff").ContentDiffResult;
   semanticSimilarity?: { highestSimilarity: number; mostSimilarUrl: string; isTooDerivative: boolean };
   contentDecayRisk?: import("@/lib/seo/content-decay").ContentDecayResult;
+  /** AI transparency disclosure text (auto-generated). */
+  aiDisclosureText?: string;
 };
 
 function humanizeSlug(slug: string): string {

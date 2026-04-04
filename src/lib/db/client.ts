@@ -46,3 +46,46 @@ export async function query<T = unknown>(
     throw error;
   }
 }
+
+const RETRYABLE_ERRORS = [
+  "CONNECT_TIMEOUT",
+  "Connection terminated",
+  "connection refused",
+];
+
+function isRetryableError(error: unknown): boolean {
+  const message =
+    error instanceof Error ? error.message : String(error);
+  return RETRYABLE_ERRORS.some((pattern) => message.includes(pattern));
+}
+
+/**
+ * Retry wrapper for database operations that may fail due to transient
+ * connection issues (CONNECT_TIMEOUT, Connection terminated, connection refused).
+ * Uses exponential backoff: 1s, 2s, etc.
+ */
+export async function withDbRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 2
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxRetries && isRetryableError(error)) {
+        const delayMs = 1000 * Math.pow(2, attempt); // 1s, 2s
+        console.warn(
+          `[withDbRetry] Retryable DB error (attempt ${attempt + 1}/${maxRetries + 1}), retrying in ${delayMs}ms:`,
+          error instanceof Error ? error.message : error
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+      throw error;
+    }
+  }
+  // Should not reach here, but satisfy TypeScript
+  throw lastError;
+}

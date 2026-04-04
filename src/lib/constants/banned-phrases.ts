@@ -54,6 +54,39 @@ export const AI_PHRASES_HIGH: readonly string[] = [
   "endeavor",
 ] as const;
 
+/** Textbook opener patterns — weak paragraph starters that signal AI/academic writing.
+ * These are checked as regex patterns against the first sentence of each paragraph. */
+export const TEXTBOOK_OPENERS: readonly string[] = [
+  "there are several",
+  "there are many",
+  "there are a number of",
+  "there are various",
+  "it is important to",
+  "it is worth mentioning",
+  "it is essential to",
+  "it is crucial to",
+  "it should be noted",
+  "it can be observed",
+  "one of the most",
+  "one must consider",
+  "one should note",
+  "when it comes to",
+  "in order to understand",
+  "in order to achieve",
+  "as mentioned earlier",
+  "as previously discussed",
+  "as we all know",
+  "it goes without saying",
+  "needless to say",
+  "the importance of",
+  "the purpose of this",
+  "this section will",
+  "this article will",
+  "let us now turn to",
+  "we will now discuss",
+  "we will now explore",
+] as const;
+
 /** Common phrases that weaken quality when clustered. Individually fine; flagged in quantity. */
 export const AI_PHRASES_COMMON: readonly string[] = [
   "crucial",

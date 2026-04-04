@@ -2,7 +2,7 @@ import { getSharedAnthropicClient } from "@/lib/anthropic/shared-client";
 import { SEO } from "@/lib/constants";
 import { getBannedPhrasesForPrompt } from "@/lib/constants/banned-phrases";
 import { sanitizeUserInput } from "@/lib/constants/sanitize";
-import { type VoicePresetId, getVoicePreset, buildVoiceConstraintsBlock, DEFAULT_VOICE_PRESET_ID } from "@/lib/constants/voices";
+import { type VoicePresetId, getVoicePreset, buildVoiceConstraintsBlock, getIntentModifier, getIndustryModifier, DEFAULT_VOICE_PRESET_ID } from "@/lib/constants/voices";
 import { extractH2sFromHtml, getAuditRulesForPrompt } from "@/lib/seo/article-audit";
 import type {
   CurrentData,
@@ -74,7 +74,7 @@ Every article must pass these self-assessment checks (developers.google.com/sear
 - **Extraction Targets:** Every H2 must contain at least one dense "If X, then Y" statement or a comma-separated factual list that an AI engine can lift verbatim. Place these in mid-paragraph, not at the start.
 - **Named Entity Saturation:** Never use pronouns for tools, companies, platforms, or concepts. Write "Google Search Console shows..." not "It shows..." AI engines build entity graphs from proper nouns. High entity density correlates directly with higher citation rates.
 - **Data Tables as Bulleted Lists:** Include at least one structured data list (bulleted, with bold labels and metrics) per 1000 words. Original data tables earn 4.1x more AI citations than prose-only sections.
-- **Source Citations:** Reference 1-2 authoritative external sources per section where relevant. Adding source citations boosts AI citation performance by 31%.
+- **Inline Citations (Wikipedia-style — MANDATORY, audited):** Every quantitative claim, major finding, or attributed statement MUST have a numbered superscript citation: \`<sup><a href="SOURCE_URL" target="_blank" rel="noopener noreferrer">[1]</a></sup>\`. Assign citation numbers sequentially across the entire article (not per section). MINIMUM: 1-2 citations per H2 section. Target: 8-15 total citations per 2000-word article (scale proportionally for longer articles). Use source URLs from the currentData facts AND from competitor URLs provided in the research brief. AI engines cite content with inline references 31% more than uncited content. At the end of the article (after FAQ), include a "## References" section as a numbered \`<ol>\` list matching the citation numbers, each item containing the source name and URL as an \`<a>\` tag. Do NOT cite common knowledge. DO cite: statistics, research findings, expert claims, specific benchmarks, tool adoption numbers, and named-source attributions. If a section has zero citations, it FAILS the audit.
 - **Factual Density:** Kill filler phrases. Start sentences with the subject or data point. Every sentence must either inform or persuade. Lists appear in 78% of AI-generated answers, so use them.
 
 ## 4. The Scars Test (E-E-A-T first-hand experience)
@@ -87,13 +87,49 @@ Every H2 MUST contain at least one of these practitioner signals. No exceptions:
 - **The "I" and "We" framework:** "In our latest deployment...", "I've audited 200+ of these configurations and..."
 - **Pragmatic trade-off acknowledgment:** "This workflow is tedious. It's also the only approach that survives a cache purge."
 
-**Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data exists, use qualitative language. Every factual claim must trace back to a currentData entry.`;
+**Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data exists, use qualitative language. Every factual claim must trace back to a currentData entry.
+
+## 4a. The Inverted Pyramid (answer first, always)
+
+Front-load value at EVERY level. 79% of web users scan; only 16% read word-by-word. If you build to a conclusion, readers leave before reaching it.
+
+- **Article level:** The first 100 words must contain the core answer or takeaway. No throat-clearing, no "In this article we will..."
+- **Section level:** The answer capsule IS the first thing after the H2. This is already enforced. Good.
+- **Paragraph level:** The first sentence of every paragraph must be the point, not setup. NEVER open a paragraph with "There are several...", "It is important to...", "When it comes to...", "One of the most...". Lead with the specific claim, number, or insight.
+- **Sentence level:** Put information-carrying words first. "Redis cut response time by 80%" not "It was found that response time could be reduced by using Redis."
+
+BAD paragraph opening: "There are several factors that can influence your website's loading speed."
+GOOD paragraph opening: "Three factors control 90% of your loading speed: image compression, server response time, and render-blocking JavaScript."
+
+## 4b. Emotional Architecture (what keeps humans reading)
+
+Every section must trigger at least one emotion from this hierarchy:
+
+1. **Recognition** (opening): "You've seen this before..." / "If you've ever spent 3 hours debugging..." — the reader feels understood.
+2. **Curiosity** (before key insight): "But here's what most guides miss..." / "The counterintuitive part:" — creates a gap the brain needs to close.
+3. **Surprise** (key finding): Deliver a counterintuitive data point or contrarian insight that challenges assumptions.
+4. **Validation** (after evidence): "This confirms what experienced practitioners have known..." — the reader feels smart.
+5. **Forward pull** (section ending): "But that's only half the equation." / "The real challenge isn't X, it's Y." — momentum to next section.
+
+**Bucket brigades (mandatory: 3-5 per 1000 words):** Short transitional phrases that create micro-curiosity gaps. Use at paragraph transitions where attention dips. Examples: "Here's the thing:", "But it gets worse.", "The real question:", "So what does this mean?", "Here's where it gets interesting:". End with a colon when possible — it forces the brain to continue. Vary the phrasing; never use the same bucket brigade twice.
+
+## 4c. Concrete-First Rule (example before concept)
+
+ALWAYS lead with the specific example, case study, data point, or scenario. THEN generalize. Never explain the abstract concept first and then give an example.
+
+BAD (textbook pattern):
+"Caching is a technique that stores frequently accessed data in a temporary location to reduce latency. For example, Redis can store session data to speed up API responses."
+
+GOOD (concrete-first):
+"Redis cut our API response time from 340ms to 12ms by storing session data in memory. That's caching in action — keeping frequently accessed data close so the database doesn't get hammered on every request."
+
+The concrete-first pattern works because specificity builds trust (readers believe "340ms to 12ms" more than "reduces latency") and the brain anchors to concrete details before abstract principles.`;
 
 const SYSTEM_PROMPT_POSTAMBLE = `## 5. AI Detection Avoidance (mandatory — unedited AI output causes 85-95% traffic losses)
 
 You must produce text that reads as human-written. Follow every rule below:
 
-- **Sentence length variance:** Target a standard deviation of >= 4.5 words across sentence lengths. Mix deliberately: short (4-8 words), medium (12-18 words), long (22-30 words). NEVER write 3+ consecutive sentences of similar length. After two medium sentences, force a short punch or a long complex one.
+- **Sentence length variance (CRITICAL — this is audited):** Target a standard deviation of >= 4.5 words across sentence lengths. Mix deliberately: short (4-8 words), medium (12-18 words), long (22-30 words). NEVER write 3+ consecutive sentences of similar length. After two medium sentences, force a short punch or a long complex one. Vary sentence STRUCTURE too: start some with a noun, some with a verb, some with a prepositional phrase, some with "But" or "So." Monotonous sentence openings are the #1 AI detection signal.
 - **Paragraph length mixing:** Alternate between 1-sentence paragraphs and 3-4 sentence paragraphs. A single-sentence paragraph after a dense block creates rhythm that AI detectors cannot replicate.
 - **Contractions:** Use contractions naturally in approximately 60-70% of opportunities. "Don't" not "do not." "It's" not "it is." "We've" not "we have." Skip contractions only for emphasis: "This does not work. Period."
 - **Pattern breaking:** After 3 sentences with similar structure (e.g., Subject-Verb-Object), inject one of: a parenthetical aside (like this one), a rhetorical question, a sentence fragment, a colon-led list, or an imperative. AI writing is rhythmically monotonous. Break the pattern.
@@ -111,6 +147,10 @@ You must produce text that reads as human-written. Follow every rule below:
 **BANNED INTRODUCTORY PHRASES:** Never use "One practitioner noted" or similar repetitive attribution. Weave evidence naturally using varied structures.
 
 **STATISTIC RULES:** Never repeat a statistic or fact more than once in the article. Once used, it is retired. You receive ONLY the stats allocated for each section. Do not reference stats from previous sections.
+
+**QUOTE RULES:** Never reuse the same community quote, Reddit quote, or practitioner quote in multiple sections. Each quote may appear ONCE in the entire article. If you've already used a quote in a previous section (check the previousContent context), do not use it again. Vary your quote attributions: don't use the same phrasing like "As one user put it" more than once.
+
+**DATA DENSITY MINIMUM:** Each H2 section MUST contain at least 2 specific data points: numbers, percentages, timeframes, named tools, version numbers, user counts, or measurable outcomes. Vague claims like "significant improvement" fail. Replace with specifics: "40-60% improvement in documentation velocity." If the research brief doesn't provide enough data for a section, use specific practitioner observations with measurable details (tool names, timeframes, team sizes).
 
 - Check every paragraph against the banned phrase list; avoid every listed phrase.
 - At least one specific named example, tool, or scenario per H2. No abstract-only sections.
@@ -532,7 +572,15 @@ export async function writeDraft(
    - If currentData source is a government or regulatory body: 'per [agency name]', 'according to [regulatory body]'
    - If currentData source is a news outlet: 'as reported by [outlet name]'
 
-   Not every number needs attribution — but every MAJOR claim (revenue, market share, growth rate, benchmark result, key specification) should reference its source at least once. If multiple nearby facts come from the same source, attribute once and let proximity carry. Keep attributions conversational, not academic. Do NOT add URLs or a Sources section — linking is handled separately in the CMS.`
+   Every MAJOR claim (revenue, market share, growth rate, benchmark result, key specification) MUST have an inline citation using the Wikipedia-style numbered format: \`<sup><a href="SOURCE_URL" target="_blank" rel="noopener noreferrer">[N]</a></sup>\`. Use the source URL from the currentData entry. If multiple nearby facts come from the same source, reuse the same citation number. Keep the prose conversational — the citation sits after the claim, not as the sentence structure. Example: "Response times improved by 40%<sup><a href="https://example.com/report" target="_blank" rel="noopener noreferrer">[3]</a></sup>, making it the fastest in its category."
+
+   At the end of the article (after FAQ), output a References section:
+   <h2>References</h2>
+   <ol>
+   <li><a href="URL" target="_blank" rel="noopener noreferrer">Source Name</a></li>
+   ...
+   </ol>
+   Match each numbered citation in the article to the corresponding list item.`
       : "No current data provided. Do not invent specific statistics; use general language where needed.";
 
   const styleChecklist = brief.editorialStyleFallback
@@ -552,9 +600,20 @@ ${styleChecklist}
 - Primary: "${brief.keyword.primary}" (must appear in first 100 words + at least one H2/H3)
 - Secondary: ${brief.keyword.secondary.join(", ") || "None"}
 - PASF: ${brief.keyword.pasf.join(", ") || "None"}
-${(brief as any).clusterPosition && (brief as any).clusterPosition !== "standalone" ? `
-## CLUSTER POSITION: ${(brief as any).clusterPosition}
-${(brief as any).clusterPosition === "pillar" ? "PILLAR page: comprehensive authority across the full topic. Cover every subtopic at useful depth. This should be the definitive resource a reader bookmarks." : ""}${(brief as any).clusterPosition === "spoke" ? `SPOKE page: deep specialized coverage. Reference the broader topic "${(brief as any).clusterTopic || brief.keyword.primary}" naturally 1-2 times to signal topical relationship.` : ""}
+${brief.clusterPosition && brief.clusterPosition !== "standalone" ? `
+## CLUSTER POSITION: ${brief.clusterPosition.toUpperCase()}
+${brief.clusterPosition === "pillar" ? `This is a PILLAR page — the definitive hub for this topic cluster.
+- Cover the topic comprehensively. Every essential subtopic should appear, each at enough depth to be useful standalone.
+- Link concepts to spoke articles naturally: "For a deeper dive on [subtopic], see [our guide to X]."
+- This should be the page a reader bookmarks as their go-to reference.
+- Breadth AND depth: cover more ground than any single competitor, but don't sacrifice quality for quantity.
+- Target 3-5 internal links per 1000 words where relevant spoke content exists.` : ""}${brief.clusterPosition === "spoke" ? `This is a SPOKE page — deep specialization on a specific subtopic.
+- Go significantly deeper than the pillar page on this specific topic. Your unique depth IS the value.
+- Reference the broader topic "${brief.clusterTopic || brief.keyword.primary}" naturally 1-2 times.
+- Link back to the pillar page once in the intro and once near the conclusion.
+- Link to 1-2 related spoke pages where the reader would benefit from cross-referencing.
+- Your reader likely came from the pillar page — don't repeat what's already covered there. Add new depth, examples, and data.` : ""}
+${brief.internalLinkSuggestions?.length ? `Related articles in this cluster (reference naturally where relevant):\n${brief.internalLinkSuggestions.slice(0, 10).map((l) => `- ${l.url}`).join("\n")}` : ""}
 ` : ""}${currentDataWarning}
 ## MANDATORY OUTLINE (follow exactly; do not skip, reorder, or add H2s; you may add H3s)
 ${outlineBlock}
@@ -618,11 +677,11 @@ ${TIER_3_QUALITY}
 
 ## OUTPUT (valid JSON only)
 {
-  "content": "<p>...</p><h2>...</h2>...",
+  "content": "<p>...</p><h2>...</h2>...<h2>References</h2><ol><li><a href=\"URL\" target=\"_blank\" rel=\"noopener noreferrer\">Source Name</a></li>...</ol>",
   "suggestedCategories": ["cat1", "cat2"],
   "suggestedTags": ["tag1", "tag2", "tag3"]
 }
-No text outside the JSON. If approaching token limit, shorten middle sections but complete FAQ.`;
+The content MUST end with a References section (after FAQ) listing all inline citations as a numbered <ol>. No text outside the JSON. If approaching token limit, shorten middle sections but complete FAQ and References.`;
 
 
   const modelId = DRAFT_MODEL_IDS[draftModel] ?? CLAUDE_DEFAULT_MODEL;
@@ -715,7 +774,10 @@ export async function writeDraftSection(
   primaryKeyword?: string,
   voice?: VoicePresetId,
   customVoiceDescription?: string,
-  intent?: string
+  intent?: string,
+  authorContext?: { authorName?: string; authorBio?: string; authorExpertise?: string },
+  industry?: string,
+  allSourceUrls?: string[]
 ): Promise<string> {
   const anthropic = getAnthropicClient();
 
@@ -753,10 +815,10 @@ Enforce these in this specific section.`;
     ? `\n## PRACTITIONER INSIGHTS (Information Gain)\nThese are non-obvious insights generated to beat competitors. Weave them in if relevant to this section's topics:\n${brief.knowledgeEngine.algorithmicInsights.map((i: any) => `- [${i.type.toUpperCase()}] ${i.headline}: ${i.explanation}`).join("\n")}\n`
     : "";
 
-  const clusterBlock = (brief as any).clusterPosition && (brief as any).clusterPosition !== "standalone"
-    ? `\n## CLUSTER POSITION: ${((brief as any).clusterPosition as string).toUpperCase()}\n${(brief as any).clusterPosition === "pillar"
-      ? "This is a PILLAR article — comprehensive and authoritative. Cover the topic broadly and definitively."
-      : `This is a SPOKE article — go deep on this specific subtopic.${(brief as any).clusterTopic ? ` Reference the broader topic "${(brief as any).clusterTopic}" naturally 1-2 times where relevant.` : ""}`}\n`
+  const clusterBlock = brief.clusterPosition && brief.clusterPosition !== "standalone"
+    ? `\n## CLUSTER POSITION: ${brief.clusterPosition.toUpperCase()}\n${brief.clusterPosition === "pillar"
+      ? "PILLAR page: comprehensive hub. Cover this section's topics thoroughly — readers should feel they don't need another source. Mention related subtopics briefly and link to deeper content where it exists."
+      : `SPOKE page: deep specialization.${brief.clusterTopic ? ` Reference the broader topic "${brief.clusterTopic}" if natural for this section.` : ""} Go deeper than a pillar would — add extra examples, edge cases, and practitioner insights.`}\n${brief.internalLinkSuggestions?.length ? `Related cluster articles (reference if relevant to this section):\n${brief.internalLinkSuggestions.slice(0, 5).map((l) => `- ${l.url}`).join("\n")}\n` : ""}`
     : "";
 
   // Detect FAQ section by heading
@@ -800,11 +862,22 @@ ${section.visualSuggestion ? `- VISUAL ASSET PLANNED: "${section.visualSuggestio
 ${isFirstSection && primaryKeyword ? `\nFATAL ERROR: You MUST include the exact phrase "${primaryKeyword}" within the first 2 paragraphs of this section to establish SEO relevance.\n- FEATURED SNIPPET: Write a 40-60 word definition paragraph near the top that directly answers "What is ${primaryKeyword}?" in a concise, factual voice. This paragraph targets Google's featured snippet and AI Overview extraction.` : ""}
 ${faqInstructions}
 
-${(brief as any).secondaryKeywords?.length ? `## SEMANTIC KEYWORDS (weave naturally — do NOT force)\nInclude 2-4 of these related terms where they fit the context: ${((brief as any).secondaryKeywords as string[]).join(", ")}.\nDo NOT stuff them. Use synonyms, related phrases, and natural variations.\n` : ""}
+${brief.keyword.secondary?.length ? `## SEMANTIC KEYWORDS (weave naturally — do NOT force)\nInclude 2-4 of these related terms where they fit the context: ${brief.keyword.secondary.join(", ")}.\nDo NOT stuff them. Use synonyms, related phrases, and natural variations.\n` : ""}
 ## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
-Every number will be cross-checked by the fact-verification system. Use natural attribution ("according to [source]").
 ${currentDataWarning}
+## INLINE CITATIONS — MANDATORY
+Every factual claim, statistic, percentage, named tool feature, or attributed statement MUST have an inline citation. Format: \`<sup><a href="SOURCE_URL" target="_blank" rel="noopener noreferrer">[N]</a></sup>\` placed immediately after the claim.
+
+**Citation rules:**
+- MINIMUM ${Math.max(2, Math.ceil(section.targetWords / 250))} citations in this section (non-negotiable)
+- Cite every stat, dollar amount, percentage, growth figure, benchmark, and named study
+- Cite factual claims about tools, platforms, or specifications using the source URL
+- Common knowledge (e.g. "Markdown uses # for headings") does NOT need citation
+- Reuse the same citation number if multiple nearby facts come from the same source
+- Use source URLs from the data above. If a fact has a Source field, that IS the citation URL
+${allSourceUrls && allSourceUrls.length > 0 ? `\nAvailable source URLs for citations (use when making factual claims about these sources):\n${allSourceUrls.map(u => `- ${u}`).join("\n")}\n` : ""}
+${previousContent.trim().length > 0 ? (() => { const citationMatches = previousContent.match(/\[(\d+)\]/g); const lastNum = citationMatches ? Math.max(...citationMatches.map(m => parseInt(m.replace(/\[|\]/g, ""), 10))) : 0; return lastNum > 0 ? `Start YOUR citations at [${lastNum + 1}].` : "Start citations at [1]."; })() : "Start citations at [1]."}
 ${redditQuotes?.length ? `\n## COMMUNITY QUOTES (weave naturally if relevant)
 Vary attribution: "one engineer on a developer forum shared...", "a practitioner in an online community reported...", "as one user put it...". Never use "One practitioner noted." Never name Reddit or specific subreddits.
 ${redditQuotes.map(q => `- ${q}`).join("\n")}\n` : ""}
@@ -813,6 +886,11 @@ ${sanitizeUserInput(fieldNotes)}\n` : ""}
 ${sanitizeUserInput(toneExamples) ? `\n## TONE CALIBRATION
 Match this voice:\n"""${sanitizeUserInput(toneExamples)}"""\n` : ""}
 ${buildVoiceConstraintsBlock(voice)}
+${getIntentModifier(intent) ? `\n${getIntentModifier(intent)}\n` : ""}${getIndustryModifier(industry) ? `\n${getIndustryModifier(industry)}\n` : ""}
+${authorContext?.authorName ? `
+## AUTHOR CONTEXT (E-E-A-T signals)
+Author: ${authorContext.authorName}${authorContext.authorExpertise ? ` — ${authorContext.authorExpertise}` : ""}${authorContext.authorBio ? `\nBio: ${authorContext.authorBio}` : ""}
+Write as if this author is sharing their professional perspective. Naturally weave in first-person experience signals where relevant ("in my experience", "I've seen teams that...", "what I recommend is..."). Do NOT over-reference the author name — let the expertise show through specific, practitioner-level insights.` : ""}
 
 ${isFaqSection ? "" : TIER_3_QUALITY}
 
@@ -829,7 +907,7 @@ Return ONLY valid JSON. No H2 tag for the section title. All sub-headings must u
 
   const stream = anthropic.messages.stream({
     model: modelId,
-    max_tokens: 4000,
+    max_tokens: 8192,
     temperature: sectionTemperature,
     system: [{ type: "text" as const, text: sectionSystemPrompt, cache_control: { type: "ephemeral" as const } }],
     messages: [{ role: "user", content: userPrompt }],
@@ -847,6 +925,12 @@ Return ONLY valid JSON. No H2 tag for the section title. All sub-headings must u
       totalTokens: usage.promptTokens + usage.completionTokens,
       durationMs,
     });
+  }
+
+  // Detect truncation at section level
+  const sectionStopReason = (message as { stop_reason?: string }).stop_reason;
+  if (sectionStopReason === "max_tokens") {
+    console.warn("[writeDraftSection] Response TRUNCATED at max_tokens — will attempt partial recovery");
   }
 
   const contentBlock = message.content?.[0];
@@ -874,6 +958,12 @@ Return ONLY valid JSON. No H2 tag for the section title. All sub-headings must u
     const contentKeyMatch = /"content"\s*:/g.exec(jsonText);
     const keyIndex = contentKeyMatch ? contentKeyMatch.index : -1;
     if (keyIndex === -1) {
+      // Last resort: if Claude returned raw HTML without JSON wrapper, use it directly
+      const rawText = contentBlock.text.trim();
+      if (rawText.includes("<h2") || rawText.includes("<h3") || rawText.includes("<p>")) {
+        console.warn("[writeDraftSection] No JSON wrapper found — using raw HTML response as content");
+        return rawText;
+      }
       throw new Error(`Claude writeDraftSection JSON parse failed (no "content" key): ${err}`);
     }
 
@@ -1626,15 +1716,50 @@ Return the COMPLETE revised ResearchBrief as valid JSON (same schema as the orig
   const { currentData: _cd, knowledgeEngine: _ke, ...briefWithoutLargeFields } = existingBrief;
   const existingBriefJson = JSON.stringify(briefWithoutLargeFields, null, 2);
 
-  // Compact extraction context (only what Claude needs for adding new sections)
-  const extractionContext = JSON.stringify({
+  // Detect significant word count increase to trigger gap-filling behavior
+  const existingWordCount = existingBrief.outline?.sections?.reduce((sum, s) => sum + (s.targetWords || 0), 0) ?? 0;
+  const isSignificantIncrease = wordCountOverride && existingWordCount > 0 && wordCountOverride.target > existingWordCount * 1.3;
+
+  // Compact extraction context — richer when word count is increasing significantly
+  const extractionContext = JSON.stringify(isSignificantIncrease ? {
+    topics: topics.topics.slice(0, 20).map(t => ({ name: t.name, importance: t.importance })),
+    gaps: topics.gaps.slice(0, 10),
+    primaryKeyword: input.primaryKeyword,
+    competitorHeadings: topics.competitorHeadings?.slice(0, 30),
+  } : {
     topics: topics.topics.slice(0, 10).map(t => ({ name: t.name, importance: t.importance })),
     gaps: topics.gaps.slice(0, 5),
     primaryKeyword: input.primaryKeyword,
   });
 
   const wordCountNote = wordCountOverride
-    ? `\n\nNEW WORD COUNT TARGET: ${wordCountOverride.target} words. Adjust section targetWords to meet this total.`
+    ? isSignificantIncrease
+      ? `\n\nNEW WORD COUNT TARGET: ${wordCountOverride.target} words (up from ~${existingWordCount}).
+
+IMPORTANT — INTELLIGENT EXPANSION (word count increased by ${Math.round(((wordCountOverride.target - existingWordCount) / existingWordCount) * 100)}%):
+
+Your goal: after reading this article, the reader should NEVER need to click back to search results, visit another article, or ask an AI chatbot. Complete satisfaction.
+
+STEP 1 — EVALUATE EXISTING COVERAGE:
+Look at the existing sections and compare them against the RESEARCH CONTEXT (gaps, competitor headings, topics). Ask: "Does this outline already cover every important subtopic?" If yes, the existing sections need MORE DEPTH, not more sections.
+
+STEP 2 — DEEPEN EXISTING SECTIONS FIRST (primary strategy):
+- Identify sections that directly answer search intent or cover high-importance topics. Give these 30-60% more words.
+- Add more practitioner depth: edge cases, real-world gotchas, specific tool comparisons, concrete examples, data points, step-by-step walkthroughs.
+- Add sub-sections (H3s) within existing H2s to break up the added depth.
+- Keep thin sections thin — FAQ answers, definitions, and transitional sections stay at their current size.
+
+STEP 3 — ADD NEW SECTIONS ONLY FOR REAL GAPS:
+- Check the RESEARCH CONTEXT gaps and competitor headings. If there is a genuinely important subtopic that NO existing section covers AND that a reader would need to search separately for, add 1-2 new H2 sections.
+- Do NOT add sections just to hit the word count. Every new section must pass this test: "Would a reader leave the article to search for this topic if it were missing?"
+- If no real gaps exist, distribute ALL extra words into existing sections as deeper coverage.
+
+STEP 4 — FINAL CHECK:
+- The sum of all section targetWords must equal ${wordCountOverride.target} (±5%).
+- Every additional word must teach something new. Padding is worse than a shorter article.
+
+Use the RESEARCH CONTEXT below to evaluate gaps vs existing coverage.`
+      : `\n\nNEW WORD COUNT TARGET: ${wordCountOverride.target} words. Adjust section targetWords to meet this total.`
     : "";
 
   const userPrompt = `## EXISTING APPROVED BRIEF

@@ -13,6 +13,7 @@ import type {
   IntentValidation,
   CompetitorArticle,
   CurrentData,
+  CurrentDataFact,
   TopicExtractionResult,
   ResearchBrief,
   OutlineSection,
@@ -277,12 +278,15 @@ export async function runResearchFetch(
   const serpFeaturesFromSerp = researchSerp?.serpFeatures;
   const redditThreadsFromSerp = researchSerp?.redditThreads;
 
-  // Idempotency: if we already have a research chunk for the same URLs, return it
+  // Idempotency: if we already have a research chunk for the same URLs (within 30 min), return it
+  const IDEMPOTENCY_TTL_MS = 30 * 60 * 1000; // 30 minutes
   const existing = await store.getChunkOutput(jobId, "research") as ResearchChunkOutput | undefined;
   if (existing?.serpResults?.length) {
     const existingUrls = [...existing.serpResults.map((s) => s.url)].sort();
     const requestedUrls = [...urls].sort();
-    if (existingUrls.length === requestedUrls.length && existingUrls.every((u, i) => u === requestedUrls[i])) {
+    const fetchedAt = (existing as Record<string, unknown>)._fetchedAt as number | undefined;
+    const isFresh = !fetchedAt || (Date.now() - fetchedAt) < IDEMPOTENCY_TTL_MS;
+    if (isFresh && existingUrls.length === requestedUrls.length && existingUrls.every((u, i) => u === requestedUrls[i])) {
       const researchSummary: ResearchSummary = {
         urlCount: existing.serpResults.length,
         articleCount: existing.competitors.filter((c) => c.fetchSuccess).length,
@@ -400,6 +404,23 @@ export async function runResearchFetch(
       };
 
   const articleCount = competitors.filter((c) => c.fetchSuccess).length;
+
+  // Fallback: if Gemini grounding returned 0 facts but we have competitor content,
+  // extract basic facts from competitor articles to ensure citations are possible
+  if (currentData.facts.length === 0 && articleCount > 0) {
+    console.warn(`[chunks] Gemini grounding returned 0 facts — extracting fallback facts from ${articleCount} competitor articles`);
+    const fallbackFacts = extractFallbackFacts(competitors.filter(c => c.fetchSuccess));
+    if (fallbackFacts.length > 0) {
+      currentData = {
+        ...currentData,
+        facts: fallbackFacts,
+        groundingVerified: false,
+        lastUpdated: new Date().toISOString(),
+      };
+      emit("gemini-grounding", "started", `Gemini unavailable — extracted ${fallbackFacts.length} facts from competitor content`, 45);
+    }
+  }
+
   if (articleCount === 0 && currentData.facts.length === 0) {
     const message = "We couldn't fetch content from the selected links and no current data available. Try different sources or retry.";
     await store.setChunkFailed(jobId, "research", message);
@@ -441,7 +462,7 @@ export async function runResearchFetch(
     snippet: "",
     isArticle: true,
   }));
-  const output: ResearchChunkOutput = {
+  const output: ResearchChunkOutput & { _fetchedAt: number } = {
     serpResults,
     competitors,
     currentData,
@@ -450,6 +471,7 @@ export async function runResearchFetch(
     paaItems: paaItemsFromSerp,
     serpFeatures: serpFeaturesFromSerp,
     redditThreads: redditThreadsFromSerp ?? redditThreads,
+    _fetchedAt: Date.now(),
   };
   const durationMs = Date.now() - researchStartMs;
   const cost = buildChunkCost(
@@ -576,16 +598,33 @@ export async function runResearchChunk(
           sourceUrlValidation: { total: 0, accessible: 0, inaccessible: [] },
         };
 
+    const articleCountLegacy = competitors.filter((c) => c.fetchSuccess).length;
+
+    // Fallback: if Gemini grounding returned 0 facts but we have competitor content,
+    // extract basic facts from competitor articles to ensure citations are possible
+    if (currentData.facts.length === 0 && articleCountLegacy > 0) {
+      console.warn(`[chunks] Gemini grounding returned 0 facts — extracting fallback facts from ${articleCountLegacy} competitor articles`);
+      const fallbackFacts = extractFallbackFacts(competitors.filter(c => c.fetchSuccess));
+      if (fallbackFacts.length > 0) {
+        currentData = {
+          ...currentData,
+          facts: fallbackFacts,
+          groundingVerified: false,
+          lastUpdated: new Date().toISOString(),
+        };
+      }
+    }
+
     emit(
       "jina",
       jinaResult.success ? "completed" : "failed",
-      `${competitors.filter((c) => c.fetchSuccess).length} articles fetched`,
+      `${articleCountLegacy} articles fetched`,
       15
     );
     emit(
       "gemini-grounding",
       groundingResult.success ? "completed" : "failed",
-      `${currentData.facts.length} current data facts`,
+      `${currentData.facts.length} current data facts${currentData.groundingVerified === false && currentData.facts.length > 0 ? " (fallback)" : ""}`,
       15
     );
 
@@ -605,7 +644,7 @@ export async function runResearchChunk(
       }
     }
 
-    const output: ResearchChunkOutput = { serpResults, competitors, currentData, paaQuestions };
+    const output: ResearchChunkOutput & { _fetchedAt: number } = { serpResults, competitors, currentData, paaQuestions, _fetchedAt: Date.now() };
     const durationMs = Date.now() - researchStartMs;
     const cost = buildChunkCost(
       {
@@ -805,6 +844,24 @@ export async function runBriefChunk(
     emit("topic-extraction", "completed", `Using cached extraction (${topicExtraction.topics.length} topics)`, 30);
   }
 
+  // Override extraction wordCount with actual competitor average (more reliable than GPT math).
+  // The intent-based default is used only when no competitor word counts are available.
+  const successfulCompetitors = competitors.filter((c) => c.fetchSuccess && c.wordCount > 0);
+  if (successfulCompetitors.length > 0) {
+    const avgWordCount = Math.round(
+      successfulCompetitors.reduce((sum, c) => sum + c.wordCount, 0) / successfulCompetitors.length
+    );
+    const recommended = Math.round(avgWordCount * 1.15); // avg + 15%
+    topicExtraction = {
+      ...topicExtraction,
+      wordCount: {
+        competitorAverage: avgWordCount,
+        recommended,
+        note: `Based on ${successfulCompetitors.length} competitor articles (avg ${avgWordCount} words). Target: ${recommended} words (avg + 15%). STRICT — target must be met within ±5%.`,
+      },
+    };
+  }
+
   try {
 
     const wordCountOverride =
@@ -816,21 +873,27 @@ export async function runBriefChunk(
         : undefined;
 
     // Organic revision: if user provided instructions, patch existing brief instead of rebuilding
-    const isOrganicRevision = options?.revise && options.revisionInstructions?.trim();
+    // Also use revision path for significant word count increases (>30%) to add new sections/gaps
+    const existingBriefOutput = options?.revise ? await store.getChunkOutput(jobId, "analysis") : null;
+    const existingBrief = existingBriefOutput as unknown as ResearchBrief | null;
+    const existingWordCount = existingBrief?.outline?.sections?.reduce((sum: number, s: { targetWords?: number }) => sum + (s.targetWords || 0), 0) ?? 0;
+    const isSignificantWordCountIncrease = existingBrief && wordCountOverride && existingWordCount > 0 && wordCountOverride.target > existingWordCount * 1.3;
+    const isOrganicRevision = options?.revise && (options.revisionInstructions?.trim() || isSignificantWordCountIncrease);
 
-    if (isOrganicRevision) {
-      // Load the existing approved brief from the job store
-      const existingBriefOutput = await store.getChunkOutput(jobId, "analysis");
-      if (!existingBriefOutput) {
-        throw new Error("Cannot revise: no existing brief found. Generate a brief first.");
-      }
-      const existingBrief = existingBriefOutput as unknown as ResearchBrief;
+    if (isOrganicRevision && existingBrief) {
+      const revisionMessage = isSignificantWordCountIncrease && !options.revisionInstructions?.trim()
+        ? "Expanding brief with new sections and deeper coverage..."
+        : "Revising brief based on your instructions...";
+      emit("gpt-brief", "started", revisionMessage, 30);
 
-      emit("gpt-brief", "started", "Revising brief based on your instructions...", 30);
+      // For word-count-only expansion, generate smart instructions
+      const effectiveInstructions = options.revisionInstructions?.trim()
+        || `Expand the article to ${wordCountOverride!.target} words. Primary strategy: deepen existing sections with more practitioner depth, edge cases, examples, and data. Only add new sections if there are genuine gaps that competitors cover but our outline misses. The reader should never need to search again after reading this.`;
+
       const briefResult = await withRetry(
         async () => reviseBrief(
           existingBrief,
-          options.revisionInstructions!.trim(),
+          effectiveInstructions,
           topicExtraction,
           currentData,
           input,
@@ -841,7 +904,7 @@ export async function runBriefChunk(
             addSections: options.addSections,
           }
         ),
-        { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(120000, 120_000) },
+        { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(180000, 180_000) },
         "gpt-brief"
       );
       if (!briefResult.success || !briefResult.data) {
@@ -871,7 +934,7 @@ export async function runBriefChunk(
         cachedTopic?.algorithmicInsights,
         cachedTopic?.proprietaryFramework
       ),
-      { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(120000, 120_000) },
+      { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(180000, 180_000) },
       "gpt-brief"
     );
     if (!briefResult.success || !briefResult.data) {
@@ -1010,7 +1073,7 @@ export async function runDraftChunk(
   }
 
   const research = await store.getChunkOutput(jobId, "research") as { redditQuotes?: string[] } | undefined;
-  const redditQuotes = research?.redditQuotes;
+  let redditQuotes = research?.redditQuotes;
 
   await store.setChunkRunning(jobId, "draft");
   await store.updatePhase(jobId, "drafting");
@@ -1049,6 +1112,11 @@ export async function runDraftChunk(
     const toneExamples = (job.input as PipelineInput).toneExamples;
     const voice = (job.input as PipelineInput).voice;
     const customVoiceDescription = (job.input as PipelineInput).customVoiceDescription;
+    const authorName = (job.input as PipelineInput).authorName;
+    const authorBio = (job.input as PipelineInput).authorBio;
+    const authorExpertise = (job.input as PipelineInput).authorExpertise;
+    const authorUrl = (job.input as PipelineInput).authorUrl;
+    const industry = (job.input as PipelineInput).industry;
 
     emit("claude-draft", "started", "Writing article draft section by section...", 0);
 
@@ -1098,11 +1166,16 @@ export async function runDraftChunk(
 
       const jobInput = job.input as PipelineInput;
       const primaryIntent = Array.isArray(jobInput.intent) ? jobInput.intent[0] : (jobInput.intent ?? "informational");
+      // Collect all source URLs from facts for citation availability
+      const allSourceUrls = [...new Set((brief.currentData?.facts ?? []).map(f => f.source).filter(Boolean))];
+
       const draftResult = await withRetry(
         async () => writeDraftSection(
           sectionBrief, section, previousContext, tokenUsage, draftModel,
           fieldNotes, toneExamples, redditQuotes, i === 0, primaryKeyword,
-          voice, customVoiceDescription, primaryIntent
+          voice, customVoiceDescription, primaryIntent,
+          { authorName, authorBio, authorExpertise },
+          industry, allSourceUrls
         ),
         { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
         "claude-draft-section"
@@ -1141,6 +1214,18 @@ export async function runDraftChunk(
     const sectionResults: Array<{ index: number; html: string; wordCount: number }> = [firstResult];
     const section0Html = firstResult.html;
 
+    // Dedup quotes after first section so subsequent batches don't reuse the same quotes
+    if (redditQuotes?.length) {
+      redditQuotes = redditQuotes.filter(q => {
+        const qLower = q.toLowerCase();
+        const sectionLower = firstResult.html.toLowerCase().replace(/<[^>]+>/g, " ");
+        // Check if any significant 5+ word phrase from the quote appears in the section
+        const words = qLower.split(/\s+/).filter(w => w.length > 3);
+        const matchCount = words.filter(w => sectionLower.includes(w)).length;
+        return matchCount < words.length * 0.5; // remove if 50%+ of significant words match
+      });
+    }
+
     // -----------------------------------------------------------------------
     // Draft remaining sections in parallel batches of BATCH_SIZE
     // Each batch uses accumulated prior HTML as context for repetition avoidance
@@ -1168,6 +1253,16 @@ export async function runDraftChunk(
         .map(r => r.html)
         .join("");
       accumulatedContext += batchHtml;
+
+      // Dedup quotes after each batch so next batch doesn't reuse the same quotes
+      if (redditQuotes?.length && batchHtml) {
+        const batchTextLower = batchHtml.toLowerCase().replace(/<[^>]+>/g, " ");
+        redditQuotes = redditQuotes.filter(q => {
+          const words = q.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+          const matchCount = words.filter(w => batchTextLower.includes(w)).length;
+          return matchCount < words.length * 0.5;
+        });
+      }
     }
 
     // -----------------------------------------------------------------------
@@ -1180,6 +1275,11 @@ export async function runDraftChunk(
     if (process.env.NODE_ENV !== "test") {
       console.log(`[registry] ${registry.getSummary()}`);
     }
+
+    // --- Phase 4b: Citation Renumbering + References Section ---
+    // Sections are drafted independently so citation numbers overlap. Renumber sequentially
+    // and build a consolidated References section at the end.
+    assembledHtml = renumberCitationsAndAddReferences(assembledHtml);
 
     // --- Phase 5 (lightweight): Style Linter + Definition Nuke ---
     // Fix definition openings programmatically (the AI cannot be prompt-engineered out of this)
@@ -1217,6 +1317,8 @@ export async function runDraftChunk(
       content: assembledHtml,
       slug: titleMetaSlug.suggestedSlug,
       focusKeyword: primaryKeyword,
+      authorName,
+      authorUrl,
     });
     const level1Failures = preAudit.items
       .filter((item) => item.level === 1 && item.severity === "fail")
@@ -1318,6 +1420,9 @@ export async function runValidationChunk(
       sourceUrlValidation: { total: 0, accessible: 0, inaccessible: [] },
     };
     const primaryKeyword = job.input.primaryKeyword;
+    const authorName = job.input.authorName;
+    const authorUrl = job.input.authorUrl;
+    const draftModel = job.input.draftModel ?? "opus-4.6";
 
     let finalContent = draft.content;
 
@@ -1337,6 +1442,11 @@ export async function runValidationChunk(
     // Fact-check (instant — no LLM)
     let factCheck = verifyFactsAgainstSource(finalContent, currentData, primaryKeyword);
 
+    // Collect source URLs for citation validation
+    const factSourceUrls = [...new Set(currentData.facts.map((f: { source: string }) => f.source).filter(Boolean))];
+    const competitorSourceUrls = (research?.competitors as { url: string }[])?.map((c) => c.url) ?? [];
+    const allSourceUrls = [...new Set([...factSourceUrls, ...competitorSourceUrls])];
+
     // Run audit + EEAT in parallel with fact-check result (both instant)
     let auditResult = auditArticle({
       title: draft.title ?? primaryKeyword,
@@ -1345,7 +1455,9 @@ export async function runValidationChunk(
       slug: draft.suggestedSlug,
       focusKeyword: primaryKeyword,
       extraValueThemes: brief?.extraValueThemes?.length ? brief.extraValueThemes : undefined,
-    });
+      authorName,
+      authorUrl,
+    }, allSourceUrls);
 
     const { evaluateEEATScore } = await import("@/lib/seo/article-audit");
     const eeatScoreFeedback = evaluateEEATScore(
@@ -1432,7 +1544,9 @@ export async function runValidationChunk(
             slug: draft.suggestedSlug,
             focusKeyword: primaryKeyword,
             extraValueThemes: brief?.extraValueThemes?.length ? brief.extraValueThemes : undefined,
-          });
+            authorName,
+            authorUrl,
+          }, allSourceUrls);
         }
       }
     }
@@ -1522,6 +1636,8 @@ export async function buildPipelineOutputFromChunks(
   };
   const sourceUrls = [...new Set(currentData.facts.map((f: { source: string }) => f.source))];
   const primaryKeyword = job.input.primaryKeyword;
+  const authorName = job.input.authorName;
+  const draftModel = job.input.draftModel ?? "opus-4.6";
 
   const expectedH2s = brief.outline.sections.filter((s) => s.level === "h2").map((s) => s.heading.trim());
   const actualH2s = extractH2sFromHtml(draft.content ?? "");
@@ -1582,5 +1698,164 @@ export async function buildPipelineOutputFromChunks(
       draft.suggestedSlug,
       primaryKeyword
     ),
+    aiDisclosureText: generateAiDisclosure(draftModel, authorName),
+    tableOfContents: generateTableOfContentsForPipeline(validation.finalContent),
   };
+}
+
+/**
+ * Renumber inline citations sequentially across assembled sections and build a References section.
+ * Sections are drafted independently so citation numbers overlap (each starts at [1]).
+ * This function:
+ * 1. Finds all <sup><a href="URL">[N]</a></sup> patterns
+ * 2. Assigns new sequential numbers based on first appearance of each unique URL
+ * 3. Appends a <h2>References</h2><ol> section at the end
+ */
+function renumberCitationsAndAddReferences(html: string): string {
+  const citationRegex = /<sup>\s*<a\s+([^>]*?)href=["']([^"']+)["']([^>]*)>\s*\[(\d+)\]\s*<\/a>\s*<\/sup>/gi;
+
+  // First pass: collect all unique URLs in order of appearance
+  const urlToNumber = new Map<string, number>();
+  const urlToFirstMatch = new Map<string, string>(); // URL -> full original match for reference building
+  let match: RegExpExecArray | null;
+  let nextNumber = 1;
+
+  // Reset regex
+  citationRegex.lastIndex = 0;
+  while ((match = citationRegex.exec(html)) !== null) {
+    const url = match[2];
+    if (!urlToNumber.has(url)) {
+      urlToNumber.set(url, nextNumber++);
+      urlToFirstMatch.set(url, match[0]);
+    }
+  }
+
+  // If no citations found, return as-is
+  if (urlToNumber.size === 0) return html;
+
+  // Second pass: replace all citation numbers with renumbered ones
+  citationRegex.lastIndex = 0;
+  let renumbered = html.replace(citationRegex, (_fullMatch, pre, url, post, _oldNum) => {
+    const newNum = urlToNumber.get(url) ?? 1;
+    return `<sup><a ${pre}href="${url}"${post}>[${newNum}]</a></sup>`;
+  });
+
+  // Remove any existing References section (from individual sections that might have generated one)
+  renumbered = renumbered.replace(/<h2[^>]*>\s*References?\s*<\/h2>[\s\S]*?(?=<h2|$)/i, "");
+
+  // Build the References section
+  const refEntries = [...urlToNumber.entries()]
+    .sort((a, b) => a[1] - b[1])
+    .map(([url, num]) => {
+      // Extract domain for display name
+      let displayName: string;
+      try {
+        const parsed = new URL(url);
+        displayName = parsed.hostname.replace(/^www\./, "");
+        // Add path for context if short enough
+        const path = parsed.pathname.replace(/\/$/, "");
+        if (path && path !== "/" && path.length < 50) {
+          displayName += path;
+        }
+      } catch {
+        displayName = url;
+      }
+      return `<li><a href="${url}" target="_blank" rel="noopener noreferrer">${displayName}</a></li>`;
+    });
+
+  const referencesHtml = `\n<h2 id="references">References</h2>\n<ol>\n${refEntries.join("\n")}\n</ol>`;
+  renumbered += referencesHtml;
+
+  if (process.env.NODE_ENV !== "test") {
+    console.log(`[citations] Renumbered ${urlToNumber.size} unique citations across assembled article`);
+  }
+
+  return renumbered;
+}
+
+/** Generate Table of Contents if article is long enough (>2000 words). */
+function generateTableOfContentsForPipeline(html: string): { html: string; headings: { level: number; text: string; id: string }[] } | undefined {
+  const wordCount = html.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+  if (wordCount < 2000) return undefined;
+
+  const headings: { level: number; text: string; id: string }[] = [];
+  const headingRegex = /<h([23])[^>]*>(.*?)<\/h\1>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = headingRegex.exec(html)) !== null) {
+    const text = match[2].replace(/<[^>]+>/g, "").trim();
+    const id = text.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").slice(0, 60);
+    headings.push({ level: parseInt(match[1], 10), text, id });
+  }
+  if (headings.length < 3) return undefined;
+
+  const tocItems = headings
+    .map((h) => `${h.level === 3 ? "  " : ""}<li><a href="#${h.id}">${h.text}</a></li>`)
+    .join("\n");
+  const tocHtml = `<nav class="table-of-contents" aria-label="Table of Contents">\n<h2>Table of Contents</h2>\n<ol>\n${tocItems}\n</ol>\n</nav>`;
+
+  return { html: tocHtml, headings };
+}
+
+/**
+ * Extract basic facts from competitor content when Gemini grounding fails.
+ * Looks for sentences containing statistics, percentages, dollar amounts, and attributions.
+ * Returns up to 15 facts with their source URLs.
+ */
+function extractFallbackFacts(competitors: CompetitorArticle[]): CurrentDataFact[] {
+  const facts: CurrentDataFact[] = [];
+  const seen = new Set<string>();
+
+  // Patterns that indicate a citable fact
+  const factPatterns = [
+    /\b\d{1,3}(?:,\d{3})*(?:\.\d+)?%/,            // percentages: 45%, 12.5%
+    /\$\d{1,3}(?:,\d{3})*(?:\.\d+)?(?:\s*(?:billion|million|trillion|B|M|K))?/i, // dollar amounts
+    /\b\d{1,3}(?:,\d{3})*(?:\.\d+)?\s*(?:billion|million|trillion)\b/i,           // large numbers
+    /\baccording to\b/i,                             // attributions
+    /\bresearch(?:ers)?\s+(?:show|found|indicate|suggest|reveal)/i,
+    /\bstudy\s+(?:show|found|indicate|suggest|reveal|by)\b/i,
+    /\bsurve?y(?:ed)?\s+(?:\d|of|show|found)/i,     // surveys
+    /\b(?:grew|increased|decreased|declined|rose|fell)\s+(?:by\s+)?\d/i, // growth/decline
+    /\b20[12]\d\b/,                                   // year references (2010-2029)
+  ];
+
+  for (const comp of competitors) {
+    if (!comp.fetchSuccess || !comp.content) continue;
+
+    // Strip HTML and split into sentences
+    const text = comp.content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const sentences = text.split(/(?<=[.!?])\s+/).filter(s => s.length > 30 && s.length < 300);
+
+    for (const sentence of sentences) {
+      if (facts.length >= 15) break;
+
+      const matchesPattern = factPatterns.some(p => p.test(sentence));
+      if (!matchesPattern) continue;
+
+      // Deduplicate by first 60 chars
+      const key = sentence.slice(0, 60).toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      facts.push({
+        fact: sentence.trim(),
+        source: comp.url,
+        date: comp.publishDate,
+      });
+    }
+    if (facts.length >= 15) break;
+  }
+
+  if (facts.length > 0 && process.env.NODE_ENV !== "test") {
+    console.log(`[fallback-facts] Extracted ${facts.length} facts from ${competitors.length} competitor articles`);
+  }
+
+  return facts;
+}
+
+/** Generate AI transparency disclosure text. */
+function generateAiDisclosure(draftModel: string, authorName?: string): string {
+  const modelLabel = draftModel === "opus-4.6" ? "Claude Opus 4.6" : "Claude Sonnet 4.6";
+  const reviewer = authorName ? `Reviewed by ${authorName}` : "Reviewed by the editorial team";
+  const today = new Date().toISOString().split("T")[0];
+  return `Researched with automated search tools and drafted with AI assistance (${modelLabel}). Facts verified against primary sources. ${reviewer} on ${today}.`;
 }

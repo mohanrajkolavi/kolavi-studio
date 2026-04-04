@@ -249,6 +249,44 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     })();
   }, []);
 
+  // Restore completed result from localStorage (survives hard refresh / tab close)
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem("blog-gen-result");
+      if (!cached) return;
+      const parsed = JSON.parse(cached) as {
+        jobId?: string;
+        validation?: ValidationChunkResult;
+        pipelineResult?: PipelineResult;
+        input?: GenerationInput;
+        ts?: number;
+      };
+      // Only restore if less than 24 hours old
+      if (!parsed.pipelineResult || !parsed.input || !parsed.ts || Date.now() - parsed.ts > 86_400_000) {
+        localStorage.removeItem("blog-gen-result");
+        return;
+      }
+      // Only restore if we don't already have a result (i.e. session restore didn't produce one)
+      if (result || status === "generating") return;
+      setResult({
+        pipelineResult: parsed.pipelineResult,
+        fallbackGenerated: null,
+        input: parsed.input,
+      });
+      if (parsed.validation) {
+        setChunkOutputs((prev) => ({ ...prev, validation: parsed.validation! }));
+      }
+      if (parsed.jobId) {
+        setJobIdState(parsed.jobId);
+      }
+      setPhase("completed");
+      setStatus("success");
+    } catch {
+      // ignore parse errors
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const startGeneration = useCallback(async (input: GenerationInput) => {
     abortControllerRef.current?.abort();
     const controller = new AbortController();
@@ -264,6 +302,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     setProgress(null);
     setChunkOutputs({ research: null, researchSerp: null, brief: null, draft: null, validation: null });
     setJobIdState(null);
+    try { localStorage.removeItem("blog-gen-result"); } catch { /* ignore */ }
 
     const guarded = {
       setStatus: (s: Status) => {
@@ -344,6 +383,11 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     setJobIdState(null);
     try {
       sessionStorage.removeItem("blog-job-id");
+    } catch {
+      // ignore
+    }
+    try {
+      localStorage.removeItem("blog-gen-result");
     } catch {
       // ignore
     }
@@ -1056,6 +1100,8 @@ async function processDraftSSE(
   return draftResult;
 }
 
+const VALIDATE_TIMEOUT_MS = 60_000;
+
 async function processValidateRequest(
   jobId: string,
   signal: AbortSignal,
@@ -1071,18 +1117,21 @@ async function processValidateRequest(
     elapsedMs: 0,
     chunk: "validate",
   });
-  const response = await fetch("/api/blog/validate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jobId }),
-    signal,
-  });
-  if (signal.aborted) return;
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error((data as { error?: string }).error ?? "Validation failed");
+
+  // 60-second timeout: abort fetch if validate takes too long
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), VALIDATE_TIMEOUT_MS);
+  const combinedSignal = signal.aborted
+    ? signal
+    : (typeof AbortSignal.any === "function"
+      ? AbortSignal.any([signal, timeoutController.signal])
+      : timeoutController.signal);
+  // Fallback: also listen on the parent signal to abort the timeout controller
+  if (typeof AbortSignal.any !== "function" && !signal.aborted) {
+    signal.addEventListener("abort", () => timeoutController.abort(), { once: true });
   }
-  const data = (await response.json()) as {
+
+  let data: {
     faqEnforcement?: ValidationChunkResult["faqEnforcement"];
     auditResult?: ValidationChunkResult["auditResult"];
     factCheck?: ValidationChunkResult["factCheck"];
@@ -1091,13 +1140,84 @@ async function processValidateRequest(
     validationFailed?: boolean;
     validationError?: string;
   };
+
+  try {
+    const response = await fetch("/api/blog/validate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jobId }),
+      signal: combinedSignal,
+    });
+    clearTimeout(timeoutId);
+    if (signal.aborted) return;
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error((errData as { error?: string }).error ?? "Validation failed");
+    }
+    data = await response.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    if (signal.aborted) return;
+    // Timeout — show a recoverable message instead of hard error
+    if (err instanceof Error && err.name === "AbortError" && timeoutController.signal.aborted) {
+      guarded.setProgress?.({
+        step: "validate",
+        status: "failed",
+        message: "Validation timed out \u2014 results may be ready. Click to check.",
+        progress: 0,
+        elapsedMs: VALIDATE_TIMEOUT_MS,
+        chunk: "validate",
+      });
+      guarded.setPhase("error");
+      guarded.setGenerationStartedAt?.(null);
+      guarded.setStatus?.("error");
+      guarded.setErrorChunk("validate");
+      guarded.setError("Validation timed out \u2014 results may be ready. Click to check.");
+      return;
+    }
+    throw err;
+  }
+
   // Show a small alert if validation had issues but still returned the article
   if (data.validationFailed) {
     console.warn("[validation] Validation failed but article returned:", data.validationError);
-    if (typeof window !== "undefined") {
-      window.alert(`Validation skipped: ${data.validationError ?? "timed out"}. Article is ready but may need manual review.`);
-    }
   }
+  const validation: ValidationChunkResult = {
+    faqEnforcement: data.faqEnforcement ?? { passed: true, violations: [] },
+    auditResult: data.auditResult,
+    factCheck: data.factCheck ?? { verified: true, hallucinations: [], issues: [], skippedRhetorical: [] },
+    schemaMarkup: data.schemaMarkup ?? { article: {}, faq: null, breadcrumb: null },
+    finalContent: data.finalContent ?? "",
+  };
+
+  // Build the pipeline result OUTSIDE the state updater to avoid side-effects
+  // that can cause React 18 to silently discard the entire batched update.
+  let pipelineResult: PipelineResult | null = null;
+  guarded.setChunkOutputs((prev) => {
+    const next: ChunkOutputsState = {
+      ...prev,
+      validation,
+      draft: draftOverride ?? prev.draft,
+    };
+    try {
+      const sourceUrls = next.research?.competitorUrls ?? [];
+      pipelineResult = buildPipelineResultFromChunks(next, sourceUrls);
+    } catch (e) {
+      console.error("[validation] buildPipelineResultFromChunks failed:", e);
+      // Still update validation chunk even if pipeline assembly fails
+    }
+    return next;
+  });
+
+  // Set result, phase, and status AFTER setChunkOutputs — never inside the updater
+  if (pipelineResult) {
+    guarded.setResult?.({
+      pipelineResult,
+      fallbackGenerated: null,
+      input,
+    });
+  }
+
   guarded.setProgress?.({
     step: "validate",
     status: "completed",
@@ -1109,26 +1229,20 @@ async function processValidateRequest(
   guarded.setPhase("completed");
   guarded.setGenerationStartedAt?.(null);
   guarded.setStatus?.("success");
-  const validation: ValidationChunkResult = {
-    faqEnforcement: data.faqEnforcement ?? { passed: true, violations: [] },
-    auditResult: data.auditResult,
-    factCheck: data.factCheck ?? { verified: true, hallucinations: [], issues: [], skippedRhetorical: [] },
-    schemaMarkup: data.schemaMarkup ?? { article: {}, faq: null, breadcrumb: null },
-    finalContent: data.finalContent ?? "",
-  };
-  guarded.setChunkOutputs((prev) => {
-    const next: ChunkOutputsState = {
-      ...prev,
-      validation,
-      draft: draftOverride ?? prev.draft,
-    };
-    const sourceUrls = next.research?.competitorUrls ?? [];
-    const pipelineResult = buildPipelineResultFromChunks(next, sourceUrls);
-    guarded.setResult?.({
-      pipelineResult,
-      fallbackGenerated: null,
-      input,
-    });
-    return next;
-  });
+
+  // Persist final result to localStorage so page refresh doesn't lose it
+  try {
+    if (typeof window !== "undefined" && pipelineResult) {
+      const cachePayload = {
+        jobId,
+        validation,
+        pipelineResult,
+        input,
+        ts: Date.now(),
+      };
+      localStorage.setItem("blog-gen-result", JSON.stringify(cachePayload));
+    }
+  } catch {
+    // localStorage may be full or unavailable; non-critical
+  }
 }

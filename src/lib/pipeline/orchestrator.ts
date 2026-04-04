@@ -114,10 +114,11 @@ class TimeBudget {
 
 /**
  * Generic retry wrapper with timeout. Returns StepResult<T>.
- * Timeout is enforced via Promise.race (clients may not support AbortSignal).
+ * Timeout is enforced via Promise.race + AbortController so timed-out
+ * network requests are actually cancelled rather than left running.
  */
 export async function withRetry<T>(
-  fn: () => Promise<T>,
+  fn: (signal?: AbortSignal) => Promise<T>,
   config: RetryConfig,
   stepName: string
 ): Promise<StepResult<T>> {
@@ -128,11 +129,15 @@ export async function withRetry<T>(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let timerId: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
     try {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        timerId = setTimeout(() => reject(new Error(`Step ${stepName} timed out after ${timeoutMs}ms`)), timeoutMs);
+        timerId = setTimeout(() => {
+          controller.abort();
+          reject(new Error(`Step ${stepName} timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
       });
-      const data = await Promise.race([fn(), timeoutPromise]);
+      const data = await Promise.race([fn(controller.signal), timeoutPromise]);
       clearTimeout(timerId);
       return {
         success: true,
@@ -143,6 +148,7 @@ export async function withRetry<T>(
       };
     } catch (err) {
       clearTimeout(timerId);
+      controller.abort();
       lastError = err;
       const isTimeout =
         err instanceof Error &&
@@ -392,7 +398,7 @@ export async function runPipeline(
   emit("gpt-brief", "started", "Building strategic research brief...", 30);
   const briefResult = await withRetry(
     async () => buildResearchBrief(topicExtraction, currentData, input, undefined, tokenUsage),
-    { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(120000, 120_000) },
+    { ...RETRY_STANDARD_FAST, timeoutMs: budget.cap(180000, 180_000) },
     "gpt-brief"
   );
   if (!briefResult.success || !briefResult.data) {

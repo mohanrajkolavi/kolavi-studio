@@ -65,6 +65,16 @@ export type PipelineInput = {
   clusterPosition?: "pillar" | "spoke" | "standalone";
   /** When clusterPosition is "spoke", the broader cluster topic this article supports. */
   clusterTopic?: string;
+  /** Author name for E-E-A-T attribution and JSON-LD schema. */
+  authorName?: string;
+  /** Short author bio (150 chars) for E-E-A-T signals. */
+  authorBio?: string;
+  /** Author's expertise areas for prompt context. */
+  authorExpertise?: string;
+  /** Author page URL for JSON-LD schema author.url. */
+  authorUrl?: string;
+  /** Industry/niche for voice adaptation (tech, finance, health, marketing, ecommerce, legal, education, general). */
+  industry?: string;
 };
 
 /** Zod schema for validating job input (e.g. when loading from store). */
@@ -86,6 +96,11 @@ export const PipelineInputSchema = z.object({
   existingBlogUrls: z.array(z.string()).optional(),
   clusterPosition: z.enum(["pillar", "spoke", "standalone"]).optional().default("standalone"),
   clusterTopic: z.string().optional(),
+  authorName: z.string().optional(),
+  authorBio: z.string().optional(),
+  authorExpertise: z.string().optional(),
+  authorUrl: z.string().optional(),
+  industry: z.string().optional(),
 });
 
 // =============================================================================
@@ -685,6 +700,10 @@ export type PipelineOutput = {
   intentValidation?: IntentValidation;
   /** Reddit/community insights gathered during research. */
   redditInsights?: RedditInsight[];
+  /** AI transparency disclosure text (auto-generated). */
+  aiDisclosureText?: string;
+  /** Table of Contents HTML for articles > 2000 words. */
+  tableOfContents?: { html: string; headings: { level: number; text: string; id: string }[] };
 };
 
 // =============================================================================

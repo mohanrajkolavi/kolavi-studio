@@ -211,6 +211,94 @@ You write like a top-tier Substack author. Punchy, personality-driven, with stro
 };
 
 // ---------------------------------------------------------------------------
+// Intent-Aware Voice Modulation
+// ---------------------------------------------------------------------------
+
+export type IntentType = "informational" | "commercial" | "transactional" | "navigational";
+
+const INTENT_MODIFIERS: Record<IntentType, string> = {
+  informational: `INTENT ADJUSTMENT (Informational):
+- Heavier on teaching, examples, and step-by-step explanations
+- More bucket brigades and curiosity hooks to maintain attention through longer reads
+- Patient pacing — don't rush past complex concepts
+- Use analogies and real-world comparisons to make abstract ideas concrete
+- Include "why it matters" framing before diving into "how to do it"`,
+
+  commercial: `INTENT ADJUSTMENT (Commercial/Comparison):
+- Data-dense: prioritize numbers, benchmarks, and direct comparisons
+- Use pros/cons structure and comparison tables where relevant
+- Elevate trust signals: cite specific sources, reference real case studies
+- Be balanced but opinionated — readers want your recommendation, not just a list
+- Address objections proactively ("You might worry about X — here's the reality")`,
+
+  transactional: `INTENT ADJUSTMENT (Transactional):
+- Action-oriented: shorter sections, clear next steps, direct CTAs
+- Front-load the most important information — readers are ready to act
+- Use urgency without hype — specific deadlines, limited availability, real consequences of delay
+- Remove friction: anticipate questions and answer them inline
+- Keep paragraphs tight (2-3 sentences max) — this reader is scanning for the action item`,
+
+  navigational: `INTENT ADJUSTMENT (Navigational):
+- Concise and authoritative — the reader knows what they want, help them find it fast
+- Direct answers in the first 1-2 sentences of each section
+- Minimal storytelling — this is a reference, not a narrative
+- Use clear subheadings that match common search queries
+- Link-friendly structure: readers may be looking for a specific piece of information`,
+};
+
+// ---------------------------------------------------------------------------
+// Industry Voice Adaptation
+// ---------------------------------------------------------------------------
+
+export type IndustryType = "tech" | "finance" | "health" | "marketing" | "ecommerce" | "legal" | "education" | "general";
+
+const INDUSTRY_MODIFIERS: Record<IndustryType, string> = {
+  tech: `INDUSTRY ADAPTATION (Tech):
+- Include code snippets, CLI commands, or config examples where relevant
+- Reference specific tools, frameworks, and version numbers
+- Use benchmarks and performance metrics as evidence
+- Jargon is acceptable — this audience expects technical precision`,
+
+  finance: `INDUSTRY ADAPTATION (Finance):
+- Lead with ROI calculations, cost savings, and financial impact
+- Higher citation density — financial claims require strong sourcing
+- Use disclaimers where appropriate (not financial advice)
+- Reference regulatory frameworks when relevant (SEC, GAAP, etc.)`,
+
+  health: `INDUSTRY ADAPTATION (Health):
+- Highest citation density — every health claim must reference a study or guideline
+- Use study citations with sample sizes and publication dates
+- Include "consult your healthcare provider" disclaimers for medical advice
+- Reference clinical guidelines (WHO, CDC, NIH) as authoritative sources`,
+
+  marketing: `INDUSTRY ADAPTATION (Marketing):
+- Use real campaign data, conversion rates, and ROI examples
+- Reference platform-specific features (Google Ads, Meta Business Suite, etc.)
+- Include before/after case studies where possible
+- Balance strategy (the "why") with tactics (the "how")`,
+
+  ecommerce: `INDUSTRY ADAPTATION (E-commerce):
+- Focus on conversion-driving insights: AOV, cart abandonment, checkout flow
+- Reference specific platforms (Shopify, WooCommerce, BigCommerce)
+- Include seasonal/trend data where relevant
+- Practical: product photography tips, shipping strategy, pricing psychology`,
+
+  legal: `INDUSTRY ADAPTATION (Legal):
+- Precise language — legal readers expect exactness
+- Heavy citation of statutes, regulations, and case law
+- Mandatory disclaimers (not legal advice, consult an attorney)
+- Jurisdiction-specific when possible`,
+
+  education: `INDUSTRY ADAPTATION (Education):
+- Use pedagogical framing — learning objectives, scaffolded complexity
+- Include interactive elements: exercises, quizzes, practice problems
+- Reference educational standards and research (Bloom's taxonomy, etc.)
+- Progressive disclosure: simple concepts before complex ones`,
+
+  general: "",
+};
+
+// ---------------------------------------------------------------------------
 // Exports
 // ---------------------------------------------------------------------------
 
@@ -245,4 +333,18 @@ ${preset.examplePhrases.map(p => `- "${p}"`).join("\n")}
 
 AVOID these patterns:
 ${preset.antiPatterns.map(p => `- ${p}`).join("\n")}`;
+}
+
+/** Get intent-aware voice modifier for injection into the user prompt. */
+export function getIntentModifier(intent?: string): string {
+  if (!intent) return "";
+  const key = intent as IntentType;
+  return INTENT_MODIFIERS[key] ?? "";
+}
+
+/** Get industry-specific voice modifier for injection into the user prompt. */
+export function getIndustryModifier(industry?: string): string {
+  if (!industry || industry === "general") return "";
+  const key = industry as IndustryType;
+  return INDUSTRY_MODIFIERS[key] ?? "";
 }

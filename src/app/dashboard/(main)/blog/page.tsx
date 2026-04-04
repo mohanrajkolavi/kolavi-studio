@@ -658,6 +658,11 @@ export default function BlogMakerPage() {
   const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("opus-4.6");
   const [voice, setVoice] = useState<"conversational-expert" | "authoritative-practitioner" | "friendly-guide" | "newsletter-editorial">("authoritative-practitioner");
   const [fieldNotes, setFieldNotes] = useState<string>("");
+  const [authorName, setAuthorName] = useState<string>("");
+  const [authorBio, setAuthorBio] = useState<string>("");
+  const [authorExpertise, setAuthorExpertise] = useState<string>("");
+  const [authorUrl, setAuthorUrl] = useState<string>("");
+  const [industry, setIndustry] = useState<string>("general");
   const [clusterPosition, setClusterPosition] = useState<"standalone" | "pillar" | "spoke">("standalone");
   const [clusterTopic, setClusterTopic] = useState("");
   /** Intent array sent to API (1 or 2; default informational if none selected). */
@@ -1492,6 +1497,11 @@ export default function BlogMakerPage() {
       draftModel,
       voice,
       ...(fieldNotes.trim() && { fieldNotes: fieldNotes.trim() }),
+      ...(authorName.trim() && { authorName: authorName.trim() }),
+      ...(authorBio.trim() && { authorBio: authorBio.trim() }),
+      ...(authorExpertise.trim() && { authorExpertise: authorExpertise.trim() }),
+      ...(authorUrl.trim() && { authorUrl: authorUrl.trim() }),
+      ...(industry !== "general" && { industry }),
       ...(clusterPosition !== "standalone" && { clusterPosition }),
       ...(clusterPosition === "spoke" && clusterTopic.trim() && { clusterTopic: clusterTopic.trim() }),
     });
@@ -3012,6 +3022,87 @@ export default function BlogMakerPage() {
                   )}
                 </div>
 
+                {/* Author attribution (E-E-A-T) */}
+                <div className="p-5 sm:p-10 border-t border-border/50 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground tracking-tight">Author attribution <span className="text-muted-foreground font-normal">(optional)</span></p>
+                    <p className="text-xs text-muted-foreground mt-1">Author details for E-E-A-T signals and JSON-LD schema markup. Helps Google and AI chatbots attribute expertise.</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <input
+                      type="text"
+                      value={authorName}
+                      onChange={(e) => setAuthorName(e.target.value)}
+                      placeholder="Author name"
+                      disabled={generating || demoRunning}
+                      className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-500/30 disabled:opacity-60 transition-colors"
+                    />
+                    <input
+                      type="text"
+                      value={authorExpertise}
+                      onChange={(e) => setAuthorExpertise(e.target.value)}
+                      placeholder="Expertise (e.g. Technical SEO, 10+ years)"
+                      disabled={generating || demoRunning}
+                      className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-500/30 disabled:opacity-60 transition-colors"
+                    />
+                  </div>
+                  <textarea
+                    value={authorBio}
+                    onChange={(e) => setAuthorBio(e.target.value)}
+                    placeholder="Short bio (e.g. &quot;SEO consultant who has helped 50+ SaaS companies scale organic traffic. Previously led growth at...&quot;)"
+                    rows={2}
+                    maxLength={300}
+                    disabled={generating || demoRunning}
+                    className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-500/30 disabled:opacity-60 resize-none transition-colors"
+                  />
+                  <input
+                    type="url"
+                    value={authorUrl}
+                    onChange={(e) => setAuthorUrl(e.target.value)}
+                    placeholder="Author page URL (optional, for JSON-LD schema)"
+                    disabled={generating || demoRunning}
+                    className="w-full rounded-xl border border-border/50 bg-background/50 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:border-orange-500/50 focus:outline-none focus:ring-1 focus:ring-orange-500/30 disabled:opacity-60 transition-colors"
+                  />
+                </div>
+
+                {/* Industry / niche adaptation */}
+                <div className="p-5 sm:p-10 border-t border-border/50 space-y-3">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground tracking-tight">Industry <span className="text-muted-foreground font-normal">(optional)</span></p>
+                    <p className="text-xs text-muted-foreground mt-1">Adapts evidence types, jargon level, and citation density to your niche.</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {([
+                      { id: "general", label: "General" },
+                      { id: "tech", label: "Tech" },
+                      { id: "finance", label: "Finance" },
+                      { id: "health", label: "Health" },
+                      { id: "marketing", label: "Marketing" },
+                      { id: "ecommerce", label: "E-commerce" },
+                      { id: "legal", label: "Legal" },
+                      { id: "education", label: "Education" },
+                    ] as const).map((ind) => (
+                      <label
+                        key={ind.id}
+                        className={`relative flex cursor-pointer items-center justify-center rounded-xl border px-3 py-2 text-xs font-medium transition-all ${industry === ind.id
+                          ? "border-orange-500/60 bg-orange-50/50 text-orange-700 dark:bg-orange-950/20 dark:text-orange-400 dark:border-orange-500/40"
+                          : "border-border/50 bg-background/50 text-muted-foreground hover:border-border hover:text-foreground"
+                          } ${generating || demoRunning ? "opacity-60 pointer-events-none" : ""}`}
+                      >
+                        <input
+                          type="radio"
+                          name="industry"
+                          value={ind.id}
+                          checked={industry === ind.id}
+                          onChange={() => setIndustry(ind.id)}
+                          className="sr-only"
+                        />
+                        {ind.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Cluster position — topical authority */}
                 <div className="p-5 sm:p-10 border-t border-border/50">
                   <div className="space-y-2.5">
@@ -3413,6 +3504,30 @@ export default function BlogMakerPage() {
                         </div>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Disclosure — transparency for E-E-A-T trust */}
+              {pipelineResult?.aiDisclosureText && (
+                <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex shrink-0 items-center justify-between border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">AI Disclosure</h3>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Transparency statement for E-E-A-T trust. Add to your published article.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        navigator.clipboard.writeText(pipelineResult.aiDisclosureText!);
+                      }}
+                      className="shrink-0 rounded-lg border border-border bg-background px-2.5 py-1.5 text-[11px] font-medium text-foreground hover:bg-muted/60 transition-colors"
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <div className="p-3 sm:p-4">
+                    <p className="text-xs leading-relaxed text-muted-foreground italic">{pipelineResult.aiDisclosureText}</p>
                   </div>
                 </div>
               )}
