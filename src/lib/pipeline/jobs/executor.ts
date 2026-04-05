@@ -17,6 +17,7 @@ const CHUNK_TO_PHASE: Record<ChunkKind, JobPhase> = {
   research_serp: "researching",
   research: "researching",
   topic_extraction: "analyzing",
+  content_intelligence: "analyzing",
   analysis: "analyzing",
   draft: "drafting",
   postprocess: "post_processing",

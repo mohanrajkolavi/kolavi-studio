@@ -202,10 +202,17 @@ export async function POST(request: NextRequest) {
             }
             : undefined
         );
+        // Load content intelligence data (P5/P6/P7) saved during brief generation
+        let contentIntelligence = null;
+        try {
+          contentIntelligence = await jobStore.getChunkOutput(jobId, "content_intelligence");
+        } catch { /* non-fatal */ }
+
         sendEvent("result", {
           jobId,
           brief: result.brief,
           outline: result.outline,
+          contentIntelligence,
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Brief failed";

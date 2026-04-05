@@ -271,6 +271,8 @@ export type ValidationChunkResult = {
   contentDiff?: import("@/lib/seo/content-diff").ContentDiffResult;
   semanticSimilarity?: { highestSimilarity: number; mostSimilarUrl: string; isTooDerivative: boolean };
   contentDecayRisk?: import("@/lib/seo/content-decay").ContentDecayResult;
+  /** P7B: Surfer-style content optimization score 0-100. */
+  contentScore?: import("@/lib/seo/content-optimizer").ContentOptimizationResult;
 };
 
 /** Brief overrides for draft endpoint (edited outline). */
@@ -295,6 +297,34 @@ export type BriefOverridesForDraft = {
   }>;
 };
 
+/** Content intelligence data from P5/P6/P7 analysis (stored as content_intelligence chunk). */
+export type ContentIntelligenceResult = {
+  tfidf?: {
+    terms: { term: string; tfidf: number; docFrequency: number; recommendedCount: number; inHeadings: boolean }[];
+    totalTermsAnalyzed: number;
+    documentsAnalyzed: number;
+    primaryKeywordStats?: { avgCount: number; avgDensity: number };
+  };
+  entities?: {
+    entities: { name: string; type: string; docFrequency: number; totalMentions: number }[];
+    stats: { totalEntities: number; totalDocuments: number };
+  };
+  serpIntelligence?: {
+    patterns: { dominantType: string; typeConfidence: number; dominantFormat: string; formatConfidence: number; dominantAngle: string; angleConfidence: number };
+    recommendation: { contentType: string; contentFormat: string; contentAngle: string; targetWordCount: number; rationale: string };
+    informationGainOpportunities: { topic: string; competitorCoverage: number; reason: string; priority: string }[];
+    featuredSnippetStrategy: { hasFeaturedSnippet: boolean; targetType: string; guidance: string };
+    difficulty: string;
+    difficultyReason: string;
+  };
+  clusterAnalysis?: {
+    recommendedPosition: string;
+    positionReason: string;
+    linkSuggestions: { sourceSection: string; targetUrl: string; targetTitle: string; anchorText: string; linkType: string; relevance: number }[];
+    cannibalizationWarnings: { url: string; title: string; overlap: number }[];
+  };
+};
+
 /** Chunk outputs from step-by-step mode (for building PipelineResult). */
 export type ChunkOutputsState = {
   research: ResearchChunkResult | null;
@@ -303,6 +333,8 @@ export type ChunkOutputsState = {
   brief: BriefChunkResult | null;
   draft: DraftChunkResult | null;
   validation: ValidationChunkResult | null;
+  /** P5/P6/P7: Content intelligence analysis (TF-IDF, entities, SERP, clusters). */
+  contentIntelligence: ContentIntelligenceResult | null;
 };
 
 /** Build PipelineResult from chunk outputs (step mode completion). */

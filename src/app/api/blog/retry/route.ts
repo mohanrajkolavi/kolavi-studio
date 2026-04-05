@@ -23,6 +23,7 @@ const BUDGETS: Record<ChunkKind, number> = {
   research_serp: 30_000,
   research: 45_000,
   topic_extraction: 30_000,
+  content_intelligence: 10_000,
   analysis: 90_000, // topic-extraction + gpt-brief; 60s left gpt-brief too little after extraction
   draft: 180_000,
   postprocess: 15_000,

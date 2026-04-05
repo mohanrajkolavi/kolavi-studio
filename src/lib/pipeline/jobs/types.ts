@@ -21,7 +21,7 @@ export type JobPhase =
 // Chunk kinds — each is one resumable unit
 // -----------------------------------------------------------------------------
 
-export type ChunkKind = "research_serp" | "research" | "topic_extraction" | "analysis" | "draft" | "postprocess";
+export type ChunkKind = "research_serp" | "research" | "topic_extraction" | "analysis" | "draft" | "postprocess" | "content_intelligence";
 
 /** Order for resume/retry (research → analysis → draft → postprocess). research_serp is persisted but not in resume order. */
 export const CHUNK_ORDER: ChunkKind[] = ["research", "analysis", "draft", "postprocess"];
