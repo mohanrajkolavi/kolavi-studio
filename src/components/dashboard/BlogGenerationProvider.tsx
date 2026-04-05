@@ -1103,7 +1103,7 @@ async function processDraftSSE(
   return draftResult;
 }
 
-const VALIDATE_TIMEOUT_MS = 60_000;
+const VALIDATE_TIMEOUT_MS = 180_000;
 
 async function processValidateRequest(
   jobId: string,

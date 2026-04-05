@@ -1738,16 +1738,16 @@ function auditWritingQuality(html: string): AuditItem[] {
 
   items.push({
     id: "passive-voice",
-    severity: passiveRatio <= 0.15 ? "pass" : passiveRatio <= 0.25 ? "warn" : "fail",
+    severity: passiveRatio <= 0.12 ? "pass" : passiveRatio <= 0.20 ? "warn" : "fail",
     label: "Active voice",
-    message: passiveRatio <= 0.15
+    message: passiveRatio <= 0.12
       ? `Active voice dominant (${Math.round(passiveRatio * 100)}% passive)`
-      : `${Math.round(passiveRatio * 100)}% passive voice detected. Target under 15% for engaging, clear writing.`,
+      : `${Math.round(passiveRatio * 100)}% passive voice detected. Target under 12% for engaging, practitioner-level writing.`,
     level: 2,
     source: "editorial",
     value: `${Math.round(passiveRatio * 100)}%`,
-    threshold: "≤15%",
-    guideline: "Active voice is clearer, more engaging, and builds trust. Passive voice obscures agency and feels textbook-like.",
+    threshold: "≤12%",
+    guideline: "Active voice is clearer, more engaging, and builds trust. Passive voice obscures agency and feels textbook-like. Best human SEO writers stay under 10%.",
   });
 
   // 3. Paragraph length variance (anti-monotony)
@@ -1790,16 +1790,16 @@ function auditWritingQuality(html: string): AuditItem[] {
 
   items.push({
     id: "bucket-brigades",
-    severity: bbPer1000 >= 3 ? "pass" : bbPer1000 >= 1.5 ? "warn" : "fail",
+    severity: bbPer1000 >= 4 ? "pass" : bbPer1000 >= 2 ? "warn" : "fail",
     label: "Engagement hooks",
-    message: bbPer1000 >= 2
+    message: bbPer1000 >= 4
       ? `${bucketCount} engagement hooks found (${bbPer1000.toFixed(1)} per 1000 words)`
-      : `Only ${bucketCount} engagement hooks. Target 3-5 per 1000 words to maintain reader attention.`,
+      : `Only ${bucketCount} engagement hooks (${bbPer1000.toFixed(1)} per 1000 words). Target 4-6 per 1000 words to maintain reader attention.`,
     level: 3,
     source: "editorial",
     value: bucketCount,
-    threshold: "3-5 per 1000 words",
-    guideline: "Bucket brigades and curiosity hooks reduce bounce rate by 15-30% (NNGroup research).",
+    threshold: "4-6 per 1000 words",
+    guideline: "Bucket brigades and curiosity hooks reduce bounce rate by holding reader attention through micro-curiosity gaps.",
   });
 
   return items;
@@ -1857,6 +1857,121 @@ function auditSentenceVariety(html: string): AuditItem[] {
   }
 
   return items;
+}
+
+// =============================================================================
+// Flesch Reading Ease Audit — Target 50-65 for web readability
+// =============================================================================
+
+/**
+ * Audit Flesch Reading Ease score. Target range: 50-65 (clear and engaging
+ * without dumbing down vocabulary). Below 40 = too academic. Above 70 = may
+ * lack the depth that establishes authority.
+ */
+function auditFleschReadingEase(html: string): AuditItem[] {
+  const plainText = stripHtml(html);
+  const words = plainText.split(/\s+/).filter(Boolean);
+  const sentences = splitSentences(plainText);
+  const totalWords = words.length;
+  const totalSentences = sentences.length || 1;
+
+  if (totalWords < 100) return [];
+
+  const totalSyllables = words.reduce((sum, w) => sum + countSyllables(w), 0);
+  const fre = 206.835 - 1.015 * (totalWords / totalSentences) - 84.6 * (totalSyllables / totalWords);
+  const score = Math.round(Math.max(0, Math.min(100, fre)) * 10) / 10;
+
+  let severity: AuditSeverity;
+  if (score >= 45 && score <= 70) severity = "pass";
+  else if (score >= 35 || score <= 80) severity = "warn";
+  else severity = "fail";
+
+  return [{
+    id: "flesch-reading-ease",
+    severity,
+    label: "Readability (Flesch Reading Ease)",
+    message: score >= 45 && score <= 70
+      ? `Flesch Reading Ease: ${score} — good web readability (target 50-65)`
+      : score < 45
+        ? `Flesch Reading Ease: ${score} — too academic. Shorten sentences and use simpler words where possible.`
+        : `Flesch Reading Ease: ${score} — may lack authority. Add technical depth where appropriate.`,
+    level: 2,
+    source: "editorial",
+    value: score,
+    threshold: "50-65",
+    guideline: "Flesch Reading Ease 50-65 balances clarity with authority. Below 40 reads like an academic paper; above 75 may lack substance.",
+  }];
+}
+
+// =============================================================================
+// Filler Paragraph Detection — Every Paragraph Earns Its Place
+// =============================================================================
+
+/**
+ * Detect paragraphs that add no value: restate the heading, state the obvious,
+ * or use vague qualifiers without specifics.
+ */
+function auditFillerParagraphs(html: string): AuditItem[] {
+  const sections = html.split(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+  let fillerCount = 0;
+  const fillerExamples: string[] = [];
+
+  // Get all H2 headings for cross-reference
+  const h2Texts = extractH2sFromHtml(html).map(h => h.toLowerCase());
+
+  const paragraphs = html.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) ?? [];
+  for (const p of paragraphs) {
+    const text = stripHtml(p).trim();
+    if (text.length < 20) continue;
+
+    const words = text.split(/\s+/).filter(Boolean);
+    if (words.length > 40) continue; // Only flag short-ish paragraphs
+
+    const lower = text.toLowerCase();
+
+    // Check if paragraph merely restates a heading
+    const restatesHeading = h2Texts.some(h => {
+      const headingWords = h.split(/\s+/).filter(Boolean);
+      if (headingWords.length < 3) return false;
+      const matchCount = headingWords.filter(w => lower.includes(w)).length;
+      return matchCount / headingWords.length >= 0.7;
+    });
+
+    // Check for vague qualifiers with no specifics
+    const vaguePatterns = [
+      /\b(?:can|will|may)\s+(?:significantly|greatly|substantially|dramatically|tremendously)\s+(?:improve|enhance|boost|increase|help)/i,
+      /\b(?:is|are)\s+(?:very|extremely|incredibly|highly)\s+(?:important|crucial|essential|vital|critical)\b/i,
+      /\b(?:plays? a (?:key|crucial|vital|important|significant) role)\b/i,
+    ];
+    const isVague = vaguePatterns.some(p => p.test(text));
+
+    // Check for obvious statements (subject + "is important")
+    const obviousPatterns = [
+      /^(?:having|getting|using|choosing|creating|building)\s+(?:a |the |an )?\w+\s+(?:is|are)\s+(?:important|essential|crucial|key|vital)/i,
+    ];
+    const isObvious = obviousPatterns.some(p => p.test(text));
+
+    if ((restatesHeading && words.length < 25) || isVague || isObvious) {
+      fillerCount++;
+      if (fillerExamples.length < 2) {
+        fillerExamples.push(text.slice(0, 70) + "...");
+      }
+    }
+  }
+
+  return [{
+    id: "filler-paragraphs",
+    severity: fillerCount === 0 ? "pass" : fillerCount <= 2 ? "warn" : "fail",
+    label: "Filler paragraph check",
+    message: fillerCount === 0
+      ? "No filler paragraphs detected — every paragraph earns its place"
+      : `${fillerCount} filler paragraph(s) detected${fillerExamples.length ? ": " + fillerExamples.map(e => `"${e}"`).join(", ") : ""}. Replace with specific facts, examples, or data.`,
+    level: 2,
+    source: "editorial",
+    value: fillerCount,
+    threshold: 0,
+    guideline: "Every paragraph must contain a specific fact, example, number, or actionable recommendation. Filler that merely restates headings or states the obvious dilutes content quality.",
+  }];
 }
 
 // =============================================================================
@@ -2114,6 +2229,198 @@ export function generateTableOfContents(html: string): { html: string; headings:
   const tocHtml = `<nav class="table-of-contents" aria-label="Table of Contents">\n<h2>Table of Contents</h2>\n<ol>\n${tocItems}\n</ol>\n</nav>`;
 
   return { html: tocHtml, headings };
+}
+
+// ---------------------------------------------------------------------------
+// Citation Capsule Validation — AI-extractable 40-60 word passages per H2
+// ---------------------------------------------------------------------------
+
+/**
+ * Check that each H2 section contains at least one dense, self-contained
+ * passage (40-60 words) with a data point — optimized for AI citation extraction.
+ */
+function auditCitationCapsules(html: string): AuditItem[] {
+  const sections = html.split(/<h2[^>]*>/i).slice(1);
+  if (sections.length === 0) return [];
+
+  let sectionsWithCapsule = 0;
+  for (const section of sections) {
+    // Skip FAQ sections
+    if (/frequently asked|faq/i.test(section.slice(0, 200))) continue;
+
+    const paragraphs = section.match(/<p[^>]*>([\s\S]*?)<\/p>/gi) ?? [];
+    const earlyParagraphs = paragraphs.slice(0, 3); // Check first 3 paragraphs
+
+    let hasCapsule = false;
+    for (const p of earlyParagraphs) {
+      const text = p.replace(/<[^>]+>/g, "").trim();
+      const words = text.split(/\s+/).filter(Boolean).length;
+      // A citation capsule is 30-70 words and contains a data point (number, %, $)
+      if (words >= 30 && words <= 70) {
+        const hasData = /\b\d+(?:\.\d+)?(?:\s*%|\s*billion|\s*million|\s*x\b)|\$\d/.test(text);
+        if (hasData) {
+          hasCapsule = true;
+          break;
+        }
+      }
+    }
+    if (hasCapsule) sectionsWithCapsule++;
+  }
+
+  const nonFaqSections = sections.filter(s => !/frequently asked|faq/i.test(s.slice(0, 200))).length;
+  const ratio = nonFaqSections > 0 ? sectionsWithCapsule / nonFaqSections : 1;
+
+  return [{
+    id: "citation-capsules",
+    severity: ratio >= 0.7 ? "pass" : ratio >= 0.4 ? "warn" : "fail",
+    label: "Citation capsules (AI extractability)",
+    message: ratio >= 0.7
+      ? `${sectionsWithCapsule}/${nonFaqSections} sections have citation-ready capsules (40-60 word passages with data)`
+      : `Only ${sectionsWithCapsule}/${nonFaqSections} sections have citation capsules. Each H2 should open with a 40-60 word passage containing a stat+source for AI extraction.`,
+    level: 2,
+    source: "editorial",
+    value: sectionsWithCapsule,
+    threshold: `≥${Math.ceil(nonFaqSections * 0.7)} sections`,
+    guideline: "AI citation systems (ChatGPT, Perplexity, AI Overviews) extract self-contained 40-60 word passages with data points. Answer-first formatting increases citation rates significantly.",
+  }];
+}
+
+// ---------------------------------------------------------------------------
+// Question-Heading Ratio — H2s as questions improve AI citation eligibility
+// ---------------------------------------------------------------------------
+
+/**
+ * Check that 50-70% of H2 headings are phrased as questions.
+ * Question headings map directly to search queries and AI prompt patterns.
+ */
+function auditQuestionHeadings(html: string): AuditItem[] {
+  const h2s = extractH2sFromHtml(html);
+  if (h2s.length < 3) return [];
+
+  // Exclude FAQ and References headings from the ratio
+  const contentH2s = h2s.filter(h => !/frequently asked|faq|references/i.test(h));
+  if (contentH2s.length < 3) return [];
+
+  const questionH2s = contentH2s.filter(h => /\?$|^(?:how|what|why|when|where|which|who|is |are |can |do |does |should |will |could )/i.test(h.trim()));
+  const ratio = questionH2s.length / contentH2s.length;
+
+  return [{
+    id: "question-headings",
+    severity: ratio >= 0.4 ? "pass" : ratio >= 0.2 ? "warn" : "fail",
+    label: "Question headings (AI citation format)",
+    message: ratio >= 0.4
+      ? `${questionH2s.length}/${contentH2s.length} H2s (${Math.round(ratio * 100)}%) phrased as questions — strong for AI citation and featured snippets`
+      : `Only ${questionH2s.length}/${contentH2s.length} H2s (${Math.round(ratio * 100)}%) are questions. Aim for 40-70% question headings to match search queries and AI prompt patterns.`,
+    level: 3,
+    source: "editorial",
+    value: Math.round(ratio * 100),
+    threshold: "40-70%",
+    guideline: "Question headings map directly to how users search and how AI systems formulate queries. 60-70% of H2s as questions is ideal for dual Google+AI optimization.",
+  }];
+}
+
+// ---------------------------------------------------------------------------
+// Type-Token Ratio — Vocabulary diversity (AI detection signal)
+// ---------------------------------------------------------------------------
+
+/**
+ * Measure vocabulary diversity via Type-Token Ratio.
+ * Natural writing: TTR 0.40-0.60. AI writing tends toward TTR <0.35 (repetitive).
+ */
+function auditVocabularyDiversity(html: string): AuditItem[] {
+  const plainText = stripHtml(html);
+  const words = plainText.toLowerCase().split(/\s+/).filter(w => w.length > 2);
+  if (words.length < 200) return [];
+
+  // Use a sliding window TTR for longer texts (full-text TTR drops with length)
+  const windowSize = Math.min(1000, words.length);
+  const windowWords = words.slice(0, windowSize);
+  const uniqueWords = new Set(windowWords).size;
+  const ttr = uniqueWords / windowWords.length;
+
+  return [{
+    id: "vocabulary-diversity",
+    severity: ttr >= 0.40 ? "pass" : ttr >= 0.33 ? "warn" : "fail",
+    label: "Vocabulary diversity (Type-Token Ratio)",
+    message: ttr >= 0.40
+      ? `TTR: ${(ttr * 100).toFixed(1)}% — good vocabulary diversity`
+      : `TTR: ${(ttr * 100).toFixed(1)}% — vocabulary is too repetitive. Use more synonyms and varied phrasing to avoid monotonous word choices.`,
+    level: 2,
+    source: "editorial",
+    value: Math.round(ttr * 100),
+    threshold: "≥40%",
+    guideline: "Type-Token Ratio measures vocabulary diversity. Natural writing scores 40-60%. Below 35% suggests repetitive phrasing (common in AI-generated text).",
+  }];
+}
+
+// ---------------------------------------------------------------------------
+// Meta Description Statistic — Including a number improves CTR
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if meta description contains at least one specific number/statistic.
+ * Numbers in meta descriptions improve click-through rates.
+ */
+function auditMetaStatistic(meta: string | undefined): AuditItem[] {
+  if (!meta?.trim()) return [];
+
+  const hasNumber = /\b\d+(?:\.\d+)?(?:\s*%|\s*\+|\s*x\b|\s*billion|\s*million)?|\$\d/.test(meta);
+
+  return [{
+    id: "meta-statistic",
+    severity: hasNumber ? "pass" : "warn",
+    label: "Meta description: statistic",
+    message: hasNumber
+      ? "Meta description contains a specific number — improves CTR"
+      : "Meta description has no specific number. Including a stat (percentage, count, year) can improve click-through rate.",
+    level: 3,
+    source: "rankmath",
+    value: hasNumber ? 1 : 0,
+    threshold: "≥1 number",
+    guideline: "Meta descriptions with specific numbers stand out in SERPs and signal data-backed content to searchers.",
+  }];
+}
+
+// ---------------------------------------------------------------------------
+// Answer-First Stat Density — Each H2 should open with data
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate that H2 sections open with a data point in the first 60 words.
+ * This is the single most impactful optimization for AI citation rates.
+ */
+function auditAnswerFirstStats(html: string): AuditItem[] {
+  const sections = html.split(/<h2[^>]*>/i).slice(1);
+  if (sections.length === 0) return [];
+
+  let sectionsWithEarlyStat = 0;
+  const nonFaqSections = sections.filter(s => !/frequently asked|faq|references/i.test(s.slice(0, 200)));
+
+  for (const section of nonFaqSections) {
+    const firstPara = section.match(/<p[^>]*>([\s\S]*?)<\/p>/i);
+    if (!firstPara) continue;
+    const text = firstPara[1].replace(/<[^>]+>/g, "").trim();
+    const first60Words = text.split(/\s+/).slice(0, 60).join(" ");
+    const hasStat = /\b\d+(?:\.\d+)?(?:\s*%|\s*billion|\s*million|\s*x\b)|\$\d/.test(first60Words);
+    if (hasStat) sectionsWithEarlyStat++;
+  }
+
+  const total = nonFaqSections.length;
+  const ratio = total > 0 ? sectionsWithEarlyStat / total : 1;
+
+  return [{
+    id: "answer-first-stats",
+    severity: ratio >= 0.6 ? "pass" : ratio >= 0.3 ? "warn" : "fail",
+    label: "Answer-first data density",
+    message: ratio >= 0.6
+      ? `${sectionsWithEarlyStat}/${total} sections open with a data point in the first 60 words`
+      : `Only ${sectionsWithEarlyStat}/${total} sections open with data. Leading with a stat+source in the first 60 words of each H2 dramatically improves AI citation rates.`,
+    level: 2,
+    source: "editorial",
+    value: sectionsWithEarlyStat,
+    threshold: `≥${Math.ceil(total * 0.6)} sections`,
+    guideline: "Answer-first formatting with early statistics increases AI citation rates by up to 340% (Seenos research). Every H2 should lead with data.",
+  }];
 }
 
 // ---------------------------------------------------------------------------
@@ -2415,8 +2722,12 @@ export function auditArticle(
     ...auditCitationDensity(input.content, sourceUrls),
     // Level 2/3 — Writing quality (anti-textbook, passive voice, variety, engagement hooks)
     ...auditWritingQuality(input.content),
-    // Level 2 — Sentence length variety (anti-AI detection signal)
+    // Level 2 — Sentence length variety (natural writing signal)
     ...auditSentenceVariety(input.content),
+    // Level 2 — Flesch Reading Ease (web readability target 50-65)
+    ...auditFleschReadingEase(input.content),
+    // Level 2 — Filler paragraph detection (every paragraph earns its place)
+    ...auditFillerParagraphs(input.content),
     // Level 2 — Inverted pyramid (answer-first at article, section, and paragraph levels)
     ...auditInvertedPyramid(input.content, input.focusKeyword),
     // Level 1-3 — Helpful Content (Google's self-assessment questions, 12 automated checks)
@@ -2424,14 +2735,25 @@ export function auditArticle(
     // Level 2/3 — SERP Intelligence (featured snippet, list snippet, title CTR)
     ...auditFeaturedSnippet(input.content, input.focusKeyword),
     ...auditTitleCTR(input.title ?? ""),
+    // Level 2 — Citation capsules (AI-extractable passages per H2)
+    ...auditCitationCapsules(input.content),
+    // Level 2/3 — Question headings (AI citation format optimization)
+    ...auditQuestionHeadings(input.content),
+    // Level 2 — Vocabulary diversity (anti-repetition, natural writing signal)
+    ...auditVocabularyDiversity(input.content),
+    // Level 3 — Meta description statistic (CTR improvement)
+    ...auditMetaStatistic(input.metaDescription),
+    // Level 2 — Answer-first stat density (AI citation optimization)
+    ...auditAnswerFirstStats(input.content),
   ];
 
   const sorted = [...all].sort(byLevelThenSeverity);
 
-  // Informational items excluded from score:
-  // - AI phrase checks (editorial source, except ai-typography and excessive-symbols which are hard bans)
+  // Scoreable items: all non-editorial items PLUS editorial items that directly affect content quality.
+  // Excluded from score: ai-phrases-high, ai-phrases-common, ai-phrases-combined (informational suggestions only).
+  const EDITORIAL_EXCLUDED_FROM_SCORE = new Set(["ai-phrases-high", "ai-phrases-common", "ai-phrases-combined"]);
   const scoreable = all.filter(
-    (i) => i.source !== "editorial" || i.id === "ai-typography" || i.id === "excessive-symbols"
+    (i) => i.source !== "editorial" || !EDITORIAL_EXCLUDED_FROM_SCORE.has(i.id)
   );
   const pass = scoreable.filter((i) => i.severity === "pass").length;
   const warn = scoreable.filter((i) => i.severity === "warn").length;
@@ -2485,6 +2807,7 @@ export function getAuditRulesForPrompt(): string {
 META DESCRIPTION (Google + Rank Math):
 • 70–160 chars (Google typically displays ~155–160)
 • Primary keyword in first 120–160 chars (Rank Math 100/100)
+• MUST include at least one specific number (stat, %, year, or count from the article) — numbers in meta descriptions improve CTR
 • Pitch-style: concise summary that convinces users to click; match page content
 • Soft CTA when natural: "Discover…", "Learn…", "Get…", "Find out…"
 • Unique per page; avoid boilerplate or duplicate descriptions
