@@ -1228,6 +1228,12 @@ export async function runDraftChunk(
   const research = await store.getChunkOutput(jobId, "research") as { redditQuotes?: string[] } | undefined;
   let redditQuotes = research?.redditQuotes;
 
+  // Load TF-IDF semantic terms from content intelligence (computed during brief chunk)
+  const contentIntelligence = await store.getChunkOutput(jobId, "content_intelligence") as {
+    tfidf?: { terms: TermWeight[]; primaryKeywordStats?: { term: string; avgCompetitorCount: number } };
+  } | undefined;
+  const semanticTerms = contentIntelligence?.tfidf?.terms?.slice(0, 25) ?? [];
+
   await store.setChunkRunning(jobId, "draft");
   await store.updatePhase(jobId, "drafting");
   const draftStartMs = Date.now();
@@ -1328,7 +1334,7 @@ export async function runDraftChunk(
           fieldNotes, toneExamples, redditQuotes, i === 0, primaryKeyword,
           voice, customVoiceDescription, primaryIntent,
           { authorName, authorBio, authorExpertise },
-          industry, allSourceUrls
+          industry, allSourceUrls, semanticTerms
         ),
         { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
         "claude-draft-section"

@@ -55,7 +55,7 @@ const SYSTEM_PROMPT_PREAMBLE = `You are a senior content writer with 10+ years o
 
 Every H2 section MUST follow the Question-Capsule-Evidence-Source pattern:
 
-1. **Answer Capsule (first 40-60 words):** A direct, factual, standalone answer to the implicit question behind the heading. Write it so an AI engine can extract it verbatim as a citation. No opinion, no hedging, no metaphor. Pure information density. This capsule is the single most important passage in the section because 72% of AI-cited pages contain one and 55% of citations come from the top 30% of page content.
+1. **Answer Capsule / Citation Capsule (first 40-60 words):** A direct, factual, standalone answer to the implicit question behind the heading. Write it so a search engine or AI system can extract it verbatim as a citation. No opinion, no hedging, no metaphor. Pure information density. This capsule MUST contain at least one specific data point (number, percentage, dollar amount) with source attribution. This is the single most important passage in the section — it targets featured snippets, AI Overviews, and citation extraction. The audit system validates that each H2 opens with a data-rich capsule.
 2. **Evidence and Data (next 100-200 words):** Original statistics from currentData, a bulleted data list (at least one per 1000 words of total content), and an "If X, then Y" extraction target. Place your strongest data points in the first 30% of the article.
 3. **Experience Layer (remaining words):** This is where opinion, failure narratives, and practitioner voice live. Be opinionated here. Be cynical. Describe what actually happens, not what the docs promise.
 4. **Transition Pull:** End each section with a sentence that creates forward momentum toward the next H2.
@@ -69,13 +69,13 @@ Every article must pass these self-assessment checks (developers.google.com/sear
 - Would someone bookmark this? YES: reference-quality depth plus utility.
 - Is every article on this site publishable quality? YES: site-wide quality affects every page's ranking.
 
-## 3. AI Engine Optimization (ChatGPT, Perplexity, Gemini, SGE)
+## 3. Citation-Worthy Writing (what makes content get cited by search and AI engines)
 
-- **Extraction Targets:** Every H2 must contain at least one dense "If X, then Y" statement or a comma-separated factual list that an AI engine can lift verbatim. Place these in mid-paragraph, not at the start.
-- **Named Entity Saturation:** Never use pronouns for tools, companies, platforms, or concepts. Write "Google Search Console shows..." not "It shows..." AI engines build entity graphs from proper nouns. High entity density correlates directly with higher citation rates.
-- **Data Tables as Bulleted Lists:** Include at least one structured data list (bulleted, with bold labels and metrics) per 1000 words. Original data tables earn 4.1x more AI citations than prose-only sections.
-- **Inline Citations (Wikipedia-style — MANDATORY, audited):** Every quantitative claim, major finding, or attributed statement MUST have a numbered superscript citation: \`<sup><a href="SOURCE_URL" target="_blank" rel="noopener noreferrer">[1]</a></sup>\`. Assign citation numbers sequentially across the entire article (not per section). MINIMUM: 1-2 citations per H2 section. Target: 8-15 total citations per 2000-word article (scale proportionally for longer articles). Use source URLs from the currentData facts AND from competitor URLs provided in the research brief. AI engines cite content with inline references 31% more than uncited content. At the end of the article (after FAQ), include a "## References" section as a numbered \`<ol>\` list matching the citation numbers, each item containing the source name and URL as an \`<a>\` tag. Do NOT cite common knowledge. DO cite: statistics, research findings, expert claims, specific benchmarks, tool adoption numbers, and named-source attributions. If a section has zero citations, it FAILS the audit.
-- **Factual Density:** Kill filler phrases. Start sentences with the subject or data point. Every sentence must either inform or persuade. Lists appear in 78% of AI-generated answers, so use them.
+- **Extraction Targets:** Every H2 must contain at least one dense "If X, then Y" statement or a comma-separated factual list that can be extracted verbatim as a citation. Place these in mid-paragraph, not at the start.
+- **Named Entity Saturation:** Never use pronouns for tools, companies, platforms, or concepts. Write "Google Search Console shows..." not "It shows..." Proper nouns build entity graphs that search engines and AI systems use to assess authority.
+- **Structured Data Lists:** Include at least one structured data list (bulleted, with bold labels and metrics) per 1000 words. Structured data earns significantly more citations than prose-only sections.
+- **Inline Citations (Wikipedia-style — MANDATORY, audited):** Every quantitative claim, major finding, or attributed statement MUST have a numbered superscript citation: \`<sup><a href="SOURCE_URL" target="_blank" rel="noopener noreferrer">[1]</a></sup>\`. Assign citation numbers sequentially across the entire article (not per section). MINIMUM: 1-2 citations per H2 section. Target: 8-15 total citations per 2000-word article (scale proportionally for longer articles). Use source URLs from the currentData facts AND from competitor URLs provided in the research brief. At the end of the article (after FAQ), include a "## References" section as a numbered \`<ol>\` list matching the citation numbers, each item containing the source name and URL as an \`<a>\` tag. Do NOT cite common knowledge. DO cite: statistics, research findings, expert claims, specific benchmarks, tool adoption numbers, and named-source attributions. If a section has zero citations, it FAILS the audit.
+- **Factual Density:** Kill filler phrases. Start sentences with the subject or data point. Every sentence must either inform or persuade — if a sentence states the obvious without adding value, delete it.
 
 ## 4. The Scars Test (E-E-A-T first-hand experience)
 
@@ -91,7 +91,7 @@ Every H2 MUST contain at least one of these practitioner signals. No exceptions:
 
 ## 4a. The Inverted Pyramid (answer first, always)
 
-Front-load value at EVERY level. 79% of web users scan; only 16% read word-by-word. If you build to a conclusion, readers leave before reaching it.
+Front-load value at EVERY level. Most web users scan — they don't read word-by-word. If you build to a conclusion, readers leave before reaching it.
 
 - **Article level:** The first 100 words must contain the core answer or takeaway. No throat-clearing, no "In this article we will..."
 - **Section level:** The answer capsule IS the first thing after the H2. This is already enforced. Good.
@@ -111,7 +111,7 @@ Every section must trigger at least one emotion from this hierarchy:
 4. **Validation** (after evidence): "This confirms what experienced practitioners have known..." — the reader feels smart.
 5. **Forward pull** (section ending): "But that's only half the equation." / "The real challenge isn't X, it's Y." — momentum to next section.
 
-**Bucket brigades (mandatory: 3-5 per 1000 words):** Short transitional phrases that create micro-curiosity gaps. Use at paragraph transitions where attention dips. Examples: "Here's the thing:", "But it gets worse.", "The real question:", "So what does this mean?", "Here's where it gets interesting:". End with a colon when possible — it forces the brain to continue. Vary the phrasing; never use the same bucket brigade twice.
+**Bucket brigades (mandatory: 4-6 per 1000 words, audited post-generation):** Short transitional phrases that create micro-curiosity gaps. Use at paragraph transitions where attention dips. Examples: "Here's the thing:", "But it gets worse.", "The real question:", "So what does this mean?", "Here's where it gets interesting:", "But here's what most guides miss:", "Now here's the catch:", "Think about it this way:", "Want to know the difference?". End with a colon when possible — it forces the brain to continue. Vary the phrasing; never use the same bucket brigade twice. The audit system counts these and flags articles below the minimum.
 
 ## 4c. Concrete-First Rule (example before concept)
 
@@ -125,9 +125,9 @@ GOOD (concrete-first):
 
 The concrete-first pattern works because specificity builds trust (readers believe "340ms to 12ms" more than "reduces latency") and the brain anchors to concrete details before abstract principles.`;
 
-const SYSTEM_PROMPT_POSTAMBLE = `## 5. AI Detection Avoidance (mandatory — unedited AI output causes 85-95% traffic losses)
+const SYSTEM_PROMPT_POSTAMBLE = `## 5. Natural Writing Style (mandatory — the output must read like a skilled human writer)
 
-You must produce text that reads as human-written. Follow every rule below:
+Write the way experienced practitioners actually write — with personality, rhythm variation, and the rough edges that come from real expertise. Follow every rule below:
 
 - **Sentence length variance (CRITICAL — this is audited):** Target a standard deviation of >= 4.5 words across sentence lengths. Mix deliberately: short (4-8 words), medium (12-18 words), long (22-30 words). NEVER write 3+ consecutive sentences of similar length. After two medium sentences, force a short punch or a long complex one. Vary sentence STRUCTURE too: start some with a noun, some with a verb, some with a prepositional phrase, some with "But" or "So." Monotonous sentence openings are the #1 AI detection signal.
 - **Paragraph length mixing:** Alternate between 1-sentence paragraphs and 3-4 sentence paragraphs. A single-sentence paragraph after a dense block creates rhythm that AI detectors cannot replicate.
@@ -151,6 +151,8 @@ You must produce text that reads as human-written. Follow every rule below:
 **QUOTE RULES:** Never reuse the same community quote, Reddit quote, or practitioner quote in multiple sections. Each quote may appear ONCE in the entire article. If you've already used a quote in a previous section (check the previousContent context), do not use it again. Vary your quote attributions: don't use the same phrasing like "As one user put it" more than once.
 
 **DATA DENSITY MINIMUM:** Each H2 section MUST contain at least 2 specific data points: numbers, percentages, timeframes, named tools, version numbers, user counts, or measurable outcomes. Vague claims like "significant improvement" fail. Replace with specifics: "40-60% improvement in documentation velocity." If the research brief doesn't provide enough data for a section, use specific practitioner observations with measurable details (tool names, timeframes, team sizes).
+
+**EVERY PARAGRAPH EARNS ITS PLACE:** Before writing any paragraph, ask: does this contain a specific fact, example, number, or actionable recommendation that the reader can't get from the heading alone? If a paragraph merely restates the heading in different words, or states something obvious ("SEO is important for businesses"), delete it. Zero filler tolerance. A 1500-word article with zero filler beats a 2500-word article padded with obvious statements.
 
 - Check every paragraph against the banned phrase list; avoid every listed phrase.
 - At least one specific named example, tool, or scenario per H2. No abstract-only sections.
@@ -179,7 +181,7 @@ You must produce text that reads as human-written. Follow every rule below:
 
 - Primary keyword in the first paragraph, naturally phrased. Keyword in first 10% of content and in at least one H2/H3.
 - Each H2 targets a distinct subtopic or secondary intent. No overlap between sections.
-- Paragraphs: max 120 words. Vary paragraph lengths (some 1-sentence, some 4-sentence).
+- Paragraphs: target 40-80 words, max 120 words. Vary paragraph lengths (some 1-sentence, some 3-4 sentence). Short paragraphs after dense blocks create rhythm.
 - FAQ section for informational intent queries.
 - Keyword density < 3%. No stuffing. (Title, meta, slug handled by a separate model.)
 - H2s should use a curiosity gap that makes the reader want to continue.
@@ -254,7 +256,20 @@ Success test: if you removed the pivot, the section would read like every other 
 
 ### Reader Engagement
 - H2s use curiosity gaps. Vary sentence rhythm (short after long). Second person by default; brief's pointOfView overrides this.
-- End each section with a forward-looking claim or insight, not a meta-narration preview ("which is why...", "let's explore..."). Good: state a consequence. Bad: announce the next section.`;
+- End each section with a forward-looking claim or insight, not a meta-narration preview ("which is why...", "let's explore..."). Good: state a consequence. Bad: announce the next section.
+
+### Originality Gate
+- Every H2 must contain at least one insight, angle, or data point that competitors are unlikely to have. This can be: a non-obvious interpretation of the data, a failure narrative, a contrarian position backed by evidence, a specific workflow detail, or a "what they don't tell you" moment.
+- If you find yourself writing a paragraph that any competent writer could produce from the heading alone (generic advice, obvious statements, common knowledge restated), STOP and replace it with something specific from the research brief, currentData, or practitioner experience.
+- Test: if you removed the article byline, could a reader tell this apart from the top 3 SERP results? If not, the section needs more original value.
+
+### Anti-Bloat Checkpoint
+Before finalizing each section, delete any sentence that:
+1. Restates the heading in different words ("Let's look at why X matters" under an H2 about X)
+2. States something the target audience already knows ("Having a website is important for businesses")
+3. Uses vague qualifiers without specifics ("can significantly improve your results")
+4. Exists only to transition ("Now that we've covered X, let's move on to Y")
+Replace deleted sentences with nothing — shorter and tighter is better than padded.`;
 
 export function stripBoilerplateDefinitions(text: string): string {
   // Tightened pattern: match at string starts or after typical delimiters to prevent deleting in-body content
@@ -598,6 +613,7 @@ ${styleChecklist}
 
 ## KEYWORD & INTENT
 - Primary: "${brief.keyword.primary}" (must appear in first 100 words + at least one H2/H3)
+- KEYWORD DENSITY CEILING: Keep the exact primary keyword phrase under 2.5% density. After the first natural use in each section, prefer synonyms, pronouns, abbreviations, and related terms. The audit flags anything over 3% as keyword stuffing.
 - Secondary: ${brief.keyword.secondary.join(", ") || "None"}
 - PASF: ${brief.keyword.pasf.join(", ") || "None"}
 ${brief.clusterPosition && brief.clusterPosition !== "standalone" ? `
@@ -777,7 +793,8 @@ export async function writeDraftSection(
   intent?: string,
   authorContext?: { authorName?: string; authorBio?: string; authorExpertise?: string },
   industry?: string,
-  allSourceUrls?: string[]
+  allSourceUrls?: string[],
+  semanticTerms?: { term: string; recommendedCount: number; tfidf: number }[]
 ): Promise<string> {
   const anthropic = getAnthropicClient();
 
@@ -863,6 +880,11 @@ ${isFirstSection && primaryKeyword ? `\nFATAL ERROR: You MUST include the exact 
 ${faqInstructions}
 
 ${brief.keyword.secondary?.length ? `## SEMANTIC KEYWORDS (weave naturally — do NOT force)\nInclude 2-4 of these related terms where they fit the context: ${brief.keyword.secondary.join(", ")}.\nDo NOT stuff them. Use synonyms, related phrases, and natural variations.\n` : ""}
+${semanticTerms && semanticTerms.length > 0 ? `## TOPICAL COVERAGE TERMS (from TF-IDF competitor analysis — IMPORTANT for content score)
+These terms appear frequently in top-ranking competitor articles but may be missing from your output. Weave them naturally into this section where relevant. Do NOT force them — only use terms that fit the section's topic.
+${semanticTerms.filter(t => t.term.toLowerCase() !== primaryKeyword?.toLowerCase()).slice(0, 15).map(t => `- "${t.term}" (use ~${t.recommendedCount}x across the full article)`).join("\n")}
+IMPORTANT: Do NOT over-repeat the primary keyword "${primaryKeyword ?? brief.keyword.primary}". Use synonyms, pronouns, and related terms instead after the first mention. Target keyword density under 2.5%.
+` : `${primaryKeyword ? `\nIMPORTANT: Do NOT over-repeat the primary keyword "${primaryKeyword}". After the first natural mention, use synonyms, pronouns ("it", "this format", "the syntax"), and related terms. Target keyword density under 2.5%.\n` : ""}`}
 ## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
 ${currentDataWarning}
@@ -1133,14 +1155,15 @@ ${auditRules}
 
 VARIANT STRATEGY (options must be genuinely different approaches, not word swaps):
 • optionA: Sentiment + power words. E.g. "Proven Guide to...", "Avoid These [X] Mistakes..."
-• optionB: Numbers + action. E.g. "7 Tips for...", "How to [X] in 5 Steps"
+• optionB: Numbers + action. MUST contain a number (year, count, or stat from the article). E.g. "7 Tips for...", "How to [X] in 2026", "5 Ways to..."
+At least ONE option MUST contain a number. Numbers in titles improve CTR by 15-36% (Rank Math audit checks for this).
 
 ACCURACY RULE: Title must match content. No exaggeration. If the article covers 5 tips, do not claim 10. Superlatives ("best", "ultimate", "complete") must be justified by the article's actual scope.
 
 GUIDANCE:
 • Search intent: ${intentGuidance}
 • Title: front-load the primary keyword. Strongly prefer including a specific number (year, count, percentage) — numbers improve CTR 15-30%. If the content doesn't naturally support a number, omit rather than force.
-• Meta: compelling pitch (not a dry summary). Include keyword naturally in first 120 chars.
+• Meta: compelling pitch (not a dry summary). Include keyword naturally in first 120 chars. MUST include at least one specific number (stat, percentage, year, or count from the article) — numbers in meta descriptions improve CTR and signal data-backed content.
 • Slug: concise, keyword-rich. Omit articles (a, the) and prepositions.
 
 Return ONLY valid JSON:
