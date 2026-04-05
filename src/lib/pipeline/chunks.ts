@@ -858,7 +858,10 @@ export async function runBriefChunk(
     const avgWordCount = Math.round(
       successfulCompetitors.reduce((sum, c) => sum + c.wordCount, 0) / successfulCompetitors.length
     );
-    const recommended = Math.round(avgWordCount * 1.15); // avg + 15%
+    const competitorBased = Math.round(avgWordCount * 1.15); // avg + 15%
+    // Floor: comprehensive guides need at least 1500 words to cover topics
+    // adequately, even if competitors are thin reference/tool pages.
+    const recommended = Math.max(competitorBased, 1500);
     topicExtraction = {
       ...topicExtraction,
       wordCount: {
@@ -1233,6 +1236,7 @@ export async function runDraftChunk(
     tfidf?: { terms: TermWeight[]; primaryKeywordStats?: { term: string; avgCompetitorCount: number } };
   } | undefined;
   const semanticTerms = contentIntelligence?.tfidf?.terms?.slice(0, 25) ?? [];
+  console.log(`[pipeline] TF-IDF semantic terms loaded: ${semanticTerms.length} terms`, semanticTerms.slice(0, 5).map(t => `"${t.term}" (rec: ${t.recommendedCount})`));
 
   await store.setChunkRunning(jobId, "draft");
   await store.updatePhase(jobId, "drafting");

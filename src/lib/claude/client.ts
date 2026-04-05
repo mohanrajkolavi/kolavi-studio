@@ -880,9 +880,11 @@ ${isFirstSection && primaryKeyword ? `\nFATAL ERROR: You MUST include the exact 
 ${faqInstructions}
 
 ${brief.keyword.secondary?.length ? `## SEMANTIC KEYWORDS (weave naturally — do NOT force)\nInclude 2-4 of these related terms where they fit the context: ${brief.keyword.secondary.join(", ")}.\nDo NOT stuff them. Use synonyms, related phrases, and natural variations.\n` : ""}
-${semanticTerms && semanticTerms.length > 0 ? `## TOPICAL COVERAGE TERMS (from TF-IDF competitor analysis — IMPORTANT for content score)
-These terms appear frequently in top-ranking competitor articles but may be missing from your output. Weave them naturally into this section where relevant. Do NOT force them — only use terms that fit the section's topic.
-${semanticTerms.filter(t => t.term.toLowerCase() !== primaryKeyword?.toLowerCase()).slice(0, 15).map(t => `- "${t.term}" (use ~${t.recommendedCount}x across the full article)`).join("\n")}
+${semanticTerms && semanticTerms.length > 0 ? `## TOPICAL COVERAGE TERMS — CRITICAL FOR CONTENT SCORE (from TF-IDF competitor analysis)
+Top-ranking competitors use these terms extensively. Your content score depends heavily on including them.
+**YOU MUST use at least 5-8 of these terms in this section.** Work them into sentences, headings, lists, or examples — wherever they fit the topic.
+${semanticTerms.filter(t => t.term.toLowerCase() !== primaryKeyword?.toLowerCase()).slice(0, 20).map(t => `- "${t.term}" (target: ~${t.recommendedCount}x across full article)`).join("\n")}
+After writing, mentally check: did you use at least 5 terms from this list? If not, revise to include more.
 IMPORTANT: Do NOT over-repeat the primary keyword "${primaryKeyword ?? brief.keyword.primary}". Use synonyms, pronouns, and related terms instead after the first mention. Target keyword density under 2.5%.
 ` : `${primaryKeyword ? `\nIMPORTANT: Do NOT over-repeat the primary keyword "${primaryKeyword}". After the first natural mention, use synonyms, pronouns ("it", "this format", "the syntax"), and related terms. Target keyword density under 2.5%.\n` : ""}`}
 ## CURRENT DATA — ZERO HALLUCINATION
@@ -1327,7 +1329,7 @@ OUTPUT FORMAT:
 3. JSON array: [{ "originalText": "...", "replacement": "...", "reason": "...", "replacedWithVerifiedFact": true/false }]
 No markdown code fences.`;
 
-const HALLUCINATION_FIX_TIMEOUT_MS = 10_000;
+const HALLUCINATION_FIX_TIMEOUT_MS = 45_000;
 
 export type FixHallucinationsResult = {
   fixedHtml: string;
@@ -1449,7 +1451,7 @@ ${draftHtml}`;
  * Receives the HTML and a list of failure messages from the audit.
  * Rewrites only what's necessary to fix the issues.
  */
-const AUDIT_FIX_TIMEOUT_MS = 12_000;
+const AUDIT_FIX_TIMEOUT_MS = 60_000;
 
 export async function fixAuditIssues(
   draftHtml: string,
