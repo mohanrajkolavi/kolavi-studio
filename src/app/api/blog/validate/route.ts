@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         factCheck: result.factCheck,
         schemaMarkup: result.schemaMarkup,
         finalContent: result.finalContent,
+        contentScore: result.contentScore,
       }),
       {
         status: 200,

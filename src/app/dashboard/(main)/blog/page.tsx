@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useReducer, useMemo, useEffect, useRef, useCallback } from "react";
 import type React from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
@@ -619,6 +619,138 @@ const SAMPLE_RESULT: ResultState = {
   input: SAMPLE_INPUT,
 };
 
+// ---------------------------------------------------------------------------
+// Chat reducer — consolidates 12 chat-related useState hooks
+// ---------------------------------------------------------------------------
+type ChatFeedback = {
+  auditScore?: number;
+  publishable?: boolean;
+  level1Failures?: string[];
+  factCheckVerified?: boolean;
+  hallucinations?: number;
+} | null;
+type ChatHistoryEntry = { section: string; message: string; timestamp: number; auditScore?: number };
+type ChatInternalLink = { url: string; anchorText: string };
+type ChatState = {
+  open: boolean;
+  section: string;
+  message: string;
+  loading: boolean;
+  error: string | null;
+  feedback: ChatFeedback;
+  history: ChatHistoryEntry[];
+  success: boolean;
+  internalLinks: ChatInternalLink[];
+  linkUrl: string;
+  linkAnchor: string;
+  linksOpen: boolean;
+};
+const CHAT_INITIAL: ChatState = {
+  open: false, section: "", message: "", loading: false, error: null,
+  feedback: null, history: [], success: false, internalLinks: [],
+  linkUrl: "", linkAnchor: "", linksOpen: false,
+};
+type ChatAction =
+  | { type: "SET_OPEN"; open: boolean }
+  | { type: "SET_SECTION"; section: string }
+  | { type: "SET_MESSAGE"; message: string }
+  | { type: "SET_LOADING"; loading: boolean }
+  | { type: "SET_ERROR"; error: string | null }
+  | { type: "SET_FEEDBACK"; feedback: ChatFeedback }
+  | { type: "SET_HISTORY"; history: ChatHistoryEntry[] }
+  | { type: "PUSH_HISTORY"; entry: ChatHistoryEntry }
+  | { type: "SET_SUCCESS"; success: boolean }
+  | { type: "SET_INTERNAL_LINKS"; links: ChatInternalLink[] }
+  | { type: "ADD_INTERNAL_LINK"; link: ChatInternalLink }
+  | { type: "REMOVE_INTERNAL_LINK"; index: number }
+  | { type: "SET_LINK_URL"; url: string }
+  | { type: "SET_LINK_ANCHOR"; anchor: string }
+  | { type: "SET_LINKS_OPEN"; open: boolean }
+  | { type: "OPEN_FOR_SECTION"; section: string }
+  | { type: "RESET" };
+
+function chatReducer(state: ChatState, action: ChatAction): ChatState {
+  switch (action.type) {
+    case "SET_OPEN": return { ...state, open: action.open };
+    case "SET_SECTION": return { ...state, section: action.section };
+    case "SET_MESSAGE": return { ...state, message: action.message };
+    case "SET_LOADING": return { ...state, loading: action.loading };
+    case "SET_ERROR": return { ...state, error: action.error };
+    case "SET_FEEDBACK": return { ...state, feedback: action.feedback };
+    case "SET_HISTORY": return { ...state, history: action.history };
+    case "PUSH_HISTORY": return { ...state, history: [...state.history, action.entry] };
+    case "SET_SUCCESS": return { ...state, success: action.success };
+    case "SET_INTERNAL_LINKS": return { ...state, internalLinks: action.links };
+    case "ADD_INTERNAL_LINK": return { ...state, internalLinks: [...state.internalLinks, action.link] };
+    case "REMOVE_INTERNAL_LINK": return { ...state, internalLinks: state.internalLinks.filter((_, i) => i !== action.index) };
+    case "SET_LINK_URL": return { ...state, linkUrl: action.url };
+    case "SET_LINK_ANCHOR": return { ...state, linkAnchor: action.anchor };
+    case "SET_LINKS_OPEN": return { ...state, linksOpen: action.open };
+    case "OPEN_FOR_SECTION": return { ...state, open: true, section: action.section, message: "", error: null, success: false };
+    case "RESET": return CHAT_INITIAL;
+    default: return state;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Demo reducer — consolidates 6 demo-related useState hooks
+// ---------------------------------------------------------------------------
+type DemoStep = "research" | "select_done" | "fetch" | "research_done" | "brief" | "brief_done" | "draft" | "validate" | "complete";
+type DemoChunkOutputs = {
+  research: ResearchChunkResult | null;
+  researchSerp: ResearchSerpResult | null;
+  brief: BriefChunkResult | null;
+};
+type DemoState = {
+  running: boolean;
+  step: DemoStep;
+  progress: number;
+  startedAt: number | null;
+  elapsedTick: number;
+  chunkOutputs: DemoChunkOutputs;
+};
+const DEMO_INITIAL: DemoState = {
+  running: false, step: "research", progress: 0,
+  startedAt: null, elapsedTick: 0,
+  chunkOutputs: { research: null, researchSerp: null, brief: null },
+};
+type DemoAction =
+  | { type: "START"; startedAt: number }
+  | { type: "STOP" }
+  | { type: "TICK" }
+  | { type: "SET_STEP"; step: DemoStep }
+  | { type: "SET_PROGRESS"; progress: number }
+  | { type: "SET_STARTED_AT"; startedAt: number | null }
+  | { type: "SET_ELAPSED_TICK"; tick: number }
+  | { type: "SET_CHUNK_OUTPUTS"; outputs: DemoChunkOutputs }
+  | { type: "MERGE_CHUNK_OUTPUTS"; partial: Partial<DemoChunkOutputs> }
+  | { type: "TRANSITION"; step: DemoStep; startedAt: number | null; progress: number; chunkOutputs?: DemoChunkOutputs | ((prev: DemoChunkOutputs) => DemoChunkOutputs) }
+  | { type: "COMPLETE" }
+  | { type: "RESET" };
+
+function demoReducer(state: DemoState, action: DemoAction): DemoState {
+  switch (action.type) {
+    case "START": return { ...DEMO_INITIAL, running: true, startedAt: action.startedAt };
+    case "STOP": return { ...state, running: false };
+    case "TICK": return { ...state, elapsedTick: state.elapsedTick + 1 };
+    case "SET_STEP": return { ...state, step: action.step };
+    case "SET_PROGRESS": return { ...state, progress: action.progress };
+    case "SET_STARTED_AT": return { ...state, startedAt: action.startedAt };
+    case "SET_ELAPSED_TICK": return { ...state, elapsedTick: action.tick };
+    case "SET_CHUNK_OUTPUTS": return { ...state, chunkOutputs: action.outputs };
+    case "MERGE_CHUNK_OUTPUTS": return { ...state, chunkOutputs: { ...state.chunkOutputs, ...action.partial } };
+    case "TRANSITION": {
+      const co = typeof action.chunkOutputs === "function"
+        ? action.chunkOutputs(state.chunkOutputs)
+        : action.chunkOutputs ?? state.chunkOutputs;
+      return { ...state, step: action.step, startedAt: action.startedAt, progress: action.progress, chunkOutputs: co };
+    }
+    case "COMPLETE": return { ...state, running: false, startedAt: null, step: "complete", chunkOutputs: { research: null, researchSerp: null, brief: null } };
+    case "RESET": return DEMO_INITIAL;
+    default: return state;
+  }
+}
+
 export default function BlogMakerPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -675,46 +807,27 @@ export default function BlogMakerPage() {
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
   const [contentView, setContentView] = useState<"preview" | "outline">("preview");
   // Section chat state
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatSection, setChatSection] = useState("");
-  const [chatMessage, setChatMessage] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [chatError, setChatError] = useState<string | null>(null);
-  const [chatFeedback, setChatFeedback] = useState<{
-    auditScore?: number;
-    publishable?: boolean;
-    level1Failures?: string[];
-    factCheckVerified?: boolean;
-    hallucinations?: number;
-  } | null>(null);
-  const [chatHistory, setChatHistory] = useState<Array<{
-    section: string;
-    message: string;
-    timestamp: number;
-    auditScore?: number;
-  }>>([]);
-  const [chatSuccess, setChatSuccess] = useState(false);
-  /** Internal links to include in chat section regeneration. */
-  const [chatInternalLinks, setChatInternalLinks] = useState<Array<{ url: string; anchorText: string }>>([]);
-  /** Current URL being typed in the internal link input. */
-  const [chatLinkUrl, setChatLinkUrl] = useState("");
-  /** Current anchor text being typed in the internal link input. */
-  const [chatLinkAnchor, setChatLinkAnchor] = useState("");
-  /** Whether the internal links section is expanded. */
-  const [chatLinksOpen, setChatLinksOpen] = useState(false);
+  const [chat, chatDispatch] = useReducer(chatReducer, CHAT_INITIAL);
+  const chatOpen = chat.open;
+  const chatSection = chat.section;
+  const chatMessage = chat.message;
+  const chatLoading = chat.loading;
+  const chatError = chat.error;
+  const chatFeedback = chat.feedback;
+  const chatHistory = chat.history;
+  const chatSuccess = chat.success;
+  const chatInternalLinks = chat.internalLinks;
+  const chatLinkUrl = chat.linkUrl;
+  const chatLinkAnchor = chat.linkAnchor;
+  const chatLinksOpen = chat.linksOpen;
   const [loadingHistory, setLoadingHistory] = useState(false);
-  /** Demo workflow: same as production (research → brief → draft → validate) with sample data, ~10s per stage. */
-  const [demoRunning, setDemoRunning] = useState(false);
-  type DemoStep = "research" | "select_done" | "fetch" | "research_done" | "brief" | "brief_done" | "draft" | "validate" | "complete";
-  const [demoStep, setDemoStep] = useState<DemoStep>("research");
-  const [demoProgress, setDemoProgress] = useState(0);
-  const [demoStartedAt, setDemoStartedAt] = useState<number | null>(null);
-  const [demoElapsedTick, setDemoElapsedTick] = useState(0);
-  const [demoChunkOutputs, setDemoChunkOutputs] = useState<{
-    research: ResearchChunkResult | null;
-    researchSerp: ResearchSerpResult | null;
-    brief: BriefChunkResult | null;
-  }>({ research: null, researchSerp: null, brief: null });
+  const [demo, demoDispatch] = useReducer(demoReducer, DEMO_INITIAL);
+  const demoRunning = demo.running;
+  const demoStep = demo.step;
+  const demoProgress = demo.progress;
+  const demoStartedAt = demo.startedAt;
+  const demoElapsedTick = demo.elapsedTick;
+  const demoChunkOutputs = demo.chunkOutputs;
   /** Selected competitor URLs (max 4) for Select competitors step. */
   const [selectedSerpUrls, setSelectedSerpUrls] = useState<string[]>([]);
   /** Custom competitor URL (max 1) — user can add one custom URL instead of picking from SERP. */
@@ -754,26 +867,20 @@ export default function BlogMakerPage() {
     lastResearchSerpRef.current = SAMPLE_RESEARCH_SERP;
 
     if (stage === "select") {
-      setDemoRunning(false);
-      setDemoStep("select_done");
-      setDemoChunkOutputs({ research: null, researchSerp: SAMPLE_RESEARCH_SERP, brief: null });
-      setDemoProgress(25);
-      setDemoStartedAt(null);
+      demoDispatch({ type: "TRANSITION", step: "select_done", startedAt: null, progress: 25, chunkOutputs: { research: null, researchSerp: SAMPLE_RESEARCH_SERP, brief: null } });
+      demoDispatch({ type: "STOP" });
       setSelectedSerpUrls(SAMPLE_RESEARCH_SERP.results.slice(0, 3).map((r) => r.url));
       setStepView(1);
     } else if (stage === "outline") {
-      setDemoRunning(false);
-      setDemoStep("brief_done");
-      setDemoChunkOutputs({ research: SAMPLE_RESEARCH, researchSerp: SAMPLE_RESEARCH_SERP, brief: SAMPLE_BRIEF });
+      demoDispatch({ type: "TRANSITION", step: "brief_done", startedAt: null, progress: 50, chunkOutputs: { research: SAMPLE_RESEARCH, researchSerp: SAMPLE_RESEARCH_SERP, brief: SAMPLE_BRIEF } });
+      demoDispatch({ type: "STOP" });
       const demoOutline = SAMPLE_BRIEF.outline.map((s, i) => ({ ...s, originalIndex: i }));
       setEditedOutline(demoOutline);
       setTargetTotal(demoOutline.reduce((acc, s) => acc + (s.targetWords || 150), 0));
-      setDemoProgress(50);
-      setDemoStartedAt(null);
       setStepView(2);
     } else {
-      setDemoRunning(false);
-      setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
+      demoDispatch({ type: "STOP" });
+      demoDispatch({ type: "SET_CHUNK_OUTPUTS", outputs: { research: null, researchSerp: null, brief: null } });
       setStepView(null);
       setSampleResult(SAMPLE_RESULT);
       const initial = pipelineToGenerated(SAMPLE_PIPELINE_RESULT);
@@ -931,7 +1038,7 @@ export default function BlogMakerPage() {
   // Demo: tick every second for elapsed display
   useEffect(() => {
     if (!demoRunning) return;
-    const id = setInterval(() => setDemoElapsedTick((t) => t + 1), 1000);
+    const id = setInterval(() => demoDispatch({ type: "TICK" }), 1000);
     return () => clearInterval(id);
   }, [demoRunning]);
 
@@ -941,41 +1048,27 @@ export default function BlogMakerPage() {
     if (!demoRunning || demoStartedAt == null) return;
     const elapsed = Date.now() - demoStartedAt;
     if (demoStep === "research" && elapsed >= demoStepDurationMs) {
-      setDemoChunkOutputs({ research: null, researchSerp: SAMPLE_RESEARCH_SERP, brief: null });
-      setDemoStep("select_done");
-      setDemoStartedAt(null);
-      setDemoProgress(25);
+      demoDispatch({ type: "TRANSITION", step: "select_done", startedAt: null, progress: 25, chunkOutputs: { research: null, researchSerp: SAMPLE_RESEARCH_SERP, brief: null } });
       setSelectedSerpUrls(SAMPLE_RESEARCH_SERP.results.slice(0, 3).map((r) => r.url));
       return;
     }
     if (demoStep === "fetch" && elapsed >= demoStepDurationMs) {
-      setDemoChunkOutputs((prev) => ({ research: SAMPLE_RESEARCH, researchSerp: prev.researchSerp ?? SAMPLE_RESEARCH_SERP, brief: null }));
-      setDemoStep("brief");
-      setDemoStartedAt(Date.now());
-      setDemoProgress(25);
+      demoDispatch({ type: "TRANSITION", step: "brief", startedAt: Date.now(), progress: 25, chunkOutputs: (prev) => ({ research: SAMPLE_RESEARCH, researchSerp: prev.researchSerp ?? SAMPLE_RESEARCH_SERP, brief: null }) });
       return;
     }
     if (demoStep === "brief" && elapsed >= demoStepDurationMs) {
-      setDemoChunkOutputs((prev) => ({ ...prev, brief: SAMPLE_BRIEF, research: prev.research ?? SAMPLE_RESEARCH, researchSerp: prev.researchSerp ?? SAMPLE_RESEARCH_SERP }));
+      demoDispatch({ type: "TRANSITION", step: "brief_done", startedAt: null, progress: 50, chunkOutputs: (prev) => ({ ...prev, brief: SAMPLE_BRIEF, research: prev.research ?? SAMPLE_RESEARCH, researchSerp: prev.researchSerp ?? SAMPLE_RESEARCH_SERP }) });
       const demoOutline = SAMPLE_BRIEF.outline.map((s, i) => ({ ...s, originalIndex: i }));
       setEditedOutline(demoOutline);
       setTargetTotal(demoOutline.reduce((acc, s) => acc + (s.targetWords || 150), 0));
-      setDemoStep("brief_done");
-      setDemoStartedAt(null);
-      setDemoProgress(50);
       return;
     }
     if (demoStep === "draft" && elapsed >= demoStepDurationMs) {
-      setDemoStep("validate");
-      setDemoStartedAt(Date.now());
-      setDemoProgress(75);
+      demoDispatch({ type: "TRANSITION", step: "validate", startedAt: Date.now(), progress: 75 });
       return;
     }
     if (demoStep === "validate" && elapsed >= demoStepDurationMs) {
-      setDemoRunning(false);
-      setDemoStartedAt(null);
-      setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
-      setDemoStep("complete");
+      demoDispatch({ type: "COMPLETE" });
       setSampleResult(SAMPLE_RESULT);
       const initial = pipelineToGenerated(SAMPLE_PIPELINE_RESULT);
       setSampleOutput(initial);
@@ -991,11 +1084,11 @@ export default function BlogMakerPage() {
       return;
     }
     // Progress bar during running steps
-    if (demoStep === "research") setDemoProgress(Math.min(25, (elapsed / demoStepDurationMs) * 25));
-    if (demoStep === "fetch") setDemoProgress(25);
-    if (demoStep === "brief") setDemoProgress(25 + (elapsed / demoStepDurationMs) * 25);
-    if (demoStep === "draft") setDemoProgress(50 + (elapsed / demoStepDurationMs) * 25);
-    if (demoStep === "validate") setDemoProgress(75 + (elapsed / demoStepDurationMs) * 25);
+    if (demoStep === "research") demoDispatch({ type: "SET_PROGRESS", progress: Math.min(25, (elapsed / demoStepDurationMs) * 25) });
+    if (demoStep === "fetch") demoDispatch({ type: "SET_PROGRESS", progress: 25 });
+    if (demoStep === "brief") demoDispatch({ type: "SET_PROGRESS", progress: 25 + (elapsed / demoStepDurationMs) * 25 });
+    if (demoStep === "draft") demoDispatch({ type: "SET_PROGRESS", progress: 50 + (elapsed / demoStepDurationMs) * 25 });
+    if (demoStep === "validate") demoDispatch({ type: "SET_PROGRESS", progress: 75 + (elapsed / demoStepDurationMs) * 25 });
   }, [demoRunning, demoStartedAt, demoStep, demoElapsedTick]);
 
   // Reset auto-save flag, history id, and SERP cache when starting new generation
@@ -1510,10 +1603,10 @@ export default function BlogMakerPage() {
 
   async function handleSectionChat() {
     if (!chatSection.trim() || !chatMessage.trim() || !jobId) return;
-    setChatLoading(true);
-    setChatError(null);
-    setChatFeedback(null);
-    setChatSuccess(false);
+    chatDispatch({ type: "SET_LOADING", loading: true });
+    chatDispatch({ type: "SET_ERROR", error: null });
+    chatDispatch({ type: "SET_FEEDBACK", feedback: null });
+    chatDispatch({ type: "SET_SUCCESS", success: false });
     try {
       const res = await fetch("/api/blog/chat", {
         method: "POST",
@@ -1532,7 +1625,7 @@ export default function BlogMakerPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setChatError(data.error ?? "Section regeneration failed");
+        chatDispatch({ type: "SET_ERROR", error: data.error ?? "Section regeneration failed" });
         return;
       }
       // Update the editing content with the regenerated article
@@ -1541,36 +1634,33 @@ export default function BlogMakerPage() {
       }
       // Show audit + fact-check feedback
       if (data.auditDelta || data.factCheck) {
-        setChatFeedback({
+        chatDispatch({ type: "SET_FEEDBACK", feedback: {
           auditScore: data.auditDelta?.score,
           publishable: data.auditDelta?.publishable,
           level1Failures: data.auditDelta?.level1Failures,
           factCheckVerified: data.factCheck?.verified,
           hallucinations: data.factCheck?.hallucinations?.length ?? 0,
-        });
+        } });
       }
       // Add to chat history
-      setChatHistory((prev) => [
-        ...prev,
-        {
-          section: chatSection.trim(),
-          message: chatMessage.trim(),
-          timestamp: Date.now(),
-          auditScore: data.auditDelta?.score,
-        },
-      ]);
-      setChatMessage("");
-      setChatInternalLinks([]);
-      setChatLinkUrl("");
-      setChatLinkAnchor("");
-      setChatError(null);
+      chatDispatch({ type: "PUSH_HISTORY", entry: {
+        section: chatSection.trim(),
+        message: chatMessage.trim(),
+        timestamp: Date.now(),
+        auditScore: data.auditDelta?.score,
+      } });
+      chatDispatch({ type: "SET_MESSAGE", message: "" });
+      chatDispatch({ type: "SET_INTERNAL_LINKS", links: [] });
+      chatDispatch({ type: "SET_LINK_URL", url: "" });
+      chatDispatch({ type: "SET_LINK_ANCHOR", anchor: "" });
+      chatDispatch({ type: "SET_ERROR", error: null });
       // Show success indicator (auto-dismiss after 3s)
-      setChatSuccess(true);
-      setTimeout(() => setChatSuccess(false), 3000);
+      chatDispatch({ type: "SET_SUCCESS", success: true });
+      setTimeout(() => chatDispatch({ type: "SET_SUCCESS", success: false }), 3000);
     } catch (err) {
-      setChatError(err instanceof Error ? err.message : "Network error");
+      chatDispatch({ type: "SET_ERROR", error: err instanceof Error ? err.message : "Network error" });
     } finally {
-      setChatLoading(false);
+      chatDispatch({ type: "SET_LOADING", loading: false });
     }
   }
 
@@ -1632,9 +1722,8 @@ export default function BlogMakerPage() {
       if (urls.length === 0) return;
       autoAdvanceCompetitorsDoneRef.current = true;
       if (demoRunning && demoChunkOutputs.researchSerp) {
-        setDemoStep("fetch");
-        setDemoStartedAt(Date.now());
-        setDemoElapsedTick(0);
+        demoDispatch({ type: "TRANSITION", step: "fetch", startedAt: Date.now(), progress: demoProgress });
+        demoDispatch({ type: "SET_ELAPSED_TICK", tick: 0 });
       } else if (jobId && urls.length >= 1 && urls.length <= 3) {
         startResearchFetch(jobId, urls);
       }
@@ -1652,9 +1741,8 @@ export default function BlogMakerPage() {
     const t = setTimeout(() => {
       autoAdvanceBriefDoneRef.current = true;
       if (demoRunning && demoChunkOutputs.brief) {
-        setDemoStep("draft");
-        setDemoStartedAt(Date.now());
-        setDemoElapsedTick(0);
+        demoDispatch({ type: "TRANSITION", step: "draft", startedAt: Date.now(), progress: demoProgress });
+        demoDispatch({ type: "SET_ELAPSED_TICK", tick: 0 });
       } else if (jobId) {
         const N = chunkOutputs.brief?.outline?.length ?? 0;
         const existing = editedOutline.filter((e) => e.originalIndex >= 0);
@@ -1991,8 +2079,7 @@ export default function BlogMakerPage() {
                           setSelectedSerpUrls([]);
                           setCustomCompetitorUrl("");
                           if (demoRunning) {
-                            setDemoRunning(false);
-                            setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
+                            demoDispatch({ type: "RESET" });
                           }
                         }}
                         className="text-[13px] text-muted-foreground hover:text-foreground transition-colors py-1.5 px-2 rounded-md hover:bg-muted/40 -mr-1"
@@ -2363,9 +2450,8 @@ export default function BlogMakerPage() {
                                 disabled={totalSelected < 1}
                                 onClick={() => {
                                   if (demoRunning && demoChunkOutputs.researchSerp) {
-                                    setDemoStep("fetch");
-                                    setDemoStartedAt(Date.now());
-                                    setDemoElapsedTick(0);
+                                    demoDispatch({ type: "TRANSITION", step: "fetch", startedAt: Date.now(), progress: demoProgress });
+                                    demoDispatch({ type: "SET_ELAPSED_TICK", tick: 0 });
                                     return;
                                   }
                                   setStepView(null);
@@ -2494,6 +2580,100 @@ export default function BlogMakerPage() {
                       </div>
                     )}
                   </header>
+
+                  {/* Content Intelligence panel (P5/P6/P7) — SERP insights, TF-IDF terms, entity targets */}
+                  {(chunkOutputs.contentIntelligence?.serpIntelligence || chunkOutputs.contentIntelligence?.tfidf) && (
+                    <div className="shrink-0 rounded-xl border border-border/50 bg-muted/20 p-4 sm:p-5 mb-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-[13px] font-semibold text-foreground">Content Intelligence</h3>
+                        <span className="text-[11px] text-muted-foreground rounded-full bg-muted/60 px-2 py-0.5">P6/P7</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 sm:gap-3">
+                        {chunkOutputs.contentIntelligence.serpIntelligence && (
+                          <>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-3 py-1 text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                              SERP: {chunkOutputs.contentIntelligence.serpIntelligence.patterns.dominantType}
+                              <span className="text-blue-500/60">({chunkOutputs.contentIntelligence.serpIntelligence.patterns.typeConfidence}%)</span>
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-3 py-1 text-[11px] font-medium text-purple-600 dark:text-purple-400">
+                              Format: {chunkOutputs.contentIntelligence.serpIntelligence.patterns.dominantFormat}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/10 px-3 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                              Difficulty: {chunkOutputs.contentIntelligence.serpIntelligence.difficulty}
+                            </span>
+                            {chunkOutputs.contentIntelligence.serpIntelligence.featuredSnippetStrategy.hasFeaturedSnippet && (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1 text-[11px] font-medium text-green-600 dark:text-green-400">
+                                Featured snippet: {chunkOutputs.contentIntelligence.serpIntelligence.featuredSnippetStrategy.targetType}
+                              </span>
+                            )}
+                          </>
+                        )}
+                        {chunkOutputs.contentIntelligence.tfidf && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-500/10 px-3 py-1 text-[11px] font-medium text-teal-600 dark:text-teal-400">
+                            {chunkOutputs.contentIntelligence.tfidf.terms.length} key terms tracked
+                          </span>
+                        )}
+                        {chunkOutputs.contentIntelligence.entities && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/10 px-3 py-1 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">
+                            {chunkOutputs.contentIntelligence.entities.entities.length} entities detected
+                          </span>
+                        )}
+                        {chunkOutputs.contentIntelligence.clusterAnalysis && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-3 py-1 text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                            Cluster: {chunkOutputs.contentIntelligence.clusterAnalysis.recommendedPosition}
+                          </span>
+                        )}
+                      </div>
+                      {/* SERP recommendation */}
+                      {chunkOutputs.contentIntelligence.serpIntelligence?.recommendation.rationale && (
+                        <p className="text-[11px] text-muted-foreground leading-relaxed">
+                          {chunkOutputs.contentIntelligence.serpIntelligence.recommendation.rationale}
+                        </p>
+                      )}
+                      {/* Top TF-IDF terms (collapsible) */}
+                      {chunkOutputs.contentIntelligence.tfidf && chunkOutputs.contentIntelligence.tfidf.terms.length > 0 && (
+                        <details className="group">
+                          <summary className="text-[12px] font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                            Top terms from competitors (click to expand)
+                          </summary>
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {chunkOutputs.contentIntelligence.tfidf.terms.slice(0, 25).map((t) => (
+                              <span
+                                key={t.term}
+                                className={`inline-block rounded px-2 py-0.5 text-[10px] font-medium ${
+                                  t.inHeadings
+                                    ? "bg-orange-500/15 text-orange-700 dark:text-orange-400"
+                                    : "bg-muted/60 text-muted-foreground"
+                                }`}
+                                title={`Recommended: ${t.recommendedCount}x | Competitors: ${t.docFrequency} docs`}
+                              >
+                                {t.term} <span className="opacity-60">({t.recommendedCount}x)</span>
+                              </span>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+                      {/* Information gain opportunities */}
+                      {chunkOutputs.contentIntelligence.serpIntelligence?.informationGainOpportunities &&
+                        chunkOutputs.contentIntelligence.serpIntelligence.informationGainOpportunities.length > 0 && (
+                        <details className="group">
+                          <summary className="text-[12px] font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                            Information gain opportunities ({chunkOutputs.contentIntelligence.serpIntelligence.informationGainOpportunities.length})
+                          </summary>
+                          <ul className="mt-2 space-y-1">
+                            {chunkOutputs.contentIntelligence.serpIntelligence.informationGainOpportunities.slice(0, 5).map((opp, i) => (
+                              <li key={i} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                                <span className={`mt-0.5 shrink-0 h-1.5 w-1.5 rounded-full ${
+                                  opp.priority === "high" ? "bg-red-500" : opp.priority === "medium" ? "bg-amber-500" : "bg-muted-foreground/40"
+                                }`} />
+                                <span><strong className="text-foreground">{opp.topic}</strong> {opp.reason}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  )}
 
                   {/* Revision panel — organic brief revision with instructions */}
                   {revisionPanelOpen && (
@@ -2776,9 +2956,8 @@ export default function BlogMakerPage() {
                         className="h-12 rounded-full px-8 font-semibold text-[15px] bg-orange-600 text-white hover:bg-orange-700 dark:bg-orange-500 dark:hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 active:translate-y-0"
                         onClick={() => {
                           if (demoRunning && demoChunkOutputs.brief) {
-                            setDemoStep("draft");
-                            setDemoStartedAt(Date.now());
-                            setDemoElapsedTick(0);
+                            demoDispatch({ type: "TRANSITION", step: "draft", startedAt: Date.now(), progress: demoProgress });
+                            demoDispatch({ type: "SET_ELAPSED_TICK", tick: 0 });
                             return;
                           }
                           if (!jobId) return;
@@ -3188,12 +3367,7 @@ export default function BlogMakerPage() {
                       setSelectedIntents(["informational"]);
                       setCompetitorUrls(SAMPLE_INPUT.competitorUrls);
                       setDraftModel(SAMPLE_INPUT.draftModel ?? "opus-4.6");
-                      setDemoRunning(true);
-                      setDemoStep("research");
-                      setDemoChunkOutputs({ research: null, researchSerp: null, brief: null });
-                      setDemoProgress(0);
-                      setDemoStartedAt(Date.now());
-                      setDemoElapsedTick(0);
+                      demoDispatch({ type: "START", startedAt: Date.now() });
                       setStepView(null);
                     }}
                     className="h-11 sm:h-12 shrink-0 rounded-full border-2 border-border px-5 sm:px-8 text-sm sm:text-base font-medium text-foreground shadow-sm hover:bg-muted/60 hover:text-foreground"
@@ -3401,6 +3575,96 @@ export default function BlogMakerPage() {
                 </div>
               )}
 
+              {/* Content Score — Surfer-style optimization score (P7B) */}
+              {chunkOutputs.validation?.contentScore && (
+                <div className="flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+                  <div className="flex shrink-0 flex-col gap-2 sm:gap-3 border-b border-border px-3 sm:px-4 py-2.5 sm:py-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-foreground">Content Score</h3>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-bold tabular-nums ${
+                          chunkOutputs.validation.contentScore.score >= 80
+                            ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200"
+                            : chunkOutputs.validation.contentScore.score >= 60
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200"
+                              : "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200"
+                        }`}
+                      >
+                        {chunkOutputs.validation.contentScore.score}/100 ({chunkOutputs.validation.contentScore.grade})
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">{chunkOutputs.validation.contentScore.summary}</p>
+                  </div>
+                  <div className="space-y-2 p-3 sm:p-4">
+                    {chunkOutputs.validation.contentScore.dimensions.map((dim) => (
+                      <div key={dim.name} className="space-y-1">
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="font-medium text-foreground">{dim.name}</span>
+                          <span className="tabular-nums text-muted-foreground">{Math.round(dim.score)}</span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              dim.score >= 80
+                                ? "bg-emerald-500"
+                                : dim.score >= 60
+                                  ? "bg-amber-500"
+                                  : "bg-red-500"
+                            }`}
+                            style={{ width: `${Math.min(100, dim.score)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    {(chunkOutputs.validation.contentScore.missingTerms.length > 0 ||
+                      chunkOutputs.validation.contentScore.entityGaps.length > 0) && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground hover:text-foreground">
+                          Optimization suggestions
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                          {chunkOutputs.validation.contentScore.missingTerms.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Missing terms</p>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {chunkOutputs.validation.contentScore.missingTerms.slice(0, 12).map((term) => (
+                                  <span key={term} className="rounded-md bg-red-50 px-1.5 py-0.5 text-[10px] text-red-700 dark:bg-red-950/30 dark:text-red-300">
+                                    {term}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {chunkOutputs.validation.contentScore.entityGaps.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Entity gaps</p>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {chunkOutputs.validation.contentScore.entityGaps.slice(0, 8).map((entity) => (
+                                  <span key={entity} className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                                    {entity}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {chunkOutputs.validation.contentScore.overusedTerms.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Overused terms</p>
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {chunkOutputs.validation.contentScore.overusedTerms.slice(0, 8).map((term) => (
+                                  <span key={term} className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
+                                    {term}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Quality checks — fact verification + FAQ compliance */}
               {(pipelineResult?.faqEnforcement || pipelineResult?.factCheck) && (
@@ -4111,7 +4375,7 @@ export default function BlogMakerPage() {
                   <div className="border-t border-border">
                     <button
                       type="button"
-                      onClick={() => setChatOpen(!chatOpen)}
+                      onClick={() => chatDispatch({ type: "SET_OPEN", open: !chatOpen })}
                       className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium text-foreground hover:bg-muted/30 transition-colors"
                     >
                       <span className="flex items-center gap-2">
@@ -4144,7 +4408,7 @@ export default function BlogMakerPage() {
 
                         <select
                           value={chatSection}
-                          onChange={(e) => { setChatSection(e.target.value); setChatFeedback(null); }}
+                          onChange={(e) => { chatDispatch({ type: "SET_SECTION", section: e.target.value }); chatDispatch({ type: "SET_FEEDBACK", feedback: null }); }}
                           className="w-full h-9 rounded-lg border border-border/50 bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                         >
                           <option value="">Select a section...</option>
@@ -4154,7 +4418,7 @@ export default function BlogMakerPage() {
                         </select>
                         <Textarea
                           value={chatMessage}
-                          onChange={(e) => setChatMessage(e.target.value)}
+                          onChange={(e) => chatDispatch({ type: "SET_MESSAGE", message: e.target.value })}
                           placeholder='e.g. "Update the revenue figure to $4.2B" or "Add a case study about Company X" or "Include internal links to related posts"'
                           rows={3}
                           className="resize-y rounded-lg border-border bg-background text-sm leading-snug focus:ring-2 focus:ring-orange-500/20"
@@ -4164,7 +4428,7 @@ export default function BlogMakerPage() {
                         <div className="rounded-lg border border-border/40 bg-muted/20">
                           <button
                             type="button"
-                            onClick={() => setChatLinksOpen(!chatLinksOpen)}
+                            onClick={() => chatDispatch({ type: "SET_LINKS_OPEN", open: !chatLinksOpen })}
                             className="flex w-full items-center justify-between px-3 py-2 text-[12px] font-medium text-muted-foreground hover:text-foreground transition-colors"
                           >
                             <span className="flex items-center gap-1.5">
@@ -4193,7 +4457,7 @@ export default function BlogMakerPage() {
                                       )}
                                       <button
                                         type="button"
-                                        onClick={() => setChatInternalLinks((prev) => prev.filter((_, idx) => idx !== i))}
+                                        onClick={() => chatDispatch({ type: "REMOVE_INTERNAL_LINK", index: i })}
                                         className="shrink-0 text-muted-foreground hover:text-red-500 transition-colors"
                                         aria-label="Remove link"
                                       >
@@ -4207,14 +4471,14 @@ export default function BlogMakerPage() {
                               <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
                                 <Input
                                   value={chatLinkUrl}
-                                  onChange={(e) => setChatLinkUrl(e.target.value)}
+                                  onChange={(e) => chatDispatch({ type: "SET_LINK_URL", url: e.target.value })}
                                   placeholder="https://yourblog.com/post-slug"
                                   className="w-full sm:flex-1 h-8 sm:h-7 text-[12px] sm:text-[11px] rounded-md border-border/50 bg-background px-2"
                                 />
                                 <div className="flex gap-2">
                                 <Input
                                   value={chatLinkAnchor}
-                                  onChange={(e) => setChatLinkAnchor(e.target.value)}
+                                  onChange={(e) => chatDispatch({ type: "SET_LINK_ANCHOR", anchor: e.target.value })}
                                   placeholder="Anchor text (optional)"
                                   className="flex-1 sm:w-32 sm:flex-none h-8 sm:h-7 text-[12px] sm:text-[11px] rounded-md border-border/50 bg-background px-2"
                                 />
@@ -4224,9 +4488,9 @@ export default function BlogMakerPage() {
                                   onClick={() => {
                                     const url = chatLinkUrl.trim();
                                     if (!url) return;
-                                    setChatInternalLinks((prev) => [...prev, { url, anchorText: chatLinkAnchor.trim() }]);
-                                    setChatLinkUrl("");
-                                    setChatLinkAnchor("");
+                                    chatDispatch({ type: "ADD_INTERNAL_LINK", link: { url, anchorText: chatLinkAnchor.trim() } });
+                                    chatDispatch({ type: "SET_LINK_URL", url: "" });
+                                    chatDispatch({ type: "SET_LINK_ANCHOR", anchor: "" });
                                   }}
                                   className="shrink-0 h-8 sm:h-7 px-3 sm:px-2.5 rounded-md text-[12px] sm:text-[11px] font-medium bg-orange-500/15 text-orange-600 hover:bg-orange-500/25 dark:text-orange-400 transition-colors disabled:opacity-40"
                                 >
@@ -4239,7 +4503,20 @@ export default function BlogMakerPage() {
                         </div>
 
                         {chatError && (
-                          <p className="text-xs text-red-500">{chatError}</p>
+                          <div className="flex items-start gap-2 rounded-lg bg-red-50/80 px-3 py-2 dark:bg-red-950/30">
+                            <XCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-500" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-red-700 dark:text-red-300">{chatError}</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleSectionChat}
+                              disabled={chatLoading || !chatSection || !chatMessage.trim()}
+                              className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/40 transition-colors disabled:opacity-40"
+                            >
+                              Retry
+                            </button>
+                          </div>
                         )}
 
                         {/* Success indicator */}

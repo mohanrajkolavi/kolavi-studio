@@ -52,6 +52,13 @@ import { generateAlgorithmicInsights } from "@/lib/knowledge/insight-generator";
 import { synthesizeProprietaryFramework } from "@/lib/knowledge/framework-generator";
 import { ContentRegistry, lintDraft, fixDefinitionOpening } from "@/lib/pipeline/content-registry";
 
+// P5/P6/P7 modules
+import { extractTfidfTerms, scoreTermCoverage, type TfidfResult, type TermWeight } from "@/lib/seo/tfidf";
+import { extractEntities, detectEntityGaps, scoreEntityCoverage, type ExtractedEntity, type EntityExtractionResult } from "@/lib/seo/entity-extraction";
+import { analyzeSerpIntelligence, type SerpIntelligenceResult } from "@/lib/seo/serp-intelligence";
+import { analyzeClusterFit, toBriefLinkSuggestions, type ClusterAnalysisResult } from "@/lib/seo/topical-cluster";
+import { scoreContent, type ContentOptimizationResult } from "@/lib/seo/content-optimizer";
+
 /** Thrown when topic extraction fails after store updates; catch should not re-call store.setChunkFailed/updatePhase. */
 class TopicExtractionError extends Error {
   constructor(message: string) {
@@ -862,6 +869,136 @@ export async function runBriefChunk(
     };
   }
 
+  // -----------------------------------------------------------------------
+  // P5/P6/P7 — Parallel analysis: TF-IDF, entities, SERP intelligence, cluster fit
+  // Non-blocking: failures don't stop the pipeline.
+  // -----------------------------------------------------------------------
+  let tfidfResult: TfidfResult | undefined;
+  let entityResult: EntityExtractionResult | undefined;
+  let serpIntelligence: SerpIntelligenceResult | undefined;
+  let clusterAnalysis: ClusterAnalysisResult | undefined;
+
+  try {
+    const successfulContent = competitors.filter((c) => c.fetchSuccess && c.content?.length > 0);
+    const targetWC = topicExtraction.wordCount?.recommended ?? 2500;
+
+    // Run all four analyses in parallel (all are CPU-only, no external API calls)
+    const [tfidf, entities, serpIntel, cluster] = await Promise.all([
+      // P7A: TF-IDF term extraction
+      Promise.resolve().then(() => {
+        if (successfulContent.length === 0) return undefined;
+        return extractTfidfTerms({
+          competitorTexts: successfulContent.map((c) => ({
+            content: c.content,
+            wordCount: c.wordCount,
+          })),
+          primaryKeyword: input.primaryKeyword!,
+          secondaryKeywords: input.secondaryKeywords,
+          targetWordCount: targetWC,
+          maxTerms: 80,
+        });
+      }).catch((err) => {
+        console.warn("[chunks] TF-IDF extraction failed (non-fatal):", err instanceof Error ? err.message : err);
+        return undefined;
+      }),
+
+      // P7D: Entity extraction
+      Promise.resolve().then(() => {
+        if (successfulContent.length === 0) return undefined;
+        return extractEntities(
+          successfulContent.map((c) => ({ content: c.content }))
+        );
+      }).catch((err) => {
+        console.warn("[chunks] Entity extraction failed (non-fatal):", err instanceof Error ? err.message : err);
+        return undefined;
+      }),
+
+      // P6: SERP Intelligence (3Cs analysis)
+      Promise.resolve().then(() => {
+        if (successfulContent.length === 0) return undefined;
+        const serpFeaturesData = (research as ResearchChunkOutput).serpFeatures;
+        return analyzeSerpIntelligence({
+          competitors: successfulContent.map((c, i) => ({
+            url: c.url,
+            title: c.title,
+            content: c.content,
+            wordCount: c.wordCount,
+            position: i + 1,
+          })),
+          serpFeatures: serpFeaturesData ? {
+            hasFeaturedSnippet: serpFeaturesData.hasFeaturedSnippet,
+            hasKnowledgeGraph: serpFeaturesData.hasKnowledgeGraph,
+            hasAnswerBox: serpFeaturesData.hasAnswerBox,
+          } : undefined,
+          targetWordCount: targetWC,
+        });
+      }).catch((err) => {
+        console.warn("[chunks] SERP intelligence failed (non-fatal):", err instanceof Error ? err.message : err);
+        return undefined;
+      }),
+
+      // P5: Cluster analysis (internal linking)
+      Promise.resolve().then(() => {
+        if (!input.existingBlogUrls?.length) return undefined;
+        const outlineHeadings = topicExtraction.competitorHeadings?.flatMap(h => h.h2s) ?? [];
+        return analyzeClusterFit(
+          input.primaryKeyword!,
+          input.secondaryKeywords ?? [],
+          input.existingBlogUrls.map((url) => ({ url })),
+          outlineHeadings,
+          input.clusterPosition,
+        );
+      }).catch((err) => {
+        console.warn("[chunks] Cluster analysis failed (non-fatal):", err instanceof Error ? err.message : err);
+        return undefined;
+      }),
+    ]);
+
+    tfidfResult = tfidf;
+    entityResult = entities;
+    serpIntelligence = serpIntel;
+    clusterAnalysis = cluster;
+
+    // Save P5/P6/P7 results to job store for UI access
+    await store.saveChunkOutput(jobId, "content_intelligence", {
+      tfidf: tfidfResult ? {
+        terms: tfidfResult.terms.slice(0, 40), // Top 40 for UI
+        totalTermsAnalyzed: tfidfResult.totalTermsAnalyzed,
+        documentsAnalyzed: tfidfResult.documentsAnalyzed,
+        primaryKeywordStats: tfidfResult.primaryKeywordStats,
+      } : undefined,
+      entities: entityResult ? {
+        entities: entityResult.entities.slice(0, 30),
+        stats: entityResult.stats,
+      } : undefined,
+      serpIntelligence: serpIntelligence ? {
+        patterns: serpIntelligence.patterns,
+        recommendation: serpIntelligence.recommendation,
+        informationGainOpportunities: serpIntelligence.informationGainOpportunities.slice(0, 10),
+        featuredSnippetStrategy: serpIntelligence.featuredSnippetStrategy,
+        difficulty: serpIntelligence.difficulty,
+        difficultyReason: serpIntelligence.difficultyReason,
+      } : undefined,
+      clusterAnalysis: clusterAnalysis ? {
+        recommendedPosition: clusterAnalysis.recommendedPosition,
+        positionReason: clusterAnalysis.positionReason,
+        linkSuggestions: clusterAnalysis.linkSuggestions.slice(0, 8),
+        cannibalizationWarnings: clusterAnalysis.cannibalizationWarnings,
+      } : undefined,
+    } as Record<string, unknown>);
+
+    const parts: string[] = [];
+    if (tfidfResult) parts.push(`${tfidfResult.terms.length} TF-IDF terms`);
+    if (entityResult) parts.push(`${entityResult.entities.length} entities`);
+    if (serpIntelligence) parts.push(`SERP: ${serpIntelligence.patterns.dominantType}`);
+    if (clusterAnalysis) parts.push(`cluster: ${clusterAnalysis.recommendedPosition}`);
+    if (parts.length > 0) {
+      emit("topic-extraction", "completed", `Content intelligence: ${parts.join(", ")}`, 33);
+    }
+  } catch (err) {
+    console.warn("[chunks] Content intelligence analysis failed (non-fatal):", err instanceof Error ? err.message : err);
+  }
+
   try {
 
     const wordCountOverride =
@@ -911,7 +1048,14 @@ export async function runBriefChunk(
         emit("gpt-brief", "failed", briefResult.error ?? "brief revision failed", 40);
         throw new Error(`Brief revision failed: ${briefResult.error ?? "unknown"}`);
       }
-      const brief: ResearchBrief = briefResult.data;
+      let brief: ResearchBrief = briefResult.data;
+      // Inject P5 cluster links into revised brief
+      if (clusterAnalysis?.linkSuggestions?.length) {
+        brief = { ...brief, internalLinkSuggestions: toBriefLinkSuggestions(clusterAnalysis.linkSuggestions) };
+      }
+      if (clusterAnalysis?.recommendedPosition) {
+        brief = { ...brief, clusterPosition: clusterAnalysis.recommendedPosition, clusterTopic: clusterAnalysis.cluster?.topic };
+      }
       emit("gpt-brief", "completed", `Revised brief: ${brief.outline.sections.length} sections`, 40);
 
       const durationMs = Date.now() - analysisStartMs;
@@ -941,7 +1085,16 @@ export async function runBriefChunk(
       emit("gpt-brief", "failed", briefResult.error ?? "research brief failed", 40);
       throw new Error(`Research brief failed: ${briefResult.error ?? "unknown"}`);
     }
-    const brief: ResearchBrief = briefResult.data;
+    let brief: ResearchBrief = briefResult.data;
+
+    // Inject P5 cluster link suggestions and P6 SERP intelligence into brief
+    if (clusterAnalysis?.linkSuggestions?.length) {
+      brief = { ...brief, internalLinkSuggestions: toBriefLinkSuggestions(clusterAnalysis.linkSuggestions) };
+    }
+    if (clusterAnalysis?.recommendedPosition) {
+      brief = { ...brief, clusterPosition: clusterAnalysis.recommendedPosition, clusterTopic: clusterAnalysis.cluster?.topic };
+    }
+
     emit(
       "gpt-brief",
       "completed",
@@ -1390,6 +1543,8 @@ export type ValidationChunkOutput = {
   contentDiff?: ContentDiffResult;
   semanticSimilarity?: { highestSimilarity: number; mostSimilarUrl: string; isTooDerivative: boolean };
   contentDecayRisk?: ContentDecayResult;
+  /** P7B: Surfer-style content optimization score 0-100. */
+  contentScore?: ContentOptimizationResult;
 };
 
 /** Step 5 — Validate: FAQ enforcement, SEO audit, fact check against current data, schema.
@@ -1503,6 +1658,31 @@ export async function runValidationChunk(
         console.error("[validation] Content decay assessment failed:", err instanceof Error ? err.message : err);
         return undefined;
       }),
+
+      // 4. P7B: Content Optimization Score (Surfer-style 0-100)
+      Promise.resolve().then(async () => {
+        const contentIntelligence = await store.getChunkOutput(jobId, "content_intelligence");
+        const tfidfData = contentIntelligence?.tfidf as TfidfResult | undefined;
+        const entityData = contentIntelligence?.entities as { entities: ExtractedEntity[] } | undefined;
+        const competitorsWithContent = competitors.filter(
+          (c) => typeof c.content === "string" && c.content.trim().length > 0
+        );
+        const targetWC = brief?.wordCount?.target ?? 2500;
+        const intentList = Array.isArray(job.input.intent) ? job.input.intent : [job.input.intent ?? "informational"];
+        const isInformational = intentList.includes("informational");
+
+        return scoreContent({
+          contentHtml: finalContent,
+          targetWordCount: targetWC,
+          tfidfTerms: tfidfData,
+          competitorEntities: entityData?.entities,
+          competitorDocCount: competitorsWithContent.length || 4,
+          isInformational,
+        });
+      }).catch((err) => {
+        console.error("[validation] Content scoring failed:", err instanceof Error ? err.message : err);
+        return undefined;
+      }),
     ]);
 
     // Optional hallucination auto-fix (if input specifies) — 10s timeout
@@ -1552,7 +1732,7 @@ export async function runValidationChunk(
     }
 
     // Await parallel ops (schema uses final auditResult, so compute it after fixes)
-    const [contentDiff, semanticSimilarity, contentDecayRisk] = await parallelOpsPromise;
+    const [contentDiff, semanticSimilarity, contentDecayRisk, contentScore] = await parallelOpsPromise;
 
     const schemaMarkup = await Promise.resolve(
       auditResult.schemaMarkup ?? generateSchemaMarkup(
@@ -1586,6 +1766,7 @@ export async function runValidationChunk(
       contentDiff,
       semanticSimilarity,
       contentDecayRisk,
+      contentScore: contentScore ?? undefined,
     };
     const durationMs = Date.now() - postprocessStartMs;
     const cost = buildChunkCost({}, durationMs);

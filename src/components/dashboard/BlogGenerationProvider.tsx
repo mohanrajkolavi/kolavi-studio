@@ -139,6 +139,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     brief: null,
     draft: null,
     validation: null,
+    contentIntelligence: null,
   });
   const [errorChunk, setErrorChunk] = useState<ChunkName | null>(null);
   const [generationStartedAt, setGenerationStartedAt] = useState<number | null>(null);
@@ -199,6 +200,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
           brief: null,
           draft: null,
           validation: null,
+          contentIntelligence: null,
         };
 
         if (dbChunks.researchSerp) {
@@ -300,7 +302,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     setError(null);
     setErrorChunk(null);
     setProgress(null);
-    setChunkOutputs({ research: null, researchSerp: null, brief: null, draft: null, validation: null });
+    setChunkOutputs({ research: null, researchSerp: null, brief: null, draft: null, validation: null, contentIntelligence: null });
     setJobIdState(null);
     try { localStorage.removeItem("blog-gen-result"); } catch { /* ignore */ }
 
@@ -391,7 +393,7 @@ export function BlogGenerationProvider({ children }: BlogGenerationProviderProps
     } catch {
       // ignore
     }
-    setChunkOutputs({ research: null, researchSerp: null, brief: null, draft: null, validation: null });
+    setChunkOutputs({ research: null, researchSerp: null, brief: null, draft: null, validation: null, contentIntelligence: null });
     setErrorChunk(null);
   }, []);
 
@@ -991,7 +993,7 @@ async function processBriefSSE(
       });
     }
     if (eventType === "result") {
-      const r = parsed as { outline?: OutlineSectionForEditor[]; brief?: { similaritySummary?: string; extraValueThemes?: string[]; freshnessNote?: string } };
+      const r = parsed as { outline?: OutlineSectionForEditor[]; brief?: { similaritySummary?: string; extraValueThemes?: string[]; freshnessNote?: string }; contentIntelligence?: import("@/lib/blog/generation-types").ContentIntelligenceResult };
       const outline = r.outline ?? [];
       const briefSummary = r.brief
         ? {
@@ -1003,6 +1005,7 @@ async function processBriefSSE(
       guarded.setChunkOutputs((prev) => ({
         ...prev,
         brief: { outline, briefSummary },
+        contentIntelligence: r.contentIntelligence ?? prev.contentIntelligence,
       }));
       guarded.setGenerationStartedAt?.(null);
       guarded.setProgress?.({
@@ -1188,6 +1191,7 @@ async function processValidateRequest(
     factCheck: data.factCheck ?? { verified: true, hallucinations: [], issues: [], skippedRhetorical: [] },
     schemaMarkup: data.schemaMarkup ?? { article: {}, faq: null, breadcrumb: null },
     finalContent: data.finalContent ?? "",
+    contentScore: data.contentScore ?? undefined,
   };
 
   // Build the pipeline result OUTSIDE the state updater to avoid side-effects
