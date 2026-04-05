@@ -1140,6 +1140,7 @@ async function processValidateRequest(
     factCheck?: ValidationChunkResult["factCheck"];
     schemaMarkup?: ValidationChunkResult["schemaMarkup"];
     finalContent?: string;
+    contentScore?: ValidationChunkResult["contentScore"];
     validationFailed?: boolean;
     validationError?: string;
   };
