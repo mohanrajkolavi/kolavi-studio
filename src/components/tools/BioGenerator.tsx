@@ -412,9 +412,9 @@ export function BioGenerator() {
         {/* Platform selection */}
         <div>
           <div className="flex items-center justify-between mb-2.5 sm:mb-3">
-            <label className="block text-xs sm:text-sm font-medium text-foreground">
+            <span className="block text-xs sm:text-sm font-medium text-foreground">
               Platforms <span className="text-red-500">*</span>
-            </label>
+            </span>
             <span className="text-[11px] sm:text-xs text-muted-foreground tabular-nums">
               {selectedPlatforms.length} selected
             </span>
@@ -469,9 +469,9 @@ export function BioGenerator() {
 
           {/* Audience */}
           <div>
-            <label className="block text-xs sm:text-sm font-medium text-foreground mb-1.5">
+            <span className="block text-xs sm:text-sm font-medium text-foreground mb-1.5">
               Audience
-            </label>
+            </span>
             <div className="flex flex-wrap gap-1.5">
               {AUDIENCE_OPTIONS.map((opt) => (
                 <button
