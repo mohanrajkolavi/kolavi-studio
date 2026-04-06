@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { isAuthenticated } from "@/lib/auth";
 import { jobStore } from "@/lib/pipeline/jobs";
-import { regenerateSection, type ChatInternalLink } from "@/lib/claude/client";
+import { regenerateSection, editFullArticle, type ChatInternalLink } from "@/lib/claude/client";
 import {
   auditArticle,
   verifyFactsAgainstSource,
@@ -11,9 +11,10 @@ import type { ResearchBrief, TokenUsageRecord } from "@/lib/pipeline/types";
 export const maxDuration = 120;
 
 /**
- * POST /api/blog/chat — Section-level regeneration chatbot.
+ * POST /api/blog/chat — Section or full-article regeneration chatbot.
  * After article generation, user can feed real data or instructions
- * to regenerate a specific section without rerunning the full pipeline.
+ * to regenerate a specific section or the full article without rerunning the full pipeline.
+ * Use sectionHeading="__full_article__" for full-article editing.
  */
 export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
@@ -23,7 +24,18 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  let body: { jobId?: string; sectionHeading?: string; message?: string; internalLinks?: ChatInternalLink[] };
+  let body: {
+    jobId?: string;
+    sectionHeading?: string;
+    message?: string;
+    internalLinks?: ChatInternalLink[];
+    issues?: {
+      auditIssues?: Array<{ id: string; severity: string; label: string; message: string }>;
+      contentScoreIssues?: { score: number; grade: string; missingTerms: string[]; overusedTerms: string[]; entityGaps: string[]; summary: string };
+      integrityIssues?: Array<{ type: string; description: string }>;
+      eeatIssues?: Array<{ check: string; summary: string; detail: string | null }>;
+    };
+  };
   try {
     body = await request.json();
   } catch {
@@ -81,6 +93,8 @@ export async function POST(request: NextRequest) {
 
   const tokenUsage: TokenUsageRecord[] = [];
 
+  const isFullArticle = sectionHeading === "__full_article__";
+
   try {
     // Validate and pass internal links if provided
     const internalLinks: ChatInternalLink[] = Array.isArray(body.internalLinks)
@@ -89,15 +103,33 @@ export async function POST(request: NextRequest) {
       ).map((l) => ({ url: l.url.trim(), ...(l.anchorText && { anchorText: l.anchorText.trim() }) }))
       : [];
 
-    // Regenerate the section
-    const { updatedHtml, sectionHtml } = await regenerateSection(
-      currentHtml,
-      sectionHeading,
-      message,
-      brief,
-      tokenUsage,
-      internalLinks.length > 0 ? internalLinks : undefined
-    );
+    let updatedHtml: string;
+    let sectionHtml: string | undefined;
+
+    if (isFullArticle) {
+      // Full-article editing with all panel issues as context
+      const result = await editFullArticle(
+        currentHtml,
+        message,
+        brief,
+        tokenUsage,
+        internalLinks.length > 0 ? internalLinks : undefined,
+        body.issues
+      );
+      updatedHtml = result.updatedHtml;
+    } else {
+      // Section-level editing
+      const result = await regenerateSection(
+        currentHtml,
+        sectionHeading,
+        message,
+        brief,
+        tokenUsage,
+        internalLinks.length > 0 ? internalLinks : undefined
+      );
+      updatedHtml = result.updatedHtml;
+      sectionHtml = result.sectionHtml;
+    }
 
     // Run audit on updated content
     const primaryKeyword = brief.keyword?.primary ?? "";
@@ -130,7 +162,8 @@ export async function POST(request: NextRequest) {
     return new Response(
       JSON.stringify({
         updatedContent: updatedHtml,
-        sectionContent: sectionHtml,
+        ...(sectionHtml && { sectionContent: sectionHtml }),
+        fullArticle: isFullArticle,
         auditDelta: {
           score: auditResult.score,
           publishable: auditResult.publishable,

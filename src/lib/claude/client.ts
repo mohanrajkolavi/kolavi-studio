@@ -1721,6 +1721,134 @@ Return ONLY the complete section HTML including the H2 tag. No markdown wrapping
   return { updatedHtml, sectionHtml: newSection };
 }
 
+/** Issues from all 4 quality panels, passed for full-article editing context. */
+export type FullArticleIssues = {
+  auditIssues?: Array<{ id: string; severity: string; label: string; message: string }>;
+  contentScoreIssues?: { score: number; grade: string; missingTerms: string[]; overusedTerms: string[]; entityGaps: string[]; summary: string };
+  integrityIssues?: Array<{ type: string; description: string }>;
+  eeatIssues?: Array<{ check: string; summary: string; detail: string | null }>;
+};
+
+/**
+ * Edit the full article based on user instructions (chat-based full-article edit).
+ * When issues are provided, they are included as context so the AI can fix them
+ * alongside the user's instructions.
+ */
+export async function editFullArticle(
+  fullArticleHtml: string,
+  userInstructions: string,
+  brief: ResearchBrief,
+  tokenUsage?: TokenUsageRecord[],
+  internalLinks?: ChatInternalLink[],
+  issues?: FullArticleIssues
+): Promise<{ updatedHtml: string }> {
+  const anthropic = getAnthropicClient();
+  const originalWordCount = fullArticleHtml.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length;
+
+  const factsBlock = brief.currentData.facts.length > 0
+    ? `Current data (use ONLY these for statistics):\n${brief.currentData.facts.map((f) => `- ${f.fact} (Source: ${f.source})`).join("\n")}`
+    : "No current data. Do not invent statistics.";
+
+  const internalLinksBlock = internalLinks && internalLinks.length > 0
+    ? `\n## INTERNAL LINKS TO INCLUDE
+Place these links naturally within the article. Use the provided anchor text, or create contextually appropriate anchor text if none is given.
+
+${internalLinks.map((l) => `- <a href="${l.url}">${l.anchorText || "contextual anchor text"}</a>`).join("\n")}
+
+Rules:
+- Place each link on its first natural mention of the related topic.
+- Never cluster multiple links in one paragraph.
+- Anchor text must read naturally in the sentence.
+- Maximum ${Math.min(internalLinks.length, 5)} internal links total.
+`
+    : "";
+
+  // Build issues context block from all 4 quality panels
+  const issueBlocks: string[] = [];
+  if (issues?.auditIssues?.length) {
+    const warnFail = issues.auditIssues.filter((i) => i.severity === "warn" || i.severity === "fail");
+    if (warnFail.length > 0) {
+      issueBlocks.push(`## AUDIT ISSUES (fix these)\n${warnFail.map((i) => `- [${i.severity.toUpperCase()}] ${i.label}: ${i.message}`).join("\n")}`);
+    }
+  }
+  if (issues?.contentScoreIssues) {
+    const cs = issues.contentScoreIssues;
+    const parts: string[] = [`Current score: ${cs.score}/100 (${cs.grade})`];
+    if (cs.missingTerms.length > 0) parts.push(`Missing terms (weave in naturally 1-2 times each): ${cs.missingTerms.join(", ")}`);
+    if (cs.overusedTerms.length > 0) parts.push(`Overused terms (reduce usage): ${cs.overusedTerms.join(", ")}`);
+    if (cs.entityGaps.length > 0) parts.push(`Missing entities (mention in relevant sections): ${cs.entityGaps.join(", ")}`);
+    issueBlocks.push(`## CONTENT SCORE ISSUES (fix these)\n${parts.join("\n")}`);
+  }
+  if (issues?.integrityIssues?.length) {
+    issueBlocks.push(`## CONTENT INTEGRITY ISSUES (fix these)\n${issues.integrityIssues.map((i) => `- [${i.type}] ${i.description}`).join("\n")}`);
+  }
+  if (issues?.eeatIssues?.length) {
+    issueBlocks.push(`## E-E-A-T QUALITY ISSUES (fix these)\n${issues.eeatIssues.map((i) => `- ${i.check}: ${i.summary}${i.detail ? ` - ${i.detail}` : ""}`).join("\n")}`);
+  }
+  const issuesContext = issueBlocks.length > 0
+    ? `\n${issueBlocks.join("\n\n")}\n\nFix ALL the above issues while applying the user's instructions. The user's instructions take priority if they conflict with any issue fix.`
+    : "";
+
+  const userPrompt = `Edit the full article below based on user instructions. This is a targeted edit in a post-generation chatbot - the user is refining their article.
+
+## USER INSTRUCTIONS
+${userInstructions}
+${issuesContext}
+
+## CURRENT ARTICLE
+${fullArticleHtml}
+${internalLinksBlock}
+## CONSTRAINTS
+- Preserve the article's H2 structure and section order unless the user explicitly asks to change it.
+- Word count: ${originalWordCount} words (+-15%). Do not drastically shorten or pad the article.
+- Maintain consistent terminology, tone, and editorial style throughout.
+- If the user's instructions introduce new data, integrate it naturally.
+- Editorial style: ${brief.editorialStyle.tone}, ${brief.editorialStyle.pointOfView ?? "third"} person.
+- ${factsBlock}
+- Preserve all existing citations and source links unless the user asks to remove them.
+
+## OUTPUT
+Return ONLY the complete article HTML. No markdown wrapping, no explanation.`;
+
+  const startMs = Date.now();
+  const stream = anthropic.messages.stream({
+    model: CLAUDE_OPUS_MODEL,
+    max_tokens: 32000,
+    temperature: 0.35,
+    system: SYSTEM_PROMPT,
+    messages: [{ role: "user", content: userPrompt }],
+  });
+  const message = await stream.finalMessage();
+
+  const durationMs = Date.now() - startMs;
+  const usage = getClaudeUsage(message as { usage?: { input_tokens?: number | null; output_tokens?: number } });
+  if (tokenUsage) tokenUsage.push({
+    callName: "editFullArticle",
+    model: CLAUDE_OPUS_MODEL,
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.promptTokens + usage.completionTokens,
+    durationMs,
+  });
+
+  const contentBlock = message.content?.[0];
+  if (!contentBlock || contentBlock.type !== "text") {
+    return { updatedHtml: fullArticleHtml };
+  }
+
+  let newHtml = contentBlock.text.trim();
+  if (newHtml.startsWith("```html")) newHtml = newHtml.slice(7);
+  else if (newHtml.startsWith("```")) newHtml = newHtml.slice(3);
+  if (newHtml.endsWith("```")) newHtml = newHtml.slice(0, -3);
+  newHtml = newHtml.trim();
+
+  if (!newHtml) {
+    return { updatedHtml: fullArticleHtml };
+  }
+
+  return { updatedHtml: newHtml };
+}
+
 /**
  * Organic brief revision — patches an existing approved brief based on user instructions.
  * Unlike buildResearchBrief which starts from extraction data, this takes the existing

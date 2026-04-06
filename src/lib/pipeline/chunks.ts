@@ -1751,7 +1751,7 @@ export async function runValidationChunk(
     // Only run if no Level 1 failures remain and we have time budget
     const AUTO_FIXABLE_WARN_IDS = new Set([
       "keyword-stuffing", "helpful-not-stuffed", "long-paragraphs",
-      "bucket-brigades", "helpful-unique-value", "passive-voice",
+      "bucket-brigades", "passive-voice",
     ]);
     if (hasTime() && auditResult.summary.fail === 0 && auditResult.summary.warn > 0) {
       const fixableWarnings = auditResult.items
