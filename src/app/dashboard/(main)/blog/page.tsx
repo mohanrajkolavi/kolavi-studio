@@ -806,6 +806,7 @@ export default function BlogMakerPage() {
   const [sampleResult, setSampleResult] = useState<ResultState | null>(null);
   const [editing, setEditing] = useState<GeneratedContent | null>(null);
   const [contentView, setContentView] = useState<"preview" | "outline">("preview");
+
   // Section chat state
   const [chat, chatDispatch] = useReducer(chatReducer, CHAT_INITIAL);
   const chatOpen = chat.open;
@@ -948,9 +949,37 @@ export default function BlogMakerPage() {
   useEffect(() => {
     currentHistoryIdRef.current = currentHistoryId;
   }, [currentHistoryId]);
+  // Restore editing from sessionStorage if available (survives refresh), otherwise use generated
+  const editingRestoredRef = useRef(false);
   useEffect(() => {
-    if (generated) setEditing({ ...generated });
+    if (!generated) return;
+    if (!editingRestoredRef.current) {
+      editingRestoredRef.current = true;
+      try {
+        const cached = sessionStorage.getItem("blog-editing-state");
+        if (cached) {
+          const parsed = JSON.parse(cached) as GeneratedContent;
+          if (parsed.content) {
+            setEditing(parsed);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    setEditing({ ...generated });
   }, [generated]);
+
+  // Persist editing state to sessionStorage so title/meta/slug survive refresh
+  useEffect(() => {
+    try {
+      if (editing) {
+        sessionStorage.setItem("blog-editing-state", JSON.stringify(editing));
+      } else {
+        sessionStorage.removeItem("blog-editing-state");
+        editingRestoredRef.current = false;
+      }
+    } catch { /* ignore */ }
+  }, [editing]);
 
   // Step mode: sync editable outline when brief is ready (stable deps so effect runs when outline content changes)
   const outlineKey = JSON.stringify(chunkOutputs.brief?.outline);
@@ -1608,6 +1637,91 @@ export default function BlogMakerPage() {
     chatDispatch({ type: "SET_FEEDBACK", feedback: null });
     chatDispatch({ type: "SET_SUCCESS", success: false });
     try {
+      // For full-article edits, collect all 4 panel issues as context
+      const isFullArticle = chatSection.trim() === "__full_article__";
+      let fullArticleIssues: Record<string, unknown> | undefined;
+      if (isFullArticle) {
+        // 1. Audit issues (warn + fail only)
+        const auditIssues = seoAudit?.items
+          .filter((i: AuditItem) => i.severity === "warn" || i.severity === "fail")
+          .map((i: AuditItem) => ({ id: i.id, severity: i.severity, label: i.label, message: i.message })) ?? [];
+
+        // 2. Content score issues
+        const cs = chunkOutputs.validation?.contentScore;
+        const contentScoreIssues = cs ? {
+          score: cs.score,
+          grade: cs.grade,
+          missingTerms: cs.missingTerms ?? [],
+          overusedTerms: cs.overusedTerms ?? [],
+          entityGaps: cs.entityGaps ?? [],
+          summary: cs.summary,
+        } : undefined;
+
+        // 3. Content integrity issues
+        const integrityIssues: Array<{ type: string; description: string }> = [];
+        if (pipelineResult?.faqEnforcement && !pipelineResult.faqEnforcement.passed) {
+          for (const v of pipelineResult.faqEnforcement.violations) {
+            integrityIssues.push({
+              type: "faq_violation",
+              description: `FAQ answer for "${v.question?.slice(0, 80)}" exceeds 300 chars (${v.charCount} chars). Shorten the answer.`,
+            });
+          }
+        }
+        if (pipelineResult?.factCheck && !pipelineResult.factCheck.verified) {
+          for (const h of pipelineResult.factCheck.hallucinations) {
+            integrityIssues.push({
+              type: "hallucination",
+              description: typeof h === "string" ? h : JSON.stringify(h),
+            });
+          }
+        }
+
+        // 4. E-E-A-T issues
+        const eeatIssues: Array<{ check: string; summary: string; detail: string | null }> = [];
+        if (eeatResult?.results) {
+          const r = eeatResult.results;
+          if (r.experience_signals && !isEeatError(r.experience_signals) && r.experience_signals.score < 1) {
+            eeatIssues.push({ check: "Experience signals", summary: `Score: ${r.experience_signals.score}/100`, detail: "Add first-person experience sentences." });
+          }
+          if (r.title_hyperbole && !isEeatError(r.title_hyperbole) && r.title_hyperbole.is_clickbait) {
+            eeatIssues.push({ check: "Title hyperbole", summary: "Clickbait detected", detail: r.title_hyperbole.trigger_word ? `Trigger word: "${r.title_hyperbole.trigger_word}"` : null });
+          }
+          if (r.data_density && !isEeatError(r.data_density) && r.data_density.density_score < 1) {
+            eeatIssues.push({ check: "Data density", summary: `${r.data_density.density_score} per 100 words`, detail: `Only ${r.data_density.data_point_count} data points. Add more statistics.` });
+          }
+          if (r.skimmability && !isEeatError(r.skimmability) && r.skimmability.pass_fail !== "pass") {
+            const sections = r.skimmability.problematic_sections?.map((s) => `${s.section_label}: ${s.issue}`).join("; ");
+            eeatIssues.push({ check: "Skimmability", summary: "Issues found", detail: sections || "Break up long sections." });
+          }
+          if (r.temporal_consistency && !isEeatError(r.temporal_consistency) && r.temporal_consistency.consistency_score !== "pass") {
+            eeatIssues.push({ check: "Temporal consistency", summary: "Stale references", detail: r.temporal_consistency.stale_year_references?.join(", ") || "Update outdated year references." });
+          }
+          if (r.answer_first_structure && !isEeatError(r.answer_first_structure) && r.answer_first_structure.total_questions > 0 && r.answer_first_structure.direct_answer_ratio < 50) {
+            eeatIssues.push({ check: "Answer-first structure", summary: `${r.answer_first_structure.direct_answer_ratio}% direct answers`, detail: `${r.answer_first_structure.buried_answers?.length ?? 0} buried answer(s). Lead with direct answers.` });
+          }
+          if (r.readability_variance && !isEeatError(r.readability_variance) && r.readability_variance.variance_score !== "pass") {
+            eeatIssues.push({ check: "Readability variance", summary: r.readability_variance.monotony_detected ? "Monotony detected" : "Issues", detail: "Vary sentence length for better flow." });
+          }
+          if (r.lazy_phrasing && !isEeatError(r.lazy_phrasing) && r.lazy_phrasing.score >= 1) {
+            const parts: string[] = [];
+            if (r.lazy_phrasing.found_transitions?.length) parts.push(`Transitions: ${[...new Set(r.lazy_phrasing.found_transitions)].join(", ")}`);
+            if (r.lazy_phrasing.found_hype?.length) parts.push(`Hype: ${[...new Set(r.lazy_phrasing.found_hype)].join(", ")}`);
+            if (r.lazy_phrasing.found_tells?.length) parts.push(`Generic: ${[...new Set(r.lazy_phrasing.found_tells)].join(", ")}`);
+            eeatIssues.push({ check: "Generic phrasing", summary: `${r.lazy_phrasing.score}% filler`, detail: parts.join(" | ") || "Remove generic transitions and filler." });
+          }
+          if (r.sentence_starts && !isEeatError(r.sentence_starts) && r.sentence_starts.is_repetitive) {
+            eeatIssues.push({ check: "Sentence variety", summary: "Repetitive starts", detail: r.sentence_starts.repeating_word ? `Repeating: "${r.sentence_starts.repeating_word}". Vary sentence openings.` : "Vary sentence openings." });
+          }
+        }
+
+        fullArticleIssues = {
+          auditIssues: auditIssues.length > 0 ? auditIssues : undefined,
+          contentScoreIssues: contentScoreIssues,
+          integrityIssues: integrityIssues.length > 0 ? integrityIssues : undefined,
+          eeatIssues: eeatIssues.length > 0 ? eeatIssues : undefined,
+        };
+      }
+
       const res = await fetch("/api/blog/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1621,11 +1735,12 @@ export default function BlogMakerPage() {
               ...(l.anchorText && { anchorText: l.anchorText }),
             })),
           }),
+          ...(fullArticleIssues && { issues: fullArticleIssues }),
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        chatDispatch({ type: "SET_ERROR", error: data.error ?? "Section regeneration failed" });
+        chatDispatch({ type: "SET_ERROR", error: data.error ?? "Regeneration failed" });
         return;
       }
       // Update the editing content with the regenerated article
@@ -4338,7 +4453,7 @@ export default function BlogMakerPage() {
                     {contentView === "preview" && (
                       <div className="rounded-xl border border-border bg-background">
                         <div
-                          className="prose prose-sm dark:prose-invert max-w-none px-5 py-4 text-foreground"
+                          className="prose prose-sm dark:prose-invert max-w-none px-5 py-4 text-foreground font-sans"
                           dangerouslySetInnerHTML={{ __html: editing.content || "<p>(No content)</p>" }}
                         />
                       </div>
@@ -4386,7 +4501,7 @@ export default function BlogMakerPage() {
                     </button>
                     {chatOpen && (
                       <div className="px-4 pb-4 space-y-3">
-                        <p className="text-xs text-muted-foreground">Select a section and describe your changes. The AI will regenerate only that section.</p>
+                        <p className="text-xs text-muted-foreground">Select a section or the full article and describe your changes.</p>
 
                         {/* Chat history log */}
                         {chatHistory.length > 0 && (
@@ -4412,6 +4527,7 @@ export default function BlogMakerPage() {
                           className="w-full h-9 rounded-lg border border-border/50 bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30"
                         >
                           <option value="">Select a section...</option>
+                          <option value="__full_article__">Full article</option>
                           {editing.outline.map((heading, i) => (
                             <option key={i} value={heading}>{heading}</option>
                           ))}
@@ -4521,7 +4637,7 @@ export default function BlogMakerPage() {
 
                         {/* Success indicator */}
                         {chatSuccess && (
-                          <p className="text-xs text-emerald-500 font-medium">Section updated ✓</p>
+                          <p className="text-xs text-emerald-500 font-medium">{chatSection === "__full_article__" ? "Article updated" : "Section updated"} ✓</p>
                         )}
 
                         {/* Audit + fact-check feedback */}
@@ -4563,12 +4679,12 @@ export default function BlogMakerPage() {
                             {chatLoading ? (
                               <>
                                 <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                                Regenerating...
+                                {chatSection === "__full_article__" ? "Editing article..." : "Regenerating..."}
                               </>
                             ) : (
                               <>
                                 <Send className="mr-1.5 h-3.5 w-3.5" />
-                                Regenerate section
+                                {chatSection === "__full_article__" ? "Edit full article" : "Regenerate section"}
                               </>
                             )}
                           </Button>

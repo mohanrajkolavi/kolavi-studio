@@ -2011,23 +2011,6 @@ function auditFeaturedSnippet(html: string, focusKeyword?: string): AuditItem[] 
     guideline: "Google Featured Snippets typically extract 40-60 word definitions from the first section.",
   });
 
-  // Check for a structured list (5-8 items) suitable for list snippet
-  const listItems = html.match(/<li[^>]*>/gi) ?? [];
-  const hasStructuredList = listItems.length >= 5 && listItems.length <= 15;
-  items.push({
-    id: "serp-list-snippet",
-    severity: hasStructuredList ? "pass" : wordCount < 800 ? "pass" : "warn",
-    label: "List snippet potential",
-    message: hasStructuredList
-      ? `${listItems.length} list items found — structured for Google list snippets`
-      : "No structured list with 5+ items found. Consider adding a numbered/bulleted list for list snippet eligibility.",
-    level: 3,
-    source: "google",
-    value: listItems.length,
-    threshold: "5-15 items",
-    guideline: "Google list snippets extract ordered/unordered lists with 5-8 items from well-structured content.",
-  });
-
   return items;
 }
 
@@ -2260,50 +2243,7 @@ function auditHelpfulContent(
     guideline: "Google: content should leave readers feeling they've learned enough without needing to search again.",
   });
 
-  // 6. Substantial unique value — check for unique frameworks, proprietary terminology, or original analysis markers
-  //    Each pattern group is capped at 3 matches to prevent one repeated pattern from inflating the count.
-  const uniqueValuePatternGroups: { patterns: RegExp[]; cap: number }[] = [
-    // Frameworks & methodologies
-    { patterns: [/\b(?:framework|model|methodology|approach|system|formula|strategy|playbook)\b/gi], cap: 3 },
-    // Original data / research
-    { patterns: [/\b(?:our data shows|our analysis|our research|our testing|we found that|our results|we measured|we tracked|we analyzed)\b/gi], cap: 3 },
-    // Actionable guides
-    { patterns: [/\b(?:step[- ]by[- ]step|how[- ]to|walkthrough|tutorial|checklist|action plan|roadmap)\b/gi], cap: 3 },
-    // Comparisons & benchmarks
-    { patterns: [/\b(?:compared to|versus|outperforms?|benchmark|scored \d+ out of|head[- ]to[- ]head|side[- ]by[- ]side)\b/gi], cap: 3 },
-    // Cost / ROI / timeline specifics
-    { patterns: [/\b(?:costs? approximately|takes? about|ROI of|saves? roughly|budget[- ]|pricing|pay[- ]back|break[- ]even)\b/gi], cap: 3 },
-    // Tool evaluations & hands-on testing
-    { patterns: [/\b(?:we tested|after testing|in our testing|hands[- ]on with|we evaluated|we ran|we configured|we deployed)\b/gi], cap: 3 },
-    // Firsthand experience signals
-    { patterns: [/\b(?:I've seen|we found|in my experience|what actually happens|in practice|the reality is|from experience)\b/gi], cap: 3 },
-    // Scoring & rating
-    { patterns: [/\b(?:we rate|scored|on a scale|graded|ranking|rated \d)\b/gi], cap: 2 },
-  ];
-  let uniqueMarkers = 0;
-  for (const group of uniqueValuePatternGroups) {
-    let groupCount = 0;
-    for (const p of group.patterns) {
-      const m = plainText.match(p);
-      if (m) groupCount += m.length;
-    }
-    uniqueMarkers += Math.min(groupCount, group.cap);
-  }
-  items.push({
-    id: "helpful-unique-value",
-    severity: uniqueMarkers >= 4 ? "pass" : uniqueMarkers >= 2 ? "warn" : "fail",
-    label: "Unique value / original analysis",
-    message: uniqueMarkers >= 4
-      ? `${uniqueMarkers} original analysis markers found (frameworks, proprietary data, step-by-step guides)`
-      : `Only ${uniqueMarkers} unique value markers. Add original frameworks, proprietary data, or actionable guides.`,
-    level: 2,
-    source: "google",
-    value: uniqueMarkers,
-    threshold: "≥4",
-    guideline: "Google: does the content provide substantial additional value compared to other pages in search results?",
-  });
-
-  // 7. Not keyword-stuffed — helpful content quality signal (readability focus, warn at 3%).
+  // 6. Not keyword-stuffed — helpful content quality signal (readability focus, warn at 3%).
   //    Separate from the spam-policy "keyword-stuffing" check which fails/warns at 5%/2.5%.
   //    Uses exact phrase matching to avoid inflating density by counting partial word matches.
   const keyword = input.focusKeyword?.toLowerCase() ?? "";
@@ -2347,22 +2287,7 @@ function auditHelpfulContent(
     guideline: "Google Quality Raters evaluate 'clear sourcing and citation practices' as a trust signal.",
   });
 
-  // 9. Author attribution present (Level 3 — author byline is typically set at CMS publish time, not during content generation)
-  items.push({
-    id: "helpful-author",
-    severity: input.authorName ? "pass" : "warn",
-    label: "Author attribution",
-    message: input.authorName
-      ? `Author "${input.authorName}" attributed — enables E-E-A-T Person schema`
-      : "No author name set. Author byline is typically added at CMS publish time. Adding author attribution strengthens E-E-A-T trust signals.",
-    level: 3,
-    source: "google",
-    value: input.authorName ? 1 : 0,
-    threshold: "present",
-    guideline: "Google E-E-A-T: content should have clear author attribution with relevant expertise. Set in CMS when publishing.",
-  });
-
-  // 10. Direct answer in first 100 words (inverted pyramid)
+  // 9. Direct answer in first 100 words (inverted pyramid)
   const first100Words = plainText.split(/\s+/).filter(Boolean).slice(0, 100).join(" ");
   const keywordLower = keyword.toLowerCase();
   const first100Lower = first100Words.toLowerCase();
@@ -2402,22 +2327,6 @@ function auditHelpfulContent(
     value: formatScore,
     threshold: "3 content types",
     guideline: "Google: content should be well-organized and easy to read — 79% of web users scan (NNGroup).",
-  });
-
-  // 12. Bookmark test — is the article long enough and substantial enough that a reader might bookmark it?
-  const bookmarkWorthy = wordCount >= 1200 && headingCoverage >= 6 && experienceSignals >= 3;
-  items.push({
-    id: "helpful-bookmark-test",
-    severity: bookmarkWorthy ? "pass" : "warn",
-    label: "Bookmark-worthy (would you save this?)",
-    message: bookmarkWorthy
-      ? "Content passes the bookmark test — substantial, well-structured, and experience-backed"
-      : "Content may not pass the bookmark test. Would a reader save this for future reference? Increase depth, experience signals, or structure.",
-    level: 3,
-    source: "google",
-    value: bookmarkWorthy ? 1 : 0,
-    threshold: "≥1200 words, ≥6 sections, ≥3 experience signals",
-    guideline: "Google self-assessment: would you bookmark this or recommend it to a friend?",
   });
 
   return items;
