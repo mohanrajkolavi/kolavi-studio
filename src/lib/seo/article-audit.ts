@@ -697,7 +697,9 @@ function auditKeywordStuffing(plainText: string, focusKeyword: string | undefine
   const phraseMatches = plainText.match(phraseRegex) || [];
   const phraseCount = phraseMatches.length;
 
-  // Heuristic: >2.5% of content as exact keyword phrase = stuffing risk
+  // Spam policy check: >2.5% exact keyword phrase density = stuffing risk (can block publication).
+  // Note: a separate "helpful-not-stuffed" check in auditHelpfulContent uses the same exact-phrase
+  // approach but with a higher threshold (3%) focused on natural readability, not spam policy.
   const phraseRatio = (phraseCount * kwWords.length) / total;
   const stuffingRatio = 0.025;
 
@@ -1772,34 +1774,55 @@ function auditWritingQuality(html: string): AuditItem[] {
     });
   }
 
-  // 4. Bucket brigade presence
-  const bucketBrigades = [
+  // 4. Engagement hook presence (bucket brigades, curiosity hooks, contrast hooks, question hooks)
+  const engagementPhrases = [
+    // Curiosity hooks
     "here's the thing", "but here's what", "here's where", "the real question",
+    "here's the catch", "here's why", "what most people miss", "here's what happened",
+    // Transition hooks
     "so what does this mean", "but it gets", "the bottom line", "think about it",
-    "now here's the catch", "picture this", "want to know",
+    "want to know", "let me explain", "stay with me", "bear with me",
+    // Contrast hooks
+    "sounds great in theory", "not so fast", "but wait", "plot twist",
+    "the counterintuitive part", "what nobody tells you", "the reality is",
+    // Urgency / emphasis
+    "now here's the catch", "picture this", "imagine this", "consider this",
+    "the short version", "real talk", "honest take", "spoiler",
   ];
-  let bucketCount = 0;
+  let hookCount = 0;
   const lowerText = plainText.toLowerCase();
-  for (const bb of bucketBrigades) {
-    const regex = new RegExp(bb.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  for (const phrase of engagementPhrases) {
+    const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
     const matches = lowerText.match(regex);
-    if (matches) bucketCount += matches.length;
+    if (matches) hookCount += matches.length;
   }
+
+  // Count rhetorical questions (sentences ending with ?) as half-weight engagement signals
+  const questionSentences = plainText.split(/(?<=[?])\s+/).filter((s) => s.trim().endsWith("?")).length;
+  hookCount += Math.round(questionSentences * 0.5);
+
+  // Count one-sentence paragraphs as half-weight engagement signals (rhythm breakers)
+  const shortParas = paragraphs.filter((p) => {
+    const sentCount = p.split(/[.!?]+/).filter((s) => s.trim().length > 5).length;
+    return sentCount <= 1 && p.split(/\s+/).length <= 20;
+  });
+  hookCount += Math.round(shortParas.length * 0.3);
+
   const wordCount = plainText.split(/\s+/).filter(Boolean).length;
-  const bbPer1000 = wordCount > 0 ? (bucketCount / wordCount) * 1000 : 0;
+  const hooksPer1000 = wordCount > 0 ? (hookCount / wordCount) * 1000 : 0;
 
   items.push({
     id: "bucket-brigades",
-    severity: bbPer1000 >= 3 ? "pass" : bbPer1000 >= 1.5 ? "warn" : "fail",
+    severity: hooksPer1000 >= 3 ? "pass" : hooksPer1000 >= 1.5 ? "warn" : "fail",
     label: "Engagement hooks",
-    message: bbPer1000 >= 2
-      ? `${bucketCount} engagement hooks found (${bbPer1000.toFixed(1)} per 1000 words)`
-      : `Only ${bucketCount} engagement hooks. Target 3-5 per 1000 words to maintain reader attention.`,
+    message: hooksPer1000 >= 2
+      ? `${hookCount} engagement hooks found (${hooksPer1000.toFixed(1)} per 1000 words)`
+      : `Only ${hookCount} engagement hooks. Target 3-5 per 1000 words to maintain reader attention.`,
     level: 3,
     source: "editorial",
-    value: bucketCount,
+    value: hookCount,
     threshold: "3-5 per 1000 words",
-    guideline: "Bucket brigades and curiosity hooks reduce bounce rate by 15-30% (NNGroup research).",
+    guideline: "Bucket brigades, curiosity hooks, and rhythm-breaking short paragraphs reduce bounce rate by 15-30% (NNGroup research).",
   });
 
   return items;
@@ -2238,15 +2261,33 @@ function auditHelpfulContent(
   });
 
   // 6. Substantial unique value — check for unique frameworks, proprietary terminology, or original analysis markers
-  const uniqueValuePatterns = [
-    /\b(?:framework|model|methodology|approach|system|formula|strategy|playbook)\b/gi,
-    /\b(?:our data shows|our analysis|our research|our testing|we found that|our results)/gi,
-    /\b(?:step[- ]by[- ]step|how[- ]to|walkthrough|tutorial|checklist)\b/gi,
+  //    Each pattern group is capped at 3 matches to prevent one repeated pattern from inflating the count.
+  const uniqueValuePatternGroups: { patterns: RegExp[]; cap: number }[] = [
+    // Frameworks & methodologies
+    { patterns: [/\b(?:framework|model|methodology|approach|system|formula|strategy|playbook)\b/gi], cap: 3 },
+    // Original data / research
+    { patterns: [/\b(?:our data shows|our analysis|our research|our testing|we found that|our results|we measured|we tracked|we analyzed)\b/gi], cap: 3 },
+    // Actionable guides
+    { patterns: [/\b(?:step[- ]by[- ]step|how[- ]to|walkthrough|tutorial|checklist|action plan|roadmap)\b/gi], cap: 3 },
+    // Comparisons & benchmarks
+    { patterns: [/\b(?:compared to|versus|outperforms?|benchmark|scored \d+ out of|head[- ]to[- ]head|side[- ]by[- ]side)\b/gi], cap: 3 },
+    // Cost / ROI / timeline specifics
+    { patterns: [/\b(?:costs? approximately|takes? about|ROI of|saves? roughly|budget[- ]|pricing|pay[- ]back|break[- ]even)\b/gi], cap: 3 },
+    // Tool evaluations & hands-on testing
+    { patterns: [/\b(?:we tested|after testing|in our testing|hands[- ]on with|we evaluated|we ran|we configured|we deployed)\b/gi], cap: 3 },
+    // Firsthand experience signals
+    { patterns: [/\b(?:I've seen|we found|in my experience|what actually happens|in practice|the reality is|from experience)\b/gi], cap: 3 },
+    // Scoring & rating
+    { patterns: [/\b(?:we rate|scored|on a scale|graded|ranking|rated \d)\b/gi], cap: 2 },
   ];
   let uniqueMarkers = 0;
-  for (const p of uniqueValuePatterns) {
-    const m = plainText.match(p);
-    if (m) uniqueMarkers += m.length;
+  for (const group of uniqueValuePatternGroups) {
+    let groupCount = 0;
+    for (const p of group.patterns) {
+      const m = plainText.match(p);
+      if (m) groupCount += m.length;
+    }
+    uniqueMarkers += Math.min(groupCount, group.cap);
   }
   items.push({
     id: "helpful-unique-value",
@@ -2262,11 +2303,19 @@ function auditHelpfulContent(
     guideline: "Google: does the content provide substantial additional value compared to other pages in search results?",
   });
 
-  // 7. Not keyword-stuffed (already checked elsewhere, but include in helpful content panel)
+  // 7. Not keyword-stuffed — helpful content quality signal (readability focus, warn at 3%).
+  //    Separate from the spam-policy "keyword-stuffing" check which fails/warns at 5%/2.5%.
+  //    Uses exact phrase matching to avoid inflating density by counting partial word matches.
   const keyword = input.focusKeyword?.toLowerCase() ?? "";
   const words = plainText.toLowerCase().split(/\s+/).filter(Boolean);
-  const kwCount = keyword ? words.filter((w) => w.includes(keyword.split(/\s+/)[0])).length : 0;
-  const kwDensity = words.length > 0 ? (kwCount / words.length) * 100 : 0;
+  let kwDensity = 0;
+  if (keyword) {
+    const kwPhraseRegex = new RegExp(keyword.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    const kwPhraseMatches = plainText.toLowerCase().match(kwPhraseRegex) || [];
+    const kwPhraseCount = kwPhraseMatches.length;
+    const kwWordsInPhrase = keyword.split(/\s+/).length;
+    kwDensity = words.length > 0 ? ((kwPhraseCount * kwWordsInPhrase) / words.length) * 100 : 0;
+  }
   items.push({
     id: "helpful-not-stuffed",
     severity: kwDensity <= 3 ? "pass" : kwDensity <= 4 ? "warn" : "fail",
@@ -2298,19 +2347,19 @@ function auditHelpfulContent(
     guideline: "Google Quality Raters evaluate 'clear sourcing and citation practices' as a trust signal.",
   });
 
-  // 9. Author attribution present
+  // 9. Author attribution present (Level 3 — author byline is typically set at CMS publish time, not during content generation)
   items.push({
     id: "helpful-author",
     severity: input.authorName ? "pass" : "warn",
     label: "Author attribution",
     message: input.authorName
       ? `Author "${input.authorName}" attributed — enables E-E-A-T Person schema`
-      : "No author name set. Adding author attribution strengthens E-E-A-T trust signals.",
-    level: 2,
+      : "No author name set. Author byline is typically added at CMS publish time. Adding author attribution strengthens E-E-A-T trust signals.",
+    level: 3,
     source: "google",
     value: input.authorName ? 1 : 0,
     threshold: "present",
-    guideline: "Google E-E-A-T: content should have clear author attribution with relevant expertise.",
+    guideline: "Google E-E-A-T: content should have clear author attribution with relevant expertise. Set in CMS when publishing.",
   });
 
   // 10. Direct answer in first 100 words (inverted pyramid)

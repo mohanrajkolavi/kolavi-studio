@@ -269,11 +269,14 @@ export function extractTfidfTerms(input: TfidfInput): TfidfResult {
     });
   }
 
+  // Filter noisy terms (URL fragments, CMS artifacts, SERP scraping noise)
+  const filtered = termScores.filter((tw) => !isNoisyTerm(tw.term));
+
   // Sort by TF-IDF score, take top N
-  termScores.sort((a, b) => b.tfidf - a.tfidf);
+  filtered.sort((a, b) => b.tfidf - a.tfidf);
 
   // Deduplicate: if a bigram/trigram subsumes a unigram, keep the longer one
-  const deduped = deduplicateTerms(termScores);
+  const deduped = deduplicateTerms(filtered);
   const topTerms = deduped.slice(0, maxTerms);
 
   // Primary keyword stats
@@ -286,6 +289,60 @@ export function extractTfidfTerms(input: TfidfInput): TfidfResult {
     documentsAnalyzed: docCount,
     primaryKeywordStats: pkStats,
   };
+}
+
+/**
+ * Filter out noisy terms that are URL fragments, CMS artifacts, image paths,
+ * navigation elements, or SERP scraping noise — not real content terms.
+ */
+function isNoisyTerm(term: string): boolean {
+  const t = term.toLowerCase().trim();
+
+  // Single character or pure number
+  if (t.length <= 1 || /^\d+$/.test(t)) return true;
+
+  // URL / protocol fragments
+  const urlNoise = new Set([
+    "https", "http", "www", "com", "org", "net", "html", "htm", "php", "asp", "aspx", "jsp",
+    "url", "href", "mailto", "ftp",
+  ]);
+  if (urlNoise.has(t)) return true;
+
+  // WordPress / CMS artifacts
+  const cmsNoise = new Set([
+    "uploads", "wp content", "wp includes", "wp admin", "plugins", "themes",
+    "wp json", "wp login", "widget", "shortcode", "elementor", "gutenberg",
+  ]);
+  if (cmsNoise.has(t)) return true;
+
+  // Image / file extension artifacts
+  const fileNoise = new Set([
+    "png", "jpg", "jpeg", "gif", "svg", "webp", "avif", "ico", "bmp", "tiff",
+    "pdf", "css", "js", "json", "xml", "csv", "zip", "woff", "woff2", "ttf", "eot",
+  ]);
+  if (fileNoise.has(t)) return true;
+
+  // Navigation / UI chrome scraped from competitor pages
+  const uiNoise = new Set([
+    "menu", "sidebar", "footer", "header", "navbar", "breadcrumb",
+    "skip to content", "skip to main", "toggle navigation", "close menu",
+    "search for", "search results", "no results", "load more", "read more",
+    "leave a comment", "post comment", "comments", "reply", "share this",
+    "table of contents", "previous post", "next post", "related posts",
+  ]);
+  if (uiNoise.has(t)) return true;
+
+  // SERP / Google UI artifacts
+  const serpNoise = new Set([
+    "cached", "similar", "people also ask", "related searches",
+    "image google", "image google serp", "google serp", "serp features",
+  ]);
+  if (serpNoise.has(t)) return true;
+
+  // Image path patterns (e.g., "image uploads", "content uploads")
+  if (/\b(?:uploads?|wp[- ]content|images?\/)\b/.test(t) && t.split(" ").length <= 2) return true;
+
+  return false;
 }
 
 /** Remove shorter terms that are fully contained in higher-scoring longer terms. */

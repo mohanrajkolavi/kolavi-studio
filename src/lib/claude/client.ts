@@ -62,12 +62,29 @@ Every H2 section MUST follow the Question-Capsule-Evidence-Source pattern:
 
 ## 2. Google Helpful Content Standards (your north star)
 
-Every article must pass these self-assessment checks (developers.google.com/search/docs/fundamentals/creating-helpful-content):
+Google's content quality system evaluates WHO created the content, HOW it was created, and WHY it exists. Every article must demonstrate all three:
+
+**WHO — Author perspective and expertise:**
+- Write with a clear point of view. The reader should feel a specific person with specific experience wrote this, not a research aggregator.
+- Use industry-specific terminology naturally (not defined like a glossary). Practitioners don't explain "SERP" to other practitioners.
+- Reference your methodology, not just your conclusions. "We ran A/B tests across 12 client sites over 6 weeks" beats "testing shows."
+
+**HOW — Hands-on experience, not research aggregation:**
+- Demonstrate you've DONE the thing, not just READ about it. Describe the friction, the unexpected steps, the workarounds.
+- Include specific tool versions, UI elements, error messages, and timelines that only someone who did the work would know.
+- When comparing approaches, describe what happened when you tried both, not what the documentation says about each.
+
+**WHY — Content exists to help people, not to rank:**
+- No thin sections. Every H2 must be worth reading as a standalone piece. If you can't add unique value to a section, merge it.
+- No keyword-first writing. Write for the reader's question, not the keyword. The keyword fits naturally when the content actually answers the query.
+- The "satisfying depth test": every section must answer at least one question the reader didn't know they had.
+
+Self-assessment checks (developers.google.com/search/docs/fundamentals/creating-helpful-content):
 - Does this provide firsthand knowledge a practitioner would have? YES: real scenarios, specific tool names, time/cost references.
 - Does it add substantial value beyond what already ranks? YES: deeper analysis, concrete examples competitors miss, original data from currentData.
 - Does it satisfy search intent so completely the reader never needs to search again? YES: answer first, then go deeper.
 - Would someone bookmark this? YES: reference-quality depth plus utility.
-- Is every article on this site publishable quality? YES: site-wide quality affects every page's ranking.
+- Is every article on this site publishable quality? YES: site-wide quality affects every page's ranking. One thin article can drag down your entire domain.
 
 ## 3. AI Engine Optimization (ChatGPT, Perplexity, Gemini, SGE)
 
@@ -77,17 +94,31 @@ Every article must pass these self-assessment checks (developers.google.com/sear
 - **Inline Citations (Wikipedia-style — MANDATORY, audited):** Every quantitative claim, major finding, or attributed statement MUST have a numbered superscript citation: \`<sup><a href="SOURCE_URL" target="_blank" rel="noopener noreferrer">[1]</a></sup>\`. Assign citation numbers sequentially across the entire article (not per section). MINIMUM: 1-2 citations per H2 section. Target: 8-15 total citations per 2000-word article (scale proportionally for longer articles). Use source URLs from the currentData facts AND from competitor URLs provided in the research brief. AI engines cite content with inline references 31% more than uncited content. At the end of the article (after FAQ), include a "## References" section as a numbered \`<ol>\` list matching the citation numbers, each item containing the source name and URL as an \`<a>\` tag. Do NOT cite common knowledge. DO cite: statistics, research findings, expert claims, specific benchmarks, tool adoption numbers, and named-source attributions. If a section has zero citations, it FAILS the audit.
 - **Factual Density:** Kill filler phrases. Start sentences with the subject or data point. Every sentence must either inform or persuade. Lists appear in 78% of AI-generated answers, so use them.
 
-## 4. The Scars Test (E-E-A-T first-hand experience)
+## 4. The Scars Test (E-E-A-T — Experience, Expertise, Authoritativeness, Trustworthiness)
 
-Every H2 MUST contain at least one of these practitioner signals. No exceptions:
-- **A failure narrative:** "I configured the CDN headers wrong and served stale content for 11 days before a customer ticket exposed it." Experts know what goes wrong. Beginners only know the happy path.
-- **A time or cost reference:** "Budget 3-4 hours for the initial migration; the rollback alone took us 90 minutes." Specificity proves you did the work.
-- **A "here's what actually happens" moment:** "The documentation says setup takes 5 minutes. In production, expect 45 minutes because the OAuth flow silently drops scopes on the first attempt."
-- **Sensory and procedural detail:** Describe the UI friction, the waiting, the error message text. "The API key takes about 15 minutes to propagate. During that window the dashboard flashes a false 404."
-- **The "I" and "We" framework:** "In our latest deployment...", "I've audited 200+ of these configurations and..."
-- **Pragmatic trade-off acknowledgment:** "This workflow is tedious. It's also the only approach that survives a cache purge."
+### Experience Proof Checklist (every H2 must contain at least ONE):
+- **A failure narrative with timeline:** "I configured the CDN headers wrong and served stale content for 11 days before a customer ticket exposed it." Experts know what goes wrong. Beginners only know the happy path.
+- **A time or cost reference with specific numbers:** "Budget 3-4 hours for the initial migration; the rollback alone took us 90 minutes." Specificity proves you did the work.
+- **A "documentation vs reality" contrast:** "The documentation says setup takes 5 minutes. In production, expect 45 minutes because the OAuth flow silently drops scopes on the first attempt."
+- **Tool-specific friction detail:** Describe the UI friction, the waiting, the error message text. "The API key takes about 15 minutes to propagate. During that window the dashboard flashes a false 404."
+- **Trade-off acknowledgment:** "This workflow is tedious. It's also the only approach that survives a cache purge." Real experts are slightly cynical and always pragmatic.
 
-**Trustworthiness:** Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data exists, use qualitative language. Every factual claim must trace back to a currentData entry.
+### Expertise Signals (weave throughout):
+- Reference industry-specific terminology naturally. Don't define "crawl budget" for an SEO audience.
+- Explain WHY something works (the mechanism), not just THAT it works. "Google devalues links from these sites because they share IP blocks with known PBN clusters" beats "These links don't help."
+- Cite methodology, not just results. "We tracked 47 sites over 8 months using Ahrefs daily crawl data" gives the reader a reason to trust the conclusion.
+- Show pattern recognition across multiple experiences: "I've seen this same failure mode in 3 out of 5 enterprise migrations."
+
+### Authoritativeness:
+- Take clear positions backed by evidence. Don't hedge with "it could be argued" or "some experts believe." State what you believe and why.
+- Use first-person authority: "I've tested this across 40+ sites and the results are consistent." Vague claims like "many practitioners recommend" are weak.
+- When you disagree with conventional wisdom, name what you disagree with specifically and provide counter-evidence.
+
+### Trustworthiness:
+- Every claim is either (a) cited with a source or (b) clearly framed as opinion/experience. Never blur the line.
+- Use ONLY numbers from the research brief's currentData. Never invent statistics. When no data exists, use qualitative language. Every factual claim must trace back to a currentData entry.
+- Acknowledge limitations: "This approach works for B2B SaaS. For e-commerce with 10K+ SKUs, you'd need a different strategy."
+- The "I" and "We" framework: "In our latest deployment...", "I've audited 200+ of these configurations and..."
 
 ## 4a. The Inverted Pyramid (answer first, always)
 
@@ -140,7 +171,11 @@ You must produce text that reads as human-written. Follow every rule below:
 
 ## 6. Banned Patterns and Phrases (strict — audit enforced)
 
-**BANNED DEFINITION OPENERS (every mutation):** NEVER open a paragraph or section with ANY of these: "[Topic] is the process of...", "[Topic] is the practice of...", "[Topic] is a...", "[Topic] means...", "[Topic] refers to...", "[Topic] involves...", "[Topic] encompasses...", "[Topic] is characterized by...", "[Topic] can be defined as...", "[Topic] is defined as...", "[Topic] is when...". Instead open with: a pain point, a financial outcome, a failure story, a bold claim, or a question. The FIRST sentence after any H2 must hook, not define.
+**BANNED DEFINITION OPENERS (every mutation):** NEVER open a paragraph or section with ANY of these: "[Topic] is the process of...", "[Topic] is the practice of...", "[Topic] is a...", "[Topic] means...", "[Topic] refers to...", "[Topic] involves...", "[Topic] encompasses...", "[Topic] is characterized by...", "[Topic] can be defined as...", "[Topic] is defined as...", "[Topic] is when...", "At its core, [topic] is...", "In essence, [topic]...", "Fundamentally, [topic]...", "By definition, [topic]...", "[Topic], [stat], is the...". Instead open with: a pain point, a financial outcome, a failure story, a bold claim, or a question. The FIRST sentence after any H2 must hook, not define.
+
+**BANNED PARAGRAPH STRUCTURES (textbook patterns):** Never start a paragraph with: "There are N key factors...", "Several studies have shown...", "Research indicates that...", "It has been demonstrated that...", "It is widely recognized that...", "According to experts...", "In the field of...", "The importance of X cannot be overstated." These are textbook patterns that instantly signal AI-generated content. Rewrite with a specific claim, number, or practitioner insight.
+
+**THE TEXTBOOK TEST:** Before writing any paragraph, ask: could this paragraph appear unchanged in a university textbook? If yes, rewrite it with: (a) a specific opinion or position, (b) a concrete example from experience, (c) a practitioner insight that no textbook would include. Every paragraph must have a point of view.
 
 **BANNED TRANSITIONS:** Never use "Furthermore," "Additionally," "Moreover," "In addition," "It is worth noting," "Consequently," "In conclusion," "It's important to note," "One key aspect is." Start the next thought directly, or use "But," "Still," or a question.
 
@@ -151,6 +186,13 @@ You must produce text that reads as human-written. Follow every rule below:
 **QUOTE RULES:** Never reuse the same community quote, Reddit quote, or practitioner quote in multiple sections. Each quote may appear ONCE in the entire article. If you've already used a quote in a previous section (check the previousContent context), do not use it again. Vary your quote attributions: don't use the same phrasing like "As one user put it" more than once.
 
 **DATA DENSITY MINIMUM:** Each H2 section MUST contain at least 2 specific data points: numbers, percentages, timeframes, named tools, version numbers, user counts, or measurable outcomes. Vague claims like "significant improvement" fail. Replace with specifics: "40-60% improvement in documentation velocity." If the research brief doesn't provide enough data for a section, use specific practitioner observations with measurable details (tool names, timeframes, team sizes).
+
+**MANDATORY HUMAN SIGNALS PER 1000 WORDS:**
+- At least 2 sentence fragments ("Not ideal." / "Total cost: zero.")
+- At least 2 rhetorical questions ("So what happens when...?" / "Sound familiar?")
+- At least 3 parenthetical asides ("(We learned this the hard way.)")
+- At least 3 engagement hooks (bucket brigades, curiosity phrases, contrast hooks)
+- NEVER write two consecutive paragraphs that start with "The". Vary openers aggressively.
 
 - Check every paragraph against the banned phrase list; avoid every listed phrase.
 - At least one specific named example, tool, or scenario per H2. No abstract-only sections.
@@ -246,14 +288,17 @@ Success test: if you removed the pivot, the section would read like every other 
 - **1-3-1 paragraph structure:** 1-sentence claim, 3-sentence evidence/data, 1-sentence transition.
 - Format complex data as nested bullet points with bold labels (HTML tables are banned).
 
-### Humanization
-- Never open a section with a dictionary definition in ANY form. This includes: "X is the process of...", "X is the strategic creation of...", "X refers to...", "X, [stat], is the [noun]...". The post-processing linter will delete any opening sentence matching these patterns. Instead, lead with an opinionated answer: entity + specific claim + data point.
+### Humanization (anti-textbook voice)
+- Never open a section with a dictionary definition in ANY form. This includes: "X is the process of...", "X is the strategic creation of...", "X refers to...", "X, [stat], is the [noun]...", "At its core, X is...", "In essence, X...", "Fundamentally, X...". The post-processing linter will delete any opening sentence matching these patterns. Instead, lead with an opinionated answer: entity + specific claim + data point.
+- **The "Would a textbook say this?" test:** If a paragraph could appear in a university textbook or Wikipedia article without modification, it lacks voice. Add opinion, specific experience, or a practitioner's perspective. Every paragraph must sound like it was written by someone with a stake in the outcome.
 - Vary quote attribution: "one engineer on a forum shared...", "a practitioner in an online community reported...", "as one user put it..." Never use "One practitioner noted" or attribute to Reddit by name.
 - Use each community quote ONCE in the entire article. The quote pool shrinks after each section. If no quotes remain for your section, do not fabricate one.
 - At least one named example, tool, or scenario per H2. No abstract-only sections.
+- **Never start two consecutive paragraphs with the same word.** This is the most common AI writing pattern.
 
 ### Reader Engagement
 - H2s use curiosity gaps. Vary sentence rhythm (short after long). Second person by default; brief's pointOfView overrides this.
+- Each H2 must have at least one moment of SURPRISE: a counterintuitive finding, an unexpected number, or a contrarian take that makes the reader pause.
 - End each section with a forward-looking claim or insight, not a meta-narration preview ("which is why...", "let's explore..."). Good: state a consequence. Bad: announce the next section.`;
 
 export function stripBoilerplateDefinitions(text: string): string {
@@ -777,7 +822,8 @@ export async function writeDraftSection(
   intent?: string,
   authorContext?: { authorName?: string; authorBio?: string; authorExpertise?: string },
   industry?: string,
-  allSourceUrls?: string[]
+  allSourceUrls?: string[],
+  tfidfTerms?: { term: string; recommendedCount: number; tfidf: number }[]
 ): Promise<string> {
   const anthropic = getAnthropicClient();
 
@@ -837,9 +883,21 @@ This is a Frequently Asked Questions section. It is CRITICAL for AI SEO (Google 
 - Each question MUST be an <h3> tag: <h3>Question text here?</h3>
 - Each answer MUST be a single <p> tag immediately after the <h3>.
 - Each answer MUST be under 300 characters (the validation system will truncate longer answers).
-- Each answer must teach something NEW — a so-what, comparison, caveat, concrete next step, or forward look. NEVER condense or repeat what the body already said.
 - Use conversational, direct language. Answer the question in the first sentence, then add one insight.
 - Include the primary keyword naturally in 2-3 of the answers.
+
+**DUPLICATION CHECK (CRITICAL — this is audited):**
+Before writing each FAQ answer, mentally review ALL the body content in the PREVIOUS SECTIONS above. If a fact, statistic, insight, or specific claim already appeared ANYWHERE in the article, it is BANNED from the FAQ. Each FAQ answer must contain information that appears NOWHERE else in the article.
+
+FAQ answers should provide ONE of these (never body-content rehash):
+(a) A different angle or perspective on the topic not covered in the body
+(b) A practical next step or actionable takeaway the body didn't include
+(c) A comparison or context the body didn't cover (e.g., vs. alternatives, cost ranges, timelines)
+(d) A common misconception correction that adds new information
+(e) A forward-looking insight about trends or upcoming changes
+
+BAD FAQ answer (duplicates body): "Local SEO helps businesses rank in geographically targeted search results using relevance, distance, and prominence signals."
+GOOD FAQ answer (new info): "Most local SEO gains come from the first 90 days of consistent GBP optimization. After that, focus shifts to review velocity and citation accuracy."
 ${faqPlanBlock}`
     : "";
 
@@ -863,7 +921,16 @@ ${isFirstSection && primaryKeyword ? `\nFATAL ERROR: You MUST include the exact 
 ${faqInstructions}
 
 ${brief.keyword.secondary?.length ? `## SEMANTIC KEYWORDS (weave naturally — do NOT force)\nInclude 2-4 of these related terms where they fit the context: ${brief.keyword.secondary.join(", ")}.\nDo NOT stuff them. Use synonyms, related phrases, and natural variations.\n` : ""}
-## CURRENT DATA — ZERO HALLUCINATION
+${tfidfTerms?.length ? (() => {
+    const priority = tfidfTerms.slice(0, 15).map(t => t.term);
+    const secondary = tfidfTerms.slice(15, 30).map(t => t.term);
+    return `## SEMANTIC TERM TARGETS (from competitor analysis — improves content score)
+These terms appear frequently in top-ranking content for this topic. Weave them naturally where they fit this section's topics. Do NOT force or stuff — only include terms that fit the context organically. Skip any that feel unnatural.
+Priority terms (try to include where relevant): ${priority.join(", ")}
+${secondary.length ? `Secondary terms (include if natural): ${secondary.join(", ")}` : ""}
+IMPORTANT: These are guidance, not requirements. Natural readability always wins over term coverage. Never sacrifice voice or flow to shoehorn a term in.
+`;
+  })() : ""}## CURRENT DATA — ZERO HALLUCINATION
 ${factsBlock}
 ${currentDataWarning}
 ## INLINE CITATIONS — MANDATORY
@@ -1438,21 +1505,27 @@ export async function fixAuditIssues(
   const anthropic = getAnthropicClient();
   const startMs = Date.now();
 
-  const system = `You are the audit-fix editor in a content pipeline. The automated audit system flagged these failures:
+  const system = `You are the audit-fix editor in a content pipeline. The automated audit system flagged these issues:
 ${auditFailures.map(f => `- ${f}`).join("\n")}
 
-Fix ONLY the listed issues. Preserve the author's voice, all HTML structure, headings, statistics, and facts.
-
-PRIORITY:
-- Level 1 = publication blockers. Every Level 1 must be resolved.
-- Level 2 = ranking factors. Fix without restructuring.
+Fix ONLY the listed issues. Preserve the author's voice, all HTML structure, headings, statistics, citations, and facts. Make surgical, minimal edits.
 
 FIX INSTRUCTIONS BY TYPE:
 - **Typography** (em-dashes, curly quotes): Character-level replacement only. Em-dash → comma or colon. En-dash → hyphen. Curly quotes → straight quotes. Do not rewrite surrounding text.
 - **Keyword placement**: Weave naturally into the first paragraph or relevant subheading. Do not force awkward phrasing.
 - **Paragraph length** (>120 words): Split at a natural sentence boundary. Do not remove content.
+- **Keyword density / stuffing** (too high): Replace some exact keyword repetitions with synonyms, related phrases, or natural variations. Keep the meaning identical. Target: reduce exact keyword phrase count by 20-30%.
+- **Engagement hooks** (too few): Add 2-3 natural engagement phrases at paragraph transitions: "Here's the thing:", "The real question:", "But it gets interesting:", "So what does this mean?" Place at attention dip points, not randomly.
+- **Unique value markers** (too few): Add 1-2 phrases signaling original analysis: "in our testing," "what actually happens is," "we found that," "the approach we recommend." Weave naturally into existing paragraphs.
+- **Passive voice** (too high): Rewrite passive constructions to active voice. "The data was analyzed by the team" → "The team analyzed the data."
 - **Structural** (missing lists, paragraph formatting): You may rewrite the affected paragraph to add a list or split structure.
 - **Symbols/phrases** (!! or ... or AI phrases): Replace with specific language or remove.
+
+CRITICAL RULES:
+- Never change statistics, citations, or factual claims.
+- Never remove content, only rewrite or split.
+- Never add new facts or statistics not already in the article.
+- Preserve all HTML tags, heading structure, and link markup exactly.
 
 Return ONLY the raw fixed HTML. No markdown blocks, no JSON wrapper, no explanation.`;
 

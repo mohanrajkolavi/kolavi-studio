@@ -1274,6 +1274,21 @@ export async function runDraftChunk(
     emit("claude-draft", "started", "Writing article draft section by section...", 0);
 
     // -----------------------------------------------------------------------
+    // Load TF-IDF terms from content intelligence (computed in runBriefChunk)
+    // so the draft writer can naturally incorporate competitor-common terms.
+    // -----------------------------------------------------------------------
+    let tfidfTermsForDraft: TermWeight[] | undefined;
+    try {
+      const contentIntelligence = await store.getChunkOutput(jobId, "content_intelligence");
+      const tfidfData = contentIntelligence?.tfidf as { terms?: TermWeight[] } | undefined;
+      if (tfidfData?.terms?.length) {
+        tfidfTermsForDraft = tfidfData.terms.slice(0, 30); // Top 30 terms
+      }
+    } catch {
+      // Non-fatal — draft proceeds without TF-IDF guidance
+    }
+
+    // -----------------------------------------------------------------------
     // STAT REGISTRY: Prevent data repetition across sections.
     // Each stat is allocated to at most 1-2 sections, then physically removed
     // from the payload so Claude cannot repeat it.
@@ -1328,7 +1343,7 @@ export async function runDraftChunk(
           fieldNotes, toneExamples, redditQuotes, i === 0, primaryKeyword,
           voice, customVoiceDescription, primaryIntent,
           { authorName, authorBio, authorExpertise },
-          industry, allSourceUrls
+          industry, allSourceUrls, tfidfTermsForDraft
         ),
         { ...RETRY_CLAUDE_DRAFT, timeoutMs: budget.cap(RETRY_CLAUDE_DRAFT.timeoutMs) },
         "claude-draft-section"
@@ -1696,9 +1711,10 @@ export async function runValidationChunk(
       }
     }
 
-    // Auto-fix audit failures — single attempt only, skip if out of time
+    // Auto-fix audit failures — Level 1 first, then high-impact Level 2 warnings
     let autoFixAttempts = 0;
 
+    // Pass 1: Fix Level 1 failures (publication blockers)
     if (hasTime() && auditResult.summary.fail > 0) {
       const fixableFailures = auditResult.items
         .filter((item) => item.severity === "fail" && item.level !== 3)
@@ -1713,6 +1729,44 @@ export async function runValidationChunk(
         } catch (err) {
           if (process.env.NODE_ENV !== "test") {
             console.warn("[pipeline] fixAuditIssues failed during validation; continuing with existing content", err);
+          }
+        }
+
+        if (finalContent !== contentBefore) {
+          auditResult = auditArticle({
+            title: draft.title ?? primaryKeyword,
+            metaDescription: draft.metaDescription ?? "",
+            content: finalContent,
+            slug: draft.suggestedSlug,
+            focusKeyword: primaryKeyword,
+            extraValueThemes: brief?.extraValueThemes?.length ? brief.extraValueThemes : undefined,
+            authorName,
+            authorUrl,
+          }, allSourceUrls);
+        }
+      }
+    }
+
+    // Pass 2: Fix high-impact Level 2 warnings (keyword density, long paragraphs, engagement hooks)
+    // Only run if no Level 1 failures remain and we have time budget
+    const AUTO_FIXABLE_WARN_IDS = new Set([
+      "keyword-stuffing", "helpful-not-stuffed", "long-paragraphs",
+      "bucket-brigades", "helpful-unique-value", "passive-voice",
+    ]);
+    if (hasTime() && auditResult.summary.fail === 0 && auditResult.summary.warn > 0) {
+      const fixableWarnings = auditResult.items
+        .filter((item) => item.severity === "warn" && AUTO_FIXABLE_WARN_IDS.has(item.id))
+        .map((item) => `[${item.label}] ${item.message}`);
+
+      if (fixableWarnings.length > 0) {
+        autoFixAttempts += 1;
+        const contentBefore = finalContent;
+
+        try {
+          finalContent = await fixAuditIssues(finalContent, fixableWarnings, tokenUsage);
+        } catch (err) {
+          if (process.env.NODE_ENV !== "test") {
+            console.warn("[pipeline] fixAuditIssues (Level 2 warnings) failed; continuing", err);
           }
         }
 
