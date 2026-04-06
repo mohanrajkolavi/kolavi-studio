@@ -8,6 +8,7 @@ import {
   Users,
   ArrowRight,
   Sparkles,
+  UserPen,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -69,6 +70,16 @@ const tools = [
     description:
       "Compare your site to up to 3 competitors. PageSpeed, treatment pages, and digital presence gaps—so you know where you stand.",
     cta: "Compare Competitors",
+    featured: false,
+  },
+  {
+    id: "bio-generator",
+    href: "/tools/bio-generator",
+    icon: UserPen,
+    title: "AI Bio Generator",
+    description:
+      "Generate platform-optimized bios for LinkedIn, Twitter/X, Instagram, TikTok, and more — all at once from a single input. Free, no signup.",
+    cta: "Generate Your Bio",
     featured: false,
   },
 ];
