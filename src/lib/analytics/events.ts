@@ -28,4 +28,5 @@ export const EVENTS = {
   CONSULTATION_BOOK: "consultation_book",
   CONTACT_FORM_SUBMIT: "contact_form_submit",
   PRICING_TIER_CLICK: "pricing_tier_click",
+  BIO_GENERATOR_SUBMIT: "bio_generator_submit",
 } as const;
