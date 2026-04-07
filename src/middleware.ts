@@ -110,7 +110,7 @@ export async function middleware(request: NextRequest) {
       maxAge: PARTNER_COOKIE_MAX_AGE,
       sameSite: "lax",
       secure,
-      httpOnly: false, // client reads it for form submission
+      httpOnly: false, // client reads it for form submission and sessionStorage fallback; contains only referral code, not credentials
     });
   }
 

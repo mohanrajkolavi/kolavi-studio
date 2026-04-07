@@ -37,6 +37,39 @@ export async function POST(
       );
     }
 
+    // Warn if payout exceeds pending commission (soft validation)
+    let warning: string | undefined;
+    try {
+      const partnerResult = await sql`
+        SELECT commission_one_time_pct, commission_recurring_pct FROM partners WHERE id = ${partnerId} LIMIT 1
+      `;
+      const p = partnerResult[0];
+      if (p) {
+        const oneTimePct = (p.commission_one_time_pct != null ? Number(p.commission_one_time_pct) : 10) / 100;
+        const recurringPct = (p.commission_recurring_pct != null ? Number(p.commission_recurring_pct) : 5) / 100;
+        const leadsResult = await sql`
+          SELECT one_time_amount, recurring_amount, paid_at FROM leads WHERE partner_id = ${partnerId}
+        `;
+        const totalEarned = leadsResult.reduce((sum, l) => {
+          if (!l.paid_at) return sum;
+          const ot = l.one_time_amount != null ? Number(l.one_time_amount) : 0;
+          const rc = l.recurring_amount != null ? Number(l.recurring_amount) : 0;
+          return sum + ot * oneTimePct + rc * recurringPct;
+        }, 0);
+        const paidOutResult = await sql`
+          SELECT COALESCE(SUM(amount), 0) as total FROM partner_payouts
+          WHERE partner_id = ${partnerId} AND status = 'paid'
+        `;
+        const totalPaidOut = Number(paidOutResult[0]?.total ?? 0);
+        const pendingCommission = Math.round(Math.max(0, totalEarned - totalPaidOut) * 100) / 100;
+        if (amountNum > pendingCommission) {
+          warning = `Payout amount ($${amountNum}) exceeds pending commission ($${pendingCommission})`;
+        }
+      }
+    } catch {
+      // Non-critical - proceed without warning
+    }
+
     const notesVal = notes && typeof notes === "string" ? notes.trim() || null : null;
 
     const result = await sql`
@@ -50,6 +83,16 @@ export async function POST(
       return NextResponse.json({ error: "Failed to create payout" }, { status: 500 });
     }
 
+    // Audit log for payout creation
+    try {
+      await sql`
+        INSERT INTO admin_action_logs (action, target_type, target_id, details)
+        VALUES ('create_payout', 'partner', ${partnerId}, ${JSON.stringify({ payoutId: row.id, amount: amountNum })})
+      `;
+    } catch {
+      // admin_action_logs table may not exist - non-critical
+    }
+
     return NextResponse.json({
       id: row.id,
       amount: Number(row.amount),
@@ -57,6 +100,7 @@ export async function POST(
       paidAt: row.paid_at ? toIso(row.paid_at) : null,
       notes: row.notes,
       createdAt: toIso(row.created_at),
+      ...(warning ? { warning } : {}),
     });
   } catch (error) {
     console.error("Error creating payout:", error);

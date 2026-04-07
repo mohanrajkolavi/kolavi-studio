@@ -79,8 +79,8 @@ export async function GET(request: NextRequest) {
         email: p.email,
         status: p.status,
         supabaseUserId: "supabase_user_id" in p ? p.supabase_user_id : null,
-        commissionOneTimePct: p.commission_one_time_pct != null ? Number(p.commission_one_time_pct) : 15,
-        commissionRecurringPct: p.commission_recurring_pct != null ? Number(p.commission_recurring_pct) : 10,
+        commissionOneTimePct: p.commission_one_time_pct != null ? Number(p.commission_one_time_pct) : 10,
+        commissionRecurringPct: p.commission_recurring_pct != null ? Number(p.commission_recurring_pct) : 5,
         notes: p.notes,
         createdAt: toIso(p.created_at),
         updatedAt: toIso(p.updated_at),
@@ -138,6 +138,28 @@ export async function POST(request: NextRequest) {
         { error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` },
         { status: 400 }
       );
+    }
+
+    // Validate commission percentages if provided
+    const commissionOneTimePct = body.commissionOneTimePct;
+    const commissionRecurringPct = body.commissionRecurringPct;
+    if (commissionOneTimePct !== undefined && commissionOneTimePct !== null) {
+      const pct = Number(commissionOneTimePct);
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        return NextResponse.json(
+          { error: "One-time commission must be between 0 and 100" },
+          { status: 400 }
+        );
+      }
+    }
+    if (commissionRecurringPct !== undefined && commissionRecurringPct !== null) {
+      const pct = Number(commissionRecurringPct);
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        return NextResponse.json(
+          { error: "Recurring commission must be between 0 and 100" },
+          { status: 400 }
+        );
+      }
     }
 
     const phoneVal =

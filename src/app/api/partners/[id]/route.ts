@@ -68,8 +68,8 @@ export async function GET(
       name: p.name,
       email: p.email,
       status: p.status,
-      commissionOneTimePct: p.commission_one_time_pct != null ? Number(p.commission_one_time_pct) : 15,
-      commissionRecurringPct: p.commission_recurring_pct != null ? Number(p.commission_recurring_pct) : 10,
+      commissionOneTimePct: p.commission_one_time_pct != null ? Number(p.commission_one_time_pct) : 10,
+      commissionRecurringPct: p.commission_recurring_pct != null ? Number(p.commission_recurring_pct) : 5,
       notes: p.notes,
       createdAt: toIso(p.created_at),
       updatedAt: toIso(p.updated_at),
@@ -189,21 +189,67 @@ export async function PATCH(
       return NextResponse.json({ error: "Cannot update deleted partner" }, { status: 400 });
     }
     const body = await request.json();
-    const { status, notes } = body;
+    const { status, notes, commissionOneTimePct, commissionRecurringPct } = body;
 
-    if (status === undefined && notes === undefined) {
+    if (status === undefined && notes === undefined && commissionOneTimePct === undefined && commissionRecurringPct === undefined) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+    }
+
+    // Validate commission percentages
+    if (commissionOneTimePct !== undefined && commissionOneTimePct !== null) {
+      const pct = Number(commissionOneTimePct);
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        return NextResponse.json(
+          { error: "One-time commission must be between 0 and 100" },
+          { status: 400 }
+        );
+      }
+    }
+    if (commissionRecurringPct !== undefined && commissionRecurringPct !== null) {
+      const pct = Number(commissionRecurringPct);
+      if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+        return NextResponse.json(
+          { error: "Recurring commission must be between 0 and 100" },
+          { status: 400 }
+        );
+      }
     }
 
     const valid = ["pending", "active", "paused", "suspended"];
     const statusVal = status !== undefined && valid.includes(status) ? status : undefined;
     const notesVal = notes !== undefined ? (notes === null || notes === "" ? null : notes) : undefined;
+
+    // Build update fields
+    const updates: string[] = [];
+    if (statusVal !== undefined) updates.push("status");
+    if (notesVal !== undefined) updates.push("notes");
+    if (commissionOneTimePct !== undefined) updates.push("commission_one_time_pct");
+    if (commissionRecurringPct !== undefined) updates.push("commission_recurring_pct");
+
     if (statusVal !== undefined && notesVal !== undefined) {
       await sql`UPDATE partners SET status = ${statusVal}, notes = ${notesVal}, updated_at = NOW() WHERE id = ${id}`;
     } else if (statusVal !== undefined) {
       await sql`UPDATE partners SET status = ${statusVal}, updated_at = NOW() WHERE id = ${id}`;
     } else if (notesVal !== undefined) {
       await sql`UPDATE partners SET notes = ${notesVal}, updated_at = NOW() WHERE id = ${id}`;
+    }
+
+    // Update commission rates if provided
+    if (commissionOneTimePct !== undefined) {
+      await sql`UPDATE partners SET commission_one_time_pct = ${Number(commissionOneTimePct)}, updated_at = NOW() WHERE id = ${id}`;
+    }
+    if (commissionRecurringPct !== undefined) {
+      await sql`UPDATE partners SET commission_recurring_pct = ${Number(commissionRecurringPct)}, updated_at = NOW() WHERE id = ${id}`;
+    }
+
+    // Audit log for partner updates
+    try {
+      await sql`
+        INSERT INTO admin_action_logs (action, target_type, target_id, details)
+        VALUES ('update', 'partner', ${id}, ${JSON.stringify({ fields: updates, status: statusVal, commissionOneTimePct, commissionRecurringPct })})
+      `;
+    } catch {
+      // admin_action_logs table may not exist - non-critical
     }
 
     const result = await sql`

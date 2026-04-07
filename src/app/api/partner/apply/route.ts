@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { checkRateLimit } from "@/lib/rate-limit/generic";
+
+const APPLY_RATE_LIMIT = { maxRequests: 3, windowSec: 60 };
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,13 +13,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Rate limit: 3 applications per 60 seconds per IP
+    try {
+      const rl = await checkRateLimit(request, "partner_apply_rate_limit", APPLY_RATE_LIMIT);
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { error: "Too many requests. Please try again later." },
+          {
+            status: 429,
+            headers: rl.retryAfterSec ? { "Retry-After": String(rl.retryAfterSec) } : undefined,
+          }
+        );
+      }
+    } catch {
+      // Rate limit table may not exist yet - allow request through
+    }
+
     let body: Record<string, unknown>;
     try {
       body = await request.json();
     } catch {
       return NextResponse.json({ error: "Malformed JSON" }, { status: 400 });
     }
-    const { name, email, phone, audience, promotionMethod, message } = body;
+
+    // Accept both old field names (audience/promotionMethod) and new ones (role/source)
+    const name = body.name;
+    const email = body.email;
+    const phone = body.phone;
+    const audience = body.audience ?? body.role;
+    const promotionMethod = body.promotionMethod ?? body.source;
+    const message = body.message;
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -26,51 +52,74 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
 
-    if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
-      return NextResponse.json({ error: "Phone is required" }, { status: 400 });
-    }
-
     if (!audience || typeof audience !== "string" || audience.trim().length === 0) {
-      return NextResponse.json({ error: "Audience is required" }, { status: 400 });
+      return NextResponse.json({ error: "Role is required" }, { status: 400 });
     }
 
     if (!promotionMethod || typeof promotionMethod !== "string" || promotionMethod.trim().length === 0) {
-      return NextResponse.json({ error: "Promotion method is required" }, { status: 400 });
+      return NextResponse.json({ error: "Source is required" }, { status: 400 });
     }
 
-    if (name.length > 255 || email.length > 255 || phone.length > 50) {
-      return NextResponse.json({ error: "Name, email, or phone is too long" }, { status: 400 });
+    if (name.length > 255 || email.length > 255) {
+      return NextResponse.json({ error: "Name or email is too long" }, { status: 400 });
+    }
+    if (typeof phone === "string" && phone.length > 50) {
+      return NextResponse.json({ error: "Phone is too long" }, { status: 400 });
     }
     if (audience.length > 255) {
-      return NextResponse.json({ error: "Audience is too long" }, { status: 400 });
+      return NextResponse.json({ error: "Role is too long" }, { status: 400 });
     }
     if (promotionMethod.length > 255) {
-      return NextResponse.json({ error: "Promotion method is too long" }, { status: 400 });
+      return NextResponse.json({ error: "Source is too long" }, { status: 400 });
     }
 
-    // Check if partners table exists and insert application
-    // We store in a partner_applications table or similar - for now we can use a simple approach.
-    // The plan had partners table - applications could be stored as partners with status='pending'
-    // Or we create a partner_applications table. Let me check the schema.
-    // The migration has partners table with status='pending'. So we can insert new partners as pending applications.
-    // But we need a unique code - we generate one from email or random. For applications, we might want a separate table
-    // so we don't pollute partners with unapproved applications. Let me create partner_applications.
+    // Check for duplicate application with same email
+    const emailLower = email.trim().toLowerCase();
+    try {
+      const existing = await sql`
+        SELECT id FROM partner_applications
+        WHERE LOWER(email) = ${emailLower}
+          AND (status IS NULL OR status = 'pending')
+        LIMIT 1
+      `;
+      if (existing.length > 0) {
+        return NextResponse.json(
+          { error: "An application with this email is already pending review." },
+          { status: 409 }
+        );
+      }
+    } catch {
+      // status column or table may not exist - continue
+    }
 
-    // Actually the migration doesn't have partner_applications. Let me add it to the migration and create the table.
-    // For now, I'll use a simple approach: store in partner_applications if it exists, else we need to add it.
-    // Let me add partner_applications to the migration and create the API to use it.
+    // Also check if already a partner
+    try {
+      const existingPartner = await sql`
+        SELECT id FROM partners
+        WHERE LOWER(email) = ${emailLower}
+          AND deleted_at IS NULL
+        LIMIT 1
+      `;
+      if (existingPartner.length > 0) {
+        return NextResponse.json(
+          { error: "An account with this email already exists. Please log in instead." },
+          { status: 409 }
+        );
+      }
+    } catch {
+      // partners table may not exist - continue
+    }
 
-    // Simpler: use partners table with status='pending'. Generate a temporary code (we'll assign real code on approval).
-    // Problem: partners.code is UNIQUE and NOT NULL. We'd need to generate something. Let me add partner_applications table.
+    const phoneVal = phone && typeof phone === "string" && phone.trim().length > 0
+      ? phone.trim().slice(0, 50)
+      : null;
 
-    // I'll add the table in a separate migration step. For now, let me try inserting into partner_applications.
-    // If the table doesn't exist, the API will fail. I'll create the table in the migration file.
     await sql`
       INSERT INTO partner_applications (name, email, phone, audience, promotion_method, message)
       VALUES (
         ${name.trim()},
-        ${email.trim().toLowerCase()},
-        ${phone.trim().slice(0, 50)},
+        ${emailLower},
+        ${phoneVal},
         ${audience.trim()},
         ${promotionMethod.trim()},
         ${typeof message === "string" ? message.trim().slice(0, 2000) : ""}

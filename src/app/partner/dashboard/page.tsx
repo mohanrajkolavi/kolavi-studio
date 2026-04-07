@@ -106,7 +106,7 @@ const faqItems = [
   {
     question: "What is the commission structure?",
     getAnswer: (p?: { commissionOneTimePct?: number; commissionRecurringPct?: number }) =>
-      `${p?.commissionOneTimePct ?? 15}% on one-time fees and ${p?.commissionRecurringPct ?? 10}% on monthly recurring revenue from referred clients. Commission is paid only when the lead converts to a paying client.`,
+      `${p?.commissionOneTimePct ?? 10}% on one-time fees and ${p?.commissionRecurringPct ?? 5}% on monthly recurring revenue from referred clients. Commission is paid only when the lead converts to a paying client.`,
   },
   {
     question: "How long is the attribution window?",
@@ -436,11 +436,18 @@ export default function PartnerDashboardPage() {
                       </>
                     )}
                   </Button>
-                  {copyError && (
-                    <p className="text-xs text-destructive" role="alert">
-                      {copyError}
-                    </p>
-                  )}
+                  <div aria-live="polite" className="min-h-[1.25rem]">
+                    {copied && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                        Link copied to clipboard
+                      </p>
+                    )}
+                    {copyError && (
+                      <p className="text-xs text-destructive" role="alert">
+                        {copyError}
+                      </p>
+                    )}
+                  </div>
                 </div>
             </div>
           </CardContent>
@@ -529,26 +536,34 @@ export default function PartnerDashboardPage() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="divide-y divide-border/60">
-                    {referredLeads.map((lead) => (
-                      <div
-                        key={lead.id}
-                        className="flex items-center justify-between gap-6 px-6 py-4 transition-colors hover:bg-muted/20"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {lead.name}
-                          </p>
-                          <p className="mt-0.5 text-xs capitalize text-muted-foreground">
-                            {lead.status.replace(/_/g, " ")} · {formatDate(lead.createdAt)}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-sm font-semibold tabular-nums">
-                          {formatCurrency(lead.commission)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                  <table className="w-full">
+                    <thead className="sr-only">
+                      <tr>
+                        <th scope="col">Lead</th>
+                        <th scope="col">Commission</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {referredLeads.map((lead) => (
+                        <tr
+                          key={lead.id}
+                          className="transition-colors hover:bg-muted/20"
+                        >
+                          <td className="min-w-0 px-6 py-4">
+                            <p className="truncate text-sm font-medium">
+                              {lead.name}
+                            </p>
+                            <p className="mt-0.5 text-xs capitalize text-muted-foreground">
+                              {lead.status.replace(/_/g, " ")} · {formatDate(lead.createdAt)}
+                            </p>
+                          </td>
+                          <td className="shrink-0 px-6 py-4 text-right text-sm font-semibold tabular-nums">
+                            {formatCurrency(lead.commission)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </CardContent>
@@ -594,35 +609,45 @@ export default function PartnerDashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="divide-y divide-border/60">
-                    {payouts.map((p) => (
-                      <div
-                        key={p.id}
-                        className="flex items-center justify-between gap-6 px-6 py-4 transition-colors hover:bg-muted/20"
-                      >
-                        <div>
-                          <p className="text-sm font-semibold tabular-nums">
-                            {formatCurrency(p.amount)}
-                          </p>
-                          <p className="mt-0.5 text-xs text-muted-foreground">
-                            {p.paidAt
-                              ? formatDate(p.paidAt)
-                              : formatDate(p.createdAt)}
-                          </p>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className={cn(
-                            "capitalize rounded-md",
-                            p.status === "paid" &&
-                              "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
-                          )}
+                  <table className="w-full">
+                    <thead className="sr-only">
+                      <tr>
+                        <th scope="col">Payout</th>
+                        <th scope="col">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {payouts.map((p) => (
+                        <tr
+                          key={p.id}
+                          className="transition-colors hover:bg-muted/20"
                         >
-                          {p.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
+                          <td className="px-6 py-4">
+                            <p className="text-sm font-semibold tabular-nums">
+                              {formatCurrency(p.amount)}
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {p.paidAt
+                                ? formatDate(p.paidAt)
+                                : formatDate(p.createdAt)}
+                            </p>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <Badge
+                              variant="secondary"
+                              className={cn(
+                                "capitalize rounded-md",
+                                p.status === "paid" &&
+                                  "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400"
+                              )}
+                            >
+                              {p.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </CardContent>

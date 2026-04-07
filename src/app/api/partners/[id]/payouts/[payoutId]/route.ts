@@ -43,6 +43,16 @@ export async function PATCH(
       return NextResponse.json({ error: "Payout not found" }, { status: 404 });
     }
 
+    // Audit log for payout status change
+    try {
+      await sql`
+        INSERT INTO admin_action_logs (action, target_type, target_id, details)
+        VALUES ('mark_payout_paid', 'partner', ${partnerId}, ${JSON.stringify({ payoutId, amount: Number(row.amount) })})
+      `;
+    } catch {
+      // admin_action_logs table may not exist - non-critical
+    }
+
     return NextResponse.json({
       id: row.id,
       amount: Number(row.amount),
@@ -74,6 +84,13 @@ export async function DELETE(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    // Get payout details before deleting for audit
+    const payoutInfo = await sql`
+      SELECT amount, status FROM partner_payouts
+      WHERE id = ${payoutId} AND partner_id = ${partnerId}
+      LIMIT 1
+    `;
+
     const result = await sql`
       DELETE FROM partner_payouts
       WHERE id = ${payoutId} AND partner_id = ${partnerId}
@@ -82,6 +99,17 @@ export async function DELETE(
 
     if (result.length === 0) {
       return NextResponse.json({ error: "Payout not found" }, { status: 404 });
+    }
+
+    // Audit log for payout deletion
+    try {
+      const info = payoutInfo[0];
+      await sql`
+        INSERT INTO admin_action_logs (action, target_type, target_id, details)
+        VALUES ('delete_payout', 'partner', ${partnerId}, ${JSON.stringify({ payoutId, amount: info ? Number(info.amount) : null, previousStatus: info?.status })})
+      `;
+    } catch {
+      // admin_action_logs table may not exist - non-critical
     }
 
     return NextResponse.json({ success: true });

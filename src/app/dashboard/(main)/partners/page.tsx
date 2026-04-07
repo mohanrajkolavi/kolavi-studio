@@ -107,6 +107,7 @@ export default function PartnersPage() {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [inviting, setInviting] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [newPartner, setNewPartner] = useState({
     code: "",
@@ -380,7 +381,7 @@ export default function PartnersPage() {
           Partner Program
         </h1>
         <p className="text-sm text-muted-foreground max-w-xl">
-          15% one-time, 10% recurring. Approve applications and manage your partner network.
+          10% one-time, 5% recurring. Approve applications and manage your partner network.
         </p>
       </header>
 
@@ -504,6 +505,17 @@ export default function PartnersPage() {
         {/* Partners tab */}
         {activeTab === "partners" && (
           <div id="partners-panel" role="tabpanel" tabIndex={activeTab === "partners" ? 0 : -1} className="min-h-[320px]">
+            {!loading && partners.length > 0 && (
+              <div className="border-b border-border/60 px-6 py-3">
+                <Input
+                  type="search"
+                  placeholder="Search by name, email, or code..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 max-w-sm rounded-lg text-sm"
+                />
+              </div>
+            )}
             {loading ? (
               <TableSkeleton rows={5} columns={5} />
             ) : partners.length === 0 ? (
@@ -525,7 +537,15 @@ export default function PartnersPage() {
               </div>
             ) : (
               <div className="divide-y divide-border/60">
-                {partners.map((p) => {
+                {partners.filter((p) => {
+                  if (!searchQuery.trim()) return true;
+                  const q = searchQuery.trim().toLowerCase();
+                  return (
+                    p.name.toLowerCase().includes(q) ||
+                    p.email.toLowerCase().includes(q) ||
+                    p.code.toLowerCase().includes(q)
+                  );
+                }).map((p) => {
                   const config = statusConfig[p.status] ?? statusConfig.pending;
                   const StatusIcon = config.icon;
                   return (
