@@ -10,12 +10,14 @@
   ],
   "scripts": {
     "dev": "next dev",
+    "generate:sitemap-routes": "npx tsx scripts/generate-sitemap-routes.ts",
+    "prebuild": "npm run generate:sitemap-routes",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "test": "npx tsx --test 'src/**/*.test.ts'",
     "check:secrets": "sh scripts/check-secrets.sh",
-    "prepush": "npm run check:secrets && npm run lint && npm run test",
+    "prepush": "npm run generate:sitemap-routes -- --check && npm run check:secrets && npm run lint && npm run test",
     "open:browser": "node scripts/open-app-in-browser.mjs",
     "db:migrate": "sh scripts/run-migrations.sh"
   },

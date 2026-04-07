@@ -1,0 +1,42 @@
+# Kolavi Studio
+
+> AI-native growth agency that builds high-performance Next.js websites, runs AI-powered SEO campaigns, and optimizes for AI search engines (ChatGPT, Perplexity, Google AI Overviews). We help businesses dominate both traditional and AI-driven search.
+
+## Services
+
+- [Next.js + Headless CMS Websites](https://kolavistudio.com/services#websites): Custom Next.js applications with 95+ PageSpeed, sub-second load times, mobile-first, ADA compliant
+- [AI-Powered SEO](https://kolavistudio.com/services#seo): Programmatic SEO at scale, on-page optimization, technical SEO, local SEO, Google Business Profile ranking
+- [GEO: AI Search Optimization](https://kolavistudio.com/services#geo): Optimization for ChatGPT, Perplexity, Google AI Overviews with advanced schema markup and semantic authority
+- [Lead Generation & Automation](https://kolavistudio.com/services#automation): AI chatbots, multi-step conversion funnels, membership upsell automation
+- [Content Engine](https://kolavistudio.com/services#content): AI-assisted, human-edited blog content at scale with keyword-targeted guides
+- [Reputation & Reporting](https://kolavistudio.com/services#reputation): Automated review generation, call tracking, lead attribution, real-time ROI dashboards
+
+## Free Tools
+
+- [SEO & Speed Audit](https://kolavistudio.com/tools/speed-audit): PageSpeed and SEO health check with competitor comparison against 95+ benchmark
+- [Treatment Coverage Analyzer](https://kolavistudio.com/tools/treatment-analyzer): Analyzes your site content, shows local ranking positions, reveals revenue opportunities
+- [ROI Calculator](https://kolavistudio.com/tools/roi-calculator): Projects revenue from ranking for multiple keywords with multi-channel ROI estimation
+- [Treatment Coverage Visualizer](https://kolavistudio.com/tools/treatment-visualizer): Visual display of content coverage vs search volume and potential
+- [Competitor Comparison](https://kolavistudio.com/tools/competitor-comparison): Compare up to 3 competitors on PageSpeed, content pages, and digital presence
+- [AI Bio Generator](https://kolavistudio.com/tools/bio-generator): Platform-optimized bios for LinkedIn, Twitter/X, Instagram, TikTok with multiple versions
+
+## Markdown Tools
+
+- [Markdown Editor](https://kolavistudio.com/markdown-editor): Live preview markdown editor
+- [Markdown Table Generator](https://kolavistudio.com/markdown-table-generator): Visual table builder with markdown output
+- [Markdown to PDF](https://kolavistudio.com/markdown-to-pdf): Convert markdown documents to PDF
+- [Markdown to HTML](https://kolavistudio.com/markdown-to-html): Convert markdown to clean HTML
+- [Markdown Formatter](https://kolavistudio.com/markdown-formatter): Auto-format and clean up markdown files
+- [Markdown Cheat Sheet](https://kolavistudio.com/markdown-cheat-sheet): Quick reference for markdown syntax
+- [Markdown Syntax Guide](https://kolavistudio.com/markdown-syntax): Complete guide to standard markdown syntax
+- [Extended Syntax Guide](https://kolavistudio.com/markdown-extended-syntax): Tables, footnotes, task lists, and more
+- [Markdown Guide](https://kolavistudio.com/markdown-guide): Beginner-friendly introduction to markdown
+
+## Key Pages
+
+- [About Us](https://kolavistudio.com/about): Mission, values, and team story
+- [Pricing](https://kolavistudio.com/pricing): Three tiers - Marketing ($999/mo), Growth ($2,499/mo), Full System (custom)
+- [Blog](https://kolavistudio.com/blog): Expert strategies on SEO, conversion optimization, content marketing, and business growth
+- [Contact](https://kolavistudio.com/contact): Get in touch for a free consultation
+- [Partner Program](https://kolavistudio.com/partner): Referral program with 10% setup + 5% recurring commissions
+- [Portfolio](https://kolavistudio.com/portfolio): Case studies and client results

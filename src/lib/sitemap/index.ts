@@ -21,6 +21,7 @@ import {
   GET_ALL_CATEGORY_SLUGS,
   GET_ALL_TAG_SLUGS,
 } from "@/lib/graphql/queries";
+import { DISCOVERED_ROUTES } from "./generated-routes";
 
 const CACHE_REVALIDATE = 60;
 
@@ -57,7 +58,7 @@ export type UrlEntry = {
   priority: number;
 };
 
-function escapeXml(s: string): string {
+export function escapeXml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -66,8 +67,9 @@ function escapeXml(s: string): string {
     .replace(/'/g, "&apos;");
 }
 
+/** ISO 8601 with time component (Bing recommends full timestamps for AI search). */
 function formatDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return d.toISOString();
 }
 
 /** Build sitemap index XML (root). Protocol: sitemapindex, &lt;loc&gt; required, &lt;lastmod&gt; W3C Datetime. */
@@ -112,44 +114,50 @@ export function buildUrlsetXml(entries: UrlEntry[], baseUrl: string): string {
   return lines.join("\n");
 }
 
-const STATIC_ROUTES: { path: string; priority: number; changeFrequency: UrlEntry["changeFrequency"] }[] = [
-  { path: "", priority: SITEMAP.priority.home, changeFrequency: SITEMAP.changeFrequency.home },
-  { path: "/services", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/pricing", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/portfolio", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/about", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/contact", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/tools", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/tools/speed-audit", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/tools/treatment-analyzer", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/tools/roi-calculator", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/tools/treatment-visualizer", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/tools/competitor-comparison", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/markdown-tools", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/markdown-editor", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/markdown-table-generator", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/markdown-to-pdf", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/markdown-to-html", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/markdown-formatter", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/markdown-cheat-sheet", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/markdown-syntax", priority: 0.9, changeFrequency: "monthly" as const },
-  { path: "/markdown-extended-syntax", priority: 0.9, changeFrequency: "monthly" as const },
-  { path: "/markdown-guide", priority: 0.9, changeFrequency: "monthly" as const },
-  { path: "/markdown-hacks", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/discord-markdown", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/slack-markdown", priority: 0.7, changeFrequency: "monthly" as const },
-  { path: "/github-markdown", priority: 0.7, changeFrequency: "monthly" as const },
-  { path: "/partner", priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
-  { path: "/partner/apply", priority: 0.8, changeFrequency: "monthly" as const },
-  { path: "/partner/terms", priority: 0.5, changeFrequency: "yearly" as const },
-  { path: "/privacy", priority: 0.5, changeFrequency: "yearly" as const },
-  { path: "/terms", priority: 0.5, changeFrequency: "yearly" as const },
-  { path: "/cookies", priority: 0.5, changeFrequency: "yearly" as const },
-  { path: "/disclaimer", priority: 0.5, changeFrequency: "yearly" as const },
-  { path: "/blog", priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
-  { path: "/blog/category", priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
-  { path: "/blog/tag", priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
+type RouteConfig = { priority: number; changeFrequency: UrlEntry["changeFrequency"] };
+
+/** Per-path overrides for sitemap priority/changeFrequency. */
+const ROUTE_OVERRIDES: Record<string, RouteConfig> = {
+  "/": { priority: SITEMAP.priority.home, changeFrequency: SITEMAP.changeFrequency.home },
+  "/services": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/pricing": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/portfolio": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/about": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/contact": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/tools": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/tools/speed-audit": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/tools/treatment-analyzer": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/markdown-tools": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/markdown-editor": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/markdown-table-generator": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/markdown-cheat-sheet": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/markdown-syntax": { priority: 0.9, changeFrequency: "monthly" },
+  "/markdown-extended-syntax": { priority: 0.9, changeFrequency: "monthly" },
+  "/markdown-guide": { priority: 0.9, changeFrequency: "monthly" },
+  "/partner": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/blog": { priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
+  "/blog/category": { priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
+  "/blog/tag": { priority: SITEMAP.priority.blogIndex, changeFrequency: SITEMAP.changeFrequency.blog },
+};
+
+/** Pattern-based defaults for routes without an explicit override. */
+const PATTERN_DEFAULTS: { pattern: RegExp; config: RouteConfig }[] = [
+  { pattern: /^\/tools\//, config: { priority: 0.8, changeFrequency: "monthly" } },
+  { pattern: /^\/markdown-/, config: { priority: 0.8, changeFrequency: "monthly" } },
+  { pattern: /^\/discord-markdown$/, config: { priority: 0.8, changeFrequency: "monthly" } },
+  { pattern: /^\/slack-markdown$/, config: { priority: 0.7, changeFrequency: "monthly" } },
+  { pattern: /^\/github-markdown$/, config: { priority: 0.7, changeFrequency: "monthly" } },
+  { pattern: /^\/partner\//, config: { priority: 0.7, changeFrequency: "monthly" } },
+  { pattern: /^\/(privacy|terms|cookies|disclaimer)$/, config: { priority: 0.5, changeFrequency: "yearly" } },
 ];
+
+const DEFAULT_CONFIG: RouteConfig = { priority: 0.7, changeFrequency: "monthly" };
+
+function getRouteConfig(path: string): RouteConfig {
+  if (ROUTE_OVERRIDES[path]) return ROUTE_OVERRIDES[path];
+  const match = PATTERN_DEFAULTS.find((p) => p.pattern.test(path));
+  return match ? match.config : DEFAULT_CONFIG;
+}
 
 /**
  * Derive lastmod per category and per tag from the latest post in each.
@@ -180,16 +188,19 @@ function getCategoryTagLastModFromPosts(
   return { category: categoryLastMod, tag: tagLastMod };
 }
 
-/** Static pages: use build/deploy date for lastmod when set (BUILD_TIMESTAMP / VERCEL_BUILD_COMMIT_TIMESTAMP). */
+/** Static pages: auto-discovered from filesystem at build time. Use build/deploy date for lastmod. */
 export function getStaticEntries(): UrlEntry[] {
   const lastModified = getSitemapBuildDate() ?? new Date();
 
-  const staticEntries = STATIC_ROUTES.map(({ path, priority, changeFrequency }) => ({
-    path: path || "/",
-    lastModified,
-    changeFrequency,
-    priority,
-  }));
+  const staticEntries = DISCOVERED_ROUTES.map((routePath) => {
+    const config = getRouteConfig(routePath);
+    return {
+      path: routePath,
+      lastModified,
+      changeFrequency: config.changeFrequency,
+      priority: config.priority,
+    };
+  });
 
   // Dynamic markdown tool pages from tools-data.ts
   const toolEntries: UrlEntry[] = MARKDOWN_TOOLS
@@ -338,6 +349,41 @@ export async function getTagEntries(): Promise<UrlEntry[]> {
       return entries;
     },
     ["sitemap-tags"],
+    { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
+  )();
+}
+
+export type ImageEntry = {
+  path: string;
+  images: { url: string; alt?: string }[];
+};
+
+/**
+ * Image sitemap entries: blog posts with featured images.
+ * AI crawlers cannot execute JavaScript, so image sitemaps help them discover images.
+ * @see https://developers.google.com/search/docs/crawling-indexing/sitemaps/image-sitemaps
+ */
+export async function getImageEntries(): Promise<ImageEntry[]> {
+  return unstable_cache(
+    async () => {
+      const entries: ImageEntry[] = [];
+      try {
+        const posts = await getPosts();
+        for (const post of posts) {
+          const imgNode = post.featuredImage?.node;
+          if (imgNode?.sourceUrl) {
+            entries.push({
+              path: `/blog/${post.slug}`,
+              images: [{ url: imgNode.sourceUrl, alt: imgNode.altText }],
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Sitemap images:", error);
+      }
+      return entries;
+    },
+    ["sitemap-images"],
     { revalidate: CACHE_REVALIDATE, tags: ["blog"] }
   )();
 }
