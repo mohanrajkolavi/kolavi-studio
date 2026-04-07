@@ -17,6 +17,7 @@ export async function GET() {
     { loc: `${SITE_URL}/sitemap/posts`, lastmod },
     { loc: `${SITE_URL}/sitemap/categories`, lastmod },
     { loc: `${SITE_URL}/sitemap/tags`, lastmod },
+    { loc: `${SITE_URL}/sitemap/images`, lastmod },
   ];
   const xml = buildSitemapIndexXml(childSitemaps);
   return new NextResponse(xml, {
