@@ -9,6 +9,7 @@ import {
   ArrowRight,
   Sparkles,
   UserPen,
+  FileCode,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -80,6 +81,16 @@ const tools = [
     description:
       "Generate platform-optimized bios for LinkedIn, Twitter/X, Instagram, TikTok, and more — all at once from a single input. Free, no signup.",
     cta: "Generate Your Bio",
+    featured: false,
+  },
+  {
+    id: "sitemap-generator",
+    href: "/tools/sitemap-generator",
+    icon: FileCode,
+    title: "XML Sitemap Generator",
+    description:
+      "Enter your website URL. We crawl it, discover every page, and generate a downloadable sitemap.xml file. Free, instant, no signup.",
+    cta: "Generate Sitemap",
     featured: false,
   },
 ];
