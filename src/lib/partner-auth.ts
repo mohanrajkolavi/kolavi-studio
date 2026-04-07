@@ -5,7 +5,7 @@ import { sql } from "@/lib/db";
 const raw = process.env.ADMIN_SECRET ?? "";
 const SECRET = (typeof raw === "string" ? raw.trim().replace(/^['"]|['"]$/g, "") : "") || undefined;
 const PARTNER_COOKIE_NAME = "partner-auth";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
+const SESSION_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_KEY =
@@ -132,24 +132,13 @@ export async function getPartnerIdFromCookies(): Promise<string | null> {
       const supabase = await createAuthClient();
       const { data } = await supabase.auth.getUser();
       if (!data?.user?.id) return null;
-      let result: Awaited<ReturnType<typeof sql>>;
-      try {
-        result = await sql`
-          SELECT id FROM partners
-          WHERE supabase_user_id = ${data.user.id}
-            AND status = 'active'
-            AND deleted_at IS NULL
-          LIMIT 1
-        `;
-      } catch {
-        result = await sql`
-          SELECT id FROM partners
-          WHERE supabase_user_id = ${data.user.id}
-            AND status = 'active'
-            AND deleted_at IS NULL
-          LIMIT 1
-        `;
-      }
+      const result = await sql`
+        SELECT id FROM partners
+        WHERE supabase_user_id = ${data.user.id}
+          AND status = 'active'
+          AND deleted_at IS NULL
+        LIMIT 1
+      `;
       const row = result[0] as { id: string } | undefined;
       return row ? row.id : null;
     } catch {

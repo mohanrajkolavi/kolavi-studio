@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { createPartnerSessionToken, setPartnerAuthCookie } from "@/lib/partner-auth";
+import { checkRateLimit } from "@/lib/rate-limit/generic";
+
+const LOGIN_RATE_LIMIT = { maxRequests: 5, windowSec: 60 };
 
 interface PartnerRow {
   id: string;
@@ -12,6 +15,22 @@ interface PartnerRow {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 attempts per 60 seconds per IP
+    try {
+      const rl = await checkRateLimit(request, "partner_login_rate_limit", LOGIN_RATE_LIMIT);
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { error: "Too many login attempts. Please try again later." },
+          {
+            status: 429,
+            headers: rl.retryAfterSec ? { "Retry-After": String(rl.retryAfterSec) } : undefined,
+          }
+        );
+      }
+    } catch {
+      // Rate limit table may not exist yet - allow request through
+    }
+
     const body = await request.json();
     const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
     const code = typeof body?.code === "string" ? body.code.trim().toUpperCase() : "";
@@ -30,27 +49,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let result: Awaited<ReturnType<typeof sql>>;
-    try {
-      result = await sql`
-        SELECT id, code, name, email, status
-        FROM partners
-        WHERE LOWER(email) = ${email}
-          AND UPPER(code) = ${code}
-          AND deleted_at IS NULL
-        LIMIT 1
-      `;
-    } catch (err) {
-      console.error("Partner login: primary query failed", err);
-      result = await sql`
-        SELECT id, code, name, email, status
-        FROM partners
-        WHERE LOWER(email) = ${email}
-          AND UPPER(code) = ${code}
-          AND deleted_at IS NULL
-        LIMIT 1
-      `;
-    }
+    const result = await sql`
+      SELECT id, code, name, email, status
+      FROM partners
+      WHERE LOWER(email) = ${email}
+        AND UPPER(code) = ${code}
+        AND deleted_at IS NULL
+      LIMIT 1
+    `;
 
     if (result.length === 0) {
       return NextResponse.json(

@@ -39,8 +39,8 @@ export async function GET(request: NextRequest) {
       code: p.code,
       name: p.name,
       email: p.email,
-      commissionOneTimePct: p.commission_one_time_pct != null ? Number(p.commission_one_time_pct) : 15,
-      commissionRecurringPct: p.commission_recurring_pct != null ? Number(p.commission_recurring_pct) : 10,
+      commissionOneTimePct: p.commission_one_time_pct != null ? Number(p.commission_one_time_pct) : 10,
+      commissionRecurringPct: p.commission_recurring_pct != null ? Number(p.commission_recurring_pct) : 5,
       createdAt: toIso(p.created_at),
     };
 
