@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { trackEvent } from "@/lib/analytics/events";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -79,6 +79,44 @@ const AUDIENCE_OPTIONS = [
 
 const TONE_LABELS = ["Very Formal", "Professional", "Balanced", "Casual", "Bold & Witty"];
 
+const INDUSTRIES = [
+  "Technology",
+  "Finance & Banking",
+  "Healthcare",
+  "Education",
+  "Marketing & Advertising",
+  "Real Estate",
+  "Legal",
+  "Retail & E-commerce",
+  "Media & Entertainment",
+  "Design",
+  "Manufacturing",
+  "Construction",
+  "Hospitality & Tourism",
+  "Food & Beverage",
+  "Automotive",
+  "Energy & Utilities",
+  "Telecommunications",
+  "Agriculture",
+  "Aerospace & Defense",
+  "Nonprofit & NGO",
+  "Government & Public Sector",
+  "Pharmaceuticals & Biotech",
+  "Insurance",
+  "Transportation & Logistics",
+  "Sports & Fitness",
+  "Fashion & Apparel",
+  "Gaming",
+  "Music & Audio",
+  "Consulting",
+  "Human Resources",
+  "SaaS & Cloud",
+  "Cybersecurity",
+  "Data & Analytics",
+  "AI & Machine Learning",
+  "Blockchain & Web3",
+];
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -99,6 +137,13 @@ export function BioGenerator() {
     "instagram",
   ]);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
+
+  // Industry autocomplete state
+  const [industryOpen, setIndustryOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
+  const industryRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   // Results state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -113,9 +158,85 @@ export function BioGenerator() {
     );
   }, []);
 
+  // Industry autocomplete
+  const filteredIndustries = industry.trim()
+    ? INDUSTRIES.filter((ind) =>
+        ind.toLowerCase().includes(industry.trim().toLowerCase())
+      )
+    : INDUSTRIES;
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        industryRef.current &&
+        !industryRef.current.contains(e.target as Node) &&
+        listRef.current &&
+        !listRef.current.contains(e.target as Node)
+      ) {
+        setIndustryOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleIndustryKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (!industryOpen) {
+        if (e.key === "ArrowDown") {
+          setIndustryOpen(true);
+          setHighlightedIndex(0);
+          e.preventDefault();
+        }
+        return;
+      }
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setHighlightedIndex((prev) =>
+            prev < filteredIndustries.length - 1 ? prev + 1 : prev
+          );
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setHighlightedIndex((prev) => (prev > 0 ? prev - 1 : 0));
+          break;
+        case "Enter":
+          e.preventDefault();
+          if (highlightedIndex >= 0 && highlightedIndex < filteredIndustries.length) {
+            setIndustry(filteredIndustries[highlightedIndex]);
+            setIndustryOpen(false);
+            setHighlightedIndex(-1);
+          }
+          break;
+        case "Escape":
+          e.preventDefault();
+          setIndustryOpen(false);
+          setHighlightedIndex(-1);
+          break;
+        case "Tab":
+          setIndustryOpen(false);
+          setHighlightedIndex(-1);
+          break;
+      }
+    },
+    [industryOpen, filteredIndustries, highlightedIndex]
+  );
+
+  // Scroll highlighted item into view
+  useEffect(() => {
+    if (highlightedIndex >= 0 && listRef.current) {
+      const item = listRef.current.children[highlightedIndex] as HTMLElement;
+      item?.scrollIntoView({ block: "nearest" });
+    }
+  }, [highlightedIndex]);
+
   const applyTemplate = useCallback((template: typeof ROLE_TEMPLATES[0]) => {
     setRole(template.role);
-    setIndustry(template.industry);
+    if (template.industry) {
+      setIndustry(template.industry);
+    }
     setSkills(template.skills);
   }, []);
 
@@ -127,7 +248,10 @@ export function BioGenerator() {
 
   const handleGenerate = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!name.trim() || !role.trim() || selectedPlatforms.length === 0) return;
+    if (!name.trim() || !role.trim() || selectedPlatforms.length === 0) {
+      setShowValidation(true);
+      return;
+    }
 
     setIsGenerating(true);
     setError(null);
@@ -359,7 +483,7 @@ export function BioGenerator() {
       </div>
 
       <div className="space-y-4 sm:space-y-5">
-        {/* Name + Role side by side on desktop */}
+        {/* Name + Industry side by side on desktop */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
           <div>
             <label htmlFor="bio-name" className="block text-xs sm:text-sm font-medium text-foreground mb-1.5">
@@ -370,29 +494,92 @@ export function BioGenerator() {
               type="text"
               placeholder="Jane Smith"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
+              onChange={(e) => {
+                setName(e.target.value);
+                if (showValidation) setShowValidation(false);
+              }}
+              aria-required="true"
+              aria-invalid={showValidation && !name.trim()}
               maxLength={100}
-              className="h-11 sm:h-12 text-[14px] sm:text-sm"
+              className={`h-11 sm:h-12 text-[14px] sm:text-sm ${showValidation && !name.trim() ? "border-red-500 focus-visible:ring-red-500" : ""}`}
             />
+            {showValidation && !name.trim() && (
+              <p className="text-[11px] text-red-500 mt-1">Name is required</p>
+            )}
+            {name.length > 80 && (
+              <span className="text-[10px] text-muted-foreground mt-1 block text-right tabular-nums">{name.length}/100</span>
+            )}
           </div>
           <div>
             <label htmlFor="bio-industry" className="block text-xs sm:text-sm font-medium text-foreground mb-1.5">
               Industry
             </label>
-            <Input
-              id="bio-industry"
-              type="text"
-              placeholder="Technology, Finance..."
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
-              maxLength={100}
-              className="h-11 sm:h-12 text-[14px] sm:text-sm"
-            />
+            <div className="relative">
+              <Input
+                ref={industryRef}
+                id="bio-industry"
+                type="text"
+                role="combobox"
+                aria-expanded={industryOpen}
+                aria-controls="industry-listbox"
+                aria-autocomplete="list"
+                aria-activedescendant={highlightedIndex >= 0 ? `industry-option-${highlightedIndex}` : undefined}
+                autoComplete="off"
+                placeholder="Type or select an industry..."
+                value={industry}
+                onChange={(e) => {
+                  setIndustry(e.target.value);
+                  setIndustryOpen(true);
+                  setHighlightedIndex(-1);
+                }}
+                onFocus={() => setIndustryOpen(true)}
+                onKeyDown={handleIndustryKeyDown}
+                maxLength={100}
+                className="h-11 sm:h-12 text-[14px] sm:text-sm"
+              />
+              {industryOpen && filteredIndustries.length > 0 && (
+                <ul
+                  ref={listRef}
+                  id="industry-listbox"
+                  role="listbox"
+                  className="absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-xl border border-border bg-background shadow-lg"
+                >
+                  {filteredIndustries.map((ind, i) => (
+                    <li
+                      key={ind}
+                      id={`industry-option-${i}`}
+                      role="option"
+                      aria-selected={highlightedIndex === i}
+                      onMouseDown={() => {
+                        setIndustry(ind);
+                        setIndustryOpen(false);
+                        setHighlightedIndex(-1);
+                      }}
+                      onMouseEnter={() => setHighlightedIndex(i)}
+                      className={`px-3 py-2 text-sm cursor-pointer transition-colors ${
+                        highlightedIndex === i
+                          ? "bg-primary/10 text-primary"
+                          : "text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {ind}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {industryOpen && industry.trim() && filteredIndustries.length === 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-xl border border-border bg-background shadow-lg px-3 py-2 text-sm text-muted-foreground">
+                  No matching industries. Your custom value will be used.
+                </div>
+              )}
+            </div>
+            {industry.length > 80 && (
+              <span className="text-[10px] text-muted-foreground mt-1 block text-right tabular-nums">{industry.length}/100</span>
+            )}
           </div>
         </div>
 
-        {/* Role  - full width */}
+        {/* Role - full width */}
         <div>
           <label htmlFor="bio-role" className="block text-xs sm:text-sm font-medium text-foreground mb-1.5">
             Role / Title <span className="text-red-500">*</span>
@@ -402,11 +589,21 @@ export function BioGenerator() {
             type="text"
             placeholder="Senior Product Designer at Acme Inc."
             value={role}
-            onChange={(e) => setRole(e.target.value)}
-            required
+            onChange={(e) => {
+              setRole(e.target.value);
+              if (showValidation) setShowValidation(false);
+            }}
+            aria-required="true"
+            aria-invalid={showValidation && !role.trim()}
             maxLength={200}
-            className="h-11 sm:h-12 text-[14px] sm:text-sm"
+            className={`h-11 sm:h-12 text-[14px] sm:text-sm ${showValidation && !role.trim() ? "border-red-500 focus-visible:ring-red-500" : ""}`}
           />
+          {showValidation && !role.trim() && (
+            <p className="text-[11px] text-red-500 mt-1">Role is required</p>
+          )}
+          {role.length > 160 && (
+            <span className="text-[10px] text-muted-foreground mt-1 block text-right tabular-nums">{role.length}/200</span>
+          )}
         </div>
 
         {/* Platform selection */}
@@ -419,7 +616,7 @@ export function BioGenerator() {
               {selectedPlatforms.length} selected
             </span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+          <div role="group" aria-label="Select platforms" className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
             {PLATFORMS.map((p) => {
               const Icon = p.icon;
               const selected = selectedPlatforms.includes(p.key);
@@ -427,7 +624,11 @@ export function BioGenerator() {
                 <button
                   key={p.key}
                   type="button"
-                  onClick={() => togglePlatform(p.key)}
+                  aria-pressed={selected}
+                  onClick={() => {
+                    togglePlatform(p.key);
+                    if (showValidation) setShowValidation(false);
+                  }}
                   className={`flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 sm:py-2.5 rounded-xl border text-xs sm:text-sm font-medium transition-all duration-200 text-left ${
                     selected
                       ? "border-primary bg-primary/5 text-primary"
@@ -442,6 +643,9 @@ export function BioGenerator() {
               );
             })}
           </div>
+          {showValidation && selectedPlatforms.length === 0 && (
+            <p className="text-[11px] text-red-500 mt-1">Select at least one platform</p>
+          )}
         </div>
 
         {/* Tone + Audience row */}
@@ -477,6 +681,7 @@ export function BioGenerator() {
                 <button
                   key={opt.value}
                   type="button"
+                  aria-pressed={audience === opt.value}
                   onClick={() => setAudience(opt.value)}
                   className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-full text-xs sm:text-sm border transition-all duration-200 ${
                     audience === opt.value
@@ -516,6 +721,7 @@ export function BioGenerator() {
                 rows={2}
                 className="flex w-full rounded-xl border border-input bg-background px-3 sm:px-4 py-2.5 sm:py-3 text-xs sm:text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
               />
+              <span className="text-[10px] text-muted-foreground mt-1 block text-right tabular-nums">{achievements.length}/500</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
               <div>
@@ -531,6 +737,9 @@ export function BioGenerator() {
                   maxLength={300}
                   className="h-11 sm:h-12 text-[14px] sm:text-sm"
                 />
+                {skills.length > 240 && (
+                  <span className="text-[10px] text-muted-foreground mt-1 block text-right tabular-nums">{skills.length}/300</span>
+                )}
               </div>
               <div>
                 <label htmlFor="bio-personality" className="block text-xs sm:text-sm font-medium text-foreground mb-1.5">
@@ -545,6 +754,9 @@ export function BioGenerator() {
                   maxLength={300}
                   className="h-11 sm:h-12 text-[14px] sm:text-sm"
                 />
+                {personality.length > 240 && (
+                  <span className="text-[10px] text-muted-foreground mt-1 block text-right tabular-nums">{personality.length}/300</span>
+                )}
               </div>
             </div>
           </div>
