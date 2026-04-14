@@ -35,6 +35,7 @@ export const DISCOVERED_ROUTES: string[] = [
   "/tools/bio-generator",
   "/tools/competitor-comparison",
   "/tools/roi-calculator",
+  "/tools/sitemap-generator",
   "/tools/speed-audit",
   "/tools/treatment-analyzer",
   "/tools/treatment-visualizer",

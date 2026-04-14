@@ -126,6 +126,7 @@ const ROUTE_OVERRIDES: Record<string, RouteConfig> = {
   "/contact": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   "/tools": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   "/tools/speed-audit": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
+  "/tools/sitemap-generator": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   "/tools/treatment-analyzer": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   "/markdown-tools": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
   "/markdown-editor": { priority: SITEMAP.priority.main, changeFrequency: SITEMAP.changeFrequency.main },
