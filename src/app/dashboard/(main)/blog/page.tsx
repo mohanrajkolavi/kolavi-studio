@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { TagInput } from "@/components/dashboard/TagInput";
-import { useBlogGeneration } from "@/components/dashboard/BlogGenerationProvider";
+import { useBlogGeneration, consumeRewriterHandoff, type RewriterHandoff } from "@/components/dashboard/BlogGenerationProvider";
 import { Loader2, Sparkles, ArrowLeft, X, Copy, FileText, Eye, Check, CheckCircle2, AlertTriangle, XCircle, ExternalLink, ChevronDown, ChevronUp, GripVertical, Trash2, Plus, Save, Search, PenLine, MessageSquare, Send, Link2, Undo2 } from "lucide-react";
 import { GenerationLoadingOverlay } from "@/components/dashboard/GenerationLoadingOverlay";
 import { SEO } from "@/lib/constants";
@@ -790,6 +790,7 @@ export default function BlogMakerPage() {
   const [draftModel, setDraftModel] = useState<"opus-4.6" | "sonnet-4.6">("opus-4.6");
   const [voice, setVoice] = useState<"conversational-expert" | "authoritative-practitioner" | "friendly-guide" | "newsletter-editorial">("authoritative-practitioner");
   const [fieldNotes, setFieldNotes] = useState<string>("");
+  const [gscHandoff, setGscHandoff] = useState<RewriterHandoff | null>(null);
   const [authorName, setAuthorName] = useState<string>("");
   const [authorBio, setAuthorBio] = useState<string>("");
   const [authorExpertise, setAuthorExpertise] = useState<string>("");
@@ -1325,6 +1326,28 @@ export default function BlogMakerPage() {
         setLoadingHistory(false);
       });
   }, [searchParams, loadingHistory, editing, router]);
+
+  // Consume any pending GSC-to-Rewriter handoff once on mount, pre-filling
+  // keywords + brief and showing the banner with an Undo control.
+  useEffect(() => {
+    const handoff = consumeRewriterHandoff();
+    if (!handoff) return;
+    setGscHandoff(handoff);
+    if (handoff.focusKeywords.length > 0) {
+      setPrimaryKeyword(handoff.focusKeywords[0] ?? "");
+      setSecondaryKeywords(handoff.focusKeywords.slice(1, 5));
+    }
+    if (handoff.brief) {
+      setFieldNotes((prev) => (prev?.trim() ? prev : handoff.brief));
+    }
+  }, []);
+
+  const clearGscHandoff = useCallback(() => {
+    setGscHandoff(null);
+    setPrimaryKeyword("");
+    setSecondaryKeywords([]);
+    setFieldNotes("");
+  }, []);
 
   // Reset E-E-A-T auto-run flag and retry counter when pipeline result changes (e.g. new generation)
   useEffect(() => {
@@ -3127,6 +3150,36 @@ export default function BlogMakerPage() {
             {/* Step 1 — Keywords, Intent, Model */}
             {showInputSections && (
               <section className="divide-y divide-border/50">
+
+                {gscHandoff && (
+                  <div className="border-b border-orange-300/60 bg-orange-50/80 px-5 py-3 dark:border-orange-500/30 dark:bg-orange-950/30 sm:px-10">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-orange-700 dark:text-orange-300">
+                          Rewriting from GSC suggestion
+                        </p>
+                        <p className="mt-1 text-sm text-foreground">
+                          Pre-filled from <span className="font-mono">{gscHandoff.pagePath}</span>
+                        </p>
+                        {gscHandoff.brief && (
+                          <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                            {gscHandoff.brief.split("\n")[0]}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={clearGscHandoff}
+                        className="text-xs"
+                      >
+                        <Undo2 className="mr-1 h-3.5 w-3.5" />
+                        Undo
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Primary + Secondary keywords — combined */}
                 <div className="p-5 sm:p-10 grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-0 sm:divide-x sm:divide-border/50">

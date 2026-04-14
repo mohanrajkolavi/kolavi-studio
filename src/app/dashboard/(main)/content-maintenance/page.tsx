@@ -2,11 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { FileText, ExternalLink, X, RefreshCw, Loader2, AlertCircle, Calendar, Tag, ChevronUp, ChevronDown, Download, Zap, MoreHorizontal, CheckCircle2, Globe, Send, Clock, XCircle } from "lucide-react";
+import { STATIC_PAGE_GROUPS } from "@/lib/site/static-pages";
+import { GscInsightsPanel, type RewriterHandoff } from "@/components/dashboard/GscInsightsPanel";
 
 const PAGE_SIZE = 20;
 const CATEGORY_DEBOUNCE_MS = 300;
@@ -54,6 +57,7 @@ const statusStyles: Record<string, string> = {
 };
 
 export default function ContentMaintenancePage() {
+  const router = useRouter();
   const [posts, setPosts] = useState<PostMaintenance[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -94,112 +98,8 @@ export default function ContentMaintenancePage() {
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://kolavistudio.com";
 
-  // Static site pages for indexing
-  const STATIC_PAGES: { category: string; pages: { path: string; label: string }[] }[] = [
-    {
-      category: "Main",
-      pages: [
-        { path: "/", label: "Home" },
-        { path: "/about", label: "About" },
-        { path: "/services", label: "Services" },
-        { path: "/pricing", label: "Pricing" },
-        { path: "/portfolio", label: "Portfolio" },
-        { path: "/contact", label: "Contact" },
-        { path: "/blog", label: "Blog" },
-      ],
-    },
-    {
-      category: "Markdown Tools",
-      pages: [
-        { path: "/markdown-editor", label: "Markdown Editor" },
-        { path: "/markdown-guide", label: "Markdown Guide" },
-        { path: "/markdown-syntax", label: "Markdown Syntax" },
-        { path: "/markdown-extended-syntax", label: "Extended Syntax" },
-        { path: "/markdown-cheat-sheet", label: "Cheat Sheet" },
-        { path: "/markdown-formatter", label: "Formatter" },
-        { path: "/markdown-to-html", label: "MD to HTML" },
-        { path: "/markdown-to-pdf", label: "MD to PDF" },
-        { path: "/markdown-hacks", label: "Hacks" },
-        { path: "/markdown-table-generator", label: "Table Generator" },
-        { path: "/markdown-tools", label: "Tools Hub" },
-        { path: "/discord-markdown", label: "Discord Markdown" },
-        { path: "/github-markdown", label: "GitHub Markdown" },
-        { path: "/slack-markdown", label: "Slack Markdown" },
-      ],
-    },
-    {
-      category: "Tools",
-      pages: [
-        { path: "/tools", label: "Tools Hub" },
-        { path: "/tools/roi-calculator", label: "ROI Calculator" },
-        { path: "/tools/speed-audit", label: "Speed Audit" },
-        { path: "/tools/competitor-comparison", label: "Competitor Comparison" },
-        { path: "/tools/treatment-analyzer", label: "Treatment Analyzer" },
-        { path: "/tools/treatment-visualizer", label: "Treatment Visualizer" },
-      ],
-    },
-    {
-      category: "Partner",
-      pages: [
-        { path: "/partner", label: "Partner Program" },
-        { path: "/partner/apply", label: "Apply" },
-      ],
-    },
-    {
-      category: "Markdown Apps",
-      pages: [
-        { path: "/markdown-tools/obsidian", label: "Obsidian" },
-        { path: "/markdown-tools/notion", label: "Notion" },
-        { path: "/markdown-tools/bear", label: "Bear" },
-        { path: "/markdown-tools/joplin", label: "Joplin" },
-        { path: "/markdown-tools/standard-notes", label: "Standard Notes" },
-        { path: "/markdown-tools/simplenote", label: "Simplenote" },
-        { path: "/markdown-tools/logseq", label: "Logseq" },
-        { path: "/markdown-tools/typora", label: "Typora" },
-        { path: "/markdown-tools/ia-writer", label: "iA Writer" },
-        { path: "/markdown-tools/mark-text", label: "Mark Text" },
-        { path: "/markdown-tools/ulysses", label: "Ulysses" },
-        { path: "/markdown-tools/zettlr", label: "Zettlr" },
-        { path: "/markdown-tools/gitbook", label: "GitBook" },
-        { path: "/markdown-tools/mkdocs", label: "MkDocs" },
-        { path: "/markdown-tools/docusaurus", label: "Docusaurus" },
-        { path: "/markdown-tools/hugo", label: "Hugo" },
-        { path: "/markdown-tools/jekyll", label: "Jekyll" },
-        { path: "/markdown-tools/docsify", label: "Docsify" },
-        { path: "/markdown-tools/wiki-js", label: "Wiki.js" },
-        { path: "/markdown-tools/trello", label: "Trello" },
-        { path: "/markdown-tools/todoist", label: "Todoist" },
-        { path: "/markdown-tools/mattermost", label: "Mattermost" },
-        { path: "/markdown-tools/hackmd", label: "HackMD" },
-        { path: "/markdown-tools/hedgedoc", label: "HedgeDoc" },
-        { path: "/markdown-tools/stackedit", label: "StackEdit" },
-        { path: "/markdown-tools/ghost", label: "Ghost" },
-        { path: "/markdown-tools/squarespace", label: "Squarespace" },
-        { path: "/markdown-tools/carrd", label: "Carrd" },
-        { path: "/markdown-tools/vs-code", label: "VS Code" },
-        { path: "/markdown-tools/dillinger", label: "Dillinger" },
-        { path: "/markdown-tools/macdown", label: "MacDown" },
-        { path: "/markdown-tools/marked-2", label: "Marked 2" },
-        { path: "/markdown-tools/writerside", label: "Writerside" },
-        { path: "/markdown-tools/reddit", label: "Reddit" },
-        { path: "/markdown-tools/telegram", label: "Telegram" },
-        { path: "/markdown-tools/markdown-here", label: "Markdown Here" },
-        { path: "/markdown-tools/buttondown", label: "Buttondown" },
-        { path: "/markdown-tools/discord", label: "Discord" },
-        { path: "/markdown-tools/slack", label: "Slack" },
-        { path: "/markdown-tools/github", label: "GitHub" },
-      ],
-    },
-    {
-      category: "Legal",
-      pages: [
-        { path: "/privacy", label: "Privacy" },
-        { path: "/terms", label: "Terms" },
-        { path: "/cookies", label: "Cookies" },
-        { path: "/disclaimer", label: "Disclaimer" },
-      ],
-    },
-  ];
+  // Static site pages for indexing - sourced from shared registry.
+  const STATIC_PAGES = STATIC_PAGE_GROUPS;
 
   const [selectedPages, setSelectedPages] = useState<Set<string>>(new Set());
   const [pagesIndexing, setPagesIndexing] = useState(false);
@@ -700,6 +600,18 @@ export default function ContentMaintenancePage() {
     setSelectedPost(null);
     previouslyFocusedRef.current?.focus();
   }, []);
+
+  const handleSendToRewriter = useCallback(
+    (payload: RewriterHandoff) => {
+      try {
+        sessionStorage.setItem("gsc-rewriter-handoff", JSON.stringify(payload));
+      } catch (err) {
+        console.warn("sessionStorage unavailable:", err);
+      }
+      router.push("/dashboard/blog");
+    },
+    [router]
+  );
 
   return (
     <div className="space-y-8">
@@ -1416,7 +1328,7 @@ export default function ContentMaintenancePage() {
           <div
             ref={modalContentRef}
             role="document"
-            className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card shadow-lg"
+            className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-card shadow-lg"
             onClick={(e) => e.stopPropagation()}
             onKeyDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}
@@ -1538,6 +1450,15 @@ export default function ContentMaintenancePage() {
                   Last indexing failed: {selectedPost.indexError}
                 </p>
               ) : null}
+
+              <div className="border-t border-border/50 pt-5">
+                <GscInsightsPanel
+                  pagePath={`/blog/${selectedPost.slug}`}
+                  pageTitle={selectedPost.title}
+                  postSlug={selectedPost.slug}
+                  onSendToRewriter={handleSendToRewriter}
+                />
+              </div>
             </div>
           </div>
         </div>

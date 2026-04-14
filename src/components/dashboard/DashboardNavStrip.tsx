@@ -11,12 +11,14 @@ import {
   Loader2,
   Handshake,
   BarChart3,
+  TrendingUp,
 } from "lucide-react";
 import { useBlogGenerationOptional } from "@/components/dashboard/BlogGenerationProvider";
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/metrics", label: "Metrics", icon: BarChart3 },
+  { href: "/dashboard/rankings", label: "Rankings", icon: TrendingUp },
   { href: "/dashboard/leads", label: "Leads", icon: Users },
   { href: "/dashboard/partners", label: "Partners", icon: Handshake },
   { href: "/dashboard/blog", label: "Content Writer", icon: FileEdit },

@@ -1251,3 +1251,68 @@ async function processValidateRequest(
     // localStorage may be full or unavailable; non-critical
   }
 }
+
+// ---------------------------------------------------------------------------
+// GSC-to-Rewriter handoff
+// ---------------------------------------------------------------------------
+
+export type RewriterHandoff = {
+  source: "gsc";
+  pagePath: string;
+  postSlug?: string;
+  postTitle: string;
+  existingContent?: string;
+  focusKeywords: string[];
+  brief: string;
+  ts: number;
+};
+
+const REWRITER_HANDOFF_KEY = "gsc-rewriter-handoff";
+const REWRITER_HANDOFF_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Read and clear a pending GSC-to-Rewriter handoff from sessionStorage.
+ * Returns null when missing, malformed, or older than 24 hours.
+ */
+export function consumeRewriterHandoff(): RewriterHandoff | null {
+  if (typeof window === "undefined") return null;
+  let raw: string | null = null;
+  try {
+    raw = sessionStorage.getItem(REWRITER_HANDOFF_KEY);
+  } catch {
+    return null;
+  }
+  if (!raw) return null;
+  try {
+    sessionStorage.removeItem(REWRITER_HANDOFF_KEY);
+  } catch {
+    // ignore
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<RewriterHandoff> & { ts?: number };
+    if (
+      !parsed ||
+      parsed.source !== "gsc" ||
+      typeof parsed.pagePath !== "string" ||
+      typeof parsed.ts !== "number" ||
+      Date.now() - parsed.ts > REWRITER_HANDOFF_TTL_MS
+    ) {
+      return null;
+    }
+    return {
+      source: "gsc",
+      pagePath: parsed.pagePath,
+      postSlug: typeof parsed.postSlug === "string" ? parsed.postSlug : undefined,
+      postTitle: typeof parsed.postTitle === "string" ? parsed.postTitle : parsed.pagePath,
+      existingContent:
+        typeof parsed.existingContent === "string" ? parsed.existingContent : undefined,
+      focusKeywords: Array.isArray(parsed.focusKeywords)
+        ? parsed.focusKeywords.filter((k): k is string => typeof k === "string")
+        : [],
+      brief: typeof parsed.brief === "string" ? parsed.brief : "",
+      ts: parsed.ts,
+    };
+  } catch {
+    return null;
+  }
+}

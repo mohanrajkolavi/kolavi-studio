@@ -74,7 +74,7 @@ let cachedWebmastersToken: { token: string; expiresAt: number } | null = null;
 const TOKEN_CACHE_MS = 50 * 60 * 1000; // 50 minutes
 
 /** Create a signed JWT and exchange it for a Google OAuth2 access token. */
-async function getAccessToken(scope: string = "https://www.googleapis.com/auth/indexing"): Promise<string> {
+export async function getAccessToken(scope: string = "https://www.googleapis.com/auth/indexing"): Promise<string> {
   // Check scope-specific cache
   const isWebmasters = scope.includes("webmasters");
   const cached = isWebmasters ? cachedWebmastersToken : cachedIndexingToken;
