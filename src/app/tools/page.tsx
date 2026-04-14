@@ -10,8 +10,20 @@ import {
   Sparkles,
   UserPen,
   FileCode,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+type Tool = {
+  id: string;
+  href: string;
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  cta: string;
+  featured: boolean;
+  badge?: string;
+};
 
 export const metadata = getPageMetadata({
   title: "Free SEO & Marketing Tools for Med Spas",
@@ -22,7 +34,7 @@ export const metadata = getPageMetadata({
     "med spa SEO tools, free SEO audit, website speed audit, treatment analyzer, med spa ROI calculator, competitor comparison",
 });
 
-const tools = [
+const tools: Tool[] = [
   {
     id: "speed-audit",
     href: "/tools/speed-audit",
@@ -92,6 +104,7 @@ const tools = [
       "Enter your website URL. We crawl it, discover every page, and generate a downloadable sitemap.xml file. Free, instant, no signup.",
     cta: "Generate Sitemap",
     featured: false,
+    badge: "New",
   },
 ];
 
@@ -181,7 +194,14 @@ export default function ToolsPage() {
                   <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-6 group-hover:bg-primary/10 transition-colors">
                     <Icon className="w-6 h-6 text-foreground group-hover:text-primary transition-colors" />
                   </div>
-                  <h3 className="text-[20px] font-bold text-foreground mb-3">{tool.title}</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-[20px] font-bold text-foreground">{tool.title}</h3>
+                    {tool.badge && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold uppercase tracking-wider">
+                        {tool.badge}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-small text-muted-foreground mb-6">{tool.description}</p>
                   <span className="inline-flex items-center text-button text-primary font-medium group-hover:underline">
                     {tool.cta}

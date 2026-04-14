@@ -109,7 +109,7 @@ export default function SpeedAuditPage() {
               </div>
               <h3 className="text-[20px] font-bold text-foreground mb-3">Technical SEO Check</h3>
               <p className="text-small text-muted-foreground">
-                Schema markup, sitemap health, robots.txt configuration, crawlability, index status, HTTPS security, and mobile responsiveness. The invisible infrastructure that determines whether Google can even find and rank your pages properly.
+                Schema markup, <Link href="/tools/sitemap-generator" className="underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground hover:decoration-foreground transition-colors">sitemap health</Link>, robots.txt configuration, crawlability, index status, HTTPS security, and mobile responsiveness. The invisible infrastructure that determines whether Google can even find and rank your pages properly.
               </p>
             </div>
 

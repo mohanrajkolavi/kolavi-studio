@@ -28,12 +28,12 @@ import {
 import { Button } from "@/components/ui/button";
 
 export const metadata = getPageMetadata({
-  title: "Free XML Sitemap Generator - Create Sitemaps Online Instantly",
+  title: "Free XML Sitemap Generator Online - Crawl Any Website",
   description:
-    "Free XML sitemap generator that crawls your website and creates a downloadable sitemap.xml file. Set crawl depth, max URLs, and change frequency. No signup required.",
+    "Crawl any website and generate a downloadable XML sitemap online in seconds. Up to 500 URLs per crawl, instant download, no signup. Free forever.",
   path: "/tools/sitemap-generator",
   keywords:
-    "sitemap generator, xml sitemap generator, free sitemap generator, online sitemap generator, generate sitemap from url, sitemap xml generator, create sitemap, website sitemap generator, sitemap creator, generate xml sitemap",
+    "xml sitemap generator, free xml sitemap generator, online sitemap xml generator, crawl sitemap, generate xml sitemap online, sitemap generator free, website sitemap generator free, sitemap creator online",
 });
 
 /** JSON-LD schema for rich results. */
@@ -90,6 +90,14 @@ function SitemapGeneratorSchema() {
           acceptedAnswer: {
             "@type": "Answer",
             text: "Enter your website URL, set crawl depth and max pages, then click Generate. Our crawler visits your site, follows internal links using breadth-first search, respects your robots.txt rules, and discovers every accessible page. It then generates a standard XML sitemap with proper formatting, priority values, and change frequency tags - ready to download or copy.",
+          },
+        },
+        {
+          "@type": "Question",
+          name: "How do I crawl a website to build a sitemap?",
+          acceptedAnswer: {
+            "@type": "Answer",
+            text: "Enter the website URL, click Generate, and our crawler walks every internal link from that root using breadth-first search. It respects robots.txt, skips duplicate URLs, and stops at your configured depth limit (1-5 levels) or page cap (up to 500 URLs). The result is a downloadable XML sitemap of every reachable page, no signup required.",
           },
         },
         {
@@ -158,6 +166,39 @@ function SitemapGeneratorSchema() {
         },
       ],
     },
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      name: "How to Generate an XML Sitemap Online",
+      description:
+        "Crawl any website and generate a downloadable XML sitemap in three steps using a free online sitemap generator.",
+      totalTime: "PT1M",
+      supply: [{ "@type": "HowToSupply", name: "Website URL" }],
+      tool: [{ "@type": "HowToTool", name: "Kolavi Studio XML Sitemap Generator" }],
+      step: [
+        {
+          "@type": "HowToStep",
+          position: 1,
+          name: "Enter Your URL",
+          text: "Paste your website URL into the generator. Optionally configure crawl depth (1-5 levels) and maximum pages (up to 500) in the advanced settings.",
+          url: `${base}/tools/sitemap-generator#how-it-works`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 2,
+          name: "We Crawl Your Site",
+          text: "Our crawler follows internal links, respects your robots.txt rules, and discovers every accessible page on your site, typically in under 30 seconds.",
+          url: `${base}/tools/sitemap-generator#how-it-works`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 3,
+          name: "Download Your Sitemap",
+          text: "Preview all discovered URLs with depth and priority info. Then download sitemap.xml with one click or copy the raw XML to your clipboard.",
+          url: `${base}/tools/sitemap-generator#how-it-works`,
+        },
+      ],
+    },
   ];
 
   return (
@@ -216,10 +257,10 @@ export default function SitemapGeneratorPage() {
                 FREE SEO TOOL
               </div>
               <h1 className="text-h1 text-foreground mb-6 text-balance">
-                Free XML Sitemap Generator
+                Free XML Sitemap Generator Online
               </h1>
               <p className="text-[18px] sm:text-[20px] leading-relaxed text-muted-foreground max-w-2xl mx-auto mb-4 text-balance">
-                Enter your website URL. We crawl it, find every page, and generate a downloadable sitemap.xml - ready to submit to Google Search Console. No code, no hassle.
+                Crawl any website online and generate a downloadable sitemap.xml file in seconds. Set crawl depth, respect robots.txt, and submit to Google Search Console. No code, no hassle.
               </p>
               <p className="text-[15px] font-medium text-muted-foreground/80 mb-12">
                 No signup. No credit card. Just your sitemap, ready to download.
@@ -309,7 +350,7 @@ export default function SitemapGeneratorPage() {
       </section>
 
       {/* ── HOW IT WORKS ── */}
-      <section className="border-t border-border bg-muted/30 py-24 sm:py-32">
+      <section id="how-it-works" className="border-t border-border bg-muted/30 py-24 sm:py-32">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
           <div className="text-center mb-16 animate-reveal">
             <div className="inline-flex items-center justify-center px-4 py-2 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
@@ -361,6 +402,37 @@ export default function SitemapGeneratorPage() {
                 <ArrowRight className="ml-2 w-4 h-4" />
               </a>
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW TO GENERATE AN XML SITEMAP ONLINE ── */}
+      <section className="border-t border-border py-24 sm:py-32">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+          <div className="text-center mb-12 animate-reveal">
+            <div className="inline-flex items-center justify-center px-4 py-2 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
+              STEP-BY-STEP GUIDE
+            </div>
+            <h2 className="text-h2 text-foreground">
+              How to Generate an XML Sitemap Online for Any Website
+            </h2>
+          </div>
+          <div className="prose prose-lg max-w-none text-muted-foreground space-y-6 animate-reveal" style={{ animationDelay: "100ms" }}>
+            <p className="text-[16px] sm:text-[17px] leading-relaxed">
+              You don&apos;t need a desktop app or a paid SaaS subscription to crawl your website and produce a valid sitemap.xml. A free online sitemap xml generator like this one runs in the browser, takes a single URL, and returns a standards-compliant file that any search engine can read. The whole flow takes about a minute for most marketing sites.
+            </p>
+            <h3 className="text-[20px] sm:text-[22px] font-bold text-foreground mt-10 mb-3">
+              Crawling Your Site to Build a Sitemap
+            </h3>
+            <p className="text-[16px] sm:text-[17px] leading-relaxed">
+              Paste any URL into the generator above, optionally bump the crawl depth between 1 and 5 levels, and set a page cap up to 500 URLs. When you hit Generate, the crawler fetches your homepage, parses every internal link, and walks the site using breadth-first search. It honors your robots.txt file, deduplicates query string variations, and skips paths that return 404 or redirect chains. You see live progress as URLs are discovered. This is the same crawl pattern Googlebot uses, just scoped to one site at a time.
+            </p>
+            <h3 className="text-[20px] sm:text-[22px] font-bold text-foreground mt-10 mb-3">
+              Downloading and Submitting the XML File
+            </h3>
+            <p className="text-[16px] sm:text-[17px] leading-relaxed">
+              When the crawl finishes, you get a preview of every URL with its depth and auto-calculated priority. Click Download to save sitemap.xml, or copy the raw XML to paste into your CMS. Upload the file to your site root so it lives at <code className="text-sm bg-muted px-1.5 py-0.5 rounded">https://yoursite.com/sitemap.xml</code>, then submit the URL inside Google Search Console under Sitemaps. Add a <code className="text-sm bg-muted px-1.5 py-0.5 rounded">Sitemap:</code> reference to your robots.txt as well so Bing, DuckDuckGo, and other crawlers find it automatically. Regenerate any time you publish, retire, or restructure pages, that&apos;s the entire workflow for a free xml sitemap generator.
+            </p>
           </div>
         </div>
       </section>
@@ -563,6 +635,51 @@ export default function SitemapGeneratorPage() {
         </div>
       </section>
 
+      {/* ── COMPARISON ── */}
+      <section className="border-t border-border bg-muted/30 py-24 sm:py-32">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
+          <div className="text-center mb-12 animate-reveal">
+            <div className="inline-flex items-center justify-center px-4 py-2 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
+              COMPARE
+            </div>
+            <h2 className="text-h2 text-foreground">
+              How This Free Sitemap Generator Compares
+            </h2>
+            <p className="mt-4 text-body text-muted-foreground max-w-xl mx-auto">
+              The same standards-compliant XML output as paid tools, without the signup or subscription.
+            </p>
+          </div>
+          <div className="rounded-[24px] border border-border bg-card overflow-hidden shadow-sm">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border bg-muted/50">
+                  <th className="text-left px-5 py-4 font-semibold text-foreground">Feature</th>
+                  <th className="text-center px-5 py-4 font-semibold text-foreground">Kolavi Studio</th>
+                  <th className="text-center px-5 py-4 font-semibold text-foreground">Typical paid tools</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { feature: "Price", us: "Free forever", them: "$9 to $49 / month" },
+                  { feature: "Signup required", us: "No", them: "Yes" },
+                  { feature: "URLs per crawl", us: "Up to 500", them: "Varies by plan" },
+                  { feature: "Standard sitemaps.org XML", us: "Yes", them: "Yes" },
+                  { feature: "Respects robots.txt", us: "Yes", them: "Yes" },
+                  { feature: "One-click XML download", us: "Yes", them: "Varies" },
+                  { feature: "Auto-calculated priority", us: "Yes", them: "Varies" },
+                ].map((row, i) => (
+                  <tr key={row.feature} className={`border-b border-border/50 last:border-0 ${i % 2 === 0 ? "" : "bg-muted/20"}`}>
+                    <td className="px-5 py-3.5 font-medium text-foreground">{row.feature}</td>
+                    <td className="px-5 py-3.5 text-center text-muted-foreground">{row.us}</td>
+                    <td className="px-5 py-3.5 text-center text-muted-foreground">{row.them}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       {/* ── COMMON SITEMAP MISTAKES ── */}
       <section className="border-t border-border bg-muted/30 py-24 sm:py-32">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-3xl">
@@ -645,6 +762,10 @@ export default function SitemapGeneratorPage() {
               {
                 q: "How does this XML sitemap generator work?",
                 a: "Enter your website URL, set crawl depth and max pages, then click Generate. Our crawler visits your site, follows internal links using breadth-first search, respects your robots.txt rules, and discovers every accessible page. It then generates a standard XML sitemap with proper formatting, priority values, and change frequency tags - ready to download or copy.",
+              },
+              {
+                q: "How do I crawl a website to build a sitemap?",
+                a: "Enter the website URL, click Generate, and our crawler walks every internal link from that root using breadth-first search. It respects robots.txt, skips duplicate URLs, and stops at your configured depth limit (1-5 levels) or page cap (up to 500 URLs). The result is a downloadable XML sitemap of every reachable page, no signup required.",
               },
               {
                 q: "Is this sitemap generator free?",
