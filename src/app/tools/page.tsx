@@ -10,6 +10,8 @@ import {
   Sparkles,
   UserPen,
   FileCode,
+  Megaphone,
+  Compass,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -103,6 +105,28 @@ const tools: Tool[] = [
     description:
       "Enter your website URL. We crawl it, discover every page, and generate a downloadable sitemap.xml file. Free, instant, no signup.",
     cta: "Generate Sitemap",
+    featured: false,
+    badge: "New",
+  },
+  {
+    id: "slogan-generator",
+    href: "/tools/slogan-generator",
+    icon: Megaphone,
+    title: "AI Slogan Generator",
+    description:
+      "Generate 8 catchy slogans, taglines, mottos, or catchphrases in seconds. Pick industry, tone, and style. Free, no signup, no credit card.",
+    cta: "Generate a Slogan",
+    featured: false,
+    badge: "New",
+  },
+  {
+    id: "motto-generator",
+    href: "/tools/motto-generator",
+    icon: Compass,
+    title: "Motto Generator",
+    description:
+      "Create inspiring mottos for yourself, your family, your team, or your company. 8 values-driven options per generation, free forever.",
+    cta: "Generate a Motto",
     featured: false,
     badge: "New",
   },
