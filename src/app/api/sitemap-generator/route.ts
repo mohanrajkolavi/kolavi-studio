@@ -1,67 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
 import * as cheerio from "cheerio";
+import { assertSafePublicUrl, isSafePublicUrl, SsrfBlockedError } from "@/lib/security/url-guard";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { logError } from "@/lib/logging/error";
 
 export const maxDuration = 60;
 
-/* ------------------------------------------------------------------ */
-/*  Rate Limiting                                                      */
-/* ------------------------------------------------------------------ */
-
 const RATE_LIMIT_WINDOW_SEC = 86400; // 24 hours
 const RATE_LIMIT_MAX = 3;
+const RATE_LIMIT_BUCKET = "sitemap-generator";
 const hasDb = !!process.env.DATABASE_URL;
-
-function hashIp(ip: string): string {
-  return createHash("sha256").update(`sitemap-gen-rl:${ip}`).digest("hex");
-}
-
-const memoryRateLimit = new Map<string, { count: number; resetAt: number }>();
-
-async function checkRateLimit(ipHash: string): Promise<boolean> {
-  if (hasDb) {
-    try {
-      const { sql } = await import("@/lib/db");
-      const now = new Date();
-      const resetAt = new Date(now.getTime() + RATE_LIMIT_WINDOW_SEC * 1000);
-      const updated = await sql`
-        INSERT INTO contact_rate_limit (ip_hash, request_count, reset_at)
-        VALUES (${ipHash}, 1, ${resetAt})
-        ON CONFLICT (ip_hash) DO UPDATE SET
-          request_count = CASE
-            WHEN contact_rate_limit.reset_at <= ${now} THEN 1
-            ELSE contact_rate_limit.request_count + 1
-          END,
-          reset_at = CASE
-            WHEN contact_rate_limit.reset_at <= ${now} THEN ${resetAt}
-            ELSE contact_rate_limit.reset_at
-          END
-        RETURNING request_count
-      `;
-      const count = Number(updated[0]?.request_count);
-      return Number.isFinite(count) && count >= 0 && count <= RATE_LIMIT_MAX;
-    } catch {
-      // Fall through to memory
-    }
-  }
-  const now = Date.now();
-  const entry = memoryRateLimit.get(ipHash);
-  if (!entry || entry.resetAt <= now) {
-    memoryRateLimit.set(ipHash, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_SEC * 1000 });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= RATE_LIMIT_MAX;
-}
-
-function getClientIp(request: NextRequest): string | null {
-  return (
-    request.headers.get("x-vercel-ip")?.trim() ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    null
-  );
-}
 
 /* ------------------------------------------------------------------ */
 /*  Crawler Types & Config                                             */
@@ -100,10 +48,14 @@ const MAX_CONCURRENT = 5;
 
 async function fetchRobotsTxt(origin: string, signal: AbortSignal): Promise<string[]> {
   try {
-    const res = await fetch(`${origin}/robots.txt`, {
+    const robotsUrl = `${origin}/robots.txt`;
+    if (!(await isSafePublicUrl(robotsUrl))) return [];
+    const res = await fetch(robotsUrl, {
       signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
       headers: { "User-Agent": "KolaviSitemapBot/1.0" },
+      redirect: "manual",
     });
+    if (res.status >= 300 && res.status < 400) return [];
     if (!res.ok) return [];
     const text = await res.text();
     const disallowed: string[] = [];
@@ -207,11 +159,35 @@ async function crawlSite(config: CrawlConfig): Promise<CrawledPage[]> {
       visited.add(normalized);
 
       try {
+        // Re-validate every URL before fetching - the start URL passed the check but discovered
+        // links or later DNS responses could still resolve to private IPs.
+        if (!(await isSafePublicUrl(normalized))) return;
+
         const res = await fetch(normalized, {
           signal: AbortSignal.any([globalSignal, AbortSignal.timeout(10_000)]),
           headers: { "User-Agent": "KolaviSitemapBot/1.0" },
-          redirect: "follow",
+          redirect: "manual",
         });
+
+        // Follow at most one redirect, after re-validating the destination.
+        if (res.status >= 300 && res.status < 400) {
+          const location = res.headers.get("location");
+          if (!location) return;
+          let redirectTarget: string;
+          try {
+            redirectTarget = new URL(location, normalized).toString();
+          } catch {
+            return;
+          }
+          const redirectParsed = new URL(redirectTarget);
+          if (redirectParsed.origin !== origin) return;
+          if (!(await isSafePublicUrl(redirectTarget))) return;
+          // Fall through by re-queuing; don't fetch twice in this slot.
+          if (!visited.has(normalizeUrl(redirectTarget))) {
+            queue.push({ url: redirectTarget, depth });
+          }
+          return;
+        }
 
         if (!res.ok) return;
         const contentType = res.headers.get("content-type") || "";
@@ -357,7 +333,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unable to verify request origin." }, { status: 400 });
     }
 
-    const allowed = await checkRateLimit(hashIp(ip));
+    const { allowed } = await checkRateLimit(RATE_LIMIT_BUCKET, ip, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_SEC);
     if (!allowed) {
       return NextResponse.json(
         { error: "Daily limit reached (3 sitemaps per day). Please try again tomorrow." },
@@ -392,6 +368,18 @@ export async function POST(request: NextRequest) {
 
     if (!["http:", "https:"].includes(parsedUrl.protocol)) {
       return NextResponse.json({ error: "URL must start with http:// or https://." }, { status: 400 });
+    }
+
+    try {
+      await assertSafePublicUrl(parsedUrl.toString());
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        return NextResponse.json(
+          { error: "URL is not allowed. Use a public http(s) website address." },
+          { status: 400 }
+        );
+      }
+      throw err;
     }
 
     const startUrl = parsedUrl.toString();
@@ -485,7 +473,7 @@ export async function POST(request: NextRequest) {
       clearTimeout(timeout);
     }
   } catch (err) {
-    console.error("[sitemap-generator] Error:", err);
+    logError("sitemap-generator", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Something went wrong. Please try again." },
       { status: 500 }

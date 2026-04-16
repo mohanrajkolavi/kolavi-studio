@@ -28,10 +28,10 @@ export function parseMarkdown(
   const purify = getPurify();
   if (!purify) return html;
 
-  return purify.sanitize(html, {
-    ADD_TAGS: ["iframe"],
-    ADD_ATTR: ["target", "rel"],
-  });
+  // Default-deny sanitization. All callers are markdown editor tools where users
+  // paste their own content - iframe/script/event-handler allowances are not needed
+  // and would expose XSS if any rendered output were ever persisted or shared.
+  return purify.sanitize(html);
 }
 
 export function minifyHtml(html: string): string {

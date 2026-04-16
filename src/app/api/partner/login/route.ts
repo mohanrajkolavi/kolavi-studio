@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { createPartnerSessionToken, setPartnerAuthCookie } from "@/lib/partner-auth";
 import { checkRateLimit } from "@/lib/rate-limit/generic";
+import { PARTNER_CODE_REGEX } from "@/lib/partner/cookie-server";
+import { isValidEmail } from "@/lib/validators/email";
+import { logError } from "@/lib/logging/error";
 
 const LOGIN_RATE_LIMIT = { maxRequests: 5, windowSec: 60 };
 
@@ -42,7 +45,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (code.length < 6) {
+    if (!isValidEmail(email)) {
+      return NextResponse.json(
+        { error: "Invalid email or partner code" },
+        { status: 401 }
+      );
+    }
+
+    if (!PARTNER_CODE_REGEX.test(code)) {
       return NextResponse.json(
         { error: "Invalid partner code" },
         { status: 400 }
@@ -92,7 +102,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Partner login error:", error);
+    logError("partner-login", error);
     return NextResponse.json(
       { error: "Login failed" },
       { status: 500 }

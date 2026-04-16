@@ -1,21 +1,68 @@
 /**
  * Shared API middleware helpers: CORS headers, payload size limits.
+ *
+ * CORS policy:
+ *  - CORS_ORIGIN env var is a comma-separated allowlist of origins.
+ *  - If the request Origin matches, we echo it back (not "*").
+ *  - If not configured or not matched, CORS response headers are omitted, which
+ *    blocks cross-origin browser requests (same-origin callers still work).
+ *  - Wildcard "*" is refused in production - log a warning instead.
  */
 
-/** Standard CORS headers for API routes. */
-export const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": process.env.CORS_ORIGIN ?? "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Access-Control-Max-Age": "86400",
-} as const;
+const CORS_ALLOWED_METHODS = "GET, POST, OPTIONS";
+const CORS_ALLOWED_HEADERS = "Content-Type, Authorization";
+const CORS_MAX_AGE = "86400";
 
-/** Return a 200 OK for CORS preflight requests. */
+function parseAllowedOrigins(): string[] {
+  const raw = (process.env.CORS_ORIGIN ?? "").trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+const ALLOWED_ORIGINS = parseAllowedOrigins();
+const ALLOW_WILDCARD =
+  ALLOWED_ORIGINS.length === 1 && ALLOWED_ORIGINS[0] === "*";
+
+if (ALLOW_WILDCARD && process.env.NODE_ENV === "production") {
+  console.warn(
+    "[middleware] CORS_ORIGIN=* in production - cross-origin requests are fully open. Set an explicit allowlist."
+  );
+}
+
+if (ALLOWED_ORIGINS.length === 0 && process.env.NODE_ENV === "production") {
+  // Not fatal - many routes are same-origin only. But operators should know.
+  console.warn(
+    "[middleware] CORS_ORIGIN is unset in production - cross-origin requests will be blocked."
+  );
+}
+
+function matchAllowedOrigin(requestOrigin: string | null): string | null {
+  if (!requestOrigin) return null;
+  if (ALLOW_WILDCARD) return requestOrigin;
+  return ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : null;
+}
+
+/** Build the CORS response header set for this request, or {} if the origin is not allowed. */
+export function corsHeadersForRequest(request: Request): Record<string, string> {
+  const origin = request.headers.get("origin");
+  const allowed = matchAllowedOrigin(origin);
+  if (!allowed) return {};
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Methods": CORS_ALLOWED_METHODS,
+    "Access-Control-Allow-Headers": CORS_ALLOWED_HEADERS,
+    "Access-Control-Max-Age": CORS_MAX_AGE,
+    Vary: "Origin",
+  };
+}
+
+/** Return a 200 OK for CORS preflight requests, honoring the allowlist. */
 export function handleCorsPreflightIfNeeded(request: Request): Response | null {
-  if (request.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: CORS_HEADERS });
-  }
-  return null;
+  if (request.method !== "OPTIONS") return null;
+  return new Response(null, { status: 200, headers: corsHeadersForRequest(request) });
 }
 
 /** Maximum request body size (bytes). Default 1MB. Override via MAX_PAYLOAD_BYTES env var. */
@@ -47,7 +94,10 @@ export async function parseJsonBodyWithLimit(
   }
 }
 
-/** Add CORS headers to an existing Response headers object. */
-export function withCors(headers: Record<string, string>): Record<string, string> {
-  return { ...headers, ...CORS_HEADERS };
+/** Merge CORS headers onto an existing headers object. Pass the request so origin can be matched. */
+export function withCors(
+  request: Request,
+  headers: Record<string, string> = {}
+): Record<string, string> {
+  return { ...headers, ...corsHeadersForRequest(request) };
 }

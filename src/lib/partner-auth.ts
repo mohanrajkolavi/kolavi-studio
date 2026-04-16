@@ -2,8 +2,24 @@ import { cookies } from "next/headers";
 import { NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 
-const raw = process.env.ADMIN_SECRET ?? "";
-const SECRET = (typeof raw === "string" ? raw.trim().replace(/^['"]|['"]$/g, "") : "") || undefined;
+function readEnvSecret(name: string): string | undefined {
+  const raw = process.env[name] ?? "";
+  const cleaned = typeof raw === "string" ? raw.trim().replace(/^['"]|['"]$/g, "") : "";
+  return cleaned || undefined;
+}
+
+// Partner auth uses its own signing key. Fall back to ADMIN_SECRET with a deprecation
+// warning so existing deploys keep working for one release cycle - remove the fallback next.
+const PARTNER_SECRET = readEnvSecret("PARTNER_AUTH_SECRET");
+const FALLBACK_ADMIN_SECRET = readEnvSecret("ADMIN_SECRET");
+const SECRET = PARTNER_SECRET ?? FALLBACK_ADMIN_SECRET;
+
+if (!PARTNER_SECRET && FALLBACK_ADMIN_SECRET && process.env.NODE_ENV === "production") {
+  console.warn(
+    "[partner-auth] PARTNER_AUTH_SECRET is not set - falling back to ADMIN_SECRET. Set a separate secret for partner tokens; the fallback will be removed."
+  );
+}
+
 const PARTNER_COOKIE_NAME = "partner-auth";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 14; // 14 days
 
@@ -65,7 +81,7 @@ async function hmacSha256Base64url(key: string, data: string): Promise<string> {
 }
 
 async function signToken(payload: string): Promise<string> {
-  if (!SECRET) throw new Error("ADMIN_SECRET not set");
+  if (!SECRET) throw new Error("PARTNER_AUTH_SECRET (or ADMIN_SECRET fallback) not set");
   const sig = await hmacSha256Base64url(SECRET, payload);
   return `${payload}.${sig}`;
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { sql } from "@/lib/db";
 import * as cheerio from "cheerio";
+import { assertSafePublicUrl, SsrfBlockedError } from "@/lib/security/url-guard";
+import { logError } from "@/lib/logging/error";
 
 const RATE_LIMIT_WINDOW_SEC = 60;
 const RATE_LIMIT_MAX = 5;
@@ -50,15 +52,6 @@ function getClientIp(request: NextRequest): string | null {
   return request.headers.get("x-real-ip")?.trim() ?? null;
 }
 
-function isValidUrl(url: string): boolean {
-  try {
-    const u = new URL(url);
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 async function fetchHtmlMetaTags(url: string) {
   try {
     const controller = new AbortController();
@@ -67,14 +60,23 @@ async function fetchHtmlMetaTags(url: string) {
     // Always fetch HTTPS first, fallback to HTTP is not recommended for audits anyway
     const secureUrl = url.startsWith('http://') ? url.replace('http://', 'https://') : url;
 
+    // Re-validate the rewritten URL against SSRF ranges (https variant may resolve differently).
+    await assertSafePublicUrl(secureUrl);
+
     const response = await fetch(secureUrl, {
       signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 KolaviAuditBot/1.0',
         'Accept': 'text/html'
-      }
+      },
+      redirect: "manual",
     });
     clearTimeout(timeoutId);
+
+    // Block redirects entirely - a redirect to a private IP would bypass our DNS check.
+    if (response.status >= 300 && response.status < 400) {
+      return null;
+    }
 
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -112,7 +114,7 @@ async function fetchHtmlMetaTags(url: string) {
       }
     };
   } catch (error) {
-    console.error('Meta tag fetch error:', error);
+    logError("speed-audit/meta", error);
     // Return null object indicating fetch failure, but don't crash
     return null;
   }
@@ -175,7 +177,7 @@ async function fetchPageSpeedScores(url: string) {
       }
     };
   } catch (err) {
-    console.error("PageSpeed API error:", err);
+    logError("speed-audit/pagespeed", err);
     return { error: err instanceof Error ? err.message : "Failed to fetch PageSpeed data" };
   }
 }
@@ -214,8 +216,19 @@ export async function POST(request: NextRequest) {
     const phone = typeof body.phone === "string" ? body.phone.trim() : "";
     const spaName = typeof body.spaName === "string" ? body.spaName.trim() : "";
 
-    if (!url || !isValidUrl(url)) {
+    if (!url) {
       return NextResponse.json({ error: "Valid website URL is required" }, { status: 400 });
+    }
+    try {
+      await assertSafePublicUrl(url);
+    } catch (err) {
+      if (err instanceof SsrfBlockedError) {
+        return NextResponse.json(
+          { error: "URL is not allowed. Use a public http(s) website address." },
+          { status: 400 }
+        );
+      }
+      throw err;
     }
 
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -287,7 +300,7 @@ export async function POST(request: NextRequest) {
       }
     });
   } catch (error) {
-    console.error("Speed audit error:", error);
+    logError("speed-audit", error);
     return NextResponse.json(
       { error: "Something went wrong. Please try again." },
       { status: 500 }

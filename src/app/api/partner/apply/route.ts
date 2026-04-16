@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { checkRateLimit } from "@/lib/rate-limit/generic";
+import { isValidEmail, EMAIL_MAX_LENGTH } from "@/lib/validators/email";
+import { logError } from "@/lib/logging/error";
 
 const APPLY_RATE_LIMIT = { maxRequests: 3, windowSec: 60 };
 
@@ -48,7 +50,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
     }
 
@@ -60,7 +62,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Source is required" }, { status: 400 });
     }
 
-    if (name.length > 255 || email.length > 255) {
+    if (name.length > 255 || email.length > EMAIL_MAX_LENGTH) {
       return NextResponse.json({ error: "Name or email is too long" }, { status: 400 });
     }
     if (typeof phone === "string" && phone.length > 50) {
@@ -134,9 +136,10 @@ export async function POST(request: NextRequest) {
       /does not exist|undefined table/i.test(msg);
 
     if (isTableMissing) {
-      console.error(
-        "Partner apply: table missing. Run migration: src/lib/db/migrations/001_partner_program.sql",
-        error
+      logError(
+        "partner-apply",
+        error,
+        { hint: "table missing. Run migration: src/lib/db/migrations/001_partner_program.sql" }
       );
       return NextResponse.json(
         { error: "Partner applications are not available" },
@@ -144,7 +147,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.error("Partner apply error:", error);
+    logError("partner-apply", error);
     return NextResponse.json(
       { error: "Failed to submit application. Please try again." },
       { status: 500 }

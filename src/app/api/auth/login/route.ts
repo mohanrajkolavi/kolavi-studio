@@ -6,6 +6,7 @@ import {
   recordFailedLogin,
   clearLoginRateLimit,
 } from "@/lib/auth/login-rate-limit";
+import { logError } from "@/lib/logging/error";
 
 const ADMIN_COOKIE_NAME = "admin-auth";
 
@@ -13,10 +14,7 @@ function timingSafeCompare(a: string, b: string): boolean {
   const trimmedA = (typeof a === "string" ? a : "").trim();
   const bufA = Buffer.from(trimmedA, "utf8");
   const bufB = Buffer.from(b, "utf8");
-  if (bufA.length !== bufB.length) {
-    crypto.timingSafeEqual(bufB, bufB);
-    return false;
-  }
+  if (bufA.length !== bufB.length) return false;
   if (bufB.length === 0) return trimmedA.length === 0;
   try {
     return crypto.timingSafeEqual(bufA, bufB);
@@ -137,13 +135,13 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
+      maxAge: 60 * 60 * 24 * 7, // 7 days
       path: "/",
     });
 
     return response;
   } catch (error) {
-    console.error("Login error:", error);
+    logError("admin-login", error);
     const wantsJson = (request.headers.get("content-type") || "").includes("application/json");
     if (wantsJson) return jsonError("Login failed", 500);
     return redirectWithError(request, "Login+failed");

@@ -1,62 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createHash } from "crypto";
 import { getSharedAnthropicClient } from "@/lib/anthropic/shared-client";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { logError } from "@/lib/logging/error";
 
 const RATE_LIMIT_WINDOW_SEC = 86400; // 24 hours
 const RATE_LIMIT_MAX = 6;
+const RATE_LIMIT_BUCKET = "bio-generator";
 const hasDb = !!process.env.DATABASE_URL;
-
-function hashIp(ip: string): string {
-  return createHash("sha256").update(`bio-gen-rl:${ip}`).digest("hex");
-}
-
-// In-memory rate limit fallback when DB is unavailable
-const memoryRateLimit = new Map<string, { count: number; resetAt: number }>();
-
-async function checkRateLimit(ipHash: string): Promise<boolean> {
-  if (hasDb) {
-    try {
-      const { sql } = await import("@/lib/db");
-      const now = new Date();
-      const resetAt = new Date(now.getTime() + RATE_LIMIT_WINDOW_SEC * 1000);
-      const updated = await sql`
-        INSERT INTO contact_rate_limit (ip_hash, request_count, reset_at)
-        VALUES (${ipHash}, 1, ${resetAt})
-        ON CONFLICT (ip_hash) DO UPDATE SET
-          request_count = CASE
-            WHEN contact_rate_limit.reset_at <= ${now} THEN 1
-            ELSE contact_rate_limit.request_count + 1
-          END,
-          reset_at = CASE
-            WHEN contact_rate_limit.reset_at <= ${now} THEN ${resetAt}
-            ELSE contact_rate_limit.reset_at
-          END
-        RETURNING request_count
-      `;
-      const count = Number(updated[0]?.request_count);
-      return Number.isFinite(count) && count >= 0 && count <= RATE_LIMIT_MAX;
-    } catch {
-      // Fall through to memory
-    }
-  }
-  const now = Date.now();
-  const entry = memoryRateLimit.get(ipHash);
-  if (!entry || entry.resetAt <= now) {
-    memoryRateLimit.set(ipHash, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_SEC * 1000 });
-    return true;
-  }
-  entry.count++;
-  return entry.count <= RATE_LIMIT_MAX;
-}
-
-function getClientIp(request: NextRequest): string | null {
-  return (
-    request.headers.get("x-vercel-ip")?.trim() ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip")?.trim() ||
-    null
-  );
-}
 
 /** Platform character limits. */
 const PLATFORM_LIMITS: Record<string, number> = {
@@ -121,7 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unable to verify request origin" }, { status: 400 });
     }
 
-    const allowed = await checkRateLimit(hashIp(ip));
+    const { allowed } = await checkRateLimit(RATE_LIMIT_BUCKET, ip, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_SEC);
     if (!allowed) {
       return NextResponse.json(
         { error: "Daily limit reached (6 generations per day). Please try again tomorrow." },
@@ -283,7 +233,7 @@ Platforms: ${platformSpec}`;
 
     return NextResponse.json({ success: true, bios: result });
   } catch (err) {
-    console.error("[bio-generator] Error:", err);
+    logError("bio-generator", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Something went wrong. Please try again." },
       { status: 500 }

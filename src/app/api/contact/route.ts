@@ -1,7 +1,9 @@
 import { createHash } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
-import { parsePartnerRefFromCookieHeader } from "@/lib/partner/cookie-server";
+import { parsePartnerRefFromCookieHeader, PARTNER_CODE_REGEX } from "@/lib/partner/cookie-server";
+import { isValidEmail, EMAIL_MAX_LENGTH } from "@/lib/validators/email";
+import { logError } from "@/lib/logging/error";
 
 const RATE_LIMIT_WINDOW_SEC = 60;
 const RATE_LIMIT_MAX = 5;
@@ -95,17 +97,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Partner attribution: body first, then Cookie header (handles fetch + cookie, or traditional POST)
+    const bodyRefTrimmed =
+      bodyRef && typeof bodyRef === "string" ? bodyRef.trim() : "";
     const referralCode =
-      bodyRef && typeof bodyRef === "string" && bodyRef.trim().length >= 6
-        ? bodyRef.trim()
+      bodyRefTrimmed && PARTNER_CODE_REGEX.test(bodyRefTrimmed)
+        ? bodyRefTrimmed
         : parsePartnerRefFromCookieHeader(request.headers.get("cookie"));
 
     let partnerId: string | null = null;
     let referralCodeVal: string | null = null;
     let source = "contact_form";
-    if (referralCode && referralCode.length >= 6) {
+    if (referralCode && PARTNER_CODE_REGEX.test(referralCode)) {
       try {
-        const code = referralCode.trim().slice(0, 50);
+        const code = referralCode.slice(0, 50);
         // Case-insensitive lookup so partner links work regardless of URL casing (e.g. ?ref=John2025 vs ?ref=JOHN2025)
         const partner = await sql`
           SELECT id, code FROM partners
@@ -129,7 +133,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (!isValidEmail(email)) {
       return NextResponse.json(
         { error: "Valid email is required" },
         { status: 400 }
@@ -150,7 +154,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (email.length > 255) {
+    if (email.length > EMAIL_MAX_LENGTH) {
       return NextResponse.json(
         { error: "Email is too long" },
         { status: 400 }
@@ -178,7 +182,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Contact form submission error:", error);
+    logError("contact", error);
 
     // In development, surface the real error so you can fix config/DB issues
     const isDev = process.env.NODE_ENV === "development";
