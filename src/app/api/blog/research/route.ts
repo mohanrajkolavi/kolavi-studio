@@ -8,13 +8,14 @@ import { prewarmClient as prewarmOpenAI } from "@/lib/openai/client";
 import { prewarmClient as prewarmGemini } from "@/lib/gemini/client";
 import { handleCorsPreflightIfNeeded, withCors } from "@/lib/api/middleware";
 
-const SSE_HEADERS = {
-  "Content-Type": "text/event-stream",
-  "Cache-Control": "no-cache, no-transform",
-  Connection: "keep-alive",
-  "X-Accel-Buffering": "no",
-  ...withCors({}),
-} as const;
+function sseHeaders(request: NextRequest): Record<string, string> {
+  return withCors(request, {
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+}
 
 export const maxDuration = 300;
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
   } catch {
     return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
       status: 400,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
 
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
   if ("error" in parsed) {
     return new Response(JSON.stringify({ error: parsed.error }), {
       status: 400,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
   const { pipelineInput } = parsed;
@@ -118,5 +119,5 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  return new Response(stream, { headers: SSE_HEADERS });
+  return new Response(stream, { headers: sseHeaders(request) });
 }

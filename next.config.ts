@@ -15,7 +15,6 @@ const nextConfig: NextConfig = {
       "@radix-ui/react-collapsible",
       "@radix-ui/react-dropdown-menu",
       "@radix-ui/react-label",
-      "@radix-ui/react-radio-group",
       "@radix-ui/react-select",
       "@radix-ui/react-separator",
       "@radix-ui/react-slot",

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
 import { checkCheckSignupRateLimit } from "@/lib/rate-limit/check-signup";
+import { logError } from "@/lib/logging/error";
 
 /** GET ?email=... - Check if email is eligible for partner signup (approved, not yet linked). */
 export async function GET(request: NextRequest) {
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ eligible: true });
   } catch (error) {
-    console.error("Check signup error:", error);
+    logError("partner-check-signup", error);
     return NextResponse.json({ eligible: false, reason: "Email not eligible for signup" });
   }
 }

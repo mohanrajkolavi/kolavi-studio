@@ -115,14 +115,6 @@
     padding-top: calc(1rem + env(safe-area-inset-top, 0));
   }
 
-  .safe-bottom {
-    padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0));
-  }
-
-  .safe-b {
-    padding-bottom: env(safe-area-inset-bottom, 0);
-  }
-
   /* Hide scrollbar for Chrome, Safari and Opera */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
@@ -160,14 +152,6 @@
     background: hsl(var(--muted-foreground) / 0.5);
   }
 
-  /* Dashboard: subtle grid pattern (theme-aware) */
-  .dashboard-grid {
-    background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.4) 1px, transparent 1px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.4) 1px, transparent 1px);
-    background-size: 24px 24px;
-  }
-
   /* Ultra-subtle, sharp shadows (Linear/Vercel inspired) */
   .shadow-premium {
     box-shadow:
@@ -179,18 +163,6 @@
     box-shadow: 0 4px 24px -4px rgb(0 0 0 / 0.3);
   }
 
-  /* Subtle page background gradient */
-  .page-gradient {
-    background: linear-gradient(180deg,
-        hsl(var(--muted) / 0.5) 0%,
-        hsl(var(--background)) 20%);
-  }
-
-  .dark .page-gradient {
-    background: linear-gradient(180deg,
-        hsl(var(--muted) / 0.3) 0%,
-        hsl(var(--background)) 15%);
-  }
 
   /* Premium Atmosphere Gradients (Replaced blurry divs and linear gradients) */
   .bg-hero-atmosphere {

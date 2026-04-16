@@ -4,7 +4,23 @@ import { NextRequest } from "next/server";
 const raw = process.env.ADMIN_SECRET ?? "";
 const ADMIN_SECRET = (typeof raw === "string" ? raw.trim().replace(/^['"]|['"]$/g, "") : "") || undefined;
 const ADMIN_COOKIE_NAME = "admin-auth";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days in seconds
+const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
+const MIN_ADMIN_SECRET_LENGTH = 32;
+
+if (process.env.NODE_ENV === "production") {
+  if (!ADMIN_SECRET) {
+    throw new Error("ADMIN_SECRET environment variable is required in production");
+  }
+  if (ADMIN_SECRET.length < MIN_ADMIN_SECRET_LENGTH) {
+    throw new Error(
+      `ADMIN_SECRET must be at least ${MIN_ADMIN_SECRET_LENGTH} characters. Generate with: openssl rand -hex 32`
+    );
+  }
+} else if (ADMIN_SECRET && ADMIN_SECRET.length < MIN_ADMIN_SECRET_LENGTH) {
+  console.warn(
+    `[auth] ADMIN_SECRET is shorter than ${MIN_ADMIN_SECRET_LENGTH} chars. Production will refuse to boot with this secret.`
+  );
+}
 
 // --- Edge-compatible helpers (no Node crypto) ---
 
@@ -135,7 +151,7 @@ export async function setAuthCookie(secret: string): Promise<void> {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
+    maxAge: SESSION_MAX_AGE,
   });
 }
 

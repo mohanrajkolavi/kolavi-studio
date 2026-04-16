@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   if (!(await isAuthenticated(request))) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), {
       status: 401,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
 
@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   if ("error" in parsed) {
     return new Response(JSON.stringify({ error: parsed.error }), {
       status: parsed.status,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
   const body = parsed.data as { jobId?: string };
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
   if (!jobId) {
     return new Response(JSON.stringify({ error: "jobId is required" }), {
       status: 400,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
 
@@ -44,14 +44,14 @@ export async function POST(request: NextRequest) {
   if (!job) {
     return new Response(JSON.stringify({ error: "Job not found" }), {
       status: 400,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
   const draft = await jobStore.getChunkOutput(jobId, "draft");
   if (!draft || !draft.content) {
     return new Response(JSON.stringify({ error: "Draft not completed" }), {
       status: 400,
-      headers: withCors({ "Content-Type": "application/json" }),
+      headers: withCors(request, { "Content-Type": "application/json" }),
     });
   }
 
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       }),
       {
         status: 200,
-        headers: withCors({ "Content-Type": "application/json" }),
+        headers: withCors(request, { "Content-Type": "application/json" }),
       }
     );
   } catch (error) {
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       }),
       {
         status: 200,
-        headers: withCors({ "Content-Type": "application/json" }),
+        headers: withCors(request, { "Content-Type": "application/json" }),
       }
     );
   }
