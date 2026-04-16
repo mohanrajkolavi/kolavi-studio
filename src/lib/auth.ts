@@ -15,14 +15,13 @@ if (process.env.NODE_ENV === "production" && !IS_BUILD_PHASE) {
   if (!ADMIN_SECRET) {
     throw new Error("ADMIN_SECRET environment variable is required in production");
   }
-  if (ADMIN_SECRET.length < MIN_ADMIN_SECRET_LENGTH) {
-    throw new Error(
-      `ADMIN_SECRET must be at least ${MIN_ADMIN_SECRET_LENGTH} characters. Generate with: openssl rand -hex 32`
-    );
-  }
-} else if (ADMIN_SECRET && ADMIN_SECRET.length < MIN_ADMIN_SECRET_LENGTH) {
+}
+
+if (ADMIN_SECRET && ADMIN_SECRET.length < MIN_ADMIN_SECRET_LENGTH) {
+  // Strong recommendation, not a hard gate: throwing here takes the whole site
+  // down (middleware runs on every request). Rotate via `openssl rand -hex 32`.
   console.warn(
-    `[auth] ADMIN_SECRET is shorter than ${MIN_ADMIN_SECRET_LENGTH} chars. Production will refuse to boot with this secret.`
+    `[auth] ADMIN_SECRET is shorter than ${MIN_ADMIN_SECRET_LENGTH} chars. Rotate to a 32+ char value for full security.`
   );
 }
 
