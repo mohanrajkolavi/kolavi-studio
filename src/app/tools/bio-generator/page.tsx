@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getPageMetadata } from "@/lib/seo/metadata";
 import { BioGenerator } from "@/components/tools/BioGenerator";
 import { SITE_URL } from "@/lib/constants";
@@ -17,6 +18,8 @@ import {
   AlertTriangle,
   CheckCircle,
   Lightbulb,
+  Mail,
+  Compass,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -686,6 +689,37 @@ export default function BioGeneratorPage() {
                 </div>
               </details>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* RELATED TOOLS */}
+      <section className="border-t border-border bg-muted/30 py-20 sm:py-24">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
+          <div className="text-center mb-10 animate-reveal">
+            <h2 className="text-h3 text-foreground">More Free AI Tools From KolaviStudio</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-reveal" style={{ animationDelay: "100ms" }}>
+            {[
+              { href: "/tools/email-generator", title: "AI Email Generator", desc: "Write cold outreach, follow-ups, replies, subject lines, and signatures in seconds.", icon: Mail },
+              { href: "/tools/slogan-generator", title: "AI Slogan Generator", desc: "8 catchy slogans, taglines, mottos, or catchphrases in seconds.", icon: Megaphone },
+              { href: "/tools/motto-generator", title: "Motto Generator", desc: "Inspiring mottos for yourself, your family, your team, or your company.", icon: Compass },
+            ].map((tool) => {
+              const Icon = tool.icon;
+              return (
+                <Link
+                  key={tool.href}
+                  href={tool.href}
+                  className="rounded-[20px] border border-border bg-card p-6 shadow-sm transition-all duration-300 hover:shadow-premium hover:-translate-y-1 group block"
+                >
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                    <Icon className="w-5 h-5 text-primary" />
+                  </div>
+                  <h3 className="text-[16px] font-bold text-foreground mb-2">{tool.title}</h3>
+                  <p className="text-[13px] text-muted-foreground leading-relaxed">{tool.desc}</p>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>

@@ -8,6 +8,7 @@ import {
   FileCode,
   Megaphone,
   Compass,
+  Mail,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,9 +50,20 @@ const tools: Tool[] = [
     icon: UserPen,
     title: "AI Bio Generator",
     description:
-      "Generate platform-optimized bios for LinkedIn, Twitter/X, Instagram, TikTok, and more — all at once from a single input. Free, no signup.",
+      "Generate platform-optimized bios for LinkedIn, Twitter/X, Instagram, TikTok, and more - all at once from a single input. Free, no signup.",
     cta: "Generate Your Bio",
     featured: false,
+  },
+  {
+    id: "email-generator",
+    href: "/tools/email-generator",
+    icon: Mail,
+    title: "AI Email Generator",
+    description:
+      "Write professional emails in 10 seconds. 15 email types (cold outreach, follow-ups, replies, and more), 3 variants per generation, plus subject line and signature modes.",
+    cta: "Generate an Email",
+    featured: false,
+    badge: "New",
   },
   {
     id: "sitemap-generator",

@@ -25,6 +25,7 @@ export const EVENTS = {
   CONTACT_FORM_SUBMIT: "contact_form_submit",
   PRICING_TIER_CLICK: "pricing_tier_click",
   BIO_GENERATOR_SUBMIT: "bio_generator_submit",
+  EMAIL_GENERATOR_SUBMIT: "email_generator_submit",
   SITEMAP_GENERATOR_SUBMIT: "sitemap_generator_submit",
   SITEMAP_GENERATOR_DOWNLOAD: "sitemap_generator_download",
   SITEMAP_GENERATOR_COPY: "sitemap_generator_copy",
