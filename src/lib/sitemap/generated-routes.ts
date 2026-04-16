@@ -33,12 +33,8 @@ export const DISCOVERED_ROUTES: string[] = [
   "/terms",
   "/tools",
   "/tools/bio-generator",
-  "/tools/competitor-comparison",
   "/tools/motto-generator",
-  "/tools/roi-calculator",
   "/tools/sitemap-generator",
   "/tools/slogan-generator",
   "/tools/speed-audit",
-  "/tools/treatment-analyzer",
-  "/tools/treatment-visualizer",
 ];

@@ -32,7 +32,6 @@
 
 ### Phase 4: Lead Magnet Tools ✅
 - **Speed Audit** (`/tools/speed-audit`): Form with URL + email. API `/api/speed-audit` calls PageSpeed Insights when `GOOGLE_PAGESPEED_API_KEY` set. Stores leads with source `speed_audit`. Returns scores inline.
-- **Treatment Analyzer** (`/tools/treatment-analyzer`): Form placeholder. Submits to contact API. Phase 4 full implementation (crawl + ranking) deferred.
 - **GEO Visibility Checker**: Not implemented (requires ChatGPT/Perplexity APIs)
 
 ### Phase 5: Conversion Optimization ✅
@@ -46,7 +45,7 @@
 - **SITE_DESCRIPTION**: Updated to Next.js/AI/med spa focus
 - **Organization schema**: Updated description
 - **Homepage FAQ schema**: FAQPage JSON-LD added
-- **Sitemap**: Added `/tools/speed-audit`, `/tools/treatment-analyzer`
+- **Sitemap**: Added `/tools/speed-audit`
 - Title/meta already updated in Phases 2-3
 
 ## Phase 7: Content Updates
@@ -61,10 +60,7 @@
 
 ## Phase 8: Interactive Elements
 - **Code/Implementation Complete**:
-  - ROI Calculator (`/tools/roi-calculator`)
-  - Treatment Coverage Visualizer (`/tools/treatment-visualizer`)
   - PageSpeed Before/After slider (homepage)
-  - Competitor Comparison Tool (`/tools/competitor-comparison`)
 
 ## Phase 9: Email & Automation
 - **Code/Implementation Complete**:
@@ -136,17 +132,12 @@ src/components/sections/medspa/
   MultiTreatmentCaseStudies.tsx
 
 src/components/tools/
-  SpeedAuditForm.tsx, TreatmentAnalyzerForm.tsx, TreatmentVisualizer.tsx,
-  CompetitorComparisonTool.tsx, ROICalculator.tsx (implemented),
+  SpeedAuditForm.tsx
 
 src/components/conversion/
   ExitIntentPopup.tsx, StickyLeadBar.tsx
 
 src/app/tools/speed-audit/page.tsx
-src/app/tools/treatment-analyzer/page.tsx
-src/app/tools/roi-calculator/page.tsx
-src/app/tools/treatment-visualizer/page.tsx
-src/app/tools/competitor-comparison/page.tsx
 src/app/book/page.tsx
 src/app/dashboard/metrics/page.tsx
 
@@ -173,4 +164,3 @@ Visit:
 - Homepage: http://localhost:3000
 - Med Spa: http://localhost:3000/medical-spas
 - Speed Audit: http://localhost:3000/tools/speed-audit
-- Treatment Analyzer: http://localhost:3000/tools/treatment-analyzer

@@ -43,11 +43,11 @@ export const STATIC_PAGE_GROUPS: StaticPageGroup[] = [
     category: "Tools",
     pages: [
       { path: "/tools", label: "Tools Hub" },
-      { path: "/tools/roi-calculator", label: "ROI Calculator" },
       { path: "/tools/speed-audit", label: "Speed Audit" },
-      { path: "/tools/competitor-comparison", label: "Competitor Comparison" },
-      { path: "/tools/treatment-analyzer", label: "Treatment Analyzer" },
-      { path: "/tools/treatment-visualizer", label: "Treatment Visualizer" },
+      { path: "/tools/bio-generator", label: "Bio Generator" },
+      { path: "/tools/sitemap-generator", label: "Sitemap Generator" },
+      { path: "/tools/slogan-generator", label: "Slogan Generator" },
+      { path: "/tools/motto-generator", label: "Motto Generator" },
     ],
   },
   {

@@ -58,7 +58,7 @@ export function MultiTreatmentCaseStudies() {
 
           <div className="mt-12 text-center">
             <Button asChild size="lg" className="rounded-2xl bg-orange-600 px-8 font-semibold hover:bg-orange-700">
-              <Link href="/tools/treatment-analyzer">Get Similar Results: Analyze My Menu</Link>
+              <Link href="/contact">Get Similar Results: Book a Consultation</Link>
             </Button>
           </div>
         </div>

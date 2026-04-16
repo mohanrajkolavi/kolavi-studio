@@ -17,14 +17,6 @@ export function useTrackConversion() {
     trackEvent(EVENTS.SPEED_AUDIT_SUBMIT, { url: sanitizeUrl(url) });
   }, []);
 
-  const trackTreatmentAnalyzer = useCallback((url: string) => {
-    trackEvent(EVENTS.TREATMENT_ANALYZER_SUBMIT, { url: sanitizeUrl(url) });
-  }, []);
-
-  const trackCompetitorComparison = useCallback(() => {
-    trackEvent(EVENTS.COMPETITOR_COMPARISON_SUBMIT);
-  }, []);
-
   const trackContactSubmit = useCallback(() => {
     trackEvent(EVENTS.CONTACT_FORM_SUBMIT);
   }, []);
@@ -35,8 +27,6 @@ export function useTrackConversion() {
 
   return {
     trackSpeedAudit,
-    trackTreatmentAnalyzer,
-    trackCompetitorComparison,
     trackContactSubmit,
     trackPricingClick,
   };

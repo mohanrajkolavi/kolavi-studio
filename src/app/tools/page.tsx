@@ -2,10 +2,6 @@ import { getPageMetadata } from "@/lib/seo/metadata";
 import Link from "next/link";
 import {
   Zap,
-  BarChart3,
-  Calculator,
-  LayoutGrid,
-  Users,
   ArrowRight,
   Sparkles,
   UserPen,
@@ -30,10 +26,10 @@ type Tool = {
 export const metadata = getPageMetadata({
   title: "Free SEO & Marketing Tools for Med Spas",
   description:
-    "Free tools to power your SEO strategy: website speed audit, treatment coverage analyzer, ROI calculator, competitor comparison, and more. No signup required.",
+    "Free tools to power your SEO strategy: website speed audit, AI bio generator, sitemap generator, slogan generator, and more. No signup required.",
   path: "/tools",
   keywords:
-    "med spa SEO tools, free SEO audit, website speed audit, treatment analyzer, med spa ROI calculator, competitor comparison",
+    "med spa SEO tools, free SEO audit, website speed audit, sitemap generator, bio generator, slogan generator",
 });
 
 const tools: Tool[] = [
@@ -46,46 +42,6 @@ const tools: Tool[] = [
       "Get a free PageSpeed and SEO health check. See how your med spa site performs, what’s costing you patients, and how you compare to the 95+ benchmark.",
     cta: "Get Your Free Audit",
     featured: true,
-  },
-  {
-    id: "treatment-analyzer",
-    href: "/tools/treatment-analyzer",
-    icon: BarChart3,
-    title: "Treatment Coverage Analyzer",
-    description:
-      "Enter your website URL. We identify all treatments you offer, check local rankings, and show the revenue opportunity you’re missing.",
-    cta: "Analyze My Menu",
-    featured: false,
-  },
-  {
-    id: "roi-calculator",
-    href: "/tools/roi-calculator",
-    icon: Calculator,
-    title: "ROI Calculator",
-    description:
-      "See how much revenue you could gain by ranking for all your treatments, not just your top one. Multi-treatment SEO ROI in minutes.",
-    cta: "Calculate ROI",
-    featured: false,
-  },
-  {
-    id: "treatment-visualizer",
-    href: "/tools/treatment-visualizer",
-    icon: LayoutGrid,
-    title: "Treatment Coverage Visualizer",
-    description:
-      "Select which treatments you offer and see how much search volume you’re missing. Current vs. potential state at a glance.",
-    cta: "Visualize Coverage",
-    featured: false,
-  },
-  {
-    id: "competitor-comparison",
-    href: "/tools/competitor-comparison",
-    icon: Users,
-    title: "Competitor Comparison",
-    description:
-      "Compare your site to up to 3 competitors. PageSpeed, treatment pages, and digital presence gaps—so you know where you stand.",
-    cta: "Compare Competitors",
-    featured: false,
   },
   {
     id: "bio-generator",
@@ -151,7 +107,7 @@ export default function ToolsPage() {
                 Free Tools to Power Your Med Spa SEO
               </h1>
               <p className="text-[18px] sm:text-[20px] text-muted-foreground max-w-2xl mx-auto leading-relaxed text-balance">
-                Part of our SEO strategy: use these tools to audit your site, analyze treatment coverage, estimate ROI, and compare yourself to competitors. No signup. No credit card. Just data.
+                Part of our SEO strategy: use these tools to audit your site, generate bios and sitemaps, and craft taglines. No signup. No credit card. Just data.
               </p>
             </div>
           </div>

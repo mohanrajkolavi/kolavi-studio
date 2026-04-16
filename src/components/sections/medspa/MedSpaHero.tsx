@@ -19,16 +19,16 @@ export function MedSpaHero() {
       >
         <div className="flex flex-col gap-4 sm:flex-row sm:justify-center">
           <Link
-            href="/tools/treatment-analyzer"
+            href="/tools/speed-audit"
             className="inline-flex items-center justify-center gap-2 rounded-full bg-orange-600 px-8 py-3 font-semibold text-white transition-colors hover:bg-orange-700"
           >
-            Analyze My Full Treatment Menu
+            Get Free Speed Audit
           </Link>
           <Link
-            href="/tools/speed-audit"
+            href="/contact"
             className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-border bg-card px-8 py-3 font-semibold text-foreground transition-colors hover:bg-muted"
           >
-            Get Free Speed Audit
+            Book a Consultation
           </Link>
         </div>
       </PageHero>

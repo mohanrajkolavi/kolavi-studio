@@ -14,11 +14,10 @@
 ## Free Tools
 
 - [SEO & Speed Audit](https://kolavistudio.com/tools/speed-audit): PageSpeed and SEO health check with competitor comparison against 95+ benchmark
-- [Treatment Coverage Analyzer](https://kolavistudio.com/tools/treatment-analyzer): Analyzes your site content, shows local ranking positions, reveals revenue opportunities
-- [ROI Calculator](https://kolavistudio.com/tools/roi-calculator): Projects revenue from ranking for multiple keywords with multi-channel ROI estimation
-- [Treatment Coverage Visualizer](https://kolavistudio.com/tools/treatment-visualizer): Visual display of content coverage vs search volume and potential
-- [Competitor Comparison](https://kolavistudio.com/tools/competitor-comparison): Compare up to 3 competitors on PageSpeed, content pages, and digital presence
 - [AI Bio Generator](https://kolavistudio.com/tools/bio-generator): Platform-optimized bios for LinkedIn, Twitter/X, Instagram, TikTok with multiple versions
+- [XML Sitemap Generator](https://kolavistudio.com/tools/sitemap-generator): Crawls your site and generates a downloadable sitemap.xml file
+- [AI Slogan Generator](https://kolavistudio.com/tools/slogan-generator): Generates catchy slogans, taglines, mottos, and catchphrases
+- [Motto Generator](https://kolavistudio.com/tools/motto-generator): Creates values-driven mottos for individuals, families, teams, and companies
 
 ## Markdown Tools
 
