@@ -7,7 +7,11 @@ const ADMIN_COOKIE_NAME = "admin-auth";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 7; // 7 days in seconds
 const MIN_ADMIN_SECRET_LENGTH = 32;
 
-if (process.env.NODE_ENV === "production") {
+// Skip the fail-fast during `next build` page-data collection; it still fires
+// when the server actually boots to serve traffic.
+const IS_BUILD_PHASE = process.env.NEXT_PHASE === "phase-production-build";
+
+if (process.env.NODE_ENV === "production" && !IS_BUILD_PHASE) {
   if (!ADMIN_SECRET) {
     throw new Error("ADMIN_SECRET environment variable is required in production");
   }

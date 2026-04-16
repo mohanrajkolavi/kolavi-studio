@@ -13,10 +13,10 @@ import type { NextRequest } from "next/server";
 
 const IS_PROD = process.env.NODE_ENV === "production";
 const HAS_DB = !!process.env.DATABASE_URL?.trim();
+// Skip the fail-fast during `next build`; the runtime server boot re-runs module init.
+const IS_BUILD_PHASE = process.env.NEXT_PHASE === "phase-production-build";
 
-if (IS_PROD && !HAS_DB) {
-  // Fail fast at module load so the bad config is visible in deploy logs rather than
-  // silently degrading to per-instance memory that attackers can bypass.
+if (IS_PROD && !HAS_DB && !IS_BUILD_PHASE) {
   throw new Error(
     "[rate-limit] DATABASE_URL is required in production. In-memory rate limiting is not safe across serverless instances."
   );
