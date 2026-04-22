@@ -30,6 +30,7 @@
 - [Markdown Syntax Guide](https://kolavistudio.com/markdown-syntax): Complete guide to standard markdown syntax
 - [Extended Syntax Guide](https://kolavistudio.com/markdown-extended-syntax): Tables, footnotes, task lists, and more
 - [Markdown Guide](https://kolavistudio.com/markdown-guide): Beginner-friendly introduction to markdown
+- [Obsidian Markdown Guide](https://kolavistudio.com/markdown-tools/obsidian): Complete Obsidian markdown syntax guide, cheat sheet, wiki-links, callouts, tables, and editor tips
 
 ## Key Pages
 
