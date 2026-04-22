@@ -9,7 +9,7 @@ import { ToolFooter } from "@/components/markdown-tools/ToolFooter";
 const PAGE_PATH = "/markdown-guide";
 const DATE_PUBLISHED = "2026-03-25T00:00:00Z";
 const DATE_MODIFIED = "2026-04-22T00:00:00Z";
-const LAST_UPDATED_LABEL = "Last updated: April 2026";
+const LAST_UPDATED_LABEL = "Last updated: April 22, 2026";
 const AUTHOR_NAME = "Mohan Raj Kolavi";
 const AUTHOR_URL = "/about";
 
