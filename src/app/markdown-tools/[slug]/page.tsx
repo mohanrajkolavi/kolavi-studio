@@ -9,11 +9,17 @@ import { ToolFooter } from "@/components/markdown-tools/ToolFooter";
 import { MARKDOWN_TOOLS, getToolBySlug } from "@/lib/markdown/tools-data";
 
 // ---------------------------------------------------------------------------
-// Static params: generate a page for every tool WITHOUT an externalPath
+// Static params: generate a page for every tool WITHOUT an externalPath.
+// Slugs with a bespoke static route (e.g. /markdown-tools/obsidian/page.tsx)
+// are excluded here - the static route wins over the dynamic route.
 // ---------------------------------------------------------------------------
 
+const BESPOKE_ROUTE_SLUGS = new Set<string>(["obsidian"]);
+
 export function generateStaticParams() {
-  return MARKDOWN_TOOLS.filter((t) => !t.externalPath).map((t) => ({
+  return MARKDOWN_TOOLS.filter(
+    (t) => !t.externalPath && !BESPOKE_ROUTE_SLUGS.has(t.slug),
+  ).map((t) => ({
     slug: t.slug,
   }));
 }
