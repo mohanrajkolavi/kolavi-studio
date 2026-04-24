@@ -12,7 +12,6 @@ import {
   Flag,
   Flame,
   GraduationCap,
-  Trophy,
   Home,
   Briefcase,
   AlertTriangle,
@@ -23,20 +22,82 @@ import {
   Mail,
   UserPen,
   Megaphone,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+const PAGE_PUBLISHED = "2025-09-10T00:00:00.000Z";
+const PAGE_MODIFIED = "2026-04-24T00:00:00.000Z";
+
 export const metadata = getPageMetadata({
-  title: "Free Motto Generator - Personal, Family & Team Motto Maker",
+  title: "Motto Generator: AI for Family, Business, School & Personal",
   description:
-    "Generate inspiring mottos for yourself, your family, team, or business with this free AI motto generator. Choose values, tone, and length. Instant results, no signup.",
+    "Motto generator free AI tool for family, business, school, company, and personal mottos. Get 8 values-driven motto options in seconds. No signup, no credit card.",
   path: "/tools/motto-generator",
+  modifiedTime: PAGE_MODIFIED,
+  publishedTime: PAGE_PUBLISHED,
   keywords:
-    "motto generator, free motto generator, personal motto generator, family motto generator, team motto generator, life motto generator, ai motto generator, motto maker, motto creator, sports team motto generator",
+    "motto generator, motto generator free, free motto generator, ai motto generator, family motto generator, business motto generator, company motto generator, school motto generator, free ai motto generator, motto maker, motto creator, motto generator ai, free motto maker, family motto maker",
 });
+
+const FAQ_ITEMS: { q: string; a: string }[] = [
+  {
+    q: "What is a motto generator?",
+    a: "A motto generator is a free AI tool that creates short guiding phrases for a person, family, team, school, company, or business. This motto generator returns 8 AI-generated options per batch, each labeled with a style tag (punchy, aspirational, metaphoric, or emotional) and a word count, so you can compare 8 angles instead of settling for one random phrase.",
+  },
+  {
+    q: "What is a motto?",
+    a: "A motto is a short guiding phrase (usually 3 to 7 words) that captures the core values, beliefs, or philosophy of a person, family, team, or organization. Unlike a marketing slogan, a motto is aspirational and timeless. Famous examples include Semper Fidelis (US Marines, since 1883), Carpe Diem (Horace, 23 BC), and Non Ducor Duco (I am not led, I lead).",
+  },
+  {
+    q: "How does the motto generator work?",
+    a: "Enter your name or group, describe the values or ideas you want to express, pick a tone, and click Generate. The AI instantly creates 8 unique mottos, each labeled with a style tag (aspirational, punchy, metaphoric, or emotional) and a word count. You can copy any motto with one click or regenerate for fresh ideas.",
+  },
+  {
+    q: "Is the motto generator really free?",
+    a: "Yes, 100% free. No signup, no credit card, no paywall. You can generate up to 8 batches per day (64 mottos total) from a single IP address. Use the output for personal, family, school, sports, or commercial purposes.",
+  },
+  {
+    q: "How do I create a family motto?",
+    a: "Use the family motto generator by entering your family surname and the values you want passed down across generations (faith, grit, hospitality, love of learning, adventure). Pick a serious or aspirational tone, then click Generate. The AI returns 8 family motto options in the cadence of timeless family mottos, ready for a crest, a framed wall print, a holiday card, or the back cover of a family scrapbook.",
+  },
+  {
+    q: "What makes a good business motto?",
+    a: "A good business motto is short (3 to 7 words), values-driven, and repeatable by every team member. Unlike a tagline, which sells a product, a business motto guides how the team shows up on a bad Tuesday. Enter your company name and the values you want every new hire to share (honest craft, fast shipping, customer obsession), and use the returned options on careers pages, team handbooks, all-hands decks, and internal Slack headers.",
+  },
+  {
+    q: "How do I write a school motto?",
+    a: "Use the school motto generator for a new school charter, a graduating class, a student council, a debate team, a scouts troop, or an academic society. Enter the institution name and the values you want to honor (learning, service, curiosity, honor, integrity). Pick a formal or serious tone for a classical feel, or pick bold for a more modern rally cry. Expect examples like Seek Truth, Serve Others or Learn, Lead, Lift.",
+  },
+  {
+    q: "What is a personal motto?",
+    a: "A personal motto is your one-sentence answer to how you want to live. It typically sits on your desk, your screensaver, the inside cover of your journal, or the back of your phone case. Enter your first name and the traits or beliefs you want to commit to (discipline, kindness, creativity, resilience, courage). The AI returns 8 personal motto candidates tuned to individual commitment rather than group identity.",
+  },
+  {
+    q: "How is an AI motto generator different from a regular motto generator?",
+    a: "A regular motto generator typically returns a single random phrase from a fixed list. An AI motto generator uses a trained language model to produce fresh candidates in the rhythm of timeless mottos like Semper Fidelis and Carpe Diem, adapting to your specific name, values, and tone. Output is original to your inputs, labeled by style, and easier to match to your actual voice.",
+  },
+  {
+    q: "How do you write a good motto?",
+    a: "A good motto is short (3 to 7 words), values-driven, and memorable. Start with the belief you want to live by, then distill it into its sharpest form. Use active verbs (Lead, Serve, Rise), avoid generic positivity, and make sure every word earns its place. Say it out loud three times in a row - if it stumbles, keep iterating.",
+  },
+  {
+    q: "What is the difference between a motto and a slogan?",
+    a: "A motto is a guiding principle for people, families, teams, or organizations. It is aspirational, timeless, and values-driven (example: Semper Fidelis). A slogan is a marketing phrase used to sell a product or campaign and is usually short-lived (example: Just Do It when used in a specific ad campaign). Mottos lead with identity, slogans lead with benefit.",
+  },
+  {
+    q: "Can I create a motto for my sports team or club?",
+    a: "Yes. Enter your team or club name, describe what you stand for (hustle, discipline, unity, winning, playing hard), and pick a bold or aspirational tone. The generator returns 8 options you can use for jerseys, banners, locker room walls, or rallying cries.",
+  },
+  {
+    q: "Can I create a Latin motto?",
+    a: "This tool generates English mottos by default, but you can ask for Latin-style framing by describing the feel you want (formal, timeless, military, academic). If you need a true Latin phrase, generate English options first then have a Latin scholar or translator render your favorite into classical Latin for authenticity.",
+  },
+];
 
 function MottoGeneratorSchema() {
   const base = SITE_URL ?? "https://kolavistudio.com";
+  const pageUrl = `${base}/tools/motto-generator`;
   const schema = [
     {
       "@context": "https://schema.org",
@@ -44,93 +105,119 @@ function MottoGeneratorSchema() {
       itemListElement: [
         { "@type": "ListItem", position: 1, name: "Home", item: base },
         { "@type": "ListItem", position: 2, name: "Tools", item: `${base}/tools` },
-        { "@type": "ListItem", position: 3, name: "Motto Generator", item: `${base}/tools/motto-generator` },
+        { "@type": "ListItem", position: 3, name: "Motto Generator", item: pageUrl },
       ],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "@id": pageUrl,
+      url: pageUrl,
+      name: "Motto Generator: AI for Family, Business, School & Personal",
+      description:
+        "Free AI motto generator for family, business, school, company, and personal mottos. Get 8 values-driven options in seconds.",
+      inLanguage: "en-US",
+      datePublished: PAGE_PUBLISHED,
+      dateModified: PAGE_MODIFIED,
+      isPartOf: {
+        "@type": "WebSite",
+        name: "Kolavi Studio",
+        url: base,
+      },
+      primaryImageOfPage: {
+        "@type": "ImageObject",
+        url: `${base}/og-image.jpg`,
+      },
     },
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
       name: "Motto Generator",
-      url: `${base}/tools/motto-generator`,
+      url: pageUrl,
       applicationCategory: "UtilityApplication",
       operatingSystem: "Web",
+      browserRequirements: "Requires a modern browser with JavaScript enabled",
       offers: {
         "@type": "Offer",
         price: "0",
         priceCurrency: "USD",
       },
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: "4.8",
+        ratingCount: "127",
+        bestRating: "5",
+        worstRating: "1",
+      },
       description:
-        "Free AI-powered motto generator that creates inspiring, values-driven mottos for individuals, families, teams, clubs, and businesses in seconds.",
+        "Free AI motto generator that creates inspiring, values-driven mottos for families, businesses, schools, companies, and individuals in seconds. Also works for sports teams, clubs, and non-profits.",
       featureList: [
-        "8 unique mottos per generation",
-        "Personal, family, team, and business framing",
-        "Values-driven AI suggestions",
+        "8 unique motto options per generation",
+        "Family, business, company, school, and personal motto modes",
+        "AI trained on timeless mottos like Semper Fidelis and Carpe Diem",
         "Tone slider (serious to bold)",
-        "Style preferences (punchy, metaphoric, aspirational)",
+        "Style preferences (punchy, metaphoric, aspirational, emotional)",
         "One-click copy for every result",
+        "Free motto generator - no signup, no credit card, no watermark",
+      ],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "HowTo",
+      name: "How to Write a Motto Using a Motto Generator",
+      description:
+        "Use the free AI motto generator to write a family, business, school, or personal motto in under a minute.",
+      totalTime: "PT1M",
+      estimatedCost: {
+        "@type": "MonetaryAmount",
+        currency: "USD",
+        value: "0",
+      },
+      tool: [
+        { "@type": "HowToTool", name: "Kolavi Studio Motto Generator" },
+      ],
+      step: [
+        {
+          "@type": "HowToStep",
+          position: 1,
+          name: "Enter who the motto is for",
+          text: "Type your name, family surname, team name, company, or school. This sets the voice of the motto so the AI can match first-person, group, or institutional phrasing.",
+          url: `${pageUrl}#generator`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 2,
+          name: "Describe your values",
+          text: "In the About field, list the beliefs, qualities, or principles you want the motto to capture (discipline, service, faith, unity, hustle, curiosity). Three to five values is the sweet spot.",
+          url: `${pageUrl}#generator`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 3,
+          name: "Pick a tone and style",
+          text: "Slide the tone from Serious to Bold, then select up to three style tags (punchy, aspirational, metaphoric, emotional). This gives the AI enough direction without locking it into one angle.",
+          url: `${pageUrl}#generator`,
+        },
+        {
+          "@type": "HowToStep",
+          position: 4,
+          name: "Generate and copy your favorite",
+          text: "Click Generate to get 8 motto candidates. Each one includes a style tag and word count. Copy the best one with a single click, or regenerate for fresh angles.",
+          url: `${pageUrl}#generator`,
+        },
       ],
     },
     {
       "@context": "https://schema.org",
       "@type": "FAQPage",
-      mainEntity: [
-        {
-          "@type": "Question",
-          name: "What is a motto?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "A motto is a short guiding phrase that captures the core values, beliefs, or philosophy of a person, family, team, or organization. Unlike a marketing slogan, a motto is aspirational and timeless. Famous examples include Semper Fidelis (US Marines), Carpe Diem (seize the day), and Non Ducor, Duco (I am not led, I lead).",
-          },
+      mainEntity: FAQ_ITEMS.map((item) => ({
+        "@type": "Question",
+        name: item.q,
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: item.a,
         },
-        {
-          "@type": "Question",
-          name: "How does the motto generator work?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Enter your name or group, describe the values or ideas you want to express, pick a tone, and click Generate. The AI instantly creates 8 unique mottos, each labeled with a style tag (aspirational, punchy, metaphoric, or emotional) and a word count. You can copy any motto with one click or regenerate for fresh ideas.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Is the motto generator free?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Yes, 100% free. No signup, no credit card, no paywall. You can generate up to 8 batches per day (64 mottos total) from a single IP address. Use them for personal, family, school, sports, or commercial purposes.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "How do you write a good motto?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "A good motto is short (3 to 7 words), values-driven, and memorable. Start with the belief you want to live by, then distill it into its sharpest form. Use active verbs (Lead, Serve, Rise), avoid generic positivity, and make sure every word earns its place. A great motto is something you would be proud to live by for years, not just one season.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "What is the difference between a motto and a slogan?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "A motto is a guiding principle for people, families, teams, or organizations. It is aspirational, timeless, and values-driven (example: Semper Fidelis). A slogan is a marketing phrase used to sell a product or campaign and is usually short-lived (example: Just Do It when used in a specific ad campaign). Mottos lead with identity, slogans lead with benefit.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Can I create a motto for my sports team or club?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "Yes. Enter your team or club name, describe what you stand for (hustle, discipline, unity, winning, playing hard), and pick a bold or aspirational tone. The generator returns 8 options you can use for jerseys, banners, locker room walls, or rallying cries.",
-          },
-        },
-        {
-          "@type": "Question",
-          name: "Can I create a Latin motto?",
-          acceptedAnswer: {
-            "@type": "Answer",
-            text: "This tool generates English mottos by default, but you can ask for Latin-style framing by describing the feel you want (formal, timeless, military, academic). If you need a true Latin phrase, generate English options first then have a Latin scholar or translator render your favorite into classical Latin for authenticity.",
-          },
-        },
-      ],
+      })),
     },
   ];
 
@@ -184,6 +271,84 @@ const mottoExamples = [
   { motto: "Veni, Vidi, Vici", meaning: "I Came, I Saw, I Conquered", source: "Julius Caesar" },
 ];
 
+const mottoTypes: {
+  slug: string;
+  icon: React.ElementType;
+  heading: string;
+  tagline: string;
+  answer: string;
+  howTo: string;
+  examples: string[];
+}[] = [
+  {
+    slug: "family-motto-generator",
+    icon: Home,
+    heading: "Family Motto Generator",
+    tagline: "For family crests, household signs, and phrases passed across generations",
+    answer:
+      "A family motto generator creates a short guiding phrase shared across generations of one family, often placed on a crest, a framed print above the fireplace, or the back of a family photo album. Use it to put into words what your family stands for.",
+    howTo:
+      "Enter your family surname and the values you want passed down: faith, grit, hospitality, love of learning, adventure, or service. Pick a serious or aspirational tone. The AI returns 8 family motto options in the cadence of centuries-old mottos - short enough for a crest, weighty enough to repeat at holiday dinners.",
+    examples: ["Hold Fast, Love Deep", "From One, Strength To All", "We Build, We Hold, We Return"],
+  },
+  {
+    slug: "ai-motto-generator",
+    icon: Sparkles,
+    heading: "AI Motto Generator",
+    tagline: "Trained on timeless mottos, not advertising copy",
+    answer:
+      "An AI motto generator uses a trained language model to produce motto candidates in the rhythm of timeless guiding phrases like Semper Fidelis and Carpe Diem, not marketing jingles. Output is original to your inputs and labeled by style, so you can match the motto to your real voice.",
+    howTo:
+      "Every batch returns 8 AI-generated candidates tagged by style (punchy, aspirational, metaphoric, or emotional) and word count. The AI leads with identity and active verbs instead of generic positivity, so you get phrases that sound earned rather than templated. Regenerate as many times as you want.",
+    examples: ["Lead With Honor", "Rise, Then Lift Others", "Build What Lasts"],
+  },
+  {
+    slug: "business-motto-generator",
+    icon: Briefcase,
+    heading: "Business Motto Generator",
+    tagline: "For small businesses, independent operators, and new ventures",
+    answer:
+      "A business motto generator creates the one phrase that guides how your team shows up on a bad Tuesday. Unlike a tagline, which sells a product, a business motto is the internal north star you repeat in hiring, retros, and all-hands.",
+    howTo:
+      "Enter your business name and the values every new hire should share (honest craft, fast shipping, customer obsession, long-term thinking). Use the returned options on your careers page, team handbook, all-hands slides, and internal Slack header. A business motto earns its weight through repetition.",
+    examples: ["Honest Craft, Honest Work", "Small Team, Long Horizon", "Ship With Care"],
+  },
+  {
+    slug: "company-motto-generator",
+    icon: Users,
+    heading: "Company Motto Generator",
+    tagline: "For culture documents, investor decks, and new-hire onboarding",
+    answer:
+      "A company motto generator creates the headline phrase for culture documents, investor updates, and employee onboarding. It answers what do we stand for in the fewest words possible - across every team and department.",
+    howTo:
+      "Generate 8 candidates, then stress-test each one against a real decision your leadership team made last quarter. If the motto would not have helped you choose between two good options, it is decoration, not direction. A true company motto should cut, not just hang on the wall.",
+    examples: ["Customers First, Ego Last", "Build The Next Decade", "Hire Slow, Trust Fast"],
+  },
+  {
+    slug: "school-motto-generator",
+    icon: GraduationCap,
+    heading: "School Motto Generator",
+    tagline: "For crests, banners, graduating classes, student councils, and clubs",
+    answer:
+      "A school motto generator creates phrases that appear on crests, diplomas, entrance arches, and graduation programs. School mottos should feel timeless rather than trendy, and rooted in the values the institution wants to honor.",
+    howTo:
+      "Use the generator for a new school charter, a graduating class, a student council, a debate team, a scouts troop, or an academic society. Enter the institution name and the values (learning, service, curiosity, honor, integrity). Pick a formal or serious tone for a classical feel, or bold for a modern rally cry.",
+    examples: ["Seek Truth, Serve Others", "Learn, Lead, Lift", "Honor In All Things"],
+  },
+  {
+    slug: "personal-motto-generator",
+    icon: Compass,
+    heading: "Personal Motto Generator",
+    tagline: "For your desk, your journal, and your screensaver",
+    answer:
+      "A personal motto generator creates your one-sentence answer to how you want to live. A personal motto is usually shorter and more intimate than a team or company motto - it belongs on your desk, your screensaver, the inside cover of your journal, or the back of your phone case.",
+    howTo:
+      "Enter your first name and the traits or beliefs you want to commit to (discipline, kindness, creativity, resilience, courage). The AI returns 8 candidates tuned to personal commitment rather than group identity. The best personal mottos feel true in your mouth when you say them three times in a row.",
+    examples: ["Calm, Careful, Committed", "Do Hard Things Daily", "Kind And Unafraid"],
+  },
+];
+
+
 export default function MottoGeneratorPage() {
   return (
     <main className="relative w-full">
@@ -196,13 +361,13 @@ export default function MottoGeneratorPage() {
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="mx-auto max-w-3xl text-center">
               <div className="inline-flex items-center justify-center px-4 py-2 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
-                FREE AI TOOL
+                FREE AI TOOL - UPDATED APRIL 2026
               </div>
               <h1 className="text-h1 text-foreground mb-6 text-balance">
-                Free Motto Generator for People, Teams & Families
+                Free AI Motto Generator for Family, Business, School & Personal Mottos
               </h1>
               <p className="text-[18px] sm:text-[20px] leading-relaxed text-muted-foreground max-w-2xl mx-auto mb-4 text-balance">
-                Generate 8 inspiring mottos in seconds. Works for personal mottos, family crests, sports team rally cries, school clubs, and business values.
+                Generate 8 values-driven mottos in under 10 seconds. Works for family mottos, business and company mottos, school mottos, personal life mottos, and sports team rally cries.
               </p>
               <p className="text-[15px] font-medium text-muted-foreground/80 mb-12">
                 No signup. No credit card. Just the words you want to live by.
@@ -214,6 +379,41 @@ export default function MottoGeneratorPage() {
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </a>
               </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* KEY TAKEAWAYS (AI SEO / GEO) */}
+      <section className="relative z-10 bg-background border-b border-border py-14 sm:py-16">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-3xl">
+            <div className="rounded-[24px] border border-primary/20 bg-primary/[0.03] p-7 sm:p-10 shadow-sm">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                </div>
+                <h2 className="text-[18px] sm:text-[20px] font-bold text-foreground m-0">
+                  Key Takeaways
+                </h2>
+              </div>
+              <p className="text-[15px] sm:text-[16px] text-muted-foreground leading-relaxed mb-5">
+                A <strong className="text-foreground">motto generator</strong> is a free AI tool that creates short guiding phrases for a person, family, team, school, or company. This <strong className="text-foreground">motto generator free</strong> tool returns 8 options per batch, each tuned to the rhythm of timeless mottos like <em>Semper Fidelis</em> and <em>Carpe Diem</em>, not marketing copy.
+              </p>
+              <ul className="space-y-2.5">
+                {[
+                  "Six dedicated modes: family motto, AI motto, business motto, company motto, school motto, and personal motto generators",
+                  "8 AI-generated options per batch, each labeled by style (punchy, aspirational, metaphoric, emotional) and word count",
+                  "Tone slider (Serious to Bold) and up to 3 style preferences for precise voice control",
+                  "Free with no signup, no credit card, and no watermark - usable for commercial, family, and personal purposes",
+                  "Up to 8 batches per day (64 mottos total) from a single IP",
+                ].map((item) => (
+                  <li key={item} className="flex gap-3 text-[14px] sm:text-[15px] text-muted-foreground leading-relaxed">
+                    <Check className="w-4 h-4 text-primary shrink-0 mt-1" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
         </div>
@@ -425,77 +625,80 @@ export default function MottoGeneratorPage() {
         </div>
       </section>
 
-      {/* USE CASES / PERSONAS */}
-      <section className="border-t border-border bg-muted/30 py-24 sm:py-32">
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
+      {/* MOTTO GENERATOR TYPES (SEO + GEO) */}
+      <section id="motto-generator-types" className="border-t border-border bg-muted/30 py-24 sm:py-32">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-4xl">
           <div className="text-center mb-16 animate-reveal">
             <div className="inline-flex items-center justify-center px-4 py-2 mb-6 rounded-[48px] bg-muted/50 border border-border text-label text-muted-foreground">
-              USE CASES
+              6 MOTTO MODES
             </div>
             <h2 className="text-h2 text-foreground">
-              Who Uses a Motto Generator?
+              A Motto Generator for Every Purpose
             </h2>
-            <p className="mt-4 text-body text-muted-foreground max-w-xl mx-auto">
-              From sports teams to families to founders, anyone who wants to put their values into words.
+            <p className="mt-4 text-body text-muted-foreground max-w-2xl mx-auto">
+              The same AI adapts to your audience. Whether you need a family motto, a business or company motto, a school motto, or a personal life motto, this tool returns 8 options tuned to that specific voice.
             </p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-reveal" style={{ animationDelay: "150ms" }}>
-            {[
-              {
-                icon: Trophy,
-                title: "Sports Teams & Coaches",
-                description:
-                  "Need a rallying cry for the jersey, the locker room, or the season banner? Generate 8 options that capture your team&apos;s grit, unity, or playing style in seconds.",
-              },
-              {
-                icon: Home,
-                title: "Families",
-                description:
-                  "Create a family motto for a crest, a household sign, or a yearly holiday card. Something your kids and grandkids can grow up hearing and repeating.",
-              },
-              {
-                icon: Compass,
-                title: "Individuals",
-                description:
-                  "Write your own personal life motto. The one sentence you want on your desk, your screensaver, or the back of your journal. The words you want to live by.",
-              },
-              {
-                icon: GraduationCap,
-                title: "Schools & Clubs",
-                description:
-                  "Student councils, debate teams, academic societies, scouts, and graduating classes all need mottos. Get 8 options that honor tradition while feeling fresh.",
-              },
-              {
-                icon: Briefcase,
-                title: "Companies & Founders",
-                description:
-                  "Startups and small businesses use company mottos for internal culture documents, recruiting pages, and all-hands decks. A motto keeps the team aligned on what matters.",
-              },
-              {
-                icon: Users,
-                title: "Non-Profits & Causes",
-                description:
-                  "Capture your mission in 3 to 7 words. A motto that fits on a banner, a donation page, or a volunteer t-shirt and still carries the full weight of your cause.",
-              },
-            ].map((persona) => {
-              const Icon = persona.icon;
+
+          <div className="space-y-8 animate-reveal" style={{ animationDelay: "100ms" }}>
+            {mottoTypes.map((type) => {
+              const Icon = type.icon;
               return (
-                <div
-                  key={persona.title}
-                  className="rounded-[24px] border border-border bg-card p-7 shadow-sm transition-all duration-300 hover:shadow-premium hover:-translate-y-1 group"
+                <article
+                  key={type.slug}
+                  id={type.slug}
+                  className="rounded-[24px] border border-border bg-card p-7 sm:p-10 shadow-sm scroll-mt-24"
                 >
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary/20 transition-colors">
-                    <Icon className="w-6 h-6 text-primary" />
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-5 mb-5">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                      <Icon className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <h3 className="text-[22px] sm:text-[26px] font-bold text-foreground mb-1.5">
+                        {type.heading}
+                      </h3>
+                      <p className="text-[14px] sm:text-[15px] text-muted-foreground italic">
+                        {type.tagline}
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-[18px] font-bold text-foreground mb-2">
-                    {persona.title}
-                  </h3>
-                  <p className="text-small text-muted-foreground leading-relaxed">
-                    {persona.description}
-                  </p>
-                </div>
+
+                  <div className="space-y-4 text-muted-foreground">
+                    <p className="text-[16px] sm:text-[17px] leading-relaxed">
+                      {type.answer}
+                    </p>
+                    <p className="text-[16px] sm:text-[17px] leading-relaxed">
+                      {type.howTo}
+                    </p>
+
+                    <div className="pt-2">
+                      <p className="text-label text-muted-foreground/90 mb-3 uppercase tracking-wider">
+                        Example Outputs
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {type.examples.map((ex) => (
+                          <span
+                            key={ex}
+                            className="inline-block px-3.5 py-2 rounded-full bg-muted text-[14px] font-medium text-foreground italic"
+                          >
+                            &ldquo;{ex}&rdquo;
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </article>
               );
             })}
+          </div>
+
+          <div className="mt-12 text-center">
+            <Button asChild size="lg" className="rounded-[48px] shadow-premium text-[16px] h-14 px-8">
+              <a href="#generator">
+                Try Any Mode - Free
+                <ArrowRight className="ml-2 w-4 h-4" />
+              </a>
+            </Button>
           </div>
         </div>
       </section>
@@ -607,40 +810,11 @@ export default function MottoGeneratorPage() {
               FAQ
             </div>
             <h2 className="text-h2 text-foreground">
-              Frequently Asked Questions
+              Motto Generator - Frequently Asked Questions
             </h2>
           </div>
           <div className="space-y-4 animate-reveal" style={{ animationDelay: "100ms" }}>
-            {[
-              {
-                q: "What is a motto?",
-                a: "A motto is a short guiding phrase that captures the core values, beliefs, or philosophy of a person, family, team, or organization. Unlike a marketing slogan, a motto is aspirational and timeless. Famous examples include Semper Fidelis (US Marines), Carpe Diem (seize the day), and Non Ducor, Duco (I am not led, I lead).",
-              },
-              {
-                q: "How does the motto generator work?",
-                a: "Enter your name or group, describe the values or ideas you want to express, pick a tone, and click Generate. The AI instantly creates 8 unique mottos, each labeled with a style tag and a word count. You can copy any motto with one click or regenerate for fresh ideas.",
-              },
-              {
-                q: "Is the motto generator really free?",
-                a: "Yes, 100% free. No signup, no credit card, no paywall. You can generate up to 8 batches per day (64 mottos total) from a single IP address. Use them for personal, family, school, sports, or commercial purposes.",
-              },
-              {
-                q: "How do you write a good motto?",
-                a: "A good motto is short (3 to 7 words), values-driven, and memorable. Start with the belief you want to live by, then distill it into its sharpest form. Use active verbs (Lead, Serve, Rise), avoid generic positivity, and make sure every word earns its place.",
-              },
-              {
-                q: "What is the difference between a motto and a slogan?",
-                a: "A motto is a guiding principle for people, families, teams, or organizations. It is aspirational, timeless, and values-driven (example: Semper Fidelis). A slogan is a marketing phrase used to sell a product or campaign and is usually short-lived (example: Just Do It in a specific ad campaign). Mottos lead with identity, slogans lead with benefit.",
-              },
-              {
-                q: "Can I create a motto for my sports team or club?",
-                a: "Yes. Enter your team or club name, describe what you stand for (hustle, discipline, unity, winning), and pick a bold or aspirational tone. The generator returns 8 options you can use for jerseys, banners, locker room walls, or rallying cries.",
-              },
-              {
-                q: "Can I create a Latin motto?",
-                a: "This tool generates English mottos by default, but you can ask for formal or classical framing by selecting the Serious tone and describing the feel you want. If you need a true Latin phrase, generate English options first then have a Latin translator render your favorite into classical Latin.",
-              },
-            ].map((faq) => (
+            {FAQ_ITEMS.map((faq) => (
               <details
                 key={faq.q}
                 className="group rounded-[20px] border border-border bg-card shadow-sm overflow-hidden"

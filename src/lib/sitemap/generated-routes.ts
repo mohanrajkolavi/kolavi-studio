@@ -22,6 +22,7 @@ export const DISCOVERED_ROUTES: string[] = [
   "/markdown-to-html",
   "/markdown-to-pdf",
   "/markdown-tools",
+  "/markdown-tools/obsidian",
   "/partner",
   "/partner/apply",
   "/partner/terms",
