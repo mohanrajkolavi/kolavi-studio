@@ -33,6 +33,7 @@ const FOOTER_SECTIONS: { title: string; links: FooterLink[] }[] = [
       { href: "/tools/speed-audit", label: "Free Speed Audit →", primary: true },
       { href: "/tools/sitemap-generator", label: "XML Sitemap Generator" },
       { href: "/markdown-tools", label: "Markdown Tools" },
+      { href: "/yaml-tools", label: "YAML Tools" },
     ],
   },
 ];

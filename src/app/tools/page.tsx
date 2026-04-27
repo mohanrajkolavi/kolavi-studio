@@ -9,6 +9,7 @@ import {
   Megaphone,
   Compass,
   Mail,
+  Braces,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -95,6 +96,17 @@ const tools: Tool[] = [
     description:
       "Create inspiring mottos for yourself, your family, your team, or your company. 8 values-driven options per generation, free forever.",
     cta: "Generate a Motto",
+    featured: false,
+    badge: "New",
+  },
+  {
+    id: "yaml-tools",
+    href: "/yaml-tools",
+    icon: Braces,
+    title: "YAML Tools",
+    description:
+      "Validate, convert, format, and edit YAML in your browser. 12 tools and guides covering Kubernetes, GitHub Actions, Docker Compose, and more. Free, no signup.",
+    cta: "Open YAML Tools",
     featured: false,
     badge: "New",
   },
