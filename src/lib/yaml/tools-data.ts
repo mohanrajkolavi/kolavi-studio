@@ -130,6 +130,18 @@ export const YAML_TOOLS: YamlTool[] = [
       "yaml editor, online yaml editor, yaml editor online, edit yaml, browser yaml editor, yaml ide",
     searchVolume: 500,
   },
+  {
+    slug: "yaml-diff",
+    path: "/yaml-diff",
+    name: "YAML Diff",
+    shortName: "Diff",
+    description:
+      "Compare two YAML files side by side. See added, removed, and changed keys highlighted at the line and structure level.",
+    category: "validator",
+    keywords:
+      "yaml diff, compare yaml, yaml comparison, yaml difference, diff yaml files, yaml compare online",
+    searchVolume: 250,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -204,6 +216,66 @@ export const YAML_TOPICS: YamlTopic[] = [
     keywords:
       "modulenotfounderror: no module named 'yaml', no module named yaml, no module named 'yaml', pip install yaml, install pyyaml",
     searchVolume: 1450,
+    bespoke: true,
+  },
+  {
+    slug: "python",
+    name: "YAML in Python (PyYAML Guide)",
+    description:
+      "Read, write, and manipulate YAML in Python with PyYAML. Covers safe_load, dump, ruamel.yaml, common errors, and best practices.",
+    keywords:
+      "python yaml, yaml python, python read yaml, python import yaml, python yaml package, pyyaml, ruamel.yaml",
+    searchVolume: 3000,
+    bespoke: true,
+  },
+  {
+    slug: "arrays-and-lists",
+    name: "YAML Arrays, Lists, and Dictionaries",
+    description:
+      "Block and flow sequences, nested lists, lists of maps, and YAML dictionaries explained with copy-ready examples.",
+    keywords:
+      "yaml list, yaml array, yaml dictionary, yaml variables, yaml lists, yaml nested array, yaml list of maps",
+    searchVolume: 1350,
+    bespoke: true,
+  },
+  {
+    slug: "anchors",
+    name: "YAML Anchors, Aliases, and Merge Keys",
+    description:
+      "Reuse YAML data with anchors (&), aliases (*), and merge keys (<<:). Avoid duplication across environments and Compose services.",
+    keywords:
+      "yaml anchors, yaml alias, yaml merge key, yaml reference, yaml anchor and alias, yaml dry",
+    searchVolume: 600,
+    bespoke: true,
+  },
+  {
+    slug: "kubernetes",
+    name: "Kubernetes YAML: Deployments and Manifests",
+    description:
+      "Anatomy of Kubernetes Deployment, Service, ConfigMap, and Secret manifests with copy-ready YAML examples and common errors.",
+    keywords:
+      "kubernetes deployment yaml, kubernetes deployment yaml example nginx, k8s yaml, kubernetes manifest, kubectl apply yaml",
+    searchVolume: 500,
+    bespoke: true,
+  },
+  {
+    slug: "syntax",
+    name: "YAML Syntax Reference",
+    description:
+      "Complete YAML 1.2 syntax reference: scalars, sequences, mappings, indentation rules, comments, anchors, multiline, and full examples.",
+    keywords:
+      "yaml syntax, yaml format, yaml example, yaml code, yaml structure, yaml language reference, yaml cheat sheet",
+    searchVolume: 2500,
+    bespoke: true,
+  },
+  {
+    slug: "docker-compose",
+    name: "Docker Compose YAML Guide",
+    description:
+      "Service definitions, networks, volumes, env_file, depends_on, profiles, and anchor reuse in docker-compose.yml and compose.yaml.",
+    keywords:
+      "docker compose yaml, compose.yaml, docker-compose.yml, docker compose example, compose file, docker compose services",
+    searchVolume: 250,
     bespoke: true,
   },
 ];
