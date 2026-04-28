@@ -2,13 +2,16 @@
 
 import { Check } from "lucide-react";
 import { useRevealOnScroll } from "@/hooks/useRevealOnScroll";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
+
+const PRICING_EMAIL = "kolavistudio@gmail.com";
+
+const buildMailto = (tierName: string) =>
+  `mailto:${PRICING_EMAIL}?subject=${encodeURIComponent(`Pricing inquiry - ${tierName}`)}`;
 
 const tiers = [
   {
     name: "Marketing",
-    price: "$2,499 setup + $999 per month",
     bestFor: "Growing businesses ready to stop losing clients to competitors.",
     features: [
       "Custom Next.js website up to 6 pages, 95+ PageSpeed guaranteed",
@@ -23,13 +26,12 @@ const tiers = [
     ],
     guarantee:
       "No ranking movement in 60 days? We keep working at no extra charge until there is.",
-    cta: "Book a Call for Marketing",
-    ctaHref: "/contact",
+    cta: "Email Us About Marketing",
+    ctaHref: buildMailto("Marketing"),
     isPopular: false,
   },
   {
     name: "Growth",
-    price: "$3,499 setup + $1,499 per month",
     bestFor: "Established businesses ready to own their local market.",
     features: [
       "Everything in Marketing, plus:",
@@ -46,13 +48,12 @@ const tiers = [
     ],
     guarantee:
       "Not seeing measurable lead growth by month 3? We keep working until you do.",
-    cta: "Book a Call for Growth",
-    ctaHref: "/contact",
+    cta: "Email Us About Growth",
+    ctaHref: buildMailto("Growth"),
     isPopular: true,
   },
   {
     name: "Full System",
-    price: "$5,999 setup + $2,499 per month",
     bestFor: "Multi-location operators who want total market ownership.",
     features: [
       "Everything in Growth, plus:",
@@ -68,8 +69,8 @@ const tiers = [
     ],
     guarantee:
       "Miss any agreed deliverable? That month is free. Every deliverable. Every month.",
-    cta: "Book a Call for Full System",
-    ctaHref: "/contact",
+    cta: "Email Us About Full System",
+    ctaHref: buildMailto("Full System"),
     isPopular: false,
   },
 ];
@@ -90,13 +91,20 @@ export function PricingSection() {
             }`}
         >
           <span className="inline-block text-xs sm:text-sm font-semibold text-primary uppercase tracking-widest mb-4">
-            Investment
+            Packages
           </span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-[2.5rem] font-bold text-foreground mb-4 leading-tight tracking-tight">
-            Transparent pricing. No retainer shock. No hidden fees.
+            Built around your goals, scoped on a call.
           </h2>
           <p className="text-base sm:text-lg text-muted-foreground leading-relaxed">
-            We bill for results, not hours. Every tier is a complete system. Not a list of tasks.
+            Every tier is a complete system, not a list of tasks. Email us at{" "}
+            <a
+              href={`mailto:${PRICING_EMAIL}`}
+              className="text-primary font-medium underline-offset-4 hover:underline"
+            >
+              {PRICING_EMAIL}
+            </a>{" "}
+            for the full breakdown.
           </p>
         </div>
 
@@ -129,9 +137,6 @@ export function PricingSection() {
                       </span>
                     )}
                   </div>
-                  <p className="text-sm font-semibold text-foreground mb-2">
-                    {tier.price}
-                  </p>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     Best for: {tier.bestFor}
                   </p>
@@ -165,7 +170,7 @@ export function PricingSection() {
                     variant={tier.isPopular ? "default" : "outline"}
                     className="w-full rounded-full shadow-premium"
                   >
-                    <Link href={tier.ctaHref}>{tier.cta}</Link>
+                    <a href={tier.ctaHref}>{tier.cta}</a>
                   </Button>
                 </div>
               </div>
@@ -200,7 +205,9 @@ export function PricingSection() {
               size="lg"
               className="w-full sm:w-auto shrink-0 rounded-full shadow-premium"
             >
-              <Link href="/contact">Book a Custom Scoping Call</Link>
+              <a href={`mailto:${PRICING_EMAIL}?subject=${encodeURIComponent("Custom Build inquiry")}`}>
+                Email Us to Scope It
+              </a>
             </Button>
           </div>
         </div>
@@ -214,12 +221,12 @@ export function PricingSection() {
             Everything we build is yours. Cancel any time with 30 days notice.
           </p>
           <p>
-            <Link
-              href="/pricing"
+            <a
+              href={`mailto:${PRICING_EMAIL}?subject=${encodeURIComponent("Pricing inquiry")}`}
               className="inline-flex text-sm font-medium text-primary hover:text-primary/80 transition-colors underline-offset-4 hover:underline"
             >
-              Need the full breakdown? View Full Pricing
-            </Link>
+              Need the full breakdown? Email {PRICING_EMAIL}
+            </a>
           </p>
         </div>
       </div>
