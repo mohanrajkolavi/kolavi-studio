@@ -7,8 +7,8 @@ import { JsonToYamlClient } from "./client";
 
 const PAGE_PATH = "/json-to-yaml";
 const PAGE_URL = "https://kolavistudio.com/json-to-yaml";
-const DATE_PUBLISHED = "2026-04-27T00:00:00Z";
-const DATE_MODIFIED = "2026-04-27T00:00:00Z";
+const DATE_PUBLISHED = "2026-04-28T00:00:00Z";
+const DATE_MODIFIED = "2026-04-28T00:00:00Z";
 
 export const metadata = getPageMetadata({
   title: "JSON to YAML Converter | Free Online Tool with Indent Options",

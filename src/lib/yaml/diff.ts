@@ -38,6 +38,15 @@ export interface YamlDiffResult {
   rightValid: YamlValidationResult;
   /** True when both sides parse to deep-equal values. */
   semanticallyEqual: boolean;
+  /**
+   * Set when either side has more than one YAML document. Structural diff only
+   * compares the first document - callers should warn the user and recommend
+   * line view for full coverage.
+   */
+  multiDocWarning: {
+    leftCount: number;
+    rightCount: number;
+  } | null;
 }
 
 const MAX_INPUT_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -148,11 +157,20 @@ export function diffYaml(left: string, right: string): YamlDiffResult {
     }
   }
 
+  const multiDocWarning =
+    leftValid.documentCount > 1 || rightValid.documentCount > 1
+      ? {
+          leftCount: leftValid.documentCount,
+          rightCount: rightValid.documentCount,
+        }
+      : null;
+
   return {
     lines,
     structural,
     leftValid,
     rightValid,
     semanticallyEqual,
+    multiDocWarning,
   };
 }

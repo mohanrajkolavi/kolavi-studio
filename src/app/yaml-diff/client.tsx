@@ -331,17 +331,17 @@ function YamlDiffInner({ faqs }: YamlDiffClientProps) {
                   </div>
                 ) : (
                   <div className="font-mono text-xs">
-                    {result.lines.map((line, i) => {
-                      const lines = line.value
-                        .split("\n")
-                        .filter((_, idx, arr) =>
-                          idx === arr.length - 1 ? line.value.endsWith("\n") === false : true,
-                        );
-                      const linesToRender =
-                        line.value.endsWith("\n") && lines.length > 0
-                          ? lines.slice(0, -1)
-                          : lines;
-                      return linesToRender.map((text, j) => (
+                    {result.lines.flatMap((line, i) => {
+                      // Split the hunk into rendered rows. If the value ends with
+                      // \n the trailing empty token is an artifact of split() and
+                      // must be dropped; otherwise we render every entry, which
+                      // includes empty lines (chunks of just "\n" become one row).
+                      const parts = line.value.split("\n");
+                      const rows =
+                        line.value.endsWith("\n") && parts.length > 0
+                          ? parts.slice(0, -1)
+                          : parts;
+                      return rows.map((text, j) => (
                         <div
                           key={`${i}-${j}`}
                           className={cn(
@@ -381,7 +381,34 @@ function YamlDiffInner({ faqs }: YamlDiffClientProps) {
                   <CopyButton content={structuredText} label="Copy" />
                 )}
               </div>
-              <div className="overflow-auto max-h-[500px] p-4">
+              <div className="overflow-auto max-h-[500px] p-4 space-y-3">
+                {result.multiDocWarning && (
+                  <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
+                    <div className="text-xs text-amber-800 dark:text-amber-300">
+                      <p className="font-semibold mb-0.5">
+                        Multi-document YAML detected
+                      </p>
+                      <p>
+                        Left has{" "}
+                        <span className="font-mono font-semibold">
+                          {result.multiDocWarning.leftCount}
+                        </span>{" "}
+                        document
+                        {result.multiDocWarning.leftCount === 1 ? "" : "s"},
+                        right has{" "}
+                        <span className="font-mono font-semibold">
+                          {result.multiDocWarning.rightCount}
+                        </span>{" "}
+                        document
+                        {result.multiDocWarning.rightCount === 1 ? "" : "s"}.
+                        Structural diff compares the first document only - use
+                        the line view for full coverage, or split each file into
+                        per-document chunks before diffing.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {!result.leftValid.valid || !result.rightValid.valid ? (
                   <div className="space-y-2">
                     <p className="text-sm text-muted-foreground">

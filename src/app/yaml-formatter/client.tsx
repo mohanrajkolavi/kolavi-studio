@@ -56,6 +56,7 @@ function YamlFormatterInner({ faqs }: YamlFormatterClientProps) {
 
   const [indent, setIndent] = useState<2 | 4>(2);
   const [sortKeys, setSortKeys] = useState(false);
+  const [preserveAnchors, setPreserveAnchors] = useState(false);
 
   useEffect(() => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -72,8 +73,13 @@ function YamlFormatterInner({ faqs }: YamlFormatterClientProps) {
   }, [content]);
 
   const formatted = useMemo(
-    () => formatYaml(content, { indent, sortMapEntries: sortKeys }),
-    [content, indent, sortKeys],
+    () =>
+      formatYaml(content, {
+        indent,
+        sortMapEntries: sortKeys,
+        preserveAnchors,
+      }),
+    [content, indent, sortKeys, preserveAnchors],
   );
 
   const highlightedYaml = useMemo(() => {
@@ -171,7 +177,7 @@ function YamlFormatterInner({ faqs }: YamlFormatterClientProps) {
       currentPath="/yaml-formatter"
     >
       <p className="mb-3 text-xs text-muted-foreground">
-        Last updated: April 27, 2026
+        Last updated: April 28, 2026
       </p>
 
       <div className="mb-6 rounded-xl border border-border bg-muted/30 p-5">
@@ -215,6 +221,15 @@ function YamlFormatterInner({ faqs }: YamlFormatterClientProps) {
               aria-label="Sort keys alphabetically"
             />
             <label htmlFor="sort-keys">Sort keys</label>
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Switch
+              id="preserve-anchors"
+              checked={preserveAnchors}
+              onCheckedChange={setPreserveAnchors}
+              aria-label="Preserve YAML anchors and aliases"
+            />
+            <label htmlFor="preserve-anchors">Preserve anchors</label>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -303,16 +318,18 @@ function YamlFormatterInner({ faqs }: YamlFormatterClientProps) {
           </li>
           <li>
             <strong>Anchor expansion</strong> - aliases (<code>*name</code>) are
-            resolved to their referenced values, so the output is fully
-            expanded.
+            resolved to their referenced values by default. Toggle{" "}
+            <em>Preserve anchors</em> to keep <code>&amp;name</code> /{" "}
+            <code>*name</code> in the output.
           </li>
         </ul>
 
         <h2>What the formatter cannot preserve</h2>
         <p>
-          The formatter operates on the parsed data tree, not the original
-          source text. That means it cannot preserve comments, anchor
-          declarations, or original document order. If those matter, use a
+          The default formatter operates on the parsed data tree, so it cannot
+          preserve comments or original document order. With{" "}
+          <em>Preserve anchors</em> enabled, anchors and aliases are kept;
+          comments still drop. If round-trip comment preservation matters, use a
           formatter built into a code editor (such as Prettier with the YAML
           plugin) that walks the source tokens instead.
         </p>

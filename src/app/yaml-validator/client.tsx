@@ -5,10 +5,12 @@ import { useSearchParams } from "next/navigation";
 import hljs from "highlight.js/lib/core";
 import yaml from "highlight.js/lib/languages/yaml";
 import json from "highlight.js/lib/languages/json";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, FileText } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { CopyButton } from "@/components/markdown-tools/CopyButton";
+import { DownloadButton } from "@/components/markdown-tools/DownloadButton";
 import { UploadButton } from "@/components/markdown-tools/UploadButton";
+import { ShareButton } from "@/components/markdown-tools/ShareButton";
 import { RelatedTools } from "@/components/markdown-tools/RelatedTools";
 import { YamlToolLayout } from "@/components/yaml-tools/YamlToolLayout";
 import { validateYaml, parseYaml } from "@/lib/yaml/parser";
@@ -128,7 +130,15 @@ function YamlValidatorInner({ faqs }: YamlValidatorClientProps) {
       <div className="flex items-center justify-between border-b px-3 py-2">
         <h2 className="text-sm font-semibold text-muted-foreground">Result</h2>
         {validation.valid && previewJson ? (
-          <CopyButton content={previewJson} label="Copy JSON" />
+          <div className="flex items-center gap-1.5">
+            <CopyButton content={previewJson} label="Copy JSON" />
+            <DownloadButton
+              content={previewJson}
+              filename="parsed.json"
+              mimeType="application/json"
+              label="Download JSON"
+            />
+          </div>
         ) : null}
       </div>
       <div className="flex-1 overflow-auto p-4">
@@ -145,6 +155,22 @@ function YamlValidatorInner({ faqs }: YamlValidatorClientProps) {
                 </p>
               </div>
             </div>
+            {validation.documentCount > 1 && (
+              <div className="mb-4 flex items-start gap-2 rounded-md border border-blue-500/30 bg-blue-500/10 p-3">
+                <FileText className="h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">
+                    {validation.documentCount} documents detected
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Multi-document YAML stream (separated by{" "}
+                    <code className="font-mono">---</code>). Common for
+                    Kubernetes manifests and Helm rendered output. The JSON
+                    preview shows the first document only.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="rounded-md border bg-muted/30 p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Parsed JSON preview
@@ -189,7 +215,7 @@ function YamlValidatorInner({ faqs }: YamlValidatorClientProps) {
     >
       {/* Last updated label */}
       <p className="mb-3 text-xs text-muted-foreground">
-        Last updated: April 27, 2026
+        Last updated: April 28, 2026
       </p>
 
       {/* Answer-first callout */}
@@ -208,12 +234,19 @@ function YamlValidatorInner({ faqs }: YamlValidatorClientProps) {
 
       {/* Action bar */}
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <UploadButton
             onContent={setContent}
             accept=".yml,.yaml,.txt"
             label="Upload YAML"
           />
+          <DownloadButton
+            content={content}
+            filename="config.yaml"
+            mimeType="application/yaml"
+            label="Download YAML"
+          />
+          <ShareButton content={content} basePath="/yaml-validator" />
         </div>
         <RelatedTools
           links={[

@@ -7,8 +7,8 @@ import { YamlFormatterClient } from "./client";
 
 const PAGE_PATH = "/yaml-formatter";
 const PAGE_URL = "https://kolavistudio.com/yaml-formatter";
-const DATE_PUBLISHED = "2026-04-27T00:00:00Z";
-const DATE_MODIFIED = "2026-04-27T00:00:00Z";
+const DATE_PUBLISHED = "2026-04-28T00:00:00Z";
+const DATE_MODIFIED = "2026-04-28T00:00:00Z";
 
 export const metadata = getPageMetadata({
   title: "YAML Formatter & Beautifier | Free Online Pretty Print Tool",

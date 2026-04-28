@@ -9,9 +9,9 @@ import { YamlToolFooter } from "@/components/yaml-tools/YamlToolFooter";
 
 const PAGE_PATH = "/yaml-tools/comments";
 const PAGE_URL = "https://kolavistudio.com/yaml-tools/comments";
-const DATE_PUBLISHED = "2026-04-27T00:00:00Z";
-const DATE_MODIFIED = "2026-04-27T00:00:00Z";
-const LAST_UPDATED_LABEL = "Last updated: April 27, 2026";
+const DATE_PUBLISHED = "2026-04-28T00:00:00Z";
+const DATE_MODIFIED = "2026-04-28T00:00:00Z";
+const LAST_UPDATED_LABEL = "Last updated: April 28, 2026";
 const AUTHOR_NAME = "Mohan Raj Kolavi";
 const AUTHOR_URL = "/about";
 

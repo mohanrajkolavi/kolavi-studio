@@ -151,7 +151,7 @@ function YamlEditorInner({ faqs }: YamlEditorClientProps) {
       currentPath="/yaml-editor"
     >
       <p className="mb-3 text-xs text-muted-foreground">
-        Last updated: April 27, 2026
+        Last updated: April 28, 2026
       </p>
 
       <div className="mb-6 rounded-xl border border-border bg-muted/30 p-5">
