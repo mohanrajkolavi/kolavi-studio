@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   parseYaml,
+  parseAllYaml,
+  countYamlDocuments,
   stringifyYaml,
   validateYaml,
   yamlToJson,
@@ -102,4 +104,44 @@ test("stringifyYaml renders multiline strings", () => {
   const yaml = stringifyYaml(obj);
   assert.match(yaml, /description:/);
   assert.match(yaml, /line1/);
+});
+
+test("validateYaml reports documentCount = 1 for single-doc input", () => {
+  const result = validateYaml("name: app\nversion: 1.0\n");
+  assert.equal(result.valid, true);
+  assert.equal(result.documentCount, 1);
+});
+
+test("validateYaml reports documentCount > 1 for multi-doc input", () => {
+  const yaml = "name: a\n---\nname: b\n---\nname: c\n";
+  const result = validateYaml(yaml);
+  assert.equal(result.valid, true);
+  assert.equal(result.documentCount, 3);
+});
+
+test("validateYaml documentCount = 0 for empty input", () => {
+  const result = validateYaml("");
+  assert.equal(result.valid, false);
+  assert.equal(result.documentCount, 0);
+});
+
+test("countYamlDocuments returns the doc count", () => {
+  assert.equal(countYamlDocuments(""), 0);
+  assert.equal(countYamlDocuments("a: 1\n"), 1);
+  assert.equal(countYamlDocuments("a: 1\n---\nb: 2\n"), 2);
+  assert.equal(countYamlDocuments("a: 1\n---\nb: 2\n---\nc: 3\n"), 3);
+});
+
+test("parseAllYaml returns all documents", () => {
+  const yaml = "name: a\n---\nname: b\n";
+  const docs = parseAllYaml<{ name: string }>(yaml);
+  assert.equal(docs.length, 2);
+  assert.equal(docs[0].name, "a");
+  assert.equal(docs[1].name, "b");
+});
+
+test("parseAllYaml handles single-doc input as one entry", () => {
+  const docs = parseAllYaml<{ name: string }>("name: solo\n");
+  assert.equal(docs.length, 1);
+  assert.equal(docs[0].name, "solo");
 });

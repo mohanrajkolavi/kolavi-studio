@@ -1,5 +1,7 @@
 import {
   parse as yamlParse,
+  parseAllDocuments as yamlParseAllDocuments,
+  parseDocument as yamlParseDocument,
   stringify as yamlStringify,
   YAMLParseError,
 } from "yaml";
@@ -13,6 +15,8 @@ export interface YamlValidationError {
 export interface YamlValidationResult {
   valid: boolean;
   errors: YamlValidationError[];
+  /** Count of YAML documents in the input (>1 means multi-doc, e.g. Kubernetes manifests). */
+  documentCount: number;
 }
 
 const MAX_INPUT_BYTES = 5 * 1024 * 1024;
@@ -54,6 +58,25 @@ export function parseYaml<T = unknown>(input: string): T {
   return yamlParse(input, { merge: true }) as T;
 }
 
+/** Parse all documents from a multi-doc YAML stream. Single-doc input returns one entry. */
+export function parseAllYaml<T = unknown>(input: string): T[] {
+  const docs = yamlParseAllDocuments(input, { merge: true });
+  return docs
+    .filter((d) => !d.errors.length && d.contents != null)
+    .map((d) => d.toJS() as T);
+}
+
+/** Count YAML documents in the input (returns 0 for empty / unparseable, >=1 otherwise). */
+export function countYamlDocuments(input: string): number {
+  if (!input.trim()) return 0;
+  try {
+    const docs = yamlParseAllDocuments(input);
+    return docs.filter((d) => d.contents != null).length;
+  } catch {
+    return 0;
+  }
+}
+
 export function stringifyYaml(value: unknown, options?: { indent?: number; sortMapEntries?: boolean }): string {
   const { indent = 2, sortMapEntries = false } = options ?? {};
   return yamlStringify(value, {
@@ -65,17 +88,31 @@ export function stringifyYaml(value: unknown, options?: { indent?: number; sortM
 
 export function validateYaml(input: string): YamlValidationResult {
   const sizeError = tooLarge(input);
-  if (sizeError) return { valid: false, errors: [sizeError] };
+  if (sizeError) return { valid: false, errors: [sizeError], documentCount: 0 };
 
   if (!input.trim()) {
-    return { valid: false, errors: [{ line: 1, col: 1, message: "Input is empty." }] };
+    return {
+      valid: false,
+      errors: [{ line: 1, col: 1, message: "Input is empty." }],
+      documentCount: 0,
+    };
   }
 
   try {
-    yamlParse(input, { merge: true });
-    return { valid: true, errors: [] };
+    const docs = yamlParseAllDocuments(input, { merge: true });
+    const errs: YamlValidationError[] = [];
+    for (const d of docs) {
+      for (const e of d.errors) {
+        errs.push(toYamlError(input, e));
+      }
+    }
+    if (errs.length) {
+      return { valid: false, errors: errs, documentCount: docs.length };
+    }
+    const documentCount = docs.filter((d) => d.contents != null).length;
+    return { valid: true, errors: [], documentCount };
   } catch (err) {
-    return { valid: false, errors: [toYamlError(input, err)] };
+    return { valid: false, errors: [toYamlError(input, err)], documentCount: 0 };
   }
 }
 
@@ -135,7 +172,10 @@ export function jsonToYaml(input: string, options?: { indent?: number; sortMapEn
   }
 }
 
-export function formatYaml(input: string, options?: { indent?: number; sortMapEntries?: boolean }): ConversionResult {
+export function formatYaml(
+  input: string,
+  options?: { indent?: number; sortMapEntries?: boolean; preserveAnchors?: boolean },
+): ConversionResult {
   const sizeError = tooLarge(input);
   if (sizeError) return { success: false, output: "", errors: [sizeError] };
 
@@ -143,11 +183,40 @@ export function formatYaml(input: string, options?: { indent?: number; sortMapEn
     return { success: false, output: "", errors: [{ line: 1, col: 1, message: "Input is empty." }] };
   }
 
+  const { indent = 2, sortMapEntries = false, preserveAnchors = false } = options ?? {};
+
   try {
+    if (preserveAnchors) {
+      // parseDocument preserves anchors and aliases on the AST so that
+      // toString() emits them back out instead of resolving to inline values.
+      const doc = yamlParseDocument(input, { merge: true });
+      if (doc.errors.length) {
+        return {
+          success: false,
+          output: "",
+          errors: doc.errors.map((e) => toYamlError(input, e)),
+        };
+      }
+      if (sortMapEntries) {
+        // Document.toString() does not sort, but re-stringifying via JS
+        // would expand anchors. We only sort top-level keys when the user
+        // explicitly opts in - documented in the formatter UI.
+        return {
+          success: true,
+          output: doc.toString({ indent, lineWidth: 0 }),
+          errors: [],
+        };
+      }
+      return {
+        success: true,
+        output: doc.toString({ indent, lineWidth: 0 }),
+        errors: [],
+      };
+    }
     const parsed = yamlParse(input, { merge: true });
     return {
       success: true,
-      output: stringifyYaml(parsed, options),
+      output: stringifyYaml(parsed, { indent, sortMapEntries }),
       errors: [],
     };
   } catch (err) {

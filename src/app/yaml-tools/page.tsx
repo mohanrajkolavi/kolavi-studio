@@ -15,14 +15,21 @@ import {
   FileQuestion,
   Bug,
   ExternalLink,
+  Code2,
+  ListTree,
+  Anchor,
+  Container,
+  Boxes,
+  FileCode,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { YamlToolFooter } from "@/components/yaml-tools/YamlToolFooter";
+import { YAML_TOPICS } from "@/lib/yaml/tools-data";
 
 const PAGE_PATH = "/yaml-tools";
-const DATE_PUBLISHED = "2026-04-27T00:00:00Z";
-const DATE_MODIFIED = "2026-04-27T00:00:00Z";
+const DATE_PUBLISHED = "2026-04-28T00:00:00Z";
+const DATE_MODIFIED = "2026-04-28T00:00:00Z";
 
 export const metadata = getPageMetadata({
   title: "Free YAML Tools | Validator, Formatter, Converter & Editor",
@@ -92,43 +99,26 @@ const tools: ToolCard[] = [
   },
 ];
 
-const topics: ToolCard[] = [
-  {
-    href: "/yaml-tools/comments",
-    icon: MessageSquare,
-    name: "YAML Comments",
-    description:
-      "How to add single-line and multiline comments in YAML, including the # syntax and editor-specific quirks.",
-  },
-  {
-    href: "/yaml-tools/multiline-strings",
-    icon: AlignLeft,
-    name: "Multiline Strings",
-    description:
-      "Block scalars in YAML: literal (|), folded (>), chomping indicators, and how to embed newlines cleanly.",
-  },
-  {
-    href: "/yaml-tools/yaml-vs-json",
-    icon: GitCompareArrows,
-    name: "YAML vs JSON",
-    description:
-      "Detailed YAML vs JSON comparison: syntax, comments, file size, parser support, and when to choose each.",
-  },
-  {
-    href: "/yaml-tools/yml-vs-yaml",
-    icon: FileQuestion,
-    name: "YML vs YAML",
-    description:
-      "Are .yml and .yaml the same? Definitive answer with history, tool support matrix, and recommendations.",
-  },
-  {
-    href: "/yaml-tools/no-module-named-yaml",
-    icon: Bug,
-    name: "Fix: No module named yaml",
-    description:
-      "Fix the Python ImportError when 'yaml' is missing. Covers pip install pyyaml, virtual envs, Conda, and macOS path issues.",
-  },
-];
+const TOPIC_ICONS: Record<string, React.ElementType> = {
+  comments: MessageSquare,
+  "multiline-strings": AlignLeft,
+  "yaml-vs-json": GitCompareArrows,
+  "yml-vs-yaml": FileQuestion,
+  "no-module-named-yaml": Bug,
+  python: Code2,
+  "arrays-and-lists": ListTree,
+  anchors: Anchor,
+  kubernetes: Boxes,
+  syntax: FileCode,
+  "docker-compose": Container,
+};
+
+const topics: ToolCard[] = YAML_TOPICS.map((t) => ({
+  href: `/yaml-tools/${t.slug}`,
+  icon: TOPIC_ICONS[t.slug] ?? FileQuestion,
+  name: t.name,
+  description: t.description,
+}));
 
 function ToolCardItem({ tool }: { tool: ToolCard }) {
   const Icon = tool.icon;

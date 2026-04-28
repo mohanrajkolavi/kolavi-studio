@@ -7,8 +7,8 @@ import { YamlValidatorClient } from "./client";
 
 const PAGE_PATH = "/yaml-validator";
 const PAGE_URL = "https://kolavistudio.com/yaml-validator";
-const DATE_PUBLISHED = "2026-04-27T00:00:00Z";
-const DATE_MODIFIED = "2026-04-27T00:00:00Z";
+const DATE_PUBLISHED = "2026-04-28T00:00:00Z";
+const DATE_MODIFIED = "2026-04-28T00:00:00Z";
 
 export const metadata = getPageMetadata({
   title: "YAML Validator | Free Online YAML Linter & Syntax Checker",

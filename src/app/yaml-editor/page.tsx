@@ -7,8 +7,8 @@ import { YamlEditorClient } from "./client";
 
 const PAGE_PATH = "/yaml-editor";
 const PAGE_URL = "https://kolavistudio.com/yaml-editor";
-const DATE_PUBLISHED = "2026-04-27T00:00:00Z";
-const DATE_MODIFIED = "2026-04-27T00:00:00Z";
+const DATE_PUBLISHED = "2026-04-28T00:00:00Z";
+const DATE_MODIFIED = "2026-04-28T00:00:00Z";
 
 export const metadata = getPageMetadata({
   title: "Online YAML Editor | Free Browser-Based with Live Validation",

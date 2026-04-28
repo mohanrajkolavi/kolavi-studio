@@ -7,8 +7,8 @@ import { YamlToJsonClient } from "./client";
 
 const PAGE_PATH = "/yaml-to-json";
 const PAGE_URL = "https://kolavistudio.com/yaml-to-json";
-const DATE_PUBLISHED = "2026-04-27T00:00:00Z";
-const DATE_MODIFIED = "2026-04-27T00:00:00Z";
+const DATE_PUBLISHED = "2026-04-28T00:00:00Z";
+const DATE_MODIFIED = "2026-04-28T00:00:00Z";
 
 export const metadata = getPageMetadata({
   title: "YAML to JSON Converter | Free Online Tool with Anchors Support",
@@ -56,7 +56,7 @@ const FAQS = [
   {
     question: "How does YAML to JSON conversion handle dates?",
     answer:
-      "YAML date scalars like 2026-04-27 are converted to ISO 8601 strings in JSON. JSON has no native date type, so applications must parse the string back if they need a Date object.",
+      "YAML date scalars like 2026-04-28 are converted to ISO 8601 strings in JSON. JSON has no native date type, so applications must parse the string back if they need a Date object.",
   },
   {
     question: "Can I convert multi-document YAML files?",
