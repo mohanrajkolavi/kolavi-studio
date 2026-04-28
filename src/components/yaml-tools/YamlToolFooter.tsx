@@ -7,11 +7,18 @@ const tools = [
   { href: "/json-to-yaml", label: "JSON to YAML" },
   { href: "/yaml-formatter", label: "YAML Formatter" },
   { href: "/yaml-editor", label: "YAML Editor" },
+  { href: "/yaml-diff", label: "YAML Diff" },
   { href: "/yaml-guide", label: "YAML Guide" },
+  { href: "/yaml-tools/syntax", label: "YAML Syntax" },
   { href: "/yaml-tools/comments", label: "YAML Comments" },
   { href: "/yaml-tools/multiline-strings", label: "Multiline Strings" },
+  { href: "/yaml-tools/anchors", label: "YAML Anchors" },
+  { href: "/yaml-tools/arrays-and-lists", label: "Arrays & Lists" },
   { href: "/yaml-tools/yaml-vs-json", label: "YAML vs JSON" },
   { href: "/yaml-tools/yml-vs-yaml", label: "YML vs YAML" },
+  { href: "/yaml-tools/python", label: "YAML in Python" },
+  { href: "/yaml-tools/kubernetes", label: "Kubernetes YAML" },
+  { href: "/yaml-tools/docker-compose", label: "Docker Compose YAML" },
   { href: "/yaml-tools/no-module-named-yaml", label: "Fix: No module named yaml" },
 ];
 
